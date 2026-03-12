@@ -1,0 +1,15 @@
+{
+  "name": "gauntlet-clone",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python -m http.server 8080",
+    "server:net": "node server/networkServer.js",
+    "dev": "node server/devLauncher.js",
+    "check": "node server/check-all.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

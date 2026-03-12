@@ -1,0 +1,141 @@
+import { vecLength } from "../../utils.js";
+import {
+  spawnGhost as spawnGhostEntity,
+  spawnTreasureGoblin as spawnTreasureGoblinEntity,
+  spawnAnimatedArmor as spawnAnimatedArmorEntity
+} from "../enemySystems.js";
+import { isWalkableTile } from "./navigationCollision.js";
+
+export function placeArmorStands(game) {
+  const candidates = [];
+  const mapH = game.map.length;
+  const mapW = game.map[0].length;
+  for (let y = 2; y < mapH - 2; y++) {
+    for (let x = 2; x < mapW - 2; x++) {
+      if (game.map[y][x] === "#") continue;
+      if (game.map[y][x] === "D" || game.map[y][x] === "K" || game.map[y][x] === "P") continue;
+      const nearWall =
+        game.map[y - 1][x] === "#" ||
+        game.map[y + 1][x] === "#" ||
+        game.map[y][x - 1] === "#" ||
+        game.map[y][x + 1] === "#";
+      if (!nearWall) continue;
+      const wx = x * game.config.map.tile + game.config.map.tile / 2;
+      const wy = y * game.config.map.tile + game.config.map.tile / 2;
+      if (vecLength(wx - game.player.x, wy - game.player.y) < game.config.map.tile * 6) continue;
+      candidates.push({ x: wx, y: wy });
+    }
+  }
+
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
+  const target = Math.max(10, Math.min(60, Math.floor((mapW * mapH) / game.config.enemy.armorStandCountFactor)));
+  for (let i = 0; i < Math.min(target, candidates.length); i++) {
+    const c = candidates[i];
+    game.armorStands.push({
+      x: c.x,
+      y: c.y,
+      size: 24,
+      animated: Math.random() < game.config.enemy.armorStandAnimatedChance,
+      activated: false
+    });
+  }
+}
+
+export function spawnGhost(game, x, y) {
+  return spawnGhostEntity(game, x, y);
+}
+
+export function spawnTreasureGoblin(game, x, y) {
+  return spawnTreasureGoblinEntity(game, x, y);
+}
+
+export function spawnAnimatedArmor(game, x, y) {
+  return spawnAnimatedArmorEntity(game, x, y);
+}
+
+export function applyEnemyDamage(game, enemy, amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const defense = game.getEnemyDefenseScale();
+  if (!Number.isFinite(defense) || defense <= 0) return;
+  const effective = amount / defense;
+  if (!Number.isFinite(effective) || effective <= 0) return;
+  const enemyHpBefore = Number.isFinite(enemy.hp) ? Math.max(0, enemy.hp) : 0;
+  const dealt = Math.min(effective, enemyHpBefore);
+  enemy.hp -= effective;
+  const lifeLeech = game.getLifeLeechPercent();
+  if (lifeLeech > 0 && dealt > 0) {
+    game.applyPlayerHealing(Math.max(1, Math.ceil(dealt * lifeLeech)));
+  }
+  enemy.hpBarTimer = game.config.enemy.hpBarDuration;
+  if (effective >= 1 || (enemy.damageTextTimer || 0) <= 0) {
+    game.spawnFloatingText(enemy.x, enemy.y - enemy.size * 0.65, `-${Math.max(1, Math.round(effective))}`, "#e85c5c");
+    enemy.damageTextTimer = 0.14;
+  }
+}
+
+export function randomEnemySpawnPoint(game) {
+  const tile = game.config.map.tile;
+  const cam = game.getCamera();
+  const playW = game.getPlayAreaWidth();
+  const viewLeft = Math.floor(cam.x / tile);
+  const viewRight = Math.floor((cam.x + playW) / tile);
+  const viewTop = Math.floor(cam.y / tile);
+  const viewBottom = Math.floor((cam.y + game.canvas.height) / tile);
+  const maxTx = game.map[0].length - 2;
+  const maxTy = game.map.length - 2;
+
+  const isOutsideView = (tx, ty) => tx < viewLeft || tx > viewRight || ty < viewTop || ty > viewBottom;
+  const tryPickNear = (baseTx, baseTy) => {
+    for (let r = 0; r <= 2; r++) {
+      for (let oy = -r; oy <= r; oy++) {
+        for (let ox = -r; ox <= r; ox++) {
+          const tx = Math.max(1, Math.min(maxTx, baseTx + ox));
+          const ty = Math.max(1, Math.min(maxTy, baseTy + oy));
+          if (!isOutsideView(tx, ty)) continue;
+          if (!isWalkableTile(game, tx, ty)) continue;
+          const x = tx * tile + tile / 2;
+          const y = ty * tile + tile / 2;
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  };
+
+  for (let i = 0; i < 40; i++) {
+    const side = Math.floor(Math.random() * 4);
+    let tx = 1;
+    let ty = 1;
+    if (side === 0) {
+      tx = viewLeft - 1;
+      ty = viewTop + Math.floor(Math.random() * Math.max(1, viewBottom - viewTop + 1));
+    } else if (side === 1) {
+      tx = viewRight + 1;
+      ty = viewTop + Math.floor(Math.random() * Math.max(1, viewBottom - viewTop + 1));
+    } else if (side === 2) {
+      ty = viewTop - 1;
+      tx = viewLeft + Math.floor(Math.random() * Math.max(1, viewRight - viewLeft + 1));
+    } else {
+      ty = viewBottom + 1;
+      tx = viewLeft + Math.floor(Math.random() * Math.max(1, viewRight - viewLeft + 1));
+    }
+    const p = tryPickNear(tx, ty);
+    if (p) return p;
+  }
+
+  // Fallback: random walkable tile outside visible bounds.
+  for (let i = 0; i < 60; i++) {
+    const tx = 1 + Math.floor(Math.random() * (game.map[0].length - 2));
+    const ty = 1 + Math.floor(Math.random() * (game.map.length - 2));
+    if (!isWalkableTile(game, tx, ty)) continue;
+    if (!isOutsideView(tx, ty)) continue;
+    const x = tx * tile + tile / 2;
+    const y = ty * tile + tile / 2;
+    return { x, y };
+  }
+  return null;
+}
