@@ -2,7 +2,8 @@ import { vecLength } from "../../utils.js";
 import {
   spawnGhost as spawnGhostEntity,
   spawnTreasureGoblin as spawnTreasureGoblinEntity,
-  spawnAnimatedArmor as spawnAnimatedArmorEntity
+  spawnAnimatedArmor as spawnAnimatedArmorEntity,
+  spawnMimic as spawnMimicEntity
 } from "../enemySystems.js";
 import { isWalkableTile } from "./navigationCollision.js";
 
@@ -57,11 +58,22 @@ export function spawnAnimatedArmor(game, x, y) {
   return spawnAnimatedArmorEntity(game, x, y);
 }
 
-export function applyEnemyDamage(game, enemy, amount) {
+export function spawnMimic(game, x, y) {
+  return spawnMimicEntity(game, x, y);
+}
+
+export function applyEnemyDamage(game, enemy, amount, damageType = "physical") {
   if (!Number.isFinite(amount) || amount <= 0) return;
+  let adjusted = amount;
+  if (enemy?.type === "mimic") {
+    if (damageType === "arrow") adjusted *= game.config.enemy.mimicArrowResistance;
+    else if (damageType === "fire") adjusted *= game.config.enemy.mimicFireVulnerability;
+    enemy.dormant = false;
+    enemy.revealed = true;
+  }
   const defense = game.getEnemyDefenseScale();
   if (!Number.isFinite(defense) || defense <= 0) return;
-  const effective = amount / defense;
+  const effective = adjusted / defense;
   if (!Number.isFinite(effective) || effective <= 0) return;
   const enemyHpBefore = Number.isFinite(enemy.hp) ? Math.max(0, enemy.hp) : 0;
   const dealt = Math.min(effective, enemyHpBefore);

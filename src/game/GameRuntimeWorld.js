@@ -14,6 +14,7 @@ import {
   spawnGhost,
   spawnTreasureGoblin,
   spawnAnimatedArmor,
+  spawnMimic,
   applyEnemyDamage,
   randomEnemySpawnPoint
 } from "./world/spawnCombat.js";
@@ -85,8 +86,12 @@ export class GameRuntimeWorld extends GameRuntimeBase {
     return spawnAnimatedArmor(this, x, y);
   }
 
-  applyEnemyDamage(enemy, amount) {
-    applyEnemyDamage(this, enemy, amount);
+  spawnMimic(x, y) {
+    return spawnMimic(this, x, y);
+  }
+
+  applyEnemyDamage(enemy, amount, damageType = "physical") {
+    applyEnemyDamage(this, enemy, amount, damageType);
   }
 
   getEnemySpawnInterval() {

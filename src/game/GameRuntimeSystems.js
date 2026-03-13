@@ -4,6 +4,7 @@ import {
   findNearestGoldDrop as findNearestGoldDropEntity,
   applyGoblinGrowth as applyGoblinGrowthEntity,
   updateGoblin as updateGoblinEntity,
+  updateMimic as updateMimicEntity,
   xpFromEnemy as xpFromEnemyEntity,
   maybeSpawnDrop as maybeSpawnDropEntity,
   dropTreasureBag as dropTreasureBagEntity,
@@ -26,6 +27,10 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
 
   updateGoblin(enemy, dt, speedScale) {
     updateGoblinEntity(this, enemy, dt, speedScale);
+  }
+
+  updateMimic(enemy, dt, speedScale) {
+    updateMimicEntity(this, enemy, dt, speedScale);
   }
 
   xpFromEnemy(enemy) {
@@ -137,7 +142,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       let diff = enemyAngle - angle;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      if (Math.abs(diff) <= halfArc) this.applyEnemyDamage(enemy, this.rollPrimaryDamage());
+      if (Math.abs(diff) <= halfArc) this.applyEnemyDamage(enemy, this.rollPrimaryDamage(), "melee");
     }
     for (const br of this.breakables || []) {
       const ex = br.x - this.player.x;
@@ -177,7 +182,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
     const blastRadius = this.getFireArrowBlastRadius();
     for (const enemy of this.enemies) {
       if (vecLength(x - enemy.x, y - enemy.y) <= blastRadius + enemy.size * 0.3) {
-        this.applyEnemyDamage(enemy, this.getFireArrowImpactDamage());
+        this.applyEnemyDamage(enemy, this.getFireArrowImpactDamage(), "fire");
       }
     }
     this.fireZones.push({ x, y, radius: blastRadius * 0.9, life: this.config.fireArrow.lingerDuration });

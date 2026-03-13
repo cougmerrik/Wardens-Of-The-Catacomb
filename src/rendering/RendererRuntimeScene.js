@@ -59,6 +59,10 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     for (const enemy of game.enemies) {
       if (enemy.type === "goblin") this.drawTreasureGoblin(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "armor") this.drawAnimatedArmor(enemy, enemy.x - cameraX, enemy.y - cameraY);
+      else if (enemy.type === "mimic") {
+        if (enemy.dormant) this.drawBreakable({ type: "box", size: enemy.size }, enemy.x - cameraX, enemy.y - cameraY);
+        else this.drawMimic(enemy, enemy.x - cameraX, enemy.y - cameraY);
+      }
       else this.drawGhost(enemy.x - cameraX, enemy.y - cameraY, enemy.size);
       this.drawEnemyHealthBar(enemy, enemy.x - cameraX, enemy.y - cameraY);
     }
@@ -385,6 +389,71 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     ctx.fillStyle = "#ff6868";
     ctx.fillRect(screenX - 2.5, screenY - 11, 2, 2);
     ctx.fillRect(screenX + 0.5, screenY - 11, 2, 2);
+  }
+
+  drawMimic(enemy, screenX, screenY) {
+    const ctx = this.ctx;
+    const half = enemy.size * 0.5;
+    const tongueLen = Math.max(0, enemy.tongueLength || 0);
+    const tongueOut = tongueLen > 0.5;
+    const lidLift = tongueOut ? half * 0.34 : half * 0.16;
+    const dirX = enemy.tongueDirX || 1;
+    const dirY = enemy.tongueDirY || 0;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY + half * 0.72, half, half * 0.34, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#6d4b2e";
+    ctx.fillRect(screenX - half, screenY - half * 0.74, half * 2, half * 1.48);
+    ctx.strokeStyle = "#8f6a43";
+    ctx.strokeRect(screenX - half + 0.5, screenY - half * 0.74 + 0.5, half * 2 - 1, half * 1.48 - 1);
+    ctx.fillStyle = "#b38b5f";
+    ctx.fillRect(screenX - half * 0.92, screenY - 1, half * 1.84, 2);
+
+    ctx.save();
+    ctx.translate(screenX, screenY - 1);
+    ctx.rotate(Math.atan2(dirY, dirX) * 0.08);
+    ctx.fillStyle = "#7a5535";
+    ctx.fillRect(-half, -half * 0.76 - lidLift, half * 2, half * 0.56);
+    ctx.strokeStyle = "#a17a52";
+    ctx.strokeRect(-half + 0.5, -half * 0.76 - lidLift + 0.5, half * 2 - 1, half * 0.56 - 1);
+    ctx.restore();
+
+    ctx.fillStyle = "#f1e7d2";
+    for (let i = -2; i <= 2; i++) {
+      const offset = i * (half * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(screenX + offset, screenY - half * 0.18);
+      ctx.lineTo(screenX + offset + half * 0.1, screenY - half * 0.02);
+      ctx.lineTo(screenX + offset - half * 0.1, screenY - half * 0.02);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if (tongueOut) {
+      const startX = screenX + dirX * (half * 0.5);
+      const startY = screenY + dirY * (half * 0.1);
+      const tipX = startX + dirX * tongueLen;
+      const tipY = startY + dirY * tongueLen;
+      ctx.strokeStyle = "#ce5b7a";
+      ctx.lineWidth = Math.max(3, half * 0.24);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.quadraticCurveTo(
+        startX + dirX * (tongueLen * 0.45) - dirY * half * 0.35,
+        startY + dirY * (tongueLen * 0.45) + dirX * half * 0.35,
+        tipX,
+        tipY
+      );
+      ctx.stroke();
+      ctx.fillStyle = "#f08cab";
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, Math.max(2, half * 0.16), 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   drawBreakable(br, screenX, screenY) {
