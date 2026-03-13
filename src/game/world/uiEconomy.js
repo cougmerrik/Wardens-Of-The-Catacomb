@@ -74,6 +74,7 @@ export function toggleShop(game, open) {
   if (game.gameOver) return;
   game.shopOpen = typeof open === "boolean" ? open : !game.shopOpen;
   if (game.shopOpen) game.paused = false;
+  if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
   if (game.shopOpen) game.skillTreeOpen = false;
   if (game.shopOpen) game.statsPanelOpen = false;
   if (game.shopOpen && game.input) {
@@ -86,6 +87,7 @@ export function toggleSkillTree(game, open) {
   if (game.gameOver) return;
   game.skillTreeOpen = typeof open === "boolean" ? open : !game.skillTreeOpen;
   if (game.skillTreeOpen) game.paused = false;
+  if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
   if (game.skillTreeOpen) game.shopOpen = false;
   if (game.skillTreeOpen) game.statsPanelOpen = false;
   if (game.skillTreeOpen && game.input) {
@@ -116,7 +118,10 @@ export function handleUiClicks(game) {
       if (game.onReturnToMenu) game.onReturnToMenu();
     } else if (game.shopOpen) toggleShop(game, false);
     else if (game.skillTreeOpen) toggleSkillTree(game, false);
-    else game.paused = !game.paused;
+    else {
+      game.paused = !game.paused;
+      if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
+    }
   }
   const clicks = game.input.consumeUiLeftClicks();
   if (clicks.length === 0) return;
@@ -176,3 +181,4 @@ export function handleUiClicks(game) {
     }
   }
 }
+

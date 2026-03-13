@@ -1,6 +1,7 @@
 import { WebSocketServer } from "ws";
 import { GameSim } from "../src/sim/GameSim.js";
 import { buildDeltaCollection, buildJoinKeyframeState } from "./net/deltaProtocol.js";
+import { chooseGameplayTrack } from "./musicCatalog.js";
 import { buildMapChunkRows } from "./net/mapChunkStreaming.js";
 import { getStableId, serializeMetaState, serializeState } from "./net/stateSerialization.js";
 import { average, makeSamplePusher, monotonicNowMs, percentile } from "./net/telemetry.js";
@@ -86,6 +87,7 @@ class Room {
     this.lastMetaPayloadJson = "";
     this.lastChunkPushMs = 0;
     this.lastMapSignature = this.mapSignature();
+    this.currentMusicTrack = chooseGameplayTrack();
     this.snapshotCounter = 0;
     this.snapshotSeq = 0;
     this.telemetry = {
@@ -300,6 +302,7 @@ class Room {
     const sig = this.mapSignature();
     if (sig !== this.lastMapSignature) {
       this.lastMapSignature = sig;
+      this.currentMusicTrack = chooseGameplayTrack();
       this.snapshotCounter = 0;
       for (const cache of Object.values(this.deltaCache)) cache.clear();
       for (const state of this.clientChunkState.values()) state.sent.clear();
@@ -360,7 +363,7 @@ class Room {
   }
 
   maybeBroadcastMeta(nowMs, force = false) {
-    const meta = serializeMetaState(this.sim);
+    const meta = serializeMetaState(this);
     const payloadJson = JSON.stringify(meta);
     const changed = payloadJson !== this.lastMetaPayloadJson;
     if (!force && !changed && nowMs - this.lastMetaBroadcastMs < META_BROADCAST_MIN_MS) return;
@@ -375,7 +378,7 @@ class Room {
 
   sendMeta(toClient, nowMs = Date.now(), force = true) {
     if (!toClient || toClient.ws.readyState !== toClient.ws.OPEN) return;
-    const meta = serializeMetaState(this.sim);
+    const meta = serializeMetaState(this);
     const payloadJson = JSON.stringify(meta);
     const changed = payloadJson !== this.lastMetaPayloadJson;
     if (force || changed || nowMs - this.lastMetaBroadcastMs >= META_BROADCAST_MIN_MS) {
