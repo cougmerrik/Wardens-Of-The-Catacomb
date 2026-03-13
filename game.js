@@ -1,4 +1,5 @@
 import { Game } from "./src/Game.js";
+import { MusicController } from "./src/audio/MusicController.js";
 import { NetClient } from "./src/net/NetClient.js";
 import {
   applyMapStateToGame,
@@ -25,6 +26,7 @@ const networkSession = document.getElementById("network-session");
 const networkStatus = document.getElementById("network-status");
 const networkTakeControl = document.getElementById("network-take-control");
 const networkLeave = document.getElementById("network-leave");
+const music = new MusicController();
 let selectedClass = "archer";
 let currentGame = null;
 let netClient = null;
@@ -64,6 +66,20 @@ let netLastSnapshotRecvAtMs = 0;
 let netSnapshotIntervalMeanMs = 33;
 let netSnapshotJitterMs = 0;
 let netLastSnapshotGapMs = 33;
+
+function syncMusicForGame(game) {
+  if (!game) {
+    music.playMenuMusic();
+    return;
+  }
+  if (game.networkEnabled) {
+    if (game.musicTrack) music.playGameplayMusic(game.floor, game.musicTrack);
+  } else {
+    music.playGameplayMusic(game.floor);
+  }
+  if (game.paused || game.gameOver) music.pauseCurrentTrack();
+  else music.playCurrentTrack();
+}
 
 function updateNetworkStatus(text) {
   if (networkStatus) networkStatus.textContent = text;
@@ -147,6 +163,7 @@ function returnToMenu() {
   stopNetworkSession();
   cleanupCurrentGame();
   if (selector) selector.hidden = false;
+  music.playMenuMusic();
 }
 
 function isNetworkController() {
@@ -169,6 +186,7 @@ function applySnapshot(game, state, controller = false, ackSeq = 0) {
   });
   netPendingInputs = next.netPendingInputs;
   netLastAckSeq = next.netLastAckSeq;
+  syncMusicForGame(game);
 }
 
 function startNetworkRenderLoop(game) {
@@ -241,8 +259,11 @@ function startLocalGame() {
   cleanupCurrentGame();
   currentGame = new Game(canvas, {
     classType: selectedClass,
-    onReturnToMenu: returnToMenu
+    onReturnToMenu: returnToMenu,
+    onPauseChanged: (_paused, game) => syncMusicForGame(game),
+    onFloorChanged: (_floor, game) => syncMusicForGame(game)
   });
+  syncMusicForGame(currentGame);
   currentGame.start();
 }
 
@@ -258,7 +279,9 @@ function startNetworkGame() {
 
   const game = new Game(canvas, {
     classType: selectedClass,
-    onReturnToMenu: returnToMenu
+    onReturnToMenu: returnToMenu,
+    onPauseChanged: (_paused, nextGame) => syncMusicForGame(nextGame),
+    onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame)
   });
   game.networkEnabled = true;
   game.networkRole = "Connecting";
@@ -268,6 +291,7 @@ function startNetworkGame() {
   game.networkChunkSync = true;
   game.networkLoadingMessage = "Connecting...";
   currentGame = game;
+  syncMusicForGame(game);
   updateNetworkStatus(`Connecting to ${wsUrl}...`);
   startNetworkRenderLoop(game);
 
@@ -356,6 +380,7 @@ function startNetworkGame() {
     if (metaSig && netMapSignature && metaSig !== netMapSignature) return;
     const meta = msg && msg.meta && typeof msg.meta === "object" ? msg.meta : msg;
     applyMetaStateToGame(game, meta);
+    syncMusicForGame(game);
   });
   netClient.on("state.snapshot", (msg) => {
     const recvAt = performance.now();
@@ -412,6 +437,7 @@ function startNetworkGame() {
   netClient.on("error", (msg) => updateNetworkStatus(`Error: ${msg.message || "Connection error"}`));
   netClient.on("close", () => {
     game.networkReady = false;
+    syncMusicForGame(game);
     updateNetworkStatus("Disconnected from server");
   });
   netClient.connect();
@@ -474,8 +500,15 @@ if (!canvas) {
   throw new Error("Game canvas not found.");
 }
 
+music.playMenuMusic();
+
 if (!selector || !startButton || classButtons.length === 0) {
-  currentGame = new Game(canvas, { classType: "archer" });
+  currentGame = new Game(canvas, {
+    classType: "archer",
+    onPauseChanged: (_paused, game) => syncMusicForGame(game),
+    onFloorChanged: (_floor, game) => syncMusicForGame(game)
+  });
+  syncMusicForGame(currentGame);
   currentGame.start();
 } else {
   selectedClass = setSelectedClass("archer", classButtons);

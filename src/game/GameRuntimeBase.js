@@ -19,6 +19,8 @@ export class GameRuntimeBase {
     this.classType = options.classType === "fighter" ? "fighter" : "archer";
     this.classSpec = this.config.classes[this.classType] || this.config.classes.archer;
     this.onReturnToMenu = typeof options.onReturnToMenu === "function" ? options.onReturnToMenu : null;
+    this.onPauseChanged = typeof options.onPauseChanged === "function" ? options.onPauseChanged : null;
+    this.onFloorChanged = typeof options.onFloorChanged === "function" ? options.onFloorChanged : null;
     this.floor = 1;
     this.mapWidth = this.config.map.width;
     this.mapHeight = this.config.map.height;
@@ -204,6 +206,7 @@ export class GameRuntimeBase {
     this.skillPoints = persisted.skillPoints;
     this.player.maxHealth = persisted.maxHealth;
     this.player.health = Math.min(this.player.maxHealth, persisted.health);
+    if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
   }
 
   getCamera() {
@@ -497,3 +500,4 @@ export class GameRuntimeBase {
 }
 
 Object.assign(GameRuntimeBase.prototype, runtimeBaseDifficultyMethods);
+

@@ -129,6 +129,7 @@ export function stepGame(game, dt, controls = {}) {
     if (!isActive(enemy, 72)) continue;
     activeEnemies.push(enemy);
     if (enemy.type === "goblin") game.updateGoblin(enemy, dt, enemySpeedScale);
+    else if (enemy.type === "mimic") game.updateMimic(enemy, dt, enemySpeedScale);
     else game.moveEnemyTowardPlayer(enemy, enemySpeedScale, dt);
   }
   for (const br of game.breakables || []) {
@@ -210,7 +211,7 @@ export function stepGame(game, dt, controls = {}) {
       if (b.hitTargets.has(enemy)) continue;
       if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
         const dmgMult = Number.isFinite(b.damageMult) ? b.damageMult : 1;
-        game.applyEnemyDamage(enemy, game.rollPrimaryDamage() * Math.max(0.01, dmgMult));
+        game.applyEnemyDamage(enemy, game.rollPrimaryDamage() * Math.max(0.01, dmgMult), "arrow");
         b.hitTargets.add(enemy);
         if (Math.random() >= game.getPiercingChance()) b.life = 0;
         break;
@@ -253,7 +254,7 @@ export function stepGame(game, dt, controls = {}) {
     }
     for (const enemy of activeEnemies) {
       if (vecLength(zone.x - enemy.x, zone.y - enemy.y) < zone.radius + enemy.size * 0.35) {
-        game.applyEnemyDamage(enemy, game.getFireArrowLingerDps() * dt);
+        game.applyEnemyDamage(enemy, game.getFireArrowLingerDps() * dt, "fire");
       }
     }
   }
@@ -263,10 +264,12 @@ export function stepGame(game, dt, controls = {}) {
       game.triggerWarriorMomentumOnKill();
       if (enemy.type === "goblin") game.score += 30 + enemy.goldEaten;
       else if (enemy.type === "armor") game.score += 40;
+      else if (enemy.type === "mimic") game.score += 35;
       else game.score += 10;
       game.gainExperience(game.xpFromEnemy(enemy));
       if (enemy.type === "goblin") game.dropTreasureBag(enemy.x, enemy.y, enemy.goldEaten);
       else if (enemy.type === "armor") game.dropArmorLoot(enemy.x, enemy.y);
+      else if (enemy.type === "mimic") game.dropTreasureBag(enemy.x, enemy.y, 24);
       else game.maybeSpawnDrop(enemy.x, enemy.y);
       return false;
     }

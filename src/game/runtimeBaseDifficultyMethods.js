@@ -123,8 +123,13 @@ export const runtimeBaseDifficultyMethods = {
         if (vecLength(wx - this.door.x, wy - this.door.y) < tile * 2.5) continue;
         if (!this.pickup.taken && vecLength(wx - this.pickup.x, wy - this.pickup.y) < tile * 2.5) continue;
         if (Math.random() >= cfg.spawnChance) continue;
+        const type = Math.random() < 0.55 ? "crate" : "box";
+        if (type === "box" && Math.random() < this.config.enemy.mimicChestChance) {
+          this.enemies.push(this.spawnMimic(wx, wy));
+          continue;
+        }
         this.breakables.push({
-          type: Math.random() < 0.55 ? "crate" : "box",
+          type,
           x: wx,
           y: wy,
           size: 20,

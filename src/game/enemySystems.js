@@ -1,5 +1,22 @@
 import { vecLength } from "../utils.js";
 
+function hasLineOfSight(game, x0, y0, x1, y1) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const dist = vecLength(dx, dy);
+  if (dist <= 1) return true;
+  const tile = game.config?.map?.tile || 32;
+  const step = Math.max(8, tile * 0.35);
+  const steps = Math.max(1, Math.ceil(dist / step));
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const sx = x0 + dx * t;
+    const sy = y0 + dy * t;
+    if (game.isWallAt(sx, sy, false)) return false;
+  }
+  return true;
+}
+
 export function spawnGhost(game, x, y) {
   const hp = game.rollScaledEnemyHealth(game.config.enemy.ghostHpMin, game.config.enemy.ghostHpMax);
   return {
@@ -49,6 +66,31 @@ export function spawnAnimatedArmor(game, x, y) {
     hpBarTimer: 0,
     damageMin: game.config.enemy.armorDamageMin,
     damageMax: game.config.enemy.armorDamageMax
+  };
+}
+
+export function spawnMimic(game, x, y) {
+  const hp = game.rollScaledEnemyHealth(game.config.enemy.mimicHpMin, game.config.enemy.mimicHpMax);
+  return {
+    type: "mimic",
+    x,
+    y,
+    homeX: x,
+    homeY: y,
+    size: 20,
+    speed: game.config.enemy.mimicSpeed,
+    hp,
+    maxHp: hp,
+    hpBarTimer: 0,
+    damageMin: game.config.enemy.mimicDamageMin,
+    damageMax: game.config.enemy.mimicDamageMax,
+    dormant: true,
+    revealed: false,
+    tongueCooldown: 0,
+    tongueTimer: 0,
+    tongueDirX: 1,
+    tongueDirY: 0,
+    tongueLength: 0
   };
 }
 
@@ -135,8 +177,77 @@ export function updateGoblin(game, enemy, dt, speedScale) {
   enemy.wanderAngle = Math.atan2(vy, vx);
 }
 
+export function updateMimic(game, enemy, dt, speedScale) {
+  const tile = game.config?.map?.tile || 32;
+  const wakeRadius = (game.config.enemy.mimicWakeRadiusTiles || 3) * tile;
+  const tongueRange = (game.config.enemy.mimicTongueRangeTiles || 2) * tile;
+  const tongueCooldownMax = game.config.enemy.mimicTongueCooldown || 1.35;
+  const tongueWindup = game.config.enemy.mimicTongueWindup || 0.18;
+  const toPlayerX = game.player.x - enemy.x;
+  const toPlayerY = game.player.y - enemy.y;
+  const playerDist = vecLength(toPlayerX, toPlayerY) || 1;
+  const seesPlayer = hasLineOfSight(game, enemy.x, enemy.y, game.player.x, game.player.y);
+
+  enemy.tongueCooldown = Math.max(0, (enemy.tongueCooldown || 0) - dt);
+  enemy.tongueTimer = Math.max(0, (enemy.tongueTimer || 0) - dt);
+
+  if (enemy.dormant) {
+    enemy.tongueLength = 0;
+    if (seesPlayer && playerDist <= wakeRadius) {
+      enemy.dormant = false;
+      enemy.revealed = true;
+    }
+    return;
+  }
+
+  if (!seesPlayer) {
+    const dx = enemy.homeX - enemy.x;
+    const dy = enemy.homeY - enemy.y;
+    const homeDist = vecLength(dx, dy);
+    enemy.tongueLength = 0;
+    if (homeDist <= 4) {
+      enemy.x = enemy.homeX;
+      enemy.y = enemy.homeY;
+      enemy.dormant = true;
+      enemy.revealed = false;
+      enemy.tongueCooldown = 0;
+      return;
+    }
+    const len = homeDist || 1;
+    game.moveWithCollision(enemy, (dx / len) * enemy.speed * speedScale * dt, (dy / len) * enemy.speed * speedScale * dt);
+    return;
+  }
+
+  enemy.revealed = true;
+  enemy.tongueDirX = toPlayerX / playerDist;
+  enemy.tongueDirY = toPlayerY / playerDist;
+
+  if (playerDist <= tongueRange && enemy.tongueCooldown <= 0) {
+    enemy.tongueCooldown = tongueCooldownMax;
+    enemy.tongueTimer = tongueWindup;
+    enemy.tongueLength = Math.min(tongueRange, playerDist);
+    if (game.player.hitCooldown <= 0) {
+      game.player.hitCooldown = 1.0;
+      const rawDamage = game.rollEnemyContactDamage(enemy);
+      const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
+      const reducedByDefense = Math.max(1, Math.round(scaledEnemyDamage - game.getDefenseFlatReduction()));
+      const damageTaken = game.getWarriorRageDamageTaken(reducedByDefense);
+      game.applyPlayerDamage(damageTaken);
+    }
+    return;
+  }
+
+  if (enemy.tongueTimer > 0) {
+    enemy.tongueLength = Math.min(tongueRange, playerDist);
+    return;
+  }
+
+  enemy.tongueLength = 0;
+  if (playerDist > tongueRange * 0.72) game.moveEnemyTowardPlayer(enemy, speedScale, dt);
+}
+
 export function xpFromEnemy(game, enemy) {
-  const baseXp = enemy.type === "armor" ? 24 : enemy.type === "goblin" ? 12 + Math.floor(enemy.goldEaten * 0.6) : 6;
+  const baseXp = enemy.type === "armor" ? 24 : enemy.type === "mimic" ? 18 : enemy.type === "goblin" ? 12 + Math.floor(enemy.goldEaten * 0.6) : 6;
   const level = Number.isFinite(game?.level) ? Math.max(1, game.level) : 1;
   const floor = Number.isFinite(game?.floor) ? Math.max(1, game.floor) : 1;
   const ratio = level / floor;

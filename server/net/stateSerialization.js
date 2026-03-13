@@ -105,7 +105,9 @@ function isInsideBounds(obj, bounds, extra = 0) {
   return x + r >= bounds.left && x - r <= bounds.right && y + r >= bounds.top && y - r <= bounds.bottom;
 }
 
-export function serializeMetaState(sim) {
+export function serializeMetaState(source) {
+  const sim = source && source.sim ? source.sim : source;
+  const musicTrack = source && source.currentMusicTrack ? { ...source.currentMusicTrack } : sim && sim.musicTrack ? { ...sim.musicTrack } : null;
   return {
     floor: sim.floor,
     level: sim.level,
@@ -123,6 +125,7 @@ export function serializeMetaState(sim) {
     warriorMomentumTimer: sim.warriorMomentumTimer || 0,
     warriorRageActiveTimer: sim.warriorRageActiveTimer || 0,
     warriorRageCooldownTimer: sim.warriorRageCooldownTimer || 0,
+    musicTrack,
     skills: sim.skills,
     upgrades: sim.upgrades
   };
