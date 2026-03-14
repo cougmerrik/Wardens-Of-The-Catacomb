@@ -50,6 +50,10 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       if (stand.animated && stand.activated) continue;
       this.drawArmorStand(stand, stand.x - cameraX, stand.y - cameraY);
     }
+    for (const trap of game.wallTraps || []) {
+      if (!trap.spotted) continue;
+      this.drawWallTrap(trap, trap.x - cameraX, trap.y - cameraY);
+    }
     for (const br of game.breakables || []) this.drawBreakable(br, br.x - cameraX, br.y - cameraY);
 
     for (const enemy of game.enemies) {
