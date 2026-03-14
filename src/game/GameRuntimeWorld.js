@@ -97,6 +97,10 @@ export class GameRuntimeWorld extends GameRuntimeBase {
     return spawnMimic(this, x, y);
   }
 
+  spawnRatArcher(x, y) {
+    return spawnRatArcher(this, x, y);
+  }
+
   spawnNecromancer(x, y) {
     return spawnNecromancer(this, x, y);
   }
