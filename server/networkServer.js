@@ -360,8 +360,10 @@ class Room {
     if (keyframe || meleeSwingDelta) delta.meleeSwings = meleeSwingDelta || {};
     if (keyframe || floatingTextDelta) delta.floatingTexts = floatingTextDelta || {};
     const floorBossPhase = fullState.floorBoss?.phase || null;
+    const floorBossStateKey = JSON.stringify(fullState.floorBoss || null);
     const floorStateChanged = fullState.floor !== this.lastSnapshotFloor;
     const bossPhaseChanged = floorBossPhase !== this.lastSnapshotBossPhase;
+    const bossStateChanged = floorBossStateKey !== this.lastSnapshotBossStateKey;
     const doorStateChanged = !!fullState.door?.open !== this.lastSnapshotDoorOpen;
     const pickupStateChanged = !!fullState.pickup?.taken !== this.lastSnapshotPickupTaken;
     const portalStateChanged = !!fullState.portal?.active !== this.lastSnapshotPortalActive;
@@ -372,12 +374,13 @@ class Room {
       delta
     };
     if (keyframe || floorStateChanged) state.floor = fullState.floor;
-    if (keyframe || bossPhaseChanged) state.floorBoss = fullState.floorBoss;
+    if (keyframe || bossPhaseChanged || bossStateChanged) state.floorBoss = fullState.floorBoss;
     if (keyframe || doorStateChanged) state.door = fullState.door;
     if (keyframe || pickupStateChanged) state.pickup = fullState.pickup;
     if (keyframe || portalStateChanged) state.portal = fullState.portal;
     this.lastSnapshotFloor = fullState.floor;
     this.lastSnapshotBossPhase = floorBossPhase;
+    this.lastSnapshotBossStateKey = floorBossStateKey;
     this.lastSnapshotDoorOpen = !!fullState.door?.open;
     this.lastSnapshotPickupTaken = !!fullState.pickup?.taken;
     this.lastSnapshotPortalActive = !!fullState.portal?.active;

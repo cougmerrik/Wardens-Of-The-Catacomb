@@ -1,4 +1,26 @@
 export const runtimeFloorBossMethods = {
+  isStPatricksWeek(date = new Date()) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+    const year = date.getFullYear();
+    const mar17 = new Date(year, 2, 17);
+    const start = new Date(year, 2, 17 - mar17.getDay());
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return date >= start && date <= end;
+  },
+
+  getFloorBossVariant(floor = this.floor) {
+    const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    if (safeFloor === 1 && this.isStPatricksWeek()) return "leprechaun";
+    return "necromancer";
+  },
+
+  getFloorBossDisplayName(variant = this.floorBoss?.variant || this.getFloorBossVariant()) {
+    return variant === "leprechaun" ? "Leprechaun" : "Necromancer";
+  },
+
   getFloorBossTriggerLevel(floor = this.floor) {
     const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
     const multiplier = Number.isFinite(this.config.progression?.floorBossLevelMultiplier)
@@ -12,10 +34,18 @@ export const runtimeFloorBossMethods = {
     return {
       floor: safeFloor,
       triggerLevel: this.getFloorBossTriggerLevel(safeFloor),
+      variant: this.getFloorBossVariant(safeFloor),
+      bossName: this.getFloorBossDisplayName(this.getFloorBossVariant(safeFloor)),
       phase: "idle",
+      encounterPhase: "idle",
       spawnPending: false,
       spawnTriggeredAtLevel: null,
       activatedAtTime: null,
+      timerExpiresAt: null,
+      speechText: "",
+      speechSourceX: null,
+      speechSourceY: null,
+      speechExpiresAt: null,
       defeatedAtTime: null,
       portalSpawnedAtTime: null,
       completedAtTime: null
@@ -29,6 +59,8 @@ export const runtimeFloorBossMethods = {
       return this.floorBoss;
     }
     this.floorBoss.triggerLevel = this.getFloorBossTriggerLevel(this.floorBoss.floor);
+    this.floorBoss.variant = this.getFloorBossVariant(this.floorBoss.floor);
+    this.floorBoss.bossName = this.getFloorBossDisplayName(this.floorBoss.variant);
     return this.floorBoss;
   },
 
@@ -48,6 +80,7 @@ export const runtimeFloorBossMethods = {
     boss.spawnPending = false;
     return {
       floor: boss.floor,
+      variant: boss.variant,
       triggerLevel: boss.triggerLevel,
       spawnTriggeredAtLevel: boss.spawnTriggeredAtLevel
     };
@@ -56,6 +89,7 @@ export const runtimeFloorBossMethods = {
   markFloorBossActive() {
     const boss = this.syncFloorBossState();
     boss.phase = "active";
+    boss.encounterPhase = boss.variant === "leprechaun" ? "intro" : "active";
     boss.spawnPending = false;
     boss.activatedAtTime = this.time;
   },
@@ -63,13 +97,18 @@ export const runtimeFloorBossMethods = {
   markFloorBossDefeated() {
     const boss = this.syncFloorBossState();
     boss.phase = "defeated";
+    boss.encounterPhase = "defeated";
     boss.spawnPending = false;
+    boss.timerExpiresAt = null;
+    boss.speechText = "";
+    boss.speechExpiresAt = null;
     boss.defeatedAtTime = this.time;
   },
 
   markFloorBossPortalSpawned() {
     const boss = this.syncFloorBossState();
     boss.phase = "portal";
+    boss.encounterPhase = "portal";
     boss.spawnPending = false;
     boss.portalSpawnedAtTime = this.time;
   },
@@ -77,6 +116,7 @@ export const runtimeFloorBossMethods = {
   markFloorBossCompleted() {
     const boss = this.syncFloorBossState();
     boss.phase = "completed";
+    boss.encounterPhase = "completed";
     boss.spawnPending = false;
     boss.completedAtTime = this.time;
   },
@@ -97,26 +137,73 @@ export const runtimeFloorBossMethods = {
   },
 
   getActiveFloorBossEnemy() {
-    return (this.enemies || []).find((enemy) => enemy && enemy.type === "necromancer" && enemy.isFloorBoss && enemy.hp > 0) || null;
+    return (this.enemies || []).find((enemy) => enemy && enemy.isFloorBoss && enemy.hp > 0) || null;
+  },
+
+  setFloorBossEncounterPhase(encounterPhase) {
+    const boss = this.syncFloorBossState();
+    boss.encounterPhase = encounterPhase;
+    if (boss.variant === "leprechaun" && encounterPhase === "enraged" && !Number.isFinite(boss.timerExpiresAt)) {
+      boss.timerExpiresAt = this.time + (this.config.enemy.leprechaunTimerSeconds || 300);
+    }
+  },
+
+  queueFloorBossSpeech(text, sourceX, sourceY, duration = 2.2) {
+    const boss = this.syncFloorBossState();
+    boss.speechText = String(text || "");
+    boss.speechSourceX = Number.isFinite(sourceX) ? sourceX : this.player.x;
+    boss.speechSourceY = Number.isFinite(sourceY) ? sourceY : this.player.y;
+    boss.speechExpiresAt = this.time + Math.max(0.5, duration);
+  },
+
+  maybeQueueRandomLeprechaunSpeech(enemy) {
+    const sayings = [
+      "You'll not catch me gold, laddie!",
+      "May the luck o' the Irish ruin ye aim!",
+      "Yer too slow for this shamrock storm!",
+      "I've got charm to spare and fists besides!",
+      "Come closer, and regret it twice!"
+    ];
+    if (!enemy || Math.random() > 0.55) return false;
+    this.queueFloorBossSpeech(sayings[Math.floor(Math.random() * sayings.length)], enemy.x, enemy.y, 2.4);
+    return true;
+  },
+
+  getRemainingFloorBossTimer() {
+    const boss = this.syncFloorBossState();
+    if (!Number.isFinite(boss.timerExpiresAt)) return null;
+    return Math.max(0, boss.timerExpiresAt - this.time);
   },
 
   getFloorObjectiveText() {
     const boss = this.syncFloorBossState();
+    const name = boss.bossName || this.getFloorBossDisplayName(boss.variant);
     if (this.portal?.active || boss.phase === "portal") return "Objective: Enter the portal";
-    if (boss.phase === "active" || boss.phase === "defeated") return "Objective: Defeat the necromancer";
+    if (boss.phase === "active" || boss.phase === "defeated") return `Objective: Defeat the ${name.toLowerCase()}`;
     const targetLevel = Number.isFinite(boss.triggerLevel) ? boss.triggerLevel : this.getFloorBossTriggerLevel();
     const levelsRemaining = Math.max(0, targetLevel - (Number.isFinite(this.level) ? this.level : 1));
-    if (boss.phase === "queued") return "Objective: Survive the necromancer encounter";
+    if (boss.phase === "queued") return `Objective: Survive the ${name.toLowerCase()} encounter`;
     return levelsRemaining > 0
-      ? `Objective: Reach Lv ${targetLevel} to summon the necromancer`
-      : "Objective: Prepare for the necromancer";
+      ? `Objective: Reach Lv ${targetLevel} to summon the ${name.toLowerCase()}`
+      : `Objective: Prepare for the ${name.toLowerCase()}`;
   },
 
   getFloorObjectiveDetail() {
     const boss = this.syncFloorBossState();
     if (this.portal?.active || boss.phase === "portal") return "Portal open. Step into it to descend.";
-    if (boss.phase === "active") return "Mini-boss active. Avoid volleys and skeleton summons.";
-    if (boss.phase === "queued") return "The ritual is complete. The necromancer is arriving.";
+    if (boss.phase === "active") {
+      if (boss.variant === "leprechaun") {
+        const timer = this.getRemainingFloorBossTimer();
+        if (boss.encounterPhase === "intro") return "He rushes in first, just to bait the chase.";
+        if (boss.encounterPhase === "flee") return "Catch him before he empties his pockets.";
+        if (boss.encounterPhase === "to_pot") return "He is making for his pot o' gold.";
+        if (boss.encounterPhase === "waiting") return "The pot is out. Close in to trigger the real fight.";
+        if (Number.isFinite(timer)) return `Enraged. Defeat him in ${Math.ceil(timer)}s or die.`;
+        return "The leprechaun is enraged. Watch the punches and lucky charms.";
+      }
+      return "Mini-boss active. Avoid volleys and skeleton summons.";
+    }
+    if (boss.phase === "queued") return boss.variant === "leprechaun" ? "You hear jingling gold in the distance." : "The ritual is complete. The necromancer is arriving.";
     const targetLevel = Number.isFinite(boss.triggerLevel) ? boss.triggerLevel : this.getFloorBossTriggerLevel();
     const currentLevel = Number.isFinite(this.level) ? this.level : 1;
     return `Floor ${this.floor} trigger: Lv ${currentLevel}/${targetLevel}`;

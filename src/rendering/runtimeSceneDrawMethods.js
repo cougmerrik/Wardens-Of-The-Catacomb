@@ -267,6 +267,71 @@ export const runtimeSceneDrawMethods = {
     ctx.stroke();
   },
 
+  drawPrisoner(enemy, screenX, screenY) {
+    const ctx = this.ctx;
+    const half = enemy.size * 0.5;
+    const aimX = Number.isFinite(enemy.dirX) ? enemy.dirX : 1;
+    const aimY = Number.isFinite(enemy.dirY) ? enemy.dirY : 0;
+    const windup = Math.max(0.01, this.config.enemy.prisonerWindup || 0.16);
+    const swingRatio = 1 - Math.max(0, Math.min(1, (enemy.swingTimer || 0) / windup));
+    const chainReach = (this.config.enemy.prisonerAttackRangeTiles || 2) * this.config.map.tile * 0.55;
+    const dragX = -aimX;
+    const dragY = -aimY;
+    const dragPerpX = -dragY;
+    const dragPerpY = dragX;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.36)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY + half * 0.82, half * 1.05, half * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#5d4b42";
+    ctx.fillRect(screenX - half * 0.48, screenY - half * 0.1, half * 0.96, half * 1.08);
+    ctx.fillStyle = "#7c675a";
+    ctx.fillRect(screenX - half * 0.38, screenY - half * 0.72, half * 0.76, half * 0.72);
+
+    ctx.fillStyle = "#d7c2ae";
+    ctx.beginPath();
+    ctx.arc(screenX, screenY - half * 0.42, half * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#4a342c";
+    ctx.fillRect(screenX - half * 0.15, screenY - half * 0.25, half * 0.3, half * 0.48);
+
+    ctx.strokeStyle = "#8d7b6e";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(screenX - half * 0.34, screenY - half * 0.02);
+    ctx.quadraticCurveTo(
+      screenX - half * 0.34 + dragPerpX * 8,
+      screenY + half * 0.24 + dragPerpY * 8,
+      screenX - half * 0.34 + dragX * chainReach * 0.7,
+      screenY + half * 0.18 + dragY * chainReach * 0.7
+    );
+    ctx.moveTo(screenX + half * 0.34, screenY - half * 0.02);
+    ctx.quadraticCurveTo(
+      screenX + half * 0.34 - dragPerpX * 8,
+      screenY + half * 0.28 - dragPerpY * 8,
+      screenX + half * 0.34 + dragX * chainReach * 0.55,
+      screenY + half * 0.24 + dragY * chainReach * 0.55
+    );
+    if ((enemy.swingTimer || 0) > 0) {
+      const sweepReach = chainReach * (0.85 + swingRatio * 0.35);
+      const sweepPerp = 10 + swingRatio * 14;
+      ctx.moveTo(screenX - half * 0.12, screenY - half * 0.06);
+      ctx.quadraticCurveTo(
+        screenX + aimX * sweepReach * 0.5 + (-aimY) * sweepPerp,
+        screenY + aimY * sweepReach * 0.5 + aimX * sweepPerp,
+        screenX + aimX * sweepReach,
+        screenY + aimY * sweepReach
+      );
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = "#5a463b";
+    ctx.fillRect(screenX - half * 0.52, screenY + half * 0.92, half * 0.28, half * 0.42);
+    ctx.fillRect(screenX + half * 0.24, screenY + half * 0.92, half * 0.28, half * 0.42);
+  },
+
   drawSkeletonWarrior(enemy, screenX, screenY) {
     const ctx = this.ctx;
     const half = enemy.size * 0.5;
@@ -509,6 +574,123 @@ export const runtimeSceneDrawMethods = {
     ctx.beginPath();
     ctx.arc(screenX + half * 0.82, screenY - half * 0.55, half * 0.12, 0, Math.PI * 2);
     ctx.fill();
+  },
+
+  drawLeprechaunBoss(enemy, screenX, screenY) {
+    const ctx = this.ctx;
+    const half = enemy.size * 0.5;
+    const enraged = enemy.phase === "enraged";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY + half * 0.82, half * 1.05, half * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = enraged ? "#1f7c34" : "#2f9d43";
+    ctx.fillRect(screenX - half * 0.38, screenY - half * 0.12, half * 0.76, half * 1.04);
+    ctx.fillStyle = "#f3d2b3";
+    ctx.beginPath();
+    ctx.arc(screenX, screenY - half * 0.42, half * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#d96c2b";
+    ctx.beginPath();
+    ctx.moveTo(screenX - half * 0.26, screenY - half * 0.18);
+    ctx.lineTo(screenX + half * 0.26, screenY - half * 0.18);
+    ctx.lineTo(screenX, screenY + half * 0.32);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#1e5f2c";
+    ctx.beginPath();
+    ctx.moveTo(screenX - half * 0.62, screenY - half * 0.56);
+    ctx.lineTo(screenX, screenY - half * 1.02);
+    ctx.lineTo(screenX + half * 0.62, screenY - half * 0.56);
+    ctx.lineTo(screenX + half * 0.5, screenY - half * 0.18);
+    ctx.lineTo(screenX - half * 0.5, screenY - half * 0.18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#d4c35e";
+    ctx.fillRect(screenX - half * 0.52, screenY - half * 0.18, half * 1.04, half * 0.12);
+    ctx.fillStyle = "#2c2a1e";
+    ctx.fillRect(screenX - half * 0.08, screenY - half * 0.2, half * 0.16, half * 0.16);
+
+    ctx.fillStyle = "#f6f1d9";
+    ctx.fillRect(screenX - half * 0.18, screenY - half * 0.48, half * 0.08, half * 0.06);
+    ctx.fillRect(screenX + half * 0.1, screenY - half * 0.48, half * 0.08, half * 0.06);
+
+    if (enraged) {
+      ctx.strokeStyle = "rgba(167, 255, 121, 0.5)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY - half * 0.1, half * 1.15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#5cda6b";
+      ctx.fillRect(screenX - half * 0.9, screenY + half * 0.02, half * 0.3, half * 0.18);
+      ctx.fillRect(screenX + half * 0.6, screenY + half * 0.02, half * 0.3, half * 0.18);
+    }
+  },
+
+  drawLeprechaunPot(screenX, screenY, time = 0) {
+    const ctx = this.ctx;
+    const pulse = 0.92 + Math.sin(time * 5.5) * 0.08;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY + 14, 22, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1c1d18";
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, 18, Math.PI * 0.1, Math.PI * 0.9, false);
+    ctx.lineTo(screenX + 16, screenY + 12);
+    ctx.lineTo(screenX - 16, screenY + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#efcf52";
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + time * 1.2;
+      ctx.beginPath();
+      ctx.arc(screenX + Math.cos(a) * 8, screenY - 8 + Math.sin(a * 1.6) * 3, 3 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  drawBossSpeechCallout(game, cameraX, cameraY, layout) {
+    const boss = game.floorBoss;
+    if (!boss?.speechText || !boss?.speechExpiresAt || game.time >= boss.speechExpiresAt) return;
+    const ctx = this.ctx;
+    const playLeft = 0;
+    const playTop = layout.topHudH;
+    const playRight = layout.playW;
+    const playBottom = this.canvas.height - layout.xpBarH;
+    const sx = (boss.speechSourceX || game.player.x) - cameraX;
+    const sy = (boss.speechSourceY || game.player.y) - cameraY - 46;
+    let bubbleX = sx;
+    let bubbleY = sy;
+    const visible = sx >= playLeft + 32 && sx <= playRight - 32 && sy >= playTop + 12 && sy <= playBottom - 12;
+    if (!visible) {
+      const dx = (boss.speechSourceX || game.player.x) - game.player.x;
+      const dy = (boss.speechSourceY || game.player.y) - game.player.y;
+      const len = Math.hypot(dx, dy) || 1;
+      bubbleX = Math.min(playRight - 80, Math.max(playLeft + 80, layout.playW * 0.5 + (dx / len) * (layout.playW * 0.33)));
+      bubbleY = Math.min(playBottom - 22, Math.max(playTop + 22, (playTop + playBottom) * 0.5 + (dy / len) * ((playBottom - playTop) * 0.33)));
+    }
+    const text = boss.speechText;
+    ctx.font = "bold 13px Trebuchet MS";
+    const pad = 10;
+    const width = Math.min(320, ctx.measureText(text).width + pad * 2);
+    const height = 28;
+    const x = bubbleX - width * 0.5;
+    const y = bubbleY - height;
+    ctx.fillStyle = "rgba(249, 252, 232, 0.96)";
+    ctx.strokeStyle = "rgba(38, 54, 28, 0.9)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#29401d";
+    ctx.textAlign = "center";
+    ctx.fillText(text, bubbleX, y + 18);
+    ctx.textAlign = "left";
   },
 
   drawExitPortal(portal, screenX, screenY, time = 0) {

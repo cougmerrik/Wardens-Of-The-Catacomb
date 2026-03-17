@@ -40,7 +40,7 @@ function makeRoom(sim) {
 }
 
 function killFloorBoss(game) {
-  const boss = game.enemies.find((enemy) => enemy.type === "necromancer" && enemy.isFloorBoss);
+  const boss = game.enemies.find((enemy) => enemy.isFloorBoss);
   assert(boss, "expected floor boss to exist");
   boss.hp = 0;
   stepGame(game, 0.016, { processUi: false });
@@ -75,9 +75,14 @@ function validateLocalProgression() {
 
   game.level = game.getFloorBossTriggerLevel();
   assert(game.updateFloorBossTrigger() === true, "boss did not queue locally");
-  const boss = game.spawnNecromancer(game.player.x + 96, game.player.y);
+  const variant = game.getFloorBossVariant();
+  const boss = variant === "leprechaun" ? game.spawnLeprechaunBoss(game.player.x + 96, game.player.y) : game.spawnNecromancer(game.player.x + 96, game.player.y);
   game.enemies.push(boss);
   game.markFloorBossActive();
+  if (variant === "leprechaun") {
+    boss.phase = "enraged";
+    game.setFloorBossEncounterPhase("enraged");
+  }
   killFloorBoss(game);
   assert(game.portal.active, "portal did not spawn after local boss defeat");
   assert(game.floorBoss.phase === "portal", `expected portal phase, got ${game.floorBoss.phase}`);
@@ -99,16 +104,21 @@ function validateNetworkReconciliation() {
   const sim = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   sim.level = sim.getFloorBossTriggerLevel();
   assert(sim.updateFloorBossTrigger() === true, "network sim boss did not queue");
-  const boss = sim.spawnNecromancer(sim.player.x + 96, sim.player.y);
+  const variant = sim.getFloorBossVariant();
+  const boss = variant === "leprechaun" ? sim.spawnLeprechaunBoss(sim.player.x + 96, sim.player.y) : sim.spawnNecromancer(sim.player.x + 96, sim.player.y);
   sim.enemies.push(boss);
   sim.markFloorBossActive();
+  if (variant === "leprechaun") {
+    boss.phase = "enraged";
+    sim.setFloorBossEncounterPhase("enraged");
+  }
 
   const room = makeRoom(sim);
   const client = new Game(null, { headless: true });
   const joinState = buildJoinKeyframeState(serializeState(room));
   applySnapshotToGame({ game: client, state: joinState, controller: false });
   assert(client.floorBoss?.phase === "active", `join phase expected active, got ${client.floorBoss?.phase}`);
-  assert(client.enemies.some((enemy) => enemy.type === "necromancer" && enemy.isFloorBoss), "joining client missed boss");
+  assert(client.enemies.some((enemy) => enemy.isFloorBoss), "joining client missed boss");
 
   killFloorBoss(sim);
   applySnapshotToGame({ game: client, state: serializeState(room), controller: false });

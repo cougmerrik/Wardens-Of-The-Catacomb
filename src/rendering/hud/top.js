@@ -47,12 +47,19 @@ export function drawHud(renderer, game, layout) {
     ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, 17);
     ctx.fillStyle = "#3a1f48";
     ctx.fillRect(barX + 4, barY + 4, barW - 8, 10);
-    ctx.fillStyle = "#b86cff";
+    const bossLabel = game.floorBoss?.bossName || (boss.type === "leprechaun" ? "Leprechaun" : "Necromancer");
+    const isLeprechaun = boss.type === "leprechaun";
+    ctx.fillStyle = isLeprechaun ? "#74d74d" : "#b86cff";
     ctx.fillRect(barX + 4, barY + 4, Math.floor((barW - 8) * ratio), 10);
     ctx.fillStyle = "#f7e8ff";
     ctx.font = "bold 12px Trebuchet MS";
     ctx.textAlign = "center";
-    ctx.fillText(`Necromancer ${Math.ceil(Math.max(0, boss.hp))}/${boss.maxHp}`, layout.playW / 2, barY - 4 + 12);
+    let title = `${bossLabel} ${Math.ceil(Math.max(0, boss.hp))}/${boss.maxHp}`;
+    if (isLeprechaun && typeof game.getRemainingFloorBossTimer === "function") {
+      const remaining = game.getRemainingFloorBossTimer();
+      if (remaining !== null) title += ` | ${formatTime(remaining)}`;
+    }
+    ctx.fillText(title, layout.playW / 2, barY - 4 + 12);
     ctx.textAlign = "left";
   }
 }

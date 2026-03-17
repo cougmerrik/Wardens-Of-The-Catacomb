@@ -18,6 +18,8 @@ const canvas = document.getElementById("game");
 const layout = document.querySelector(".layout");
 const menuPanel = document.querySelector(".panel");
 const selector = document.getElementById("character-select");
+const devStartOptions = document.getElementById("dev-start-options");
+const devStartFloorInput = document.getElementById("dev-start-floor");
 const classButtons = Array.from(document.querySelectorAll("[data-class-option]"));
 const startButton = document.getElementById("start-game");
 const startNetworkButton = document.getElementById("start-network-game");
@@ -75,6 +77,7 @@ let splashDismissed = false;
 let splashRaf = 0;
 let splashStartedAt = 0;
 let splashReady = false;
+const isDevMode = new URLSearchParams(window.location.search).get("dev") === "1";
 
 splashLogo.addEventListener("load", () => {
   splashReady = true;
@@ -418,6 +421,9 @@ function startLocalGame() {
   stopNetworkSession();
   if (selector) selector.hidden = true;
   cleanupCurrentGame();
+  const requestedStartFloor = isDevMode && devStartFloorInput
+    ? Math.max(1, Number.parseInt(devStartFloorInput.value || "1", 10) || 1)
+    : 1;
   currentGame = new Game(canvas, {
     classType: selectedClass,
     onReturnToMenu: returnToMenu,
@@ -425,6 +431,9 @@ function startLocalGame() {
     onFloorChanged: (_floor, game) => syncMusicForGame(game),
     onGameOverChanged: (_gameOver, game) => syncMusicForGame(game)
   });
+  if (requestedStartFloor > 1 && typeof currentGame.applyDebugStartingFloor === "function") {
+    currentGame.applyDebugStartingFloor(requestedStartFloor);
+  }
   syncMusicForGame(currentGame);
   currentGame.start();
 }
@@ -671,6 +680,7 @@ function monitorIdleSoundState() {
 requestAnimationFrame(monitorIdleSoundState);
 
 if (selector && startButton && classButtons.length > 0) {
+  if (devStartOptions) devStartOptions.hidden = !isDevMode;
   selectedClass = setSelectedClass("archer", classButtons);
   for (const button of classButtons) {
     button.addEventListener("click", () => {

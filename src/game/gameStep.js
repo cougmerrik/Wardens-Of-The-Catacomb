@@ -53,6 +53,17 @@ export function stepGame(game, dt, controls = {}) {
   game.time += dt;
   if (typeof game.updateFloorBossTrigger === "function") game.updateFloorBossTrigger();
   if (typeof game.syncFloorBossFeedback === "function") game.syncFloorBossFeedback();
+  if (game.floorBoss?.speechExpiresAt && game.time >= game.floorBoss.speechExpiresAt) {
+    game.floorBoss.speechText = "";
+    game.floorBoss.speechExpiresAt = null;
+  }
+  if (typeof game.getRemainingFloorBossTimer === "function") {
+    const bossTimerRemaining = game.getRemainingFloorBossTimer();
+    if (bossTimerRemaining !== null && bossTimerRemaining <= 0 && !game.gameOver) {
+      game.applyPlayerDamage(Math.max(999999, game.player.health + 999999));
+      return;
+    }
+  }
   game.player.speed = game.getPlayerMoveSpeed();
   game.player.fireCooldown = Math.max(0, game.player.fireCooldown - dt);
   game.player.fireArrowCooldown = Math.max(0, game.player.fireArrowCooldown - dt);
@@ -299,11 +310,17 @@ export function stepGame(game, dt, controls = {}) {
     const bossRequest = game.consumeFloorBossSpawnRequest();
     if (bossRequest) {
       const point = game.randomEnemySpawnPoint() || { x: game.door.x || game.player.x, y: game.door.y || game.player.y };
-      const boss = game.spawnNecromancer(point.x, point.y);
+      const boss = bossRequest.variant === "leprechaun" ? game.spawnLeprechaunBoss(point.x, point.y) : game.spawnNecromancer(point.x, point.y);
       game.enemies.push(boss);
       if (typeof game.markFloorBossActive === "function") game.markFloorBossActive();
+      if (bossRequest.variant === "leprechaun" && game.floorBoss) {
+        game.floorBoss.potX = null;
+        game.floorBoss.potY = null;
+      }
       if (typeof game.spawnFloatingText === "function") {
-        game.spawnFloatingText(game.player.x, game.player.y - 96, `Necromancer Stirs`, "#d49dff", 1.5, 18);
+        const bossLabel = bossRequest.variant === "leprechaun" ? "Leprechaun Escapes" : "Necromancer Stirs";
+        const bossColor = bossRequest.variant === "leprechaun" ? "#a2f06e" : "#d49dff";
+        game.spawnFloatingText(game.player.x, game.player.y - 96, bossLabel, bossColor, 1.5, 18);
       }
     }
   }
@@ -315,11 +332,19 @@ export function stepGame(game, dt, controls = {}) {
       const point = game.randomEnemySpawnPoint();
       if (!point) continue;
       const activeGoblins = game.enemies.filter((enemy) => enemy.type === "goblin").length;
+      const activePrisoners = game.enemies.filter((enemy) => enemy.type === "prisoner").length;
       const activeRatArchers = game.enemies.filter((enemy) => enemy.type === "rat_archer").length;
+      const prisonerMinFloor = Number.isFinite(game.config.enemy.prisonerMinFloor) ? game.config.enemy.prisonerMinFloor : 2;
       const skeletonMinFloor = Number.isFinite(game.config.enemy.skeletonWarriorMinFloor) ? game.config.enemy.skeletonWarriorMinFloor : 4;
       const spawnSkeleton = game.floor >= skeletonMinFloor && Math.random() < (game.config.enemy.skeletonWarriorSpawnChance || 0.25);
       const ratArcherMinFloor = Number.isFinite(game.config.enemy.ratArcherMinFloor) ? game.config.enemy.ratArcherMinFloor : 3;
       if (
+        game.floor >= prisonerMinFloor &&
+        activePrisoners < game.config.enemy.maxActivePrisoners &&
+        Math.random() < game.config.enemy.prisonerSpawnChance
+      ) {
+        game.enemies.push(game.spawnPrisoner(point.x, point.y));
+      } else if (
         game.floor >= ratArcherMinFloor &&
         activeRatArchers < game.config.enemy.maxActiveRatArchers &&
         Math.random() < game.config.enemy.ratArcherSpawnChance
@@ -361,9 +386,11 @@ export function stepGame(game, dt, controls = {}) {
     activeEnemies.push(enemy);
     if (enemy.type === "goblin") game.updateGoblin(enemy, dt, enemySpeedScale);
     else if (enemy.type === "mimic") game.updateMimic(enemy, dt, enemySpeedScale);
+    else if (enemy.type === "prisoner") game.updatePrisoner(enemy, dt, enemySpeedScale);
     else if (enemy.type === "rat_archer") game.updateRatArcher(enemy, dt, enemySpeedScale);
     else if (enemy.type === "skeleton_warrior") game.updateSkeletonWarrior(enemy, dt, enemySpeedScale);
     else if (enemy.type === "necromancer") game.updateNecromancer(enemy, dt, enemySpeedScale);
+    else if (enemy.type === "leprechaun") game.updateLeprechaunBoss(enemy, dt, enemySpeedScale);
     else if (typeof game.updateGenericEnemy === "function") game.updateGenericEnemy(enemy, dt, enemySpeedScale);
     else game.moveEnemyTowardPlayer(enemy, enemySpeedScale, dt);
   }
@@ -557,6 +584,7 @@ export function stepGame(game, dt, controls = {}) {
     }
     if (b.life <= 0) continue;
     for (const enemy of activeEnemies) {
+      if (enemy.type === "prisoner") continue;
       if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
       if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (b.hitTargets.has(enemy)) continue;
@@ -705,22 +733,26 @@ export function stepGame(game, dt, controls = {}) {
       if (enemy.type === "goblin") game.score += 30 + enemy.goldEaten;
       else if (enemy.type === "armor") game.score += 40;
       else if (enemy.type === "mimic") game.score += 35;
+      else if (enemy.type === "prisoner") game.score += 22;
       else if (enemy.type === "rat_archer") game.score += 16;
       else if (enemy.type === "skeleton_warrior") game.score += 10;
       else if (enemy.type === "necromancer") game.score += 250;
+      else if (enemy.type === "leprechaun") game.score += 500;
       else if (enemy.type === "skeleton") game.score += 12;
       else game.score += 10;
       game.gainExperience(game.xpFromEnemy(enemy));
       if (enemy.type === "goblin") game.dropTreasureBag(enemy.x, enemy.y, enemy.goldEaten);
       else if (enemy.type === "armor") game.dropArmorLoot(enemy.x, enemy.y);
       else if (enemy.type === "mimic") game.dropTreasureBag(enemy.x, enemy.y, 24);
+      else if (enemy.type === "prisoner") game.maybeSpawnDrop(enemy.x, enemy.y);
       else if (enemy.type === "rat_archer") game.maybeSpawnDrop(enemy.x, enemy.y);
       else if (enemy.type === "skeleton_warrior") game.maybeSpawnDrop(enemy.x, enemy.y);
-      else if (enemy.type === "necromancer") {
+      else if (enemy.type === "necromancer" || enemy.type === "leprechaun") {
         if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
         removeBossSummons = true;
         if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
-        game.dropNecromancerLoot(enemy.x, enemy.y);
+        if (enemy.type === "leprechaun") game.dropLeprechaunLoot(enemy.x, enemy.y);
+        else game.dropNecromancerLoot(enemy.x, enemy.y);
         game.spawnFloatingText(enemy.x, enemy.y - 42, "Boss Defeated", "#f2bf7b", 1.5, 18);
         game.spawnFloatingText(enemy.x, enemy.y - 62, "Portal Open", "#90f0ff", 1.5, 18);
       }
@@ -784,6 +816,7 @@ export function stepGame(game, dt, controls = {}) {
   if (game.player.hitCooldown <= 0) {
     for (const enemy of activeEnemies) {
       if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
+      if (enemy.type === "leprechaun" && enemy.phase !== "enraged") continue;
       if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (vecLength(game.player.x - enemy.x, game.player.y - enemy.y) <= enemy.size * 0.5 + playerEnemyRadius) {
         game.player.hitCooldown = 1.0;

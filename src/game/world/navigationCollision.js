@@ -166,6 +166,108 @@ export function getPathDirectionToPlayer(game, entity) {
   return { x: dx / len, y: dy / len };
 }
 
+export function getPathDirectionToTarget(game, entity, targetX, targetY, options = {}) {
+  if (!entity || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return { x: 0, y: 0, reached: true };
+  const tileSize = game.config.map.tile;
+  const startTx = Math.floor(entity.x / tileSize);
+  const startTy = Math.floor(entity.y / tileSize);
+  const goalTx = Math.floor(targetX / tileSize);
+  const goalTy = Math.floor(targetY / tileSize);
+  const directDx = targetX - entity.x;
+  const directDy = targetY - entity.y;
+  const directLen = vecLength(directDx, directDy) || 1;
+  const minDistance = Math.max(0, Number.isFinite(options.minDistance) ? options.minDistance : 0);
+  if (directLen <= minDistance) return { x: directDx / directLen, y: directDy / directLen, reached: true };
+  if (!isWalkableTile(game, startTx, startTy) || !isWalkableTile(game, goalTx, goalTy)) {
+    return { x: directDx / directLen, y: directDy / directLen, reached: false };
+  }
+
+  const cache = entity._pathToTargetCache || (entity._pathToTargetCache = {});
+  const targetChanged = cache.goalTx !== goalTx || cache.goalTy !== goalTy;
+  const startChanged = cache.startTx !== startTx || cache.startTy !== startTy;
+  const stale = !Array.isArray(cache.path) || cache.path.length === 0 || (cache.repathTimer || 0) <= 0;
+  cache.repathTimer = Math.max(0, (cache.repathTimer || 0) - (Number.isFinite(options.dt) ? options.dt : 0));
+
+  if (targetChanged || startChanged || stale) {
+    const heuristic = (tx, ty) => Math.abs(goalTx - tx) + Math.abs(goalTy - ty);
+    const width = game.map[0].length;
+    const height = game.map.length;
+    const open = [{ tx: startTx, ty: startTy, g: 0, f: heuristic(startTx, startTy) }];
+    const cameFrom = new Map();
+    const gScore = new Map([[`${startTx},${startTy}`, 0]]);
+    const closed = new Set();
+    const dirs = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 }
+    ];
+    let goalKey = null;
+    while (open.length > 0) {
+      let bestIndex = 0;
+      for (let i = 1; i < open.length; i++) {
+        if (open[i].f < open[bestIndex].f) bestIndex = i;
+      }
+      const current = open.splice(bestIndex, 1)[0];
+      const currentKey = `${current.tx},${current.ty}`;
+      if (closed.has(currentKey)) continue;
+      closed.add(currentKey);
+      if (current.tx === goalTx && current.ty === goalTy) {
+        goalKey = currentKey;
+        break;
+      }
+      for (const dir of dirs) {
+        const nx = current.tx + dir.x;
+        const ny = current.ty + dir.y;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (!isWalkableTile(game, nx, ny)) continue;
+        const neighborKey = `${nx},${ny}`;
+        if (closed.has(neighborKey)) continue;
+        const tentative = current.g + 1;
+        const bestKnown = gScore.get(neighborKey);
+        if (bestKnown !== undefined && tentative >= bestKnown) continue;
+        cameFrom.set(neighborKey, currentKey);
+        gScore.set(neighborKey, tentative);
+        open.push({ tx: nx, ty: ny, g: tentative, f: tentative + heuristic(nx, ny) });
+      }
+    }
+
+    if (goalKey) {
+      const path = [];
+      let cursor = goalKey;
+      while (cursor) {
+        const [tx, ty] = cursor.split(",").map(Number);
+        path.push({ tx, ty });
+        cursor = cameFrom.get(cursor) || null;
+      }
+      path.reverse();
+      cache.path = path;
+    } else {
+      cache.path = [];
+    }
+    cache.goalTx = goalTx;
+    cache.goalTy = goalTy;
+    cache.repathTimer = 0.3;
+  }
+
+  const path = Array.isArray(cache.path) ? cache.path : [];
+  let waypoint = null;
+  for (let i = 1; i < path.length; i++) {
+    const node = path[i];
+    const wx = node.tx * tileSize + tileSize * 0.5;
+    const wy = node.ty * tileSize + tileSize * 0.5;
+    if (vecLength(wx - entity.x, wy - entity.y) > Math.max(8, tileSize * 0.2)) {
+      waypoint = { x: wx, y: wy };
+      break;
+    }
+  }
+  if (!waypoint) waypoint = { x: targetX, y: targetY };
+  const dx = waypoint.x - entity.x;
+  const dy = waypoint.y - entity.y;
+  const len = vecLength(dx, dy) || 1;
+  return { x: dx / len, y: dy / len, reached: false };
+}
+
 export function moveEnemyTowardPlayer(game, enemy, speedScale, dt) {
   if (!enemy || !Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
     return;
@@ -214,6 +316,24 @@ export function moveEnemyTowardPlayer(game, enemy, speedScale, dt) {
     moveWithCollision(game, enemy, sx, sy);
     if (vecLength(enemy.x - px, enemy.y - py) > moveStep * 0.12) return;
   }
+}
+
+export function moveEnemyTowardTargetPoint(game, enemy, targetX, targetY, speedScale, dt, minDistance = 0, usePathfinding = false) {
+  if (!enemy || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+  const enemySpeed = Number.isFinite(enemy.speed) ? enemy.speed : 70;
+  const appliedScale = Number.isFinite(speedScale) ? speedScale : 1;
+  const delta = Number.isFinite(dt) ? dt : 0;
+  const step = enemySpeed * appliedScale * delta;
+  if (step <= 0) return;
+  const dx = targetX - enemy.x;
+  const dy = targetY - enemy.y;
+  const dist = vecLength(dx, dy) || 1;
+  if (dist <= minDistance) return;
+  const dir = usePathfinding
+    ? getPathDirectionToTarget(game, enemy, targetX, targetY, { dt: delta, minDistance })
+    : { x: dx / dist, y: dy / dist };
+  const moveStep = Math.min(step, dist - minDistance);
+  moveWithCollision(game, enemy, dir.x * moveStep, dir.y * moveStep);
 }
 
 export function separateEnemyFromPlayer(game, enemy) {

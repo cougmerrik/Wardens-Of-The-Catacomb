@@ -177,6 +177,18 @@ export class GameRuntimeBase {
     if (this.player.health <= 0) this.triggerGameOver();
   }
 
+  applyPlayerKnockback(distance, dirX, dirY) {
+    if (!Number.isFinite(distance) || distance <= 0) return;
+    const len = clamp(Math.hypot(dirX || 0, dirY || 0), 0, Number.POSITIVE_INFINITY) || 1;
+    const nx = (dirX || 0) / len;
+    const ny = (dirY || 0) / len;
+    const steps = Math.max(6, Math.ceil(distance / 32));
+    const step = distance / steps;
+    for (let i = 0; i < steps; i++) {
+      if (typeof this.moveWithCollision === "function") this.moveWithCollision(this.player, nx * step, ny * step);
+    }
+  }
+
   triggerGameOver() {
     if (this.deathTransition.active) return;
     this.gameOver = true;
@@ -292,6 +304,48 @@ export class GameRuntimeBase {
       });
       this.enemies.push(...controlledUndead);
     }
+    if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
+  }
+
+  getMinimumLevelForFloorStart(floor = this.floor) {
+    const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    if (safeFloor <= 1) return 1;
+    return this.getFloorBossTriggerLevel(safeFloor - 1);
+  }
+
+  applyDebugStartingFloor(floor = 1) {
+    const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    const targetLevel = this.getMinimumLevelForFloorStart(safeFloor);
+    this.floor = safeFloor;
+    this.level = 1;
+    this.experience = 0;
+    this.expToNextLevel = this.config.progression.baseXpToLevel;
+    this.skillPoints = 0;
+    this.gold = 0;
+    this.score = 0;
+    this.levelWeaponDamageBonus = 0;
+    this.player.maxHealth = Number.isFinite(this.classSpec.baseMaxHealth) ? this.classSpec.baseMaxHealth : this.config.player.maxHealth;
+    this.player.health = this.player.maxHealth;
+    this.player.fireCooldown = 0;
+    this.player.fireArrowCooldown = 0;
+    this.player.deathBoltCooldown = 0;
+    this.player.hitCooldown = 0;
+    this.player.hpBarTimer = 0;
+    while (this.level < targetLevel) {
+      this.gainExperience(this.expToNextLevel);
+    }
+    this.experience = 0;
+    this.floatingTexts = [];
+
+    let nextWidth = this.config.map.width;
+    let nextHeight = this.config.map.height;
+    const growth = this.config.progression.mapGrowthFactorPerFloor;
+    for (let currentFloor = 1; currentFloor < safeFloor; currentFloor++) {
+      nextWidth = Math.max(nextWidth + 1, Math.floor(nextWidth * growth));
+      nextHeight = Math.max(nextHeight + 1, Math.floor(nextHeight * growth));
+    }
+    this.generateFloor(nextWidth, nextHeight);
+    this.syncFloorBossState();
     if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
   }
 

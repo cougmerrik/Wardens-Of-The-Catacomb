@@ -162,11 +162,7 @@ export function serializeState(room) {
   const activeBounds = makeActiveBounds(sim, 10);
   const floorBoss =
     sim.floorBoss && typeof sim.floorBoss === "object"
-      ? {
-          floor: sim.floorBoss.floor,
-          triggerLevel: sim.floorBoss.triggerLevel,
-          phase: sim.floorBoss.phase
-        }
+      ? { ...sim.floorBoss }
       : null;
   const activeEnemies = sim.enemies.filter((e) => isInsideBounds(e, activeBounds, 72));
   const activeDrops = sim.drops.filter((d) => isInsideBounds(d, activeBounds, 64));

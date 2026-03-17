@@ -5,14 +5,17 @@ import {
   applyGoblinGrowth as applyGoblinGrowthEntity,
   updateGoblin as updateGoblinEntity,
   updateMimic as updateMimicEntity,
+  updatePrisoner as updatePrisonerEntity,
   updateRatArcher as updateRatArcherEntity,
   updateSkeletonWarrior as updateSkeletonWarriorEntity,
   updateNecromancer as updateNecromancerEntity,
+  updateLeprechaunBoss as updateLeprechaunBossEntity,
   xpFromEnemy as xpFromEnemyEntity,
   maybeSpawnDrop as maybeSpawnDropEntity,
   dropTreasureBag as dropTreasureBagEntity,
   dropArmorLoot as dropArmorLootEntity,
-  dropNecromancerLoot as dropNecromancerLootEntity
+  dropNecromancerLoot as dropNecromancerLootEntity,
+  dropLeprechaunLoot as dropLeprechaunLootEntity
 } from "./enemySystems.js";
 import { GameRuntimeWorld } from "./GameRuntimeWorld.js";
 
@@ -173,6 +176,10 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
     updateMimicEntity(this, enemy, dt, speedScale);
   }
 
+  updatePrisoner(enemy, dt, speedScale) {
+    updatePrisonerEntity(this, enemy, dt, speedScale);
+  }
+
   updateRatArcher(enemy, dt, speedScale) {
     updateRatArcherEntity(this, enemy, dt, speedScale);
   }
@@ -183,6 +190,10 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
 
   updateNecromancer(enemy, dt, speedScale) {
     updateNecromancerEntity(this, enemy, dt, speedScale);
+  }
+
+  updateLeprechaunBoss(enemy, dt, speedScale) {
+    updateLeprechaunBossEntity(this, enemy, dt, speedScale);
   }
 
   xpFromEnemy(enemy) {
@@ -238,6 +249,10 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
 
   dropNecromancerLoot(x, y) {
     dropNecromancerLootEntity(this, x, y);
+  }
+
+  dropLeprechaunLoot(x, y) {
+    dropLeprechaunLootEntity(this, x, y);
   }
 
   fire(dx, dy) {
