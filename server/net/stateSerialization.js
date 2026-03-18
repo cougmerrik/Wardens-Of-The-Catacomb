@@ -150,6 +150,8 @@ export function serializeMetaState(source) {
     warriorMomentumTimer: sim.warriorMomentumTimer || 0,
     warriorRageActiveTimer: sim.warriorRageActiveTimer || 0,
     warriorRageCooldownTimer: sim.warriorRageCooldownTimer || 0,
+    warriorRageVictoryRushPool: sim.warriorRageVictoryRushPool || 0,
+    warriorRageVictoryRushTimer: sim.warriorRageVictoryRushTimer || 0,
     floorBoss,
     portal: sim.portal ? { ...sim.portal } : null,
     musicTrack,

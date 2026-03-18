@@ -13,7 +13,12 @@ export const runtimeFloorBossMethods = {
 
   getFloorBossVariant(floor = this.floor) {
     const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
-    if (safeFloor === 1 && this.isStPatricksWeek()) return "leprechaun";
+    if (safeFloor === 1 && this.isStPatricksWeek()) {
+      const chance = Number.isFinite(this.config?.progression?.floorOneLeprechaunBossChance)
+        ? Math.max(0, Math.min(1, this.config.progression.floorOneLeprechaunBossChance))
+        : 0.2;
+      if (Math.random() < chance) return "leprechaun";
+    }
     return "necromancer";
   },
 

@@ -322,6 +322,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       if (Math.abs(diff) <= halfArc) {
+        const hpBefore = Number.isFinite(enemy.hp) ? enemy.hp : 0;
         this.applyEnemyDamage(enemy, this.rollPrimaryDamage(), "melee");
         const threshold = this.getWarriorExecuteThreshold();
         const chance = this.getWarriorExecuteChance();
@@ -329,6 +330,22 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
         if (!enemy.isBoss && chance > 0 && enemy.hp > 0 && hpRatio > 0 && hpRatio <= threshold && Math.random() < chance) {
           enemy.hp = 0;
           executeProc = true;
+        }
+        if (
+          hpBefore > 0 &&
+          enemy.hp <= 0 &&
+          this.warriorRageActiveTimer > 0 &&
+          (!this.isEnemyFriendlyToPlayer || !this.isEnemyFriendlyToPlayer(enemy))
+        ) {
+          const victoryRushHeal = this.getWarriorRageVictoryRushHeal();
+          if (victoryRushHeal > 0) {
+            this.warriorRageVictoryRushPool = Math.min(
+              this.getWarriorRageVictoryRushPoolCap(),
+              this.warriorRageVictoryRushPool + victoryRushHeal
+            );
+            this.warriorRageVictoryRushTimer += this.getWarriorRageVictoryRushHotDuration();
+            this.spawnFloatingText(this.player.x, this.player.y - 32, "Victory Rush", "#ffb3b3", 0.8, 13);
+          }
         }
       }
     }

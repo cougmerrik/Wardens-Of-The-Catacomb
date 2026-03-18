@@ -81,6 +81,8 @@ export class GameRuntimeBase {
     this.warriorMomentumTimer = 0;
     this.warriorRageActiveTimer = 0;
     this.warriorRageCooldownTimer = 0;
+    this.warriorRageVictoryRushPool = 0;
+    this.warriorRageVictoryRushTimer = 0;
     this.necromancerBeam = createNecromancerBeamState();
     this.upgrades = createUpgradeState();
     this.shopOrder = ["moveSpeed", "attackSpeed", "damage", "defense"];
@@ -118,14 +120,17 @@ export class GameRuntimeBase {
     this.player.hpBarTimer = this.config.player.hpBarDuration;
   }
 
-  applyPlayerHealing(amount) {
+  applyPlayerHealing(amount, options = {}) {
     if (amount <= 0) return;
+    const suppressText = !!options.suppressText;
     const before = this.player.health;
     this.player.health = Math.min(this.player.maxHealth, this.player.health + amount);
     if (this.player.health > before) {
       const healed = this.player.health - before;
       this.markPlayerHealthBarVisible();
-      this.spawnFloatingText(this.player.x, this.player.y - 26, `+${Math.max(1, Math.round(healed))}`, "#79e59a", 0.8, 14);
+      if (!suppressText) {
+        this.spawnFloatingText(this.player.x, this.player.y - 26, `+${Math.max(1, Math.round(healed))}`, "#79e59a", 0.8, 14);
+      }
     }
   }
 
@@ -147,11 +152,10 @@ export class GameRuntimeBase {
     const len = clamp(Math.hypot(dirX || 0, dirY || 0), 0, Number.POSITIVE_INFINITY) || 1;
     const nx = (dirX || 0) / len;
     const ny = (dirY || 0) / len;
-    const steps = Math.max(6, Math.ceil(distance / 32));
-    const step = distance / steps;
-    for (let i = 0; i < steps; i++) {
-      if (typeof this.moveWithCollision === "function") this.moveWithCollision(this.player, nx * step, ny * step);
-    }
+    const duration = Math.max(0.08, Number.isFinite(this.config?.enemy?.leprechaunPunchKnockbackDuration) ? this.config.enemy.leprechaunPunchKnockbackDuration : 0.28);
+    this.player.knockbackVx = (distance / duration) * nx;
+    this.player.knockbackVy = (distance / duration) * ny;
+    this.player.knockbackTimer = duration;
   }
 
   triggerGameOver() {
@@ -209,6 +213,8 @@ export class GameRuntimeBase {
     this.warriorMomentumTimer = 0;
     this.warriorRageActiveTimer = 0;
     this.warriorRageCooldownTimer = 0;
+    this.warriorRageVictoryRushPool = 0;
+    this.warriorRageVictoryRushTimer = 0;
     this.necromancerBeam = createNecromancerBeamState();
     this.navDistance = Array.from({ length: this.map.length }, () => Array(this.map[0].length).fill(-1));
     this.navPlayerTile = { x: -1, y: -1 };

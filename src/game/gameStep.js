@@ -71,9 +71,11 @@ export function stepGame(game, dt, controls = {}) {
   game.player.deathBoltCooldown = Math.max(0, (Number.isFinite(game.player.deathBoltCooldown) ? game.player.deathBoltCooldown : 0) - dt);
   game.player.hitCooldown = Math.max(0, game.player.hitCooldown - dt);
   game.player.hpBarTimer = Math.max(0, game.player.hpBarTimer - dt);
+  game.player.knockbackTimer = Math.max(0, (Number.isFinite(game.player.knockbackTimer) ? game.player.knockbackTimer : 0) - dt);
   game.warriorMomentumTimer = Math.max(0, game.warriorMomentumTimer - dt);
   game.warriorRageActiveTimer = Math.max(0, (Number.isFinite(game.warriorRageActiveTimer) ? game.warriorRageActiveTimer : 0) - dt);
   game.warriorRageCooldownTimer = Math.max(0, (Number.isFinite(game.warriorRageCooldownTimer) ? game.warriorRageCooldownTimer : 0) - dt);
+  game.warriorRageVictoryRushTimer = Math.max(0, (Number.isFinite(game.warriorRageVictoryRushTimer) ? game.warriorRageVictoryRushTimer : 0) - dt);
   game.passiveRegenTimer = Math.max(-4, (Number.isFinite(game.passiveRegenTimer) ? game.passiveRegenTimer : 2) - dt);
   game.player.animTime += dt;
   for (const ft of game.floatingTexts) {
@@ -81,6 +83,19 @@ export function stepGame(game, dt, controls = {}) {
     ft.y -= ft.vy * dt;
   }
   game.floatingTexts = game.floatingTexts.filter((ft) => ft.life > 0);
+
+  if (
+    (game.warriorRageVictoryRushPool || 0) > 0 &&
+    (game.warriorRageVictoryRushTimer || 0) > 0 &&
+    game.player.health > 0
+  ) {
+    const timer = Math.max(dt, game.warriorRageVictoryRushTimer);
+    const healAmount = Math.min(game.warriorRageVictoryRushPool, (game.warriorRageVictoryRushPool / timer) * dt);
+    game.warriorRageVictoryRushPool = Math.max(0, game.warriorRageVictoryRushPool - healAmount);
+    game.applyPlayerHealing(healAmount, { suppressText: true });
+  } else if ((game.warriorRageVictoryRushTimer || 0) <= 0) {
+    game.warriorRageVictoryRushPool = 0;
+  }
 
   while (game.passiveRegenTimer <= 0) {
     game.passiveRegenTimer += 2;
@@ -94,7 +109,9 @@ export function stepGame(game, dt, controls = {}) {
   const my = Number.isFinite(controls.moveY) ? controls.moveY : 0;
   game.player.lastX = game.player.x;
   game.player.lastY = game.player.y;
-  if (mx || my) {
+  if ((game.player.knockbackTimer || 0) > 0) {
+    game.moveWithCollision(game.player, (game.player.knockbackVx || 0) * dt, (game.player.knockbackVy || 0) * dt);
+  } else if (mx || my) {
     const len = vecLength(mx, my) || 1;
     game.moveWithCollision(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
   }

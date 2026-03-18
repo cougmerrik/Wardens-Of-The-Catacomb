@@ -197,6 +197,35 @@ export const runtimeCombatStatsMethods = {
     return Math.floor(Math.max(0, safe) * 0.5);
   },
 
+  getWarriorRageVictoryRushPerKillPct(points = this.skills.warriorRage.points) {
+    if (this.classSpec.usesRanged) return 0;
+    const c = this.config.warriorRage || {};
+    const p = Math.max(0, Number.isFinite(points) ? points : 0);
+    if (p <= 0) return 0;
+    const minPct = Number.isFinite(c.victoryRushPerKillMinPct) ? Math.max(0, c.victoryRushPerKillMinPct) : 0.01;
+    const maxPct = Number.isFinite(c.victoryRushPerKillMaxPct) ? Math.max(minPct, c.victoryRushPerKillMaxPct) : 0.03;
+    const maxPoints = Number.isFinite(this.skills?.warriorRage?.maxPoints) ? this.skills.warriorRage.maxPoints : 8;
+    const denom = Math.log1p(1.2 * Math.max(1, maxPoints));
+    const norm = denom > 0 ? Math.log1p(1.2 * p) / denom : 0;
+    return minPct + (maxPct - minPct) * Math.max(0, Math.min(1, norm));
+  },
+
+  getWarriorRageVictoryRushHeal(points = this.skills.warriorRage.points) {
+    if (this.classSpec.usesRanged || this.warriorRageActiveTimer <= 0) return 0;
+    return Math.max(1, Math.round(this.player.maxHealth * this.getWarriorRageVictoryRushPerKillPct(points)));
+  },
+
+  getWarriorRageVictoryRushPoolCap() {
+    const c = this.config.warriorRage || {};
+    const capPct = Number.isFinite(c.victoryRushPoolCapPct) ? Math.max(0, c.victoryRushPoolCapPct) : 0.2;
+    return Math.max(1, this.player.maxHealth * capPct);
+  },
+
+  getWarriorRageVictoryRushHotDuration() {
+    const c = this.config.warriorRage || {};
+    return Number.isFinite(c.victoryRushHotDuration) ? Math.max(0.5, c.victoryRushHotDuration) : 15;
+  },
+
   getWarriorExecuteChance(points = this.skills.warriorExecute.points) {
     if (this.classSpec.usesRanged) return 0;
     const p = Number.isFinite(points) ? Math.max(0, points) : 0;

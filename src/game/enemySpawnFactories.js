@@ -221,6 +221,7 @@ export function spawnLeprechaunBoss(game, x, y) {
     potSpawned: false,
     charmCooldown: 0,
     punchCooldown: 0,
+    punchKnockbackCooldown: 0,
     punchWindup: 0,
     punchApplied: false,
     dirX: 1,

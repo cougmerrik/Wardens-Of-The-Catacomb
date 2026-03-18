@@ -673,11 +673,14 @@ function applyLeprechaunPunch(game, enemy) {
   const damageTaken = game.getWarriorRageDamageTaken(reducedByDefense);
   game.applyPlayerDamage(damageTaken);
   if (typeof game.applyPlayerKnockback === "function") {
-    game.applyPlayerKnockback(
-      (game.config.enemy.leprechaunPunchKnockbackTiles || 20) * (game.config.map?.tile || 32),
-      dx / dist,
-      dy / dist
-    );
+    if ((enemy.punchKnockbackCooldown || 0) <= 0) {
+      game.applyPlayerKnockback(
+        (game.config.enemy.leprechaunPunchKnockbackTiles || 20) * (game.config.map?.tile || 32),
+        dx / dist,
+        dy / dist
+      );
+      enemy.punchKnockbackCooldown = game.config.enemy.leprechaunPunchKnockbackCooldown || 15;
+    }
   }
   return true;
 }
@@ -692,6 +695,7 @@ export function updateLeprechaunBoss(game, enemy, dt, speedScale) {
   enemy.goldDropCooldown = Math.max(0, (enemy.goldDropCooldown || 0) - dt);
   enemy.charmCooldown = Math.max(0, (enemy.charmCooldown || 0) - dt);
   enemy.punchCooldown = Math.max(0, (enemy.punchCooldown || 0) - dt);
+  enemy.punchKnockbackCooldown = Math.max(0, (enemy.punchKnockbackCooldown || 0) - dt);
   enemy.punchWindup = Math.max(0, (enemy.punchWindup || 0) - dt);
   enemy.speechCooldown = Math.max(0, (enemy.speechCooldown || 0) - dt);
 

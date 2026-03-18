@@ -248,6 +248,8 @@ export const CONFIG = {
     leprechaunPunchDamageMin: 28,
     leprechaunPunchDamageMax: 42,
     leprechaunPunchKnockbackTiles: 20,
+    leprechaunPunchKnockbackCooldown: 15,
+    leprechaunPunchKnockbackDuration: 0.28,
     leprechaunCharmCooldown: 1.2,
     leprechaunCharmProjectileSpeed: 300,
     leprechaunCharmProjectileLife: 2.2,
@@ -327,7 +329,8 @@ export const CONFIG = {
       2.84
     ],
     mapGrowthFactorPerFloor: 1.2,
-    floorBossLevelMultiplier: 5
+    floorBossLevelMultiplier: 5,
+    floorOneLeprechaunBossChance: 0.2
   },
   fireArrow: {
     cooldown: 2.0,
@@ -370,7 +373,11 @@ export const CONFIG = {
     cooldown: 20,
     maxCooldownReductionPct: 0.4,
     baseDamageBonus: 0.3,
-    baseDamageBonusPerPoint: 0.14
+    baseDamageBonusPerPoint: 0.14,
+    victoryRushPerKillMinPct: 0.01,
+    victoryRushPerKillMaxPct: 0.03,
+    victoryRushPoolCapPct: 0.2,
+    victoryRushHotDuration: 15
   },
   minimap: {
     width: 220,
