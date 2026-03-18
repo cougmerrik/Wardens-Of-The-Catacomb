@@ -51,6 +51,9 @@ export function createPlayerState(classType, classSpec, fallbackMaxHealth) {
     animTime: 0,
     hitCooldown: 0,
     hpBarTimer: 0,
+    knockbackVx: 0,
+    knockbackVy: 0,
+    knockbackTimer: 0,
     classType
   };
 }

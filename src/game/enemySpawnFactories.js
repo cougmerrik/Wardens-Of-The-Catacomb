@@ -91,6 +91,27 @@ export function spawnMummy(game, x, y) {
   };
 }
 
+export function spawnPrisoner(game, x, y) {
+  const hp = game.rollScaledEnemyHealth(game.config.enemy.prisonerHpMin, game.config.enemy.prisonerHpMax);
+  return {
+    type: "prisoner",
+    x,
+    y,
+    size: 26,
+    speed: game.config.enemy.prisonerSpeed,
+    hp,
+    maxHp: hp,
+    hpBarTimer: 0,
+    damageMin: game.config.enemy.prisonerDamageMin,
+    damageMax: game.config.enemy.prisonerDamageMax,
+    attackCooldown: 0,
+    swingTimer: 0,
+    sweepApplied: false,
+    dirX: 1,
+    dirY: 0
+  };
+}
+
 export function spawnMimic(game, x, y) {
   const hp = game.rollScaledEnemyHealth(game.config.enemy.mimicHpMin, game.config.enemy.mimicHpMax);
   return {
@@ -237,6 +258,47 @@ export function spawnMinotaur(game, x, y) {
     chargeWindupTimer: 0,
     stompCooldown: 0.8,
     chargeImpactCooldown: 0
+  };
+}
+
+export function spawnLeprechaunBoss(game, x, y) {
+  const hp = game.rollScaledEnemyHealth(game.config.enemy.leprechaunHpMin, game.config.enemy.leprechaunHpMax);
+  const pot = game.findNearestSafePoint(
+    x + game.config.map.tile * (6 + Math.floor(Math.random() * 4)),
+    y + game.config.map.tile * (4 + Math.floor(Math.random() * 5)),
+    14
+  );
+  return {
+    type: "leprechaun",
+    x,
+    y,
+    size: 26,
+    speed: game.config.enemy.leprechaunFleeSpeed,
+    hp,
+    maxHp: hp,
+    baseMaxHp: hp,
+    baseSpeed: game.config.enemy.leprechaunFleeSpeed,
+    hpBarTimer: 9999,
+    damageMin: game.config.enemy.leprechaunDamageMin,
+    damageMax: game.config.enemy.leprechaunDamageMax,
+    isFloorBoss: true,
+    bossVariant: "leprechaun",
+    phase: "intro",
+    invincible: true,
+    goldDropped: 0,
+    goldDropCooldown: 0,
+    fleeElapsed: 0,
+    potX: pot.x,
+    potY: pot.y,
+    potSpawned: false,
+    charmCooldown: 0,
+    punchCooldown: 0,
+    punchKnockbackCooldown: 0,
+    punchWindup: 0,
+    punchApplied: false,
+    dirX: 1,
+    dirY: 0,
+    speechCooldown: 0
   };
 }
 

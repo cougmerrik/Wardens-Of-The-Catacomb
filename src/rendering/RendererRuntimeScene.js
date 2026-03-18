@@ -49,6 +49,9 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
 
     this.drawMap(game, cameraX, cameraY);
     if (game.portal?.active) this.drawExitPortal(game.portal, game.portal.x - cameraX, game.portal.y - cameraY, game.time);
+    if (game.floorBoss?.variant === "leprechaun" && Number.isFinite(game.floorBoss?.potX) && Number.isFinite(game.floorBoss?.potY)) {
+      this.drawLeprechaunPot(game.floorBoss.potX - cameraX, game.floorBoss.potY - cameraY, game.time);
+    }
 
     for (const stand of game.armorStands) {
       if (stand.animated && stand.activated) continue;
@@ -64,9 +67,12 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       if (enemy.type === "goblin") this.drawTreasureGoblin(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "armor") this.drawAnimatedArmor(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "mummy") this.drawMummy(enemy, enemy.x - cameraX, enemy.y - cameraY);
+      else if (enemy.type === "prisoner") this.drawPrisoner(enemy, enemy.x - cameraX, enemy.y - cameraY);
+      else if (enemy.type === "mummy") this.drawMummy(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "rat_archer") this.drawRatArcher(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "skeleton_warrior") this.drawSkeletonWarrior(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "necromancer") this.drawNecromancer(enemy, enemy.x - cameraX, enemy.y - cameraY);
+      else if (enemy.type === "leprechaun") this.drawLeprechaunBoss(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "minotaur") this.drawMinotaur(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "skeleton") this.drawSkeleton(enemy, enemy.x - cameraX, enemy.y - cameraY);
       else if (enemy.type === "mimic") {
@@ -87,6 +93,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     ctx.restore();
 
     this.drawExperienceBar(game, layout);
+    this.drawBossSpeechCallout(game, cameraX, cameraY, layout);
     this.drawHud(game, layout);
     const minimapBottom = this.drawMinimap(game, layout);
     this.drawPlayerStatsPanel(game, layout, minimapBottom + this.sidebarPadding);

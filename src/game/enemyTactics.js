@@ -3,10 +3,12 @@ import {
   updateGoblin,
   updateMummy,
   updateMimic,
+  updatePrisoner,
   updateRatArcher,
   updateSkeletonWarrior,
   updateNecromancer,
-  updateMinotaur
+  updateMinotaur,
+  updateLeprechaunBoss
 } from "./enemyAi.js";
 
 const DEFAULT_TACTIC_KEY_BY_TYPE = {
@@ -14,12 +16,14 @@ const DEFAULT_TACTIC_KEY_BY_TYPE = {
   goblin: "goblin",
   armor: "armor",
   mimic: "mimic",
+  prisoner: "prisoner",
   rat_archer: "rat_archer",
   skeleton_warrior: "skeleton_warrior",
   necromancer: "necromancer",
   skeleton: "skeleton",
   mummy: "mummy",
-  minotaur: "minotaur"
+  minotaur: "minotaur",
+  leprechaun: "leprechaun"
 };
 
 function updateGenericTactic(game, enemy, dt, speedScale) {
@@ -51,6 +55,11 @@ const TACTIC_DEFINITIONS = {
     label: "Ambush Predator",
     update: updateMimic
   },
+  prisoner: {
+    key: "prisoner",
+    label: "Deflecting Bruiser",
+    update: updatePrisoner
+  },
   rat_archer: {
     key: "rat_archer",
     label: "Ranged Spacing",
@@ -80,6 +89,11 @@ const TACTIC_DEFINITIONS = {
     key: "minotaur",
     label: "Rush Bruiser",
     update: updateMinotaur
+  },
+  leprechaun: {
+    key: "leprechaun",
+    label: "Trickster Boss",
+    update: updateLeprechaunBoss
   }
 };
 

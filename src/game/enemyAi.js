@@ -3,9 +3,11 @@ import { applyGoblinGrowth, findNearestGoldDrop } from "./enemyRewards.js";
 import {
   getPriorityTarget,
   hasLineOfSight,
+  isProjectileThreatening,
   isFriendlyToPlayer,
   moveEnemyTowardPoint
 } from "./enemyAiShared.js";
+export { updateLeprechaunBoss } from "./enemyLeprechaunAi.js";
 
 export { updateMinotaur, updateNecromancer, updateRatArcher, updateSkeletonWarrior } from "./enemyAdvancedAi.js";
 
@@ -42,8 +44,9 @@ export function updateGhost(game, enemy, dt, speedScale) {
   if (enemy.orbitSwapTimer <= 0) {
     const swapMin = Math.max(0.2, game.config.enemy.ghostOrbitSwapTimeMin || 0.9);
     const swapMax = Math.max(swapMin, game.config.enemy.ghostOrbitSwapTimeMax || 1.6);
+    const swapChance = Math.max(0, Math.min(1, Number.isFinite(game.config.enemy.ghostOrbitSwapChance) ? game.config.enemy.ghostOrbitSwapChance : 0.45));
     enemy.orbitSwapTimer = swapMin + Math.random() * Math.max(0, swapMax - swapMin);
-    if (Math.random() < 0.45) enemy.orbitDir = (enemy.orbitDir || 1) * -1;
+    if (Math.random() < swapChance) enemy.orbitDir = (enemy.orbitDir || 1) * -1;
   }
   if (enemy.diveDuration <= 0 && enemy.diveTimer <= 0) {
     enemy.diveDuration = diveDurationMax;
@@ -101,7 +104,7 @@ export function updateGhost(game, enemy, dt, speedScale) {
   const orbitY = target.y - dirY * preferredRange + perpY * (enemy.orbitDir || 1) * preferredRange * 0.7;
   const orbitTarget = { x: orbitX, y: orbitY };
   if (dist > preferredRange * 1.22) {
-    moveEnemyTowardPoint(game, enemy, orbitTarget, dt, speedScale * approachScale);
+    moveEnemyTowardPoint(game, enemy, target, dt, speedScale * approachScale, preferredRange * 0.9);
     return;
   }
   moveEnemyTowardPoint(game, enemy, orbitTarget, dt, speedScale * strafeScale);
@@ -265,4 +268,94 @@ export function updateMimic(game, enemy, dt, speedScale) {
   }
   enemy.tongueLength = 0;
   if (playerDist > tongueRange * 0.72) game.moveEnemyTowardPlayer(enemy, speedScale, dt);
+}
+export function updatePrisoner(game, enemy, dt, speedScale) {
+  enemy.attackCooldown = Math.max(0, (enemy.attackCooldown || 0) - dt);
+  enemy.swingTimer = Math.max(0, (enemy.swingTimer || 0) - dt);
+  const tile = game.config?.map?.tile || 32;
+  const range = (game.config.enemy.prisonerAttackRangeTiles || 2) * tile;
+  const target = getPriorityTarget(game, enemy, range * 3);
+  const dx = target.x - enemy.x;
+  const dy = target.y - enemy.y;
+  const dist = vecLength(dx, dy) || 1;
+  enemy.dirX = dx / dist;
+  enemy.dirY = dy / dist;
+  const startSwing = (aimX, aimY) => {
+    const aimLen = vecLength(aimX, aimY) || 1;
+    enemy.dirX = aimX / aimLen;
+    enemy.dirY = aimY / aimLen;
+    enemy.attackCooldown = game.config.enemy.prisonerAttackCooldown || 0.65;
+    enemy.swingTimer = game.config.enemy.prisonerWindup || 0.16;
+    enemy.sweepApplied = false;
+  };
+  const hostileProjectile = (() => {
+    const threatRadius = Math.max(enemy.size * 0.9, tile * 0.8);
+    for (const bullet of game.bullets || []) {
+      if ((bullet.life || 0) <= 0 || bullet.faction === "enemy" || bullet.projectileType === "trapArrow" || bullet.projectileType === "ratArrow") continue;
+      if (!isProjectileThreatening(enemy, bullet, threatRadius)) continue;
+      return { x: bullet.x + (bullet.vx || 0) * 0.05, y: bullet.y + (bullet.vy || 0) * 0.05 };
+    }
+    for (const arrow of game.fireArrows || []) {
+      if ((arrow.life || 0) <= 0) continue;
+      if (!isProjectileThreatening(enemy, arrow, threatRadius)) continue;
+      return { x: arrow.x + (arrow.vx || 0) * 0.05, y: arrow.y + (arrow.vy || 0) * 0.05 };
+    }
+    return null;
+  })();
+
+  if ((enemy.swingTimer || 0) > 0) {
+    if (!enemy.sweepApplied && enemy.swingTimer <= (game.config.enemy.prisonerWindup || 0.32) * 0.5) {
+      enemy.sweepApplied = true;
+      const swingRange = range;
+      const swingArc = ((game.config.enemy.prisonerAttackArcDeg || 70) * Math.PI) / 180;
+      const halfArc = swingArc * 0.5;
+      const enemyAngle = Math.atan2(enemy.dirY || 0, enemy.dirX || 1);
+      const inSwingArc = (x, y, radius = 0) => {
+        const tx = x - enemy.x;
+        const ty = y - enemy.y;
+        const targetDist = vecLength(tx, ty);
+        if (targetDist > swingRange + radius) return false;
+        let diff = Math.atan2(ty, tx) - enemyAngle;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        return Math.abs(diff) <= halfArc;
+      };
+      if (target === game.player && inSwingArc(game.player.x, game.player.y, game.getPlayerEnemyCollisionRadius())) {
+        if (game.player.hitCooldown <= 0) {
+          game.player.hitCooldown = 1.0;
+          const rawDamage = game.rollEnemyContactDamage(enemy);
+          const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
+          const reducedByDefense = Math.max(1, Math.round(scaledEnemyDamage - game.getDefenseFlatReduction()));
+          const damageTaken = game.getWarriorRageDamageTaken(reducedByDefense);
+          game.applyPlayerDamage(damageTaken);
+        }
+      } else if (target && target !== game.player && inSwingArc(target.x, target.y, (target.size || 20) * 0.5)) {
+        game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
+      }
+      for (const bullet of game.bullets || []) {
+        if ((bullet.life || 0) <= 0 || bullet.faction === "enemy" || bullet.projectileType === "trapArrow" || bullet.projectileType === "ratArrow") continue;
+        if (!inSwingArc(bullet.x, bullet.y, (bullet.size || 6) * 0.5)) continue;
+        if (bullet.projectileType === "deathBolt") game.triggerDeathBoltExplosion(bullet.x, bullet.y);
+        bullet.life = 0;
+      }
+      for (const arrow of game.fireArrows || []) {
+        if ((arrow.life || 0) <= 0) continue;
+        if (!inSwingArc(arrow.x, arrow.y, (arrow.size || 8) * 0.5)) continue;
+        game.triggerFireExplosion(arrow.x, arrow.y);
+        arrow.life = 0;
+      }
+    }
+    return;
+  }
+
+  if (hostileProjectile && enemy.attackCooldown <= 0) {
+    startSwing(hostileProjectile.x - enemy.x, hostileProjectile.y - enemy.y);
+    return;
+  }
+  if (dist <= range && enemy.attackCooldown <= 0) {
+    startSwing(dx, dy);
+    return;
+  }
+  if (typeof game.moveEnemyTowardTarget === "function") game.moveEnemyTowardTarget(enemy, target, speedScale, dt, Math.max(10, enemy.size * 0.25));
+  else game.moveEnemyTowardPlayer(enemy, speedScale, dt);
 }

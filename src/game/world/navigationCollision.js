@@ -174,40 +174,106 @@ export function getPathDirectionToPlayer(game, entity) {
   return { x: dx / len, y: dy / len };
 }
 
-function getPathDirectionToTarget(game, entity, target) {
-  if (!entity || !target || !Array.isArray(game.navDistance) || game.navDistance.length === 0 || !game.navDistance[0]) return null;
+export function getPathDirectionToTarget(game, entity, targetX, targetY, options = {}) {
+  if (!entity || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return { x: 0, y: 0, reached: true };
   const tileSize = game.config.map.tile;
-  const tx = Math.floor(entity.x / tileSize);
-  const ty = Math.floor(entity.y / tileSize);
-  const targetTx = Math.floor(target.x / tileSize);
-  const targetTy = Math.floor(target.y / tileSize);
-  if (!Number.isFinite(tx) || !Number.isFinite(ty) || !Number.isFinite(targetTx) || !Number.isFinite(targetTy)) return null;
-  if (ty < 0 || tx < 0 || ty >= game.navDistance.length || tx >= game.navDistance[0].length) return null;
-  if (targetTy < 0 || targetTx < 0 || targetTy >= game.navDistance.length || targetTx >= game.navDistance[0].length) return null;
-  const current = game.navDistance[ty][tx];
-  const targetDist = game.navDistance[targetTy][targetTx];
-  if (current < 0 || targetDist < 0 || current <= targetDist) return null;
-
-  let bestTx = tx;
-  let bestTy = ty;
-  let bestDist = current;
-  const dirsX = [1, -1, 0, 0];
-  const dirsY = [0, 0, 1, -1];
-  for (let i = 0; i < 4; i++) {
-    const nx = tx + dirsX[i];
-    const ny = ty + dirsY[i];
-    if (!isWalkableTile(game, nx, ny)) continue;
-    const d = game.navDistance[ny][nx];
-    if (d < 0 || d >= bestDist) continue;
-    bestDist = d;
-    bestTx = nx;
-    bestTy = ny;
+  const startTx = Math.floor(entity.x / tileSize);
+  const startTy = Math.floor(entity.y / tileSize);
+  const goalTx = Math.floor(targetX / tileSize);
+  const goalTy = Math.floor(targetY / tileSize);
+  const directDx = targetX - entity.x;
+  const directDy = targetY - entity.y;
+  const directLen = vecLength(directDx, directDy) || 1;
+  const minDistance = Math.max(0, Number.isFinite(options.minDistance) ? options.minDistance : 0);
+  if (directLen <= minDistance) return { x: directDx / directLen, y: directDy / directLen, reached: true };
+  if (!isWalkableTile(game, startTx, startTy) || !isWalkableTile(game, goalTx, goalTy)) {
+    return { x: directDx / directLen, y: directDy / directLen, reached: false };
   }
-  if (bestTx === tx && bestTy === ty) return null;
-  const dx = bestTx * tileSize + tileSize * 0.5 - entity.x;
-  const dy = bestTy * tileSize + tileSize * 0.5 - entity.y;
+
+  const cache = entity._pathToTargetCache || (entity._pathToTargetCache = {});
+  const targetChanged = cache.goalTx !== goalTx || cache.goalTy !== goalTy;
+  const startChanged = cache.startTx !== startTx || cache.startTy !== startTy;
+  const stale = !Array.isArray(cache.path) || cache.path.length === 0 || (cache.repathTimer || 0) <= 0;
+  cache.repathTimer = Math.max(0, (cache.repathTimer || 0) - (Number.isFinite(options.dt) ? options.dt : 0));
+
+  if (targetChanged || startChanged || stale) {
+    const heuristic = (tx, ty) => Math.abs(goalTx - tx) + Math.abs(goalTy - ty);
+    const width = game.map[0].length;
+    const height = game.map.length;
+    const open = [{ tx: startTx, ty: startTy, g: 0, f: heuristic(startTx, startTy) }];
+    const cameFrom = new Map();
+    const gScore = new Map([[`${startTx},${startTy}`, 0]]);
+    const closed = new Set();
+    const dirs = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 }
+    ];
+    let goalKey = null;
+    while (open.length > 0) {
+      let bestIndex = 0;
+      for (let i = 1; i < open.length; i++) {
+        if (open[i].f < open[bestIndex].f) bestIndex = i;
+      }
+      const current = open.splice(bestIndex, 1)[0];
+      const currentKey = `${current.tx},${current.ty}`;
+      if (closed.has(currentKey)) continue;
+      closed.add(currentKey);
+      if (current.tx === goalTx && current.ty === goalTy) {
+        goalKey = currentKey;
+        break;
+      }
+      for (const dir of dirs) {
+        const nx = current.tx + dir.x;
+        const ny = current.ty + dir.y;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (!isWalkableTile(game, nx, ny)) continue;
+        const neighborKey = `${nx},${ny}`;
+        if (closed.has(neighborKey)) continue;
+        const tentative = current.g + 1;
+        const bestKnown = gScore.get(neighborKey);
+        if (bestKnown !== undefined && tentative >= bestKnown) continue;
+        cameFrom.set(neighborKey, currentKey);
+        gScore.set(neighborKey, tentative);
+        open.push({ tx: nx, ty: ny, g: tentative, f: tentative + heuristic(nx, ny) });
+      }
+    }
+
+    if (goalKey) {
+      const path = [];
+      let cursor = goalKey;
+      while (cursor) {
+        const [tx, ty] = cursor.split(",").map(Number);
+        path.push({ tx, ty });
+        cursor = cameFrom.get(cursor) || null;
+      }
+      path.reverse();
+      cache.path = path;
+    } else {
+      cache.path = [];
+    }
+    cache.goalTx = goalTx;
+    cache.goalTy = goalTy;
+    cache.repathTimer = 0.3;
+  }
+
+  const path = Array.isArray(cache.path) ? cache.path : [];
+  let waypoint = null;
+  for (let i = 1; i < path.length; i++) {
+    const node = path[i];
+    const wx = node.tx * tileSize + tileSize * 0.5;
+    const wy = node.ty * tileSize + tileSize * 0.5;
+    if (vecLength(wx - entity.x, wy - entity.y) > Math.max(8, tileSize * 0.2)) {
+      waypoint = { x: wx, y: wy };
+      break;
+    }
+  }
+  if (!waypoint) waypoint = { x: targetX, y: targetY };
+  const dx = waypoint.x - entity.x;
+  const dy = waypoint.y - entity.y;
   const len = vecLength(dx, dy) || 1;
-  return { x: dx / len, y: dy / len };
+  return { x: dx / len, y: dy / len, reached: false };
 }
 
 function moveEntityWithCornerAssist(game, entity, dirX, dirY, moveStep) {
@@ -238,15 +304,15 @@ function moveEntityWithCornerAssist(game, entity, dirX, dirY, moveStep) {
   }
 }
 
-export function moveEnemyTowardTargetPoint(game, enemy, target, speedScale, dt, minDistance = 0) {
-  if (!enemy || !target || !Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) return;
+export function moveEnemyTowardTargetPoint(game, enemy, targetX, targetY, speedScale, dt, minDistance = 0, usePathfinding = false) {
+  if (!enemy || !Number.isFinite(targetX) || !Number.isFinite(targetY) || !Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) return;
   const enemySpeed = Number.isFinite(enemy.speed) ? enemy.speed : 70;
   const sScale = Number.isFinite(speedScale) ? speedScale : 1;
   const delta = Number.isFinite(dt) ? dt : 0;
   const speedStep = enemySpeed * sScale * delta;
   if (!Number.isFinite(speedStep) || speedStep <= 0) return;
-  const dx = target.x - enemy.x;
-  const dy = target.y - enemy.y;
+  const dx = targetX - enemy.x;
+  const dy = targetY - enemy.y;
   if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
   const len = vecLength(dx, dy) || 1;
   if (len <= minDistance) return;
@@ -254,9 +320,11 @@ export function moveEnemyTowardTargetPoint(game, enemy, target, speedScale, dt, 
   if (!Number.isFinite(moveStep) || moveStep <= 0) return;
   const directX = dx / len;
   const directY = dy / len;
-  const pathDir = getPathDirectionToTarget(game, enemy, target);
-  const biasX = pathDir && len > game.config.map.tile ? directX * 0.35 + pathDir.x * 0.65 : directX;
-  const biasY = pathDir && len > game.config.map.tile ? directY * 0.35 + pathDir.y * 0.65 : directY;
+  const pathDir = usePathfinding || len > game.config.map.tile
+    ? getPathDirectionToTarget(game, enemy, targetX, targetY, { dt: delta, minDistance })
+    : null;
+  const biasX = pathDir && Number.isFinite(pathDir.x) ? directX * 0.35 + pathDir.x * 0.65 : directX;
+  const biasY = pathDir && Number.isFinite(pathDir.y) ? directY * 0.35 + pathDir.y * 0.65 : directY;
   const biasLen = vecLength(biasX, biasY) || 1;
   moveEntityWithCornerAssist(game, enemy, biasX / biasLen, biasY / biasLen, moveStep);
 }
@@ -267,7 +335,24 @@ export function moveEnemyTowardPlayer(game, enemy, speedScale, dt) {
     ? game.getPlayerEnemyCollisionRadius()
     : ((game.config?.player?.enemyCollisionSize ?? game.player?.size ?? 0) * 0.5);
   const minDistance = playerRadius + enemy.size * 0.5;
-  moveEnemyTowardTargetPoint(game, enemy, game.player, speedScale, dt, minDistance);
+  const enemySpeed = Number.isFinite(enemy.speed) ? enemy.speed : 70;
+  const sScale = Number.isFinite(speedScale) ? speedScale : 1;
+  const delta = Number.isFinite(dt) ? dt : 0;
+  const speedStep = enemySpeed * sScale * delta;
+  if (!Number.isFinite(speedStep) || speedStep <= 0) return;
+  const dx = game.player.x - enemy.x;
+  const dy = game.player.y - enemy.y;
+  const len = vecLength(dx, dy) || 1;
+  if (len <= minDistance) return;
+  const moveStep = Math.min(speedStep, len - minDistance);
+  if (!Number.isFinite(moveStep) || moveStep <= 0) return;
+  const directX = dx / len;
+  const directY = dy / len;
+  const pathDir = getPathDirectionToPlayer(game, enemy);
+  const biasX = Number.isFinite(pathDir?.x) ? directX * 0.35 + pathDir.x * 0.65 : directX;
+  const biasY = Number.isFinite(pathDir?.y) ? directY * 0.35 + pathDir.y * 0.65 : directY;
+  const biasLen = vecLength(biasX, biasY) || 1;
+  moveEntityWithCornerAssist(game, enemy, biasX / biasLen, biasY / biasLen, moveStep);
 }
 
 export function separateEnemyFromPlayer(game, enemy) {

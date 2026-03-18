@@ -1,4 +1,34 @@
 export const runtimeBaseSupportMethods = {
+  getMapGrowthFactorForFloor(targetFloor) {
+    const progression = this.config?.progression || {};
+    const safeFloor = Number.isFinite(targetFloor) ? Math.max(2, Math.floor(targetFloor)) : 2;
+    const byFloor = progression.mapGrowthFactorByFloor && typeof progression.mapGrowthFactorByFloor === "object"
+      ? progression.mapGrowthFactorByFloor
+      : null;
+    const floorSpecific = byFloor ? Number(byFloor[safeFloor]) : NaN;
+    if (Number.isFinite(floorSpecific) && floorSpecific > 1) return floorSpecific;
+    const fallback = Number(progression.mapGrowthFactorDefault);
+    if (Number.isFinite(fallback) && fallback > 1) return fallback;
+    const legacy = Number(progression.mapGrowthFactorPerFloor);
+    if (Number.isFinite(legacy) && legacy > 1) return legacy;
+    return 1.05;
+  },
+
+  getMapSizeForFloor(targetFloor) {
+    const safeFloor = Number.isFinite(targetFloor) ? Math.max(1, Math.floor(targetFloor)) : 1;
+    let nextWidth = Number.isFinite(this.config?.map?.width) ? this.config.map.width : this.mapWidth;
+    let nextHeight = Number.isFinite(this.config?.map?.height) ? this.config.map.height : this.mapHeight;
+    for (let floor = 2; floor <= safeFloor; floor++) {
+      const growth = this.getMapGrowthFactorForFloor(floor);
+      nextWidth = Math.max(nextWidth + 1, Math.floor(nextWidth * growth));
+      nextHeight = Math.max(nextHeight + 1, Math.floor(nextHeight * growth));
+    }
+    return {
+      width: nextWidth,
+      height: nextHeight
+    };
+  },
+
   shouldShowPlayerHealthBar() {
     const ratio = this.player.maxHealth > 0 ? this.player.health / this.player.maxHealth : 0;
     return this.player.hpBarTimer > 0 || ratio <= this.config.player.lowHealthThreshold;

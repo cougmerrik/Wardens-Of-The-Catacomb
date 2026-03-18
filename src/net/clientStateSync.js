@@ -270,6 +270,8 @@ export function applyMetaStateToGame(game, state) {
   if (Number.isFinite(state.warriorMomentumTimer)) game.warriorMomentumTimer = state.warriorMomentumTimer;
   if (Number.isFinite(state.warriorRageActiveTimer)) game.warriorRageActiveTimer = state.warriorRageActiveTimer;
   if (Number.isFinite(state.warriorRageCooldownTimer)) game.warriorRageCooldownTimer = state.warriorRageCooldownTimer;
+  if (Number.isFinite(state.warriorRageVictoryRushPool)) game.warriorRageVictoryRushPool = state.warriorRageVictoryRushPool;
+  if (Number.isFinite(state.warriorRageVictoryRushTimer)) game.warriorRageVictoryRushTimer = state.warriorRageVictoryRushTimer;
   if (state.floorBoss && typeof state.floorBoss === "object") game.floorBoss = syncFloorBossState(game.floorBoss, state.floorBoss, game);
   if (state.portal && typeof state.portal === "object") game.portal = { ...state.portal };
   if (state.musicTrack && typeof state.musicTrack === "object") game.musicTrack = { ...state.musicTrack };

@@ -9,7 +9,7 @@ process.chdir(projectRoot);
 
 const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT || "8080", 10);
 const WS_PORT = Number.parseInt(process.env.WS_PORT || "8090", 10);
-const GAME_URL = `http://localhost:${HTTP_PORT}`;
+const GAME_URL = `http://localhost:${HTTP_PORT}/?dev=1`;
 
 const children = [];
 let shuttingDown = false;

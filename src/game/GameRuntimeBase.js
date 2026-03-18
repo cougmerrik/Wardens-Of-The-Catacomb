@@ -3,6 +3,7 @@ import { clamp } from "../utils.js";
 import { createCastleMap } from "../mapGenerator.js";
 import { InputController } from "../InputController.js";
 import { Renderer } from "../Renderer.js";
+import { runtimeBasePlacementMethods } from "./runtimeBasePlacementMethods.js";
 import { runtimeBaseSupportMethods } from "./runtimeBaseSupportMethods.js";
 import { runtimeBaseDifficultyMethods } from "./runtimeBaseDifficultyMethods.js";
 import { runtimeCombatStatsMethods } from "./runtimeCombatStatsMethods.js";
@@ -83,6 +84,8 @@ export class GameRuntimeBase {
     this.warriorMomentumTimer = 0;
     this.warriorRageActiveTimer = 0;
     this.warriorRageCooldownTimer = 0;
+    this.warriorRageVictoryRushPool = 0;
+    this.warriorRageVictoryRushTimer = 0;
     this.necromancerBeam = createNecromancerBeamState();
     this.upgrades = createUpgradeState();
     this.shopOrder = ["moveSpeed", "attackSpeed", "damage", "defense"];
@@ -111,6 +114,87 @@ export class GameRuntimeBase {
     return this.canvas.width - this.config.hud.sidebarWidth;
   }
 
+  shouldShowPlayerHealthBar() {
+    const ratio = this.player.maxHealth > 0 ? this.player.health / this.player.maxHealth : 0;
+    return this.player.hpBarTimer > 0 || ratio <= this.config.player.lowHealthThreshold;
+  }
+
+  markPlayerHealthBarVisible() {
+    this.player.hpBarTimer = this.config.player.hpBarDuration;
+  }
+
+  applyPlayerHealing(amount, options = {}) {
+    if (amount <= 0) return;
+    const suppressText = !!options.suppressText;
+    const before = this.player.health;
+    this.player.health = Math.min(this.player.maxHealth, this.player.health + amount);
+    if (this.player.health > before) {
+      const healed = this.player.health - before;
+      this.markPlayerHealthBarVisible();
+      if (!suppressText) {
+        this.spawnFloatingText(this.player.x, this.player.y - 26, `+${Math.max(1, Math.round(healed))}`, "#79e59a", 0.8, 14);
+      }
+    }
+  }
+
+  getHealthPickupAmount() {
+    const pct = Number.isFinite(this.config?.drops?.healthRestorePct) ? this.config.drops.healthRestorePct : 0.25;
+    return Math.max(1, Math.round(this.player.maxHealth * Math.max(0, pct)));
+  }
+
+  applyPlayerDamage(amount) {
+    if (amount <= 0) return;
+    this.spawnFloatingText(this.player.x, this.player.y - 18, `-${Math.round(amount)}`, "#ef6d6d");
+    this.player.health = Math.max(0, this.player.health - amount);
+    this.markPlayerHealthBarVisible();
+    if (this.player.health <= 0) this.triggerGameOver();
+  }
+
+  applyPlayerKnockback(distance, dirX, dirY) {
+    if (!Number.isFinite(distance) || distance <= 0) return;
+    const len = clamp(Math.hypot(dirX || 0, dirY || 0), 0, Number.POSITIVE_INFINITY) || 1;
+    const nx = (dirX || 0) / len;
+    const ny = (dirY || 0) / len;
+    const duration = Math.max(0.08, Number.isFinite(this.config?.enemy?.leprechaunPunchKnockbackDuration) ? this.config.enemy.leprechaunPunchKnockbackDuration : 0.28);
+    this.player.knockbackVx = (distance / duration) * nx;
+    this.player.knockbackVy = (distance / duration) * ny;
+    this.player.knockbackTimer = duration;
+  }
+
+  triggerGameOver() {
+    if (this.deathTransition.active) return;
+    this.gameOver = true;
+    this.paused = false;
+    this.shopOpen = false;
+    this.skillTreeOpen = false;
+    this.statsPanelOpen = false;
+    this.deathTransition.active = true;
+    this.deathTransition.elapsed = 0;
+    this.deathTransition.returnTriggered = false;
+    if (typeof this.onGameOverChanged === "function") this.onGameOverChanged(true, this);
+  }
+
+  updateDeathTransition(dt) {
+    if (!this.deathTransition.active) return false;
+    this.deathTransition.elapsed = Math.min(
+      this.deathTransitionDuration,
+      this.deathTransition.elapsed + Math.max(0, Number.isFinite(dt) ? dt : 0)
+    );
+    if (!this.deathTransition.returnTriggered && this.deathTransition.elapsed >= this.deathTransitionDuration) {
+      this.deathTransition.returnTriggered = true;
+      if (typeof this.onReturnToMenu === "function") this.onReturnToMenu();
+    }
+    return true;
+  }
+
+  getDeathTransitionProgress() {
+    if (!this.deathTransition.active || this.deathTransitionDuration <= 0) return 0;
+    return Math.max(0, Math.min(1, this.deathTransition.elapsed / this.deathTransitionDuration));
+  }
+
+  spawnFloatingText(x, y, text, color, life = 0.75, size = 14) {
+    this.floatingTexts.push({ x, y, text, color, life, maxLife: life, vy: 22, size });
+  }
   generateFloor(width, height) {
     this.mapWidth = width;
     this.mapHeight = height;
@@ -132,6 +216,8 @@ export class GameRuntimeBase {
     this.warriorMomentumTimer = 0;
     this.warriorRageActiveTimer = 0;
     this.warriorRageCooldownTimer = 0;
+    this.warriorRageVictoryRushPool = 0;
+    this.warriorRageVictoryRushTimer = 0;
     this.necromancerBeam = createNecromancerBeamState();
     this.navDistance = Array.from({ length: this.map.length }, () => Array(this.map[0].length).fill(-1));
     this.navPlayerTile = { x: -1, y: -1 };
@@ -158,9 +244,9 @@ export class GameRuntimeBase {
       maxHealth: this.player.maxHealth
     };
     this.floor += 1;
-    const growth = this.config.progression.mapGrowthFactorPerFloor;
-    const nextWidth = Math.max(this.mapWidth + 1, Math.floor(this.mapWidth * growth));
-    const nextHeight = Math.max(this.mapHeight + 1, Math.floor(this.mapHeight * growth));
+    const nextMapSize = this.getMapSizeForFloor(this.floor);
+    const nextWidth = nextMapSize.width;
+    const nextHeight = nextMapSize.height;
     this.generateFloor(nextWidth, nextHeight);
     this.gold = persisted.gold;
     this.skillPoints = persisted.skillPoints;
@@ -186,6 +272,42 @@ export class GameRuntimeBase {
       });
       this.enemies.push(...controlledUndead);
     }
+    if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
+  }
+
+  getMinimumLevelForFloorStart(floor = this.floor) {
+    const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    if (safeFloor <= 1) return 1;
+    return this.getFloorBossTriggerLevel(safeFloor - 1);
+  }
+
+  applyDebugStartingFloor(floor = 1) {
+    const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    const targetLevel = this.getMinimumLevelForFloorStart(safeFloor);
+    this.floor = safeFloor;
+    this.level = 1;
+    this.experience = 0;
+    this.expToNextLevel = this.config.progression.baseXpToLevel;
+    this.skillPoints = 0;
+    this.gold = 0;
+    this.score = 0;
+    this.levelWeaponDamageBonus = 0;
+    this.player.maxHealth = Number.isFinite(this.classSpec.baseMaxHealth) ? this.classSpec.baseMaxHealth : this.config.player.maxHealth;
+    this.player.health = this.player.maxHealth;
+    this.player.fireCooldown = 0;
+    this.player.fireArrowCooldown = 0;
+    this.player.deathBoltCooldown = 0;
+    this.player.hitCooldown = 0;
+    this.player.hpBarTimer = 0;
+    while (this.level < targetLevel) {
+      this.gainExperience(this.expToNextLevel);
+    }
+    this.experience = 0;
+    this.floatingTexts = [];
+
+    const nextMapSize = this.getMapSizeForFloor(safeFloor);
+    this.generateFloor(nextMapSize.width, nextMapSize.height);
+    this.syncFloorBossState();
     if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
   }
 
@@ -365,110 +487,9 @@ export class GameRuntimeBase {
     }
   }
 
-  findNearestSafePoint(x, y, maxRadiusTiles = 8) {
-    const tile = this.config.map.tile;
-    const tx = Math.floor(x / tile);
-    const ty = Math.floor(y / tile);
-    const radius = Math.max(4, (this.player?.size || tile * 0.6) * 0.5);
-    const isSafe = (cx, cy) => {
-      const px = cx * tile + tile * 0.5;
-      const py = cy * tile + tile * 0.5;
-      if (typeof this.isPositionWalkable === "function") return this.isPositionWalkable(px, py, radius);
-      if (typeof this.isWalkableTile === "function" && !this.isWalkableTile(cx, cy)) return false;
-      if (typeof this.isWallAt === "function") {
-        return !this.isWallAt(px - radius, py - radius, true) && !this.isWallAt(px + radius, py - radius, true) &&
-          !this.isWallAt(px - radius, py + radius, true) && !this.isWallAt(px + radius, py + radius, true);
-      }
-      return true;
-    };
-    if (isSafe(tx, ty)) return { x: tx * tile + tile * 0.5, y: ty * tile + tile * 0.5 };
-    for (let radius = 1; radius <= maxRadiusTiles; radius++) {
-      for (let oy = -radius; oy <= radius; oy++) {
-        for (let ox = -radius; ox <= radius; ox++) {
-          if (Math.abs(ox) !== radius && Math.abs(oy) !== radius) continue;
-          const cx = tx + ox;
-          const cy = ty + oy;
-          if (!isSafe(cx, cy)) continue;
-          return { x: cx * tile + tile * 0.5, y: cy * tile + tile * 0.5 };
-        }
-      }
-    }
-    return { x: this.player.x, y: this.player.y };
-  }
-
-  getPlayerEnemyCollisionRadius() {
-    const size = Number.isFinite(this.config.player.enemyCollisionSize)
-      ? this.config.player.enemyCollisionSize
-      : this.player.size;
-    return Math.max(0, size) * 0.5;
-  }
-
-  isPositionWalkable(x, y, radius = 0, blockBreakables = true) {
-    if (typeof this.isWallAt !== "function") return true;
-    const r = Math.max(0, Number.isFinite(radius) ? radius : 0);
-    return (
-      !this.isWallAt(x - r, y - r, blockBreakables) &&
-      !this.isWallAt(x + r, y - r, blockBreakables) &&
-      !this.isWallAt(x - r, y + r, blockBreakables) &&
-      !this.isWallAt(x + r, y + r, blockBreakables)
-    );
-  }
-
-  ensurePlayerSafePosition(maxRadiusTiles = 10) {
-    const radius = Math.max(4, (this.player?.size || this.config.map.tile * 0.6) * 0.5);
-    if (this.isPositionWalkable(this.player.x, this.player.y, radius, true)) return false;
-    const safe = this.findNearestSafePoint(this.player.x, this.player.y, maxRadiusTiles);
-    if (!safe) return false;
-    this.player.x = safe.x;
-    this.player.y = safe.y;
-    return true;
-  }
-
-  getTrapDetectionBonus() {
-    return 0;
-  }
-
-  getActiveBounds(padTiles = 8) {
-    const cam = this.getCamera();
-    const tile = this.config.map.tile;
-    const pad = Math.max(0, padTiles) * tile;
-    const playW = this.getPlayAreaWidth();
-    return {
-      left: cam.x - pad,
-      top: cam.y - pad,
-      right: cam.x + playW + pad,
-      bottom: cam.y + this.canvas.height + pad
-    };
-  }
-
-  isInsideBounds(x, y, radius = 0, bounds = null) {
-    if (!bounds || !Number.isFinite(x) || !Number.isFinite(y)) return false;
-    const r = Number.isFinite(radius) ? Math.max(0, radius) : 0;
-    return x + r >= bounds.left && x - r <= bounds.right && y + r >= bounds.top && y - r <= bounds.bottom;
-  }
-
-  getPickupRadius() {
-    return this.config.player.pickupRadius;
-  }
-
-  isPlayerAtDoor() {
-    if (!this.door.open) return false;
-    const tileHalf = this.config.map.tile / 2;
-    const left = this.door.x - tileHalf;
-    const right = this.door.x + tileHalf;
-    const top = this.door.y - tileHalf;
-    const bottom = this.door.y + tileHalf;
-    const px = this.player.x;
-    const py = this.player.y;
-    const pr = this.player.size * 0.5;
-    const closestX = Math.max(left, Math.min(px, right));
-    const closestY = Math.max(top, Math.min(py, bottom));
-    const dx = px - closestX;
-    const dy = py - closestY;
-    return dx * dx + dy * dy <= (pr + 4) * (pr + 4);
-  }
 }
 
+Object.assign(GameRuntimeBase.prototype, runtimeBasePlacementMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeBaseSupportMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeBaseDifficultyMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeFloorBossMethods);

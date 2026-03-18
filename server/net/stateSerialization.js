@@ -161,6 +161,8 @@ export function serializeMetaState(source) {
     warriorMomentumTimer: sim.warriorMomentumTimer || 0,
     warriorRageActiveTimer: sim.warriorRageActiveTimer || 0,
     warriorRageCooldownTimer: sim.warriorRageCooldownTimer || 0,
+    warriorRageVictoryRushPool: sim.warriorRageVictoryRushPool || 0,
+    warriorRageVictoryRushTimer: sim.warriorRageVictoryRushTimer || 0,
     floorBoss,
     portal: sim.portal ? { ...sim.portal } : null,
     musicTrack,
@@ -174,11 +176,7 @@ export function serializeState(room) {
   const activeBounds = makeActiveBounds(sim, 8);
   const floorBoss =
     sim.floorBoss && typeof sim.floorBoss === "object"
-      ? {
-          floor: sim.floorBoss.floor,
-          triggerLevel: sim.floorBoss.triggerLevel,
-          phase: sim.floorBoss.phase
-        }
+      ? { ...sim.floorBoss }
       : null;
   const activeEnemies = sim.enemies.filter((e) => isInsideBounds(e, activeBounds, 56));
   const activeDrops = sim.drops.filter((d) => isInsideBounds(d, activeBounds, 40));

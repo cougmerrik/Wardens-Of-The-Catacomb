@@ -64,8 +64,8 @@ export function startNetworkRenderLoopRuntime({
 
   const loop = (now) => {
     if (!getCurrentGame() || getCurrentGame() !== game) return;
-    const targetFrameMs = isNetworkController() ? 1000 / 60 : 1000 / 45;
-    if (now - lastFrameAt < targetFrameMs) {
+    const targetFrameMs = isNetworkController() ? 0 : 1000 / 45;
+    if (targetFrameMs > 0 && now - lastFrameAt < targetFrameMs) {
       setNetRenderRaf(requestAnimationFrame(loop));
       return;
     }

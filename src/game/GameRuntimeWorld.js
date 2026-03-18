@@ -6,8 +6,9 @@ import {
   isWalkableTile,
   updateNavigationField,
   getPathDirectionToPlayer,
-  moveEnemyTowardTargetPoint,
+  getPathDirectionToTarget,
   moveEnemyTowardPlayer,
+  moveEnemyTowardTargetPoint,
   moveWithCollision,
   separateEnemyFromPlayer
 } from "./world/navigationCollision.js";
@@ -17,11 +18,13 @@ import {
   spawnTreasureGoblin,
   spawnAnimatedArmor,
   spawnMummy,
+  spawnPrisoner,
   spawnMimic,
   spawnRatArcher,
   spawnSkeletonWarrior,
   spawnNecromancer,
   spawnMinotaur,
+  spawnLeprechaunBoss,
   spawnSkeleton,
   applyEnemyDamage,
   randomEnemySpawnPoint
@@ -74,12 +77,16 @@ export class GameRuntimeWorld extends GameRuntimeBase {
     return getPathDirectionToPlayer(this, entity);
   }
 
-  moveEnemyTowardTargetPoint(enemy, target, speedScale, dt, minDistance = 0) {
-    moveEnemyTowardTargetPoint(this, enemy, target, speedScale, dt, minDistance);
+  getPathDirectionToTarget(entity, targetX, targetY, options) {
+    return getPathDirectionToTarget(this, entity, targetX, targetY, options);
   }
 
   moveEnemyTowardPlayer(enemy, speedScale, dt) {
     moveEnemyTowardPlayer(this, enemy, speedScale, dt);
+  }
+
+  moveEnemyTowardTargetPoint(enemy, targetX, targetY, speedScale, dt, minDistance = 0, usePathfinding = false) {
+    moveEnemyTowardTargetPoint(this, enemy, targetX, targetY, speedScale, dt, minDistance, usePathfinding);
   }
 
   moveWithCollision(entity, dx, dy) {
@@ -110,6 +117,10 @@ export class GameRuntimeWorld extends GameRuntimeBase {
     return spawnMummy(this, x, y);
   }
 
+  spawnPrisoner(x, y) {
+    return spawnPrisoner(this, x, y);
+  }
+
   spawnMimic(x, y) {
     return spawnMimic(this, x, y);
   }
@@ -128,6 +139,10 @@ export class GameRuntimeWorld extends GameRuntimeBase {
 
   spawnMinotaur(x, y) {
     return spawnMinotaur(this, x, y);
+  }
+
+  spawnLeprechaunBoss(x, y) {
+    return spawnLeprechaunBoss(this, x, y);
   }
 
   spawnSkeleton(x, y, options) {

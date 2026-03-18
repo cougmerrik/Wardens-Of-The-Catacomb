@@ -15,7 +15,11 @@ const BASELINE_PATH = resolve(artifactsDir, "network-browser-baseline.json");
 const HTTP_PORT = 8183;
 const WS_PORT = 8193;
 const ROOM_ID = "perf-network-browser";
-const GAME_URL = `http://127.0.0.1:${HTTP_PORT}`;
+const NET_DELAY_CONTROLLER_MS = Number.parseInt(process.env.NET_DELAY_CONTROLLER_MS || "", 10);
+const GAME_URL =
+  Number.isFinite(NET_DELAY_CONTROLLER_MS) && NET_DELAY_CONTROLLER_MS >= 0
+    ? `http://127.0.0.1:${HTTP_PORT}?netDelayController=${NET_DELAY_CONTROLLER_MS}`
+    : `http://127.0.0.1:${HTTP_PORT}`;
 const SAMPLE_WINDOW_MS = 5000;
 const SAMPLE_INTERVAL_MS = 250;
 

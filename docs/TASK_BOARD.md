@@ -13,6 +13,7 @@ Use this file as the working board for the current branch. Keep tasks finite, te
 ## Validation Commands
 - `npm run validate:core`
 - `npm run validate:gameplay`
+- `npm run validate:dev-start`
 - `npm run validate:network`
 - `npm run validate:pre-commit`
 - `npm run validate:closeout`

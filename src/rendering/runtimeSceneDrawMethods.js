@@ -1,4 +1,5 @@
 import { runtimeSceneEnemyDrawMethods } from "./runtimeSceneEnemyDrawMethods.js";
+import { runtimeSceneObjectDrawMethods } from "./runtimeSceneObjectDrawMethods.js";
 
 export const runtimeSceneDrawMethods = {
   drawNetworkPendingScene(game, layout) {
@@ -158,6 +159,97 @@ export const runtimeSceneDrawMethods = {
   },
 
   ...runtimeSceneEnemyDrawMethods,
+  ...runtimeSceneObjectDrawMethods,
+
+  drawPrisoner(enemy, screenX, screenY) {
+    const ctx = this.ctx;
+    const half = enemy.size * 0.5;
+    const aimX = Number.isFinite(enemy.dirX) ? enemy.dirX : 1;
+    const aimY = Number.isFinite(enemy.dirY) ? enemy.dirY : 0;
+    const windup = Math.max(0.01, this.config.enemy.prisonerWindup || 0.16);
+    const swingRatio = 1 - Math.max(0, Math.min(1, (enemy.swingTimer || 0) / windup));
+    const chainReach = (this.config.enemy.prisonerAttackRangeTiles || 2) * this.config.map.tile * 0.55;
+    const sweepRange = (this.config.enemy.prisonerAttackRangeTiles || 1.5) * this.config.map.tile;
+    const sweepArc = ((this.config.enemy.prisonerAttackArcDeg || 180) * Math.PI) / 180;
+    const dragX = -aimX;
+    const dragY = -aimY;
+    const dragPerpX = -dragY;
+    const dragPerpY = dragX;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.36)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY + half * 0.82, half * 1.05, half * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#5d4b42";
+    ctx.fillRect(screenX - half * 0.48, screenY - half * 0.1, half * 0.96, half * 1.08);
+    ctx.fillStyle = "#7c675a";
+    ctx.fillRect(screenX - half * 0.38, screenY - half * 0.72, half * 0.76, half * 0.72);
+
+    ctx.fillStyle = "#d7c2ae";
+    ctx.beginPath();
+    ctx.arc(screenX, screenY - half * 0.42, half * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#4a342c";
+    ctx.fillRect(screenX - half * 0.15, screenY - half * 0.25, half * 0.3, half * 0.48);
+
+    ctx.strokeStyle = "#8d7b6e";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(screenX - half * 0.34, screenY - half * 0.02);
+    ctx.quadraticCurveTo(
+      screenX - half * 0.34 + dragPerpX * 8,
+      screenY + half * 0.24 + dragPerpY * 8,
+      screenX - half * 0.34 + dragX * chainReach * 0.7,
+      screenY + half * 0.18 + dragY * chainReach * 0.7
+    );
+    ctx.moveTo(screenX + half * 0.34, screenY - half * 0.02);
+    ctx.quadraticCurveTo(
+      screenX + half * 0.34 - dragPerpX * 8,
+      screenY + half * 0.28 - dragPerpY * 8,
+      screenX + half * 0.34 + dragX * chainReach * 0.55,
+      screenY + half * 0.24 + dragY * chainReach * 0.55
+    );
+    ctx.stroke();
+
+    if ((enemy.swingTimer || 0) > 0) {
+      const sweepAngle = Math.atan2(aimY, aimX);
+      const sweepStart = sweepAngle - sweepArc * 0.5;
+      const sweepEnd = sweepAngle + sweepArc * 0.5;
+      const alpha = Math.max(0.18, Math.min(0.78, 0.22 + swingRatio * 0.56));
+      const arcRadius = sweepRange * (0.88 + swingRatio * 0.16);
+      const slashGrad = ctx.createRadialGradient(
+        screenX,
+        screenY,
+        arcRadius * 0.16,
+        screenX + aimX * arcRadius * 0.55,
+        screenY + aimY * arcRadius * 0.55,
+        arcRadius
+      );
+      slashGrad.addColorStop(0, `rgba(255, 228, 186, ${alpha})`);
+      slashGrad.addColorStop(0.65, `rgba(210, 118, 82, ${alpha * 0.72})`);
+      slashGrad.addColorStop(1, "rgba(120, 38, 22, 0)");
+
+      ctx.save();
+      ctx.fillStyle = slashGrad;
+      ctx.beginPath();
+      ctx.moveTo(screenX, screenY);
+      ctx.arc(screenX, screenY, arcRadius, sweepStart, sweepEnd);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = `rgba(244, 216, 179, ${Math.min(0.95, alpha + 0.18)})`;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, arcRadius * 0.82, sweepStart, sweepEnd);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.fillStyle = "#5a463b";
+    ctx.fillRect(screenX - half * 0.52, screenY + half * 0.92, half * 0.28, half * 0.42);
+    ctx.fillRect(screenX + half * 0.24, screenY + half * 0.92, half * 0.28, half * 0.42);
+  },
 
   drawSkeletonWarrior(enemy, screenX, screenY) {
     const ctx = this.ctx;
@@ -263,108 +355,6 @@ export const runtimeSceneDrawMethods = {
     ctx.fillRect(x, y, width, height);
     ctx.fillStyle = ratio > 0.5 ? "#7cd88f" : ratio > 0.25 ? "#e1bf63" : "#de6a6a";
     ctx.fillRect(x, y, width * ratio, height);
-  },
-
-  drawArmorStand(stand, screenX, screenY) {
-    const ctx = this.ctx;
-    const half = stand.size / 2;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-    ctx.beginPath();
-    ctx.ellipse(screenX, screenY + half * 0.75, half * 0.95, half * 0.38, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#8e96a8";
-    ctx.fillRect(screenX - 5, screenY - 4, 10, 14);
-    ctx.fillStyle = "#aeb7ca";
-    ctx.beginPath();
-    ctx.arc(screenX, screenY - 9, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#6a7388";
-    ctx.fillRect(screenX - 7, screenY + 8, 14, 5);
-    ctx.fillStyle = "#7f6543";
-    ctx.fillRect(screenX + 8, screenY - 12, 2, 22);
-    ctx.fillStyle = "#aeb7ca";
-    ctx.beginPath();
-    ctx.moveTo(screenX + 9, screenY - 15);
-    ctx.lineTo(screenX + 15, screenY - 9);
-    ctx.lineTo(screenX + 9, screenY - 4);
-    ctx.closePath();
-    ctx.fill();
-    if (stand.animated && !stand.activated) {
-      ctx.fillStyle = "rgba(255, 90, 90, 0.9)";
-      ctx.fillRect(screenX - 2.5, screenY - 10, 2, 2);
-      ctx.fillRect(screenX + 0.5, screenY - 10, 2, 2);
-    }
-  },
-
-  drawWallTrap(trap, screenX, screenY) {
-    const ctx = this.ctx;
-    const dirX = Number.isFinite(trap.dirX) ? trap.dirX : 1;
-    const dirY = Number.isFinite(trap.dirY) ? trap.dirY : 0;
-    const perpX = -dirY;
-    const perpY = dirX;
-    const baseX = screenX - dirX * 10;
-    const baseY = screenY - dirY * 10;
-    const tipX = screenX + dirX * 9;
-    const tipY = screenY + dirY * 9;
-
-    ctx.fillStyle = "#4b1714";
-    ctx.beginPath();
-    ctx.moveTo(baseX + perpX * 8, baseY + perpY * 8);
-    ctx.lineTo(baseX - perpX * 8, baseY - perpY * 8);
-    ctx.lineTo(baseX - dirX * 4, baseY - dirY * 4);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = "#c43e34";
-    ctx.beginPath();
-    ctx.moveTo(baseX + perpX * 5, baseY + perpY * 5);
-    ctx.lineTo(baseX - perpX * 5, baseY - perpY * 5);
-    ctx.lineTo(tipX, tipY);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.strokeStyle = "#ff9d82";
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.moveTo(baseX + perpX * 3.4, baseY + perpY * 3.4);
-    ctx.lineTo(tipX, tipY);
-    ctx.lineTo(baseX - perpX * 3.4, baseY - perpY * 3.4);
-    ctx.stroke();
-  },
-
-  drawAnimatedArmor(enemy, screenX, screenY) {
-    const ctx = this.ctx;
-    const half = enemy.size / 2;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-    ctx.beginPath();
-    ctx.ellipse(screenX, screenY + half * 0.8, half, half * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#9ba4ba";
-    ctx.fillRect(screenX - 6, screenY - 4, 12, 15);
-    ctx.fillStyle = "#bec8dc";
-    ctx.beginPath();
-    ctx.arc(screenX, screenY - 10, 6.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#737f98";
-    ctx.fillRect(screenX - 8, screenY + 9, 16, 5);
-
-    ctx.save();
-    ctx.translate(screenX, screenY);
-    ctx.rotate(Math.atan2(enemy.y - (enemy.lastY ?? enemy.y), enemy.x - (enemy.lastX ?? enemy.x)) + Math.PI / 2);
-    ctx.fillStyle = "#7d6240";
-    ctx.fillRect(8, -1, 16, 2);
-    ctx.fillStyle = "#d0d8e9";
-    ctx.beginPath();
-    ctx.moveTo(24, 0);
-    ctx.lineTo(30, -5);
-    ctx.lineTo(30, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    ctx.fillStyle = "#ff6868";
-    ctx.fillRect(screenX - 2.5, screenY - 11, 2, 2);
-    ctx.fillRect(screenX + 0.5, screenY - 11, 2, 2);
   },
 
 };

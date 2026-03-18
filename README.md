@@ -22,15 +22,18 @@ Wardens of the Catacomb is a top-down action roguelite built with vanilla JavaSc
 - `npm run serve`: start the static host only
 - `npm run server:net`: start the authoritative WebSocket server only
 - `npm run check`: syntax check all JavaScript files
+- `npm run validate:dev-start`: verify higher-floor dev starts load and spawn correctly
 - `npm run validate:pre-commit`: run the recommended pre-commit validation suite
 - `npm run validate:closeout`: run the full branch closeout validation suite
 - `npm run perf:test`: run the automated local+network perf flow and write `artifacts/perf/latest.json`
+- `npm run perf:floor-scaling`: profile later-floor map and enemy-load cost
 
 ## Project Snapshot
 - Procedural floor progression with alternating floor mini-bosses triggered by player level
 - Playable classes: Archer, Fighter, and Necromancer
 - Class-specific passive level scaling, damage-type resistances, floor-based enemy caps, and progression-driven reward tuning
 - Enemy tactics framework with bespoke ghost, goblin, rat-archer, skeleton, mummy, necromancer, and minotaur behaviors
+- Tunable per-floor map-growth controls plus later-floor perf instrumentation for map-size and enemy-density analysis
 - Authoritative network mode with one active controller per room and spectator clients that can request control
 - Browser-driven regression coverage for network join, combat, hit confirmation, audio, archer projectile behavior, UI interaction, and browser perf
 

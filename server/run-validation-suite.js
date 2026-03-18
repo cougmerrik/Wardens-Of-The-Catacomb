@@ -11,6 +11,7 @@ const SCRIPT_TARGETS = {
   "validate:boss": "server/validate-floor-boss.js",
   "validate:tactics": "server/validate-tactics.js",
   "validate:minotaur": "server/validate-minotaur.js",
+  "validate:dev-start": "server/validate-dev-start.js",
   "validate:loc": "server/validate-loc.js",
   "validate:network-join": "server/validate-network-join.js",
   "validate:network-combat": "server/validate-network-combat.js",
@@ -19,12 +20,13 @@ const SCRIPT_TARGETS = {
   "validate:network-audio": "server/validate-network-audio.js",
   "validate:network-ui": "server/validate-network-ui.js",
   "perf:test": "server/perfRunner.js",
-  "perf:network-browser": "server/perfNetworkBrowser.js"
+  "perf:network-browser": "server/perfNetworkBrowser.js",
+  "perf:floor-scaling": "server/perfFloorScaling.js"
 };
 
 const SUITES = {
   core: ["check", "validate:loc"],
-  gameplay: ["validate:boss", "validate:tactics", "validate:minotaur"],
+  gameplay: ["validate:boss", "validate:tactics", "validate:minotaur", "validate:dev-start"],
   network: [
     "validate:network-join",
     "validate:network-combat",
@@ -33,14 +35,15 @@ const SUITES = {
     "validate:network-audio",
     "validate:network-ui"
   ],
-  perf: ["perf:test", "perf:network-browser"],
-  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:tactics", "validate:minotaur"],
+  perf: ["perf:test", "perf:network-browser", "perf:floor-scaling"],
+  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:tactics", "validate:minotaur", "validate:dev-start"],
   closeout: [
     "check",
     "validate:loc",
     "validate:boss",
     "validate:tactics",
     "validate:minotaur",
+    "validate:dev-start",
     "validate:network-join",
     "validate:network-combat",
     "validate:network-combat-hit",
@@ -48,7 +51,8 @@ const SUITES = {
     "validate:network-audio",
     "validate:network-ui",
     "perf:test",
-    "perf:network-browser"
+    "perf:network-browser",
+    "perf:floor-scaling"
   ]
 };
 

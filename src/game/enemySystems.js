@@ -3,11 +3,13 @@ export {
   spawnTreasureGoblin,
   spawnAnimatedArmor,
   spawnMummy,
+  spawnPrisoner,
   spawnMimic,
   spawnRatArcher,
   spawnSkeletonWarrior,
   spawnNecromancer,
   spawnMinotaur,
+  spawnLeprechaunBoss,
   spawnSkeleton
 } from "./enemySpawnFactories.js";
 
@@ -16,10 +18,12 @@ export {
   updateGoblin,
   updateMummy,
   updateMimic,
+  updatePrisoner,
   updateRatArcher,
   updateSkeletonWarrior,
   updateNecromancer,
-  updateMinotaur
+  updateMinotaur,
+  updateLeprechaunBoss
 } from "./enemyAi.js";
 
 export {
@@ -39,5 +43,6 @@ export {
   dropTreasureBag,
   dropArmorLoot,
   dropNecromancerLoot,
-  dropMinotaurLoot
+  dropMinotaurLoot,
+  dropLeprechaunLoot
 } from "./enemyRewards.js";

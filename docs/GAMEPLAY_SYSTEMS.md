@@ -9,6 +9,8 @@ This document summarizes the current gameplay-facing systems and balance rules.
 4. Enter the exit portal.
 5. Repeat on a larger floor.
 
+Higher-floor dev starts now use room-centered spawn selection instead of arbitrary central-floor tiles, so jumping directly to later floors no longer tends to start the player in cramped corridor positions.
+
 ## Controls
 - Move: `WASD` / Arrow Keys
 - Primary attack: left click
@@ -85,6 +87,15 @@ This document summarizes the current gameplay-facing systems and balance rules.
 ### Enemy Combat Scaling
 - Enemy speed, damage, health, and defense scale through runtime difficulty helpers.
 - Floor progression is weighted more heavily than player level for most combat difficulty systems.
+
+### Floor Size Scaling
+- Floor-size growth is now controlled by explicit progression config instead of one fixed multiplier.
+- Current tuned growth factors:
+  - floor `2`: `1.12`
+  - floor `3`: `1.10`
+  - floor `4`: `1.06`
+  - floor `5+`: `1.03`
+- This keeps later floors larger than floor `1`, but softens the growth curve where larger floor geometry stopped providing enough gameplay value relative to its perf cost.
 
 ### Multiplayer Difficulty
 - The simulation tracks `activePlayerCount`.

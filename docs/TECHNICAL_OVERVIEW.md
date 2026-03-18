@@ -16,8 +16,11 @@ This document summarizes the current high-level architecture and validation work
 - Notable extracted module groups include:
   - `src/game/enemySpawnFactories.js`
   - `src/game/enemyAi.js`
+  - `src/game/enemyLeprechaunAi.js`
   - `src/game/enemyTactics.js`
   - `src/game/enemyRewards.js`
+  - `src/game/runtimeBasePlacementMethods.js`
+  - `src/game/runtimePlayerAttackMethods.js`
   - `src/game/stepCombatResolution.js`
   - `src/bootstrap/gameUiRuntime.js`
   - `src/bootstrap/gameUiSessionRuntime.js`
@@ -25,7 +28,9 @@ This document summarizes the current high-level architecture and validation work
   - `src/bootstrap/networkRenderRuntime.js`
   - `src/rendering/rendererEffectsProjectileMethods.js`
   - `src/rendering/rendererEffectsPlayerMethods.js`
+  - `src/rendering/runtimeSceneBossDrawMethods.js`
   - `src/rendering/runtimeSceneEnemyDrawMethods.js`
+  - `src/rendering/runtimeSceneObjectDrawMethods.js`
 
 ## Network Model
 - The server is authoritative.
@@ -80,6 +85,10 @@ This document summarizes the current high-level architecture and validation work
   - verifies that controller clients can open and interact with skill/shop UI paths in live network sessions
 - `perf:network-browser`
   - captures active-tab frame cadence, snapshot backlog, correction pressure, and movement-latency proxies
+- `validate:dev-start`
+  - verifies higher-floor dev starts across classes and catches spawn-quality regressions on larger maps
+- `perf:floor-scaling`
+  - compares floor `1`, map-only later floors, and loaded later floors so map-growth and enemy-density costs can be evaluated separately
 
 ## Performance Workflow
 - Baseline metrics are stored in:
@@ -94,6 +103,8 @@ This document summarizes the current high-level architecture and validation work
   - correction distance
   - projectile origin error and snap events
   - server tick / serialize / broadcast timing
+- The floor-scaling harness showed that later-floor slowdown is not just geometry growth; enemy load is the dominant multiplier once floor `4+` density ramps up.
+- Tunable per-floor map-growth controls now exist so geometry growth can be adjusted independently from combat-density tuning.
 - For server-side performance comparisons, treat `serverMetrics.tickDurationMs` as the authoritative server tick metric.
 - Treat `avgSnapshotIntervalMs` / `p95SnapshotIntervalMs` as client-observed delivery cadence, not raw server simulation cost.
 
@@ -103,6 +114,7 @@ This document summarizes the current high-level architecture and validation work
 - `server/run-validation-suite.js` now groups the growing validation surface into maintainable suites instead of requiring every workflow step to list individual commands manually.
 - The perf baselines were refreshed from post-fix runs on 2026-03-17/18, so future comparisons should use the current baseline files instead of the earlier pre-correction artifacts.
 - `server/validate-floor-boss.js` now validates the generalized floor-boss flow rather than assuming only the necromancer boss exists.
+- `server/validate-dev-start.js` now covers higher-floor local dev starts so larger-floor spawn regressions are caught by automation instead of manual testing.
 - If network startup or render regressions return, inspect snapshot-buffer identity and snapshot-consumption paths before changing interpolation or prediction. A real branch regression came from replacing the live snapshot buffer after the render loop had already captured it.
 - If controller-only network UI regressions return, inspect the active `netClient` wiring first. A real regression came from the render loop capturing `null` before connection completed, which silently drained shop/skill clicks through the no-client path.
 

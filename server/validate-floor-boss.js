@@ -89,11 +89,18 @@ function validateLocalProgression() {
 
   game.level = game.getFloorBossTriggerLevel();
   assert(game.updateFloorBossTrigger() === true, "boss did not queue locally");
+  const variant = game.getFloorBossVariant();
   const boss = game.floorBoss?.bossType === "minotaur"
     ? game.spawnMinotaur(game.player.x + 96, game.player.y)
+    : variant === "leprechaun"
+    ? game.spawnLeprechaunBoss(game.player.x + 96, game.player.y)
     : game.spawnNecromancer(game.player.x + 96, game.player.y);
   game.enemies.push(boss);
   game.markFloorBossActive();
+  if (variant === "leprechaun") {
+    boss.phase = "enraged";
+    game.setFloorBossEncounterPhase("enraged");
+  }
   killFloorBoss(game);
   assert(game.portal.active, "portal did not spawn after local boss defeat");
   assert(game.floorBoss.phase === "portal", `expected portal phase, got ${game.floorBoss.phase}`);
@@ -115,11 +122,18 @@ function validateNetworkReconciliation() {
   const sim = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   sim.level = sim.getFloorBossTriggerLevel();
   assert(sim.updateFloorBossTrigger() === true, "network sim boss did not queue");
+  const variant = sim.getFloorBossVariant();
   const boss = sim.floorBoss?.bossType === "minotaur"
     ? sim.spawnMinotaur(sim.player.x + 96, sim.player.y)
+    : variant === "leprechaun"
+    ? sim.spawnLeprechaunBoss(sim.player.x + 96, sim.player.y)
     : sim.spawnNecromancer(sim.player.x + 96, sim.player.y);
   sim.enemies.push(boss);
   sim.markFloorBossActive();
+  if (variant === "leprechaun") {
+    boss.phase = "enraged";
+    sim.setFloorBossEncounterPhase("enraged");
+  }
 
   const room = makeRoom(sim);
   const client = new Game(null, { headless: true });

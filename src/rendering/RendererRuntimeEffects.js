@@ -4,8 +4,4 @@ import { rendererEffectsProjectileMethods } from "./rendererEffectsProjectileMet
 
 export class RendererRuntimeEffects extends RendererRuntimeScene {}
 
-Object.assign(
-  RendererRuntimeEffects.prototype,
-  rendererEffectsProjectileMethods,
-  rendererEffectsPlayerMethods
-);
+Object.assign(RendererRuntimeEffects.prototype, rendererEffectsPlayerMethods, rendererEffectsProjectileMethods);

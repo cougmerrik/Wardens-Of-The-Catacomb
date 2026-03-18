@@ -355,9 +355,12 @@ export function resolveCombatAndDrops({
       else if (enemy.type === "armor") game.score += 40;
       else if (enemy.type === "mimic") game.score += 35;
       else if (enemy.type === "mummy") game.score += 22;
+      else if (enemy.type === "prisoner") game.score += 22;
+      else if (enemy.type === "mummy") game.score += 22;
       else if (enemy.type === "rat_archer") game.score += 16;
       else if (enemy.type === "skeleton_warrior") game.score += 10;
       else if (enemy.type === "necromancer") game.score += 250;
+      else if (enemy.type === "leprechaun") game.score += 500;
       else if (enemy.type === "minotaur") game.score += 320;
       else if (enemy.type === "skeleton") game.score += 12;
       else game.score += 10;
@@ -366,12 +369,13 @@ export function resolveCombatAndDrops({
       else if (enemy.type === "armor") game.dropArmorLoot(enemy.x, enemy.y);
       else if (enemy.type === "mimic") game.dropTreasureBag(enemy.x, enemy.y, 24);
       else if (enemy.type === "mummy") game.maybeSpawnDrop(enemy.x, enemy.y);
-      else if (enemy.type === "rat_archer" || enemy.type === "skeleton_warrior" || enemy.type === "skeleton") game.maybeSpawnDrop(enemy.x, enemy.y);
-      else if (enemy.type === "necromancer") {
+      else if (enemy.type === "prisoner" || enemy.type === "rat_archer" || enemy.type === "skeleton_warrior" || enemy.type === "skeleton") game.maybeSpawnDrop(enemy.x, enemy.y);
+      else if (enemy.type === "necromancer" || enemy.type === "leprechaun") {
         if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
         removeBossSummons = true;
         if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
-        game.dropNecromancerLoot(enemy.x, enemy.y);
+        if (enemy.type === "leprechaun") game.dropLeprechaunLoot(enemy.x, enemy.y);
+        else game.dropNecromancerLoot(enemy.x, enemy.y);
         game.spawnFloatingText(enemy.x, enemy.y - 42, "Boss Defeated", "#f2bf7b", 1.5, 18);
         game.spawnFloatingText(enemy.x, enemy.y - 62, "Portal Open", "#90f0ff", 1.5, 18);
       } else if (enemy.type === "minotaur") {
@@ -432,6 +436,7 @@ export function resolveCombatAndDrops({
   if (game.player.hitCooldown <= 0) {
     for (const enemy of activeEnemies) {
       if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
+      if (enemy.type === "leprechaun" && enemy.phase !== "enraged") continue;
       if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (vecLength(game.player.x - enemy.x, game.player.y - enemy.y) <= enemy.size * 0.5 + playerEnemyRadius) {
         game.player.hitCooldown = 1.0;

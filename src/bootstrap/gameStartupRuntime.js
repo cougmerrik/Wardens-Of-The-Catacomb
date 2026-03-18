@@ -1,4 +1,4 @@
-export function createLocalGame({ Game, canvas, selectedClass, returnToMenu, syncMusicForGame }) {
+export function createLocalGame({ Game, canvas, selectedClass, returnToMenu, syncMusicForGame, startingFloor = 1 }) {
   const game = new Game(canvas, {
     classType: selectedClass,
     onReturnToMenu: returnToMenu,
@@ -6,6 +6,9 @@ export function createLocalGame({ Game, canvas, selectedClass, returnToMenu, syn
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),
     onGameOverChanged: (_gameOver, nextGame) => syncMusicForGame(nextGame)
   });
+  if (startingFloor > 1 && typeof game.applyDebugStartingFloor === "function") {
+    game.applyDebugStartingFloor(startingFloor);
+  }
   syncMusicForGame(game);
   game.start();
   return game;

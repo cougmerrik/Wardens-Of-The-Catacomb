@@ -75,6 +75,10 @@ export const rendererEffectsProjectileMethods = {
         this.drawNecroticBolt(b, cameraX, cameraY, game.time);
         continue;
       }
+      if (b.projectileType === "luckyCharm") {
+        this.drawLuckyCharmProjectile(b, cameraX, cameraY, game.time);
+        continue;
+      }
       drawArrowLikeProjectile(b, 1);
     }
     for (const arrow of game.fireArrows) {
@@ -130,6 +134,29 @@ export const rendererEffectsProjectileMethods = {
     ctx.moveTo(-size * 0.25, 0);
     ctx.lineTo(size * 0.5, 0);
     ctx.stroke();
+    ctx.restore();
+  },
+
+  drawLuckyCharmProjectile(projectile, cameraX, cameraY, time = 0) {
+    const ctx = this.ctx;
+    const x = projectile.x - cameraX;
+    const y = projectile.y - cameraY;
+    const size = Number.isFinite(projectile.size) ? projectile.size : 10;
+    const pulse = 0.9 + Math.sin(time * 14 + projectile.x * 0.04) * 0.12;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((projectile.angle || 0) + time * 2);
+    ctx.fillStyle = "rgba(201, 255, 166, 0.25)";
+    ctx.beginPath();
+    ctx.arc(0, 0, size * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    const colors = ["#f3df69", "#8ae06f", "#f48b5f", "#8fd9ff"];
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = colors[i];
+      ctx.beginPath();
+      ctx.arc(Math.cos((i / 4) * Math.PI * 2) * 3, Math.sin((i / 4) * Math.PI * 2) * 3, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   },
 

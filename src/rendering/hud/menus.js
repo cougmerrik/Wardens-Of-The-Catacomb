@@ -44,6 +44,9 @@ export function drawSkillTreeMenu(renderer, game, layout) {
   const nextRageCd = game.getWarriorRageCooldown(nextRagePoints);
   const curRageBase = game.getWarriorRageBaseDamageBonus(rageSkill.points);
   const nextRageBase = game.getWarriorRageBaseDamageBonus(nextRagePoints);
+  const curRageRush = game.getWarriorRageVictoryRushPerKillPct(rageSkill.points);
+  const nextRageRush = game.getWarriorRageVictoryRushPerKillPct(nextRagePoints);
+  const rageRushCap = game.getWarriorRageVictoryRushPoolCap() / Math.max(1, game.player.maxHealth);
   const executeSkill = game.skills.warriorExecute;
   const canSpendExecute = game.skillPoints > 0 && executeSkill.points < executeSkill.maxPoints;
   const nextExecutePoints = Math.min(executeSkill.maxPoints, executeSkill.points + 1);
@@ -247,18 +250,19 @@ export function drawSkillTreeMenu(renderer, game, layout) {
     ctx.fillText("Duration: 10.0s", rageCard.x + 14, rageCard.y + 78);
     ctx.fillText(`Cooldown: ${curRageCd.toFixed(1)}s`, rageCard.x + 14, rageCard.y + 98);
     ctx.fillText(`Base Weapon Damage Bonus: +${curRageBase.toFixed(2)}`, rageCard.x + 14, rageCard.y + 118);
+    ctx.fillText(`Victory Rush: +${(curRageRush * 100).toFixed(0)}% max HP per kill over 15s`, rageCard.x + 14, rageCard.y + 138);
     ctx.fillStyle = "#f2bcbc";
-    ctx.fillText("Right click to activate: half incoming damage while active.", rageCard.x + 14, rageCard.y + 142);
+    ctx.fillText(`Pool cap: ${(rageRushCap * 100).toFixed(0)}% max HP. Right click: half incoming damage.`, rageCard.x + 14, rageCard.y + 162);
 
     if (rageSkill.points >= rageSkill.maxPoints) {
       ctx.fillStyle = "#c5a5a5";
-      ctx.fillText("Next Point: MAXED", rageCard.x + 14, rageCard.y + 166);
+      ctx.fillText("Next Point: MAXED", rageCard.x + 14, rageCard.y + 186);
     } else {
       ctx.fillStyle = "#9ee0ad";
       ctx.fillText(
-        `Next: ${Math.max(0, curRageCd - nextRageCd).toFixed(2)}s shorter CD, +${(nextRageBase - curRageBase).toFixed(2)} base dmg`,
+        `Next: ${Math.max(0, curRageCd - nextRageCd).toFixed(2)}s shorter CD, +${(nextRageBase - curRageBase).toFixed(2)} base dmg, +${((nextRageRush - curRageRush) * 100).toFixed(1)}% per kill`,
         rageCard.x + 14,
-        rageCard.y + 166
+        rageCard.y + 186
       );
     }
 
