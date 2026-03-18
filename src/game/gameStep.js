@@ -54,15 +54,28 @@ export function stepGame(game, dt, controls = {}) {
   game.time += dt;
   if (typeof game.updateFloorBossTrigger === "function") game.updateFloorBossTrigger();
   if (typeof game.syncFloorBossFeedback === "function") game.syncFloorBossFeedback();
+  if (game.floorBoss?.speechExpiresAt && game.time >= game.floorBoss.speechExpiresAt) {
+    game.floorBoss.speechText = "";
+    game.floorBoss.speechExpiresAt = null;
+  }
+  if (typeof game.getRemainingFloorBossTimer === "function") {
+    const bossTimerRemaining = game.getRemainingFloorBossTimer();
+    if (bossTimerRemaining !== null && bossTimerRemaining <= 0 && !game.gameOver) {
+      game.applyPlayerDamage(Math.max(999999, game.player.health + 999999));
+      return;
+    }
+  }
   game.player.speed = game.getPlayerMoveSpeed();
   game.player.fireCooldown = Math.max(0, game.player.fireCooldown - dt);
   game.player.fireArrowCooldown = Math.max(0, game.player.fireArrowCooldown - dt);
   game.player.deathBoltCooldown = Math.max(0, (Number.isFinite(game.player.deathBoltCooldown) ? game.player.deathBoltCooldown : 0) - dt);
   game.player.hitCooldown = Math.max(0, game.player.hitCooldown - dt);
   game.player.hpBarTimer = Math.max(0, game.player.hpBarTimer - dt);
+  game.player.knockbackTimer = Math.max(0, (Number.isFinite(game.player.knockbackTimer) ? game.player.knockbackTimer : 0) - dt);
   game.warriorMomentumTimer = Math.max(0, game.warriorMomentumTimer - dt);
   game.warriorRageActiveTimer = Math.max(0, (Number.isFinite(game.warriorRageActiveTimer) ? game.warriorRageActiveTimer : 0) - dt);
   game.warriorRageCooldownTimer = Math.max(0, (Number.isFinite(game.warriorRageCooldownTimer) ? game.warriorRageCooldownTimer : 0) - dt);
+  game.warriorRageVictoryRushTimer = Math.max(0, (Number.isFinite(game.warriorRageVictoryRushTimer) ? game.warriorRageVictoryRushTimer : 0) - dt);
   game.passiveRegenTimer = Math.max(-4, (Number.isFinite(game.passiveRegenTimer) ? game.passiveRegenTimer : 2) - dt);
   game.player.animTime += dt;
   for (const ft of game.floatingTexts) {
@@ -70,6 +83,19 @@ export function stepGame(game, dt, controls = {}) {
     ft.y -= ft.vy * dt;
   }
   game.floatingTexts = game.floatingTexts.filter((ft) => ft.life > 0);
+
+  if (
+    (game.warriorRageVictoryRushPool || 0) > 0 &&
+    (game.warriorRageVictoryRushTimer || 0) > 0 &&
+    game.player.health > 0
+  ) {
+    const timer = Math.max(dt, game.warriorRageVictoryRushTimer);
+    const healAmount = Math.min(game.warriorRageVictoryRushPool, (game.warriorRageVictoryRushPool / timer) * dt);
+    game.warriorRageVictoryRushPool = Math.max(0, game.warriorRageVictoryRushPool - healAmount);
+    game.applyPlayerHealing(healAmount, { suppressText: true });
+  } else if ((game.warriorRageVictoryRushTimer || 0) <= 0) {
+    game.warriorRageVictoryRushPool = 0;
+  }
 
   while (game.passiveRegenTimer <= 0) {
     game.passiveRegenTimer += 2;
@@ -83,7 +109,9 @@ export function stepGame(game, dt, controls = {}) {
   const my = Number.isFinite(controls.moveY) ? controls.moveY : 0;
   game.player.lastX = game.player.x;
   game.player.lastY = game.player.y;
-  if (mx || my) {
+  if ((game.player.knockbackTimer || 0) > 0) {
+    game.moveWithCollision(game.player, (game.player.knockbackVx || 0) * dt, (game.player.knockbackVy || 0) * dt);
+  } else if (mx || my) {
     const len = vecLength(mx, my) || 1;
     game.moveWithCollision(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
   }
@@ -300,11 +328,17 @@ export function stepGame(game, dt, controls = {}) {
     const bossRequest = game.consumeFloorBossSpawnRequest();
     if (bossRequest) {
       const point = game.randomEnemySpawnPoint() || { x: game.door.x || game.player.x, y: game.door.y || game.player.y };
-      const boss = game.spawnNecromancer(point.x, point.y);
+      const boss = bossRequest.variant === "leprechaun" ? game.spawnLeprechaunBoss(point.x, point.y) : game.spawnNecromancer(point.x, point.y);
       game.enemies.push(boss);
       if (typeof game.markFloorBossActive === "function") game.markFloorBossActive();
+      if (bossRequest.variant === "leprechaun" && game.floorBoss) {
+        game.floorBoss.potX = null;
+        game.floorBoss.potY = null;
+      }
       if (typeof game.spawnFloatingText === "function") {
-        game.spawnFloatingText(game.player.x, game.player.y - 96, `Necromancer Stirs`, "#d49dff", 1.5, 18);
+        const bossLabel = bossRequest.variant === "leprechaun" ? "Leprechaun Escapes" : "Necromancer Stirs";
+        const bossColor = bossRequest.variant === "leprechaun" ? "#a2f06e" : "#d49dff";
+        game.spawnFloatingText(game.player.x, game.player.y - 96, bossLabel, bossColor, 1.5, 18);
       }
     }
   }
@@ -318,11 +352,19 @@ export function stepGame(game, dt, controls = {}) {
       const point = game.randomEnemySpawnPoint();
       if (!point) continue;
       const activeGoblins = game.enemies.filter((enemy) => enemy.type === "goblin").length;
+      const activePrisoners = game.enemies.filter((enemy) => enemy.type === "prisoner").length;
       const activeRatArchers = game.enemies.filter((enemy) => enemy.type === "rat_archer").length;
+      const prisonerMinFloor = Number.isFinite(game.config.enemy.prisonerMinFloor) ? game.config.enemy.prisonerMinFloor : 2;
       const skeletonMinFloor = Number.isFinite(game.config.enemy.skeletonWarriorMinFloor) ? game.config.enemy.skeletonWarriorMinFloor : 4;
       const spawnSkeleton = game.floor >= skeletonMinFloor && Math.random() < (game.config.enemy.skeletonWarriorSpawnChance || 0.25);
       const ratArcherMinFloor = Number.isFinite(game.config.enemy.ratArcherMinFloor) ? game.config.enemy.ratArcherMinFloor : 3;
       if (
+        game.floor >= prisonerMinFloor &&
+        activePrisoners < game.config.enemy.maxActivePrisoners &&
+        Math.random() < game.config.enemy.prisonerSpawnChance
+      ) {
+        game.enemies.push(game.spawnPrisoner(point.x, point.y));
+      } else if (
         game.floor >= ratArcherMinFloor &&
         activeRatArchers < game.config.enemy.maxActiveRatArchers &&
         Math.random() < game.config.enemy.ratArcherSpawnChance
@@ -365,9 +407,11 @@ export function stepGame(game, dt, controls = {}) {
     activeEnemies.push(enemy);
     if (enemy.type === "goblin") game.updateGoblin(enemy, dt, enemySpeedScale);
     else if (enemy.type === "mimic") game.updateMimic(enemy, dt, enemySpeedScale);
+    else if (enemy.type === "prisoner") game.updatePrisoner(enemy, dt, enemySpeedScale);
     else if (enemy.type === "rat_archer") game.updateRatArcher(enemy, dt, enemySpeedScale);
     else if (enemy.type === "skeleton_warrior") game.updateSkeletonWarrior(enemy, dt, enemySpeedScale);
     else if (enemy.type === "necromancer") game.updateNecromancer(enemy, dt, enemySpeedScale);
+    else if (enemy.type === "leprechaun") game.updateLeprechaunBoss(enemy, dt, enemySpeedScale);
     else if (typeof game.updateGenericEnemy === "function") game.updateGenericEnemy(enemy, dt, enemySpeedScale);
     else game.moveEnemyTowardPlayer(enemy, enemySpeedScale, dt);
   }

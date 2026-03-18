@@ -3,10 +3,12 @@ import {
   spawnGhost as spawnGhostEntity,
   spawnTreasureGoblin as spawnTreasureGoblinEntity,
   spawnAnimatedArmor as spawnAnimatedArmorEntity,
+  spawnPrisoner as spawnPrisonerEntity,
   spawnMimic as spawnMimicEntity,
   spawnRatArcher as spawnRatArcherEntity,
   spawnSkeletonWarrior as spawnSkeletonWarriorEntity,
   spawnNecromancer as spawnNecromancerEntity,
+  spawnLeprechaunBoss as spawnLeprechaunBossEntity,
   spawnSkeleton as spawnSkeletonEntity
 } from "../enemySystems.js";
 import { isWalkableTile } from "./navigationCollision.js";
@@ -62,6 +64,10 @@ export function spawnAnimatedArmor(game, x, y) {
   return spawnAnimatedArmorEntity(game, x, y);
 }
 
+export function spawnPrisoner(game, x, y) {
+  return spawnPrisonerEntity(game, x, y);
+}
+
 export function spawnMimic(game, x, y) {
   return spawnMimicEntity(game, x, y);
 }
@@ -78,12 +84,17 @@ export function spawnNecromancer(game, x, y) {
   return spawnNecromancerEntity(game, x, y);
 }
 
+export function spawnLeprechaunBoss(game, x, y) {
+  return spawnLeprechaunBossEntity(game, x, y);
+}
+
 export function spawnSkeleton(game, x, y, options) {
   return spawnSkeletonEntity(game, x, y, options);
 }
 
 export function applyEnemyDamage(game, enemy, amount, damageType = "physical") {
   if (!Number.isFinite(amount) || amount <= 0) return;
+  if (enemy?.invincible) return;
   if (enemy?.type === "skeleton_warrior" && enemy.collapsed) {
     if (damageType === "fire" || damageType === "melee") {
       enemy.reviveAtEnd = false;

@@ -162,6 +162,60 @@ export const runtimeSceneEnemyDrawMethods = {
     ctx.fill();
   },
 
+  drawLeprechaunBoss(enemy, screenX, screenY) {
+    const ctx = this.ctx;
+    const half = enemy.size * 0.5;
+    const enraged = enemy.phase === "enraged";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY + half * 0.82, half * 1.05, half * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = enraged ? "#1f7c34" : "#2f9d43";
+    ctx.fillRect(screenX - half * 0.38, screenY - half * 0.12, half * 0.76, half * 1.04);
+    ctx.fillStyle = "#f3d2b3";
+    ctx.beginPath();
+    ctx.arc(screenX, screenY - half * 0.42, half * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#d96c2b";
+    ctx.beginPath();
+    ctx.moveTo(screenX - half * 0.26, screenY - half * 0.18);
+    ctx.lineTo(screenX + half * 0.26, screenY - half * 0.18);
+    ctx.lineTo(screenX, screenY + half * 0.32);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#1e5f2c";
+    ctx.beginPath();
+    ctx.moveTo(screenX - half * 0.62, screenY - half * 0.56);
+    ctx.lineTo(screenX, screenY - half * 1.02);
+    ctx.lineTo(screenX + half * 0.62, screenY - half * 0.56);
+    ctx.lineTo(screenX + half * 0.5, screenY - half * 0.18);
+    ctx.lineTo(screenX - half * 0.5, screenY - half * 0.18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#d4c35e";
+    ctx.fillRect(screenX - half * 0.52, screenY - half * 0.18, half * 1.04, half * 0.12);
+    ctx.fillStyle = "#2c2a1e";
+    ctx.fillRect(screenX - half * 0.08, screenY - half * 0.2, half * 0.16, half * 0.16);
+
+    ctx.fillStyle = "#f6f1d9";
+    ctx.fillRect(screenX - half * 0.18, screenY - half * 0.48, half * 0.08, half * 0.06);
+    ctx.fillRect(screenX + half * 0.1, screenY - half * 0.48, half * 0.08, half * 0.06);
+
+    if (enraged) {
+      ctx.strokeStyle = "rgba(167, 255, 121, 0.5)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY - half * 0.1, half * 1.15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#5cda6b";
+      ctx.fillRect(screenX - half * 0.9, screenY + half * 0.02, half * 0.3, half * 0.18);
+      ctx.fillRect(screenX + half * 0.6, screenY + half * 0.02, half * 0.3, half * 0.18);
+    }
+  },
+
   drawExitPortal(portal, screenX, screenY, time = 0) {
     const ctx = this.ctx;
     const pulse = 0.88 + Math.sin(time * 5.8) * 0.08;

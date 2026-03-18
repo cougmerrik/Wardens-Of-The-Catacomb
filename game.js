@@ -39,6 +39,8 @@ const canvas = document.getElementById("game");
 const layout = document.querySelector(".layout");
 const menuPanel = document.querySelector(".panel");
 const selector = document.getElementById("character-select");
+const devStartOptions = document.getElementById("dev-start-options");
+const devStartFloorInput = document.getElementById("dev-start-floor");
 const classButtons = Array.from(document.querySelectorAll("[data-class-option]"));
 const startButton = document.getElementById("start-game"), startNetworkButton = document.getElementById("start-network-game");
 const serverUrlInput = document.getElementById("net-server-url"), roomIdInput = document.getElementById("net-room-id");
@@ -71,6 +73,9 @@ const netClockState = { offsetMs: 0, ready: false };
 let netPredictedProjectiles = new Map(), netNextHeldPrimaryPredictAtMs = 0;
 let netLastSnapshotRecvAtMs = 0, netSnapshotIntervalMeanMs = 33, netSnapshotJitterMs = 0, netLastSnapshotGapMs = 33;
 let splashActive = true, splashDismissed = false, splashRaf = 0, splashStartedAt = 0, splashReady = false;
+const isDevMode = new URLSearchParams(window.location.search).get("dev") === "1";
+
+if (devStartOptions) devStartOptions.hidden = !isDevMode;
 
 splashLogo.addEventListener("load", () => { splashReady = true; });
 splashLogo.addEventListener("error", () => { splashReady = false; });
@@ -166,7 +171,8 @@ const dismissSplash = () => {
           canvas,
           selectedClass: "archer",
           returnToMenu,
-          syncMusicForGame
+          syncMusicForGame,
+          startingFloor: 1
         });
       }
     }
@@ -242,12 +248,16 @@ function startLocalGame() {
   stopNetworkSession();
   if (selector) selector.hidden = true;
   currentGame = cleanupCurrentGameRuntime(currentGame);
+  const requestedStartFloor = isDevMode && devStartFloorInput
+    ? Math.max(1, Number.parseInt(devStartFloorInput.value || "1", 10) || 1)
+    : 1;
   currentGame = createLocalGame({
     Game,
     canvas,
     selectedClass,
     returnToMenu,
-    syncMusicForGame
+    syncMusicForGame,
+    startingFloor: requestedStartFloor
   });
 }
 

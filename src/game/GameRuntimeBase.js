@@ -81,6 +81,8 @@ export class GameRuntimeBase {
     this.warriorMomentumTimer = 0;
     this.warriorRageActiveTimer = 0;
     this.warriorRageCooldownTimer = 0;
+    this.warriorRageVictoryRushPool = 0;
+    this.warriorRageVictoryRushTimer = 0;
     this.necromancerBeam = createNecromancerBeamState();
     this.upgrades = createUpgradeState();
     this.shopOrder = ["moveSpeed", "attackSpeed", "damage", "defense"];
@@ -118,14 +120,17 @@ export class GameRuntimeBase {
     this.player.hpBarTimer = this.config.player.hpBarDuration;
   }
 
-  applyPlayerHealing(amount) {
+  applyPlayerHealing(amount, options = {}) {
     if (amount <= 0) return;
+    const suppressText = !!options.suppressText;
     const before = this.player.health;
     this.player.health = Math.min(this.player.maxHealth, this.player.health + amount);
     if (this.player.health > before) {
       const healed = this.player.health - before;
       this.markPlayerHealthBarVisible();
-      this.spawnFloatingText(this.player.x, this.player.y - 26, `+${Math.max(1, Math.round(healed))}`, "#79e59a", 0.8, 14);
+      if (!suppressText) {
+        this.spawnFloatingText(this.player.x, this.player.y - 26, `+${Math.max(1, Math.round(healed))}`, "#79e59a", 0.8, 14);
+      }
     }
   }
 
@@ -140,6 +145,17 @@ export class GameRuntimeBase {
     this.player.health = Math.max(0, this.player.health - amount);
     this.markPlayerHealthBarVisible();
     if (this.player.health <= 0) this.triggerGameOver();
+  }
+
+  applyPlayerKnockback(distance, dirX, dirY) {
+    if (!Number.isFinite(distance) || distance <= 0) return;
+    const len = clamp(Math.hypot(dirX || 0, dirY || 0), 0, Number.POSITIVE_INFINITY) || 1;
+    const nx = (dirX || 0) / len;
+    const ny = (dirY || 0) / len;
+    const duration = Math.max(0.08, Number.isFinite(this.config?.enemy?.leprechaunPunchKnockbackDuration) ? this.config.enemy.leprechaunPunchKnockbackDuration : 0.28);
+    this.player.knockbackVx = (distance / duration) * nx;
+    this.player.knockbackVy = (distance / duration) * ny;
+    this.player.knockbackTimer = duration;
   }
 
   triggerGameOver() {
@@ -197,6 +213,8 @@ export class GameRuntimeBase {
     this.warriorMomentumTimer = 0;
     this.warriorRageActiveTimer = 0;
     this.warriorRageCooldownTimer = 0;
+    this.warriorRageVictoryRushPool = 0;
+    this.warriorRageVictoryRushTimer = 0;
     this.necromancerBeam = createNecromancerBeamState();
     this.navDistance = Array.from({ length: this.map.length }, () => Array(this.map[0].length).fill(-1));
     this.navPlayerTile = { x: -1, y: -1 };
@@ -250,6 +268,48 @@ export class GameRuntimeBase {
       });
       this.enemies.push(...controlledUndead);
     }
+    if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
+  }
+
+  getMinimumLevelForFloorStart(floor = this.floor) {
+    const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    if (safeFloor <= 1) return 1;
+    return this.getFloorBossTriggerLevel(safeFloor - 1);
+  }
+
+  applyDebugStartingFloor(floor = 1) {
+    const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    const targetLevel = this.getMinimumLevelForFloorStart(safeFloor);
+    this.floor = safeFloor;
+    this.level = 1;
+    this.experience = 0;
+    this.expToNextLevel = this.config.progression.baseXpToLevel;
+    this.skillPoints = 0;
+    this.gold = 0;
+    this.score = 0;
+    this.levelWeaponDamageBonus = 0;
+    this.player.maxHealth = Number.isFinite(this.classSpec.baseMaxHealth) ? this.classSpec.baseMaxHealth : this.config.player.maxHealth;
+    this.player.health = this.player.maxHealth;
+    this.player.fireCooldown = 0;
+    this.player.fireArrowCooldown = 0;
+    this.player.deathBoltCooldown = 0;
+    this.player.hitCooldown = 0;
+    this.player.hpBarTimer = 0;
+    while (this.level < targetLevel) {
+      this.gainExperience(this.expToNextLevel);
+    }
+    this.experience = 0;
+    this.floatingTexts = [];
+
+    let nextWidth = this.config.map.width;
+    let nextHeight = this.config.map.height;
+    const growth = this.config.progression.mapGrowthFactorPerFloor;
+    for (let currentFloor = 1; currentFloor < safeFloor; currentFloor++) {
+      nextWidth = Math.max(nextWidth + 1, Math.floor(nextWidth * growth));
+      nextHeight = Math.max(nextHeight + 1, Math.floor(nextHeight * growth));
+    }
+    this.generateFloor(nextWidth, nextHeight);
+    this.syncFloorBossState();
     if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
   }
 

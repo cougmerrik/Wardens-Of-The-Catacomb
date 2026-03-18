@@ -32,10 +32,14 @@ export function applyGoblinGrowth(game, goblin, goldAmount) {
 
 export function xpFromEnemy(game, enemy) {
   const baseXp =
-    enemy.type === "necromancer"
+    enemy.type === "leprechaun"
+      ? 140
+      : enemy.type === "necromancer"
       ? 90
       : enemy.type === "skeleton"
       ? 10
+      : enemy.type === "prisoner"
+      ? 14
       : enemy.type === "rat_archer"
       ? 10
       : enemy.type === "skeleton_warrior"
@@ -145,4 +149,30 @@ export function dropNecromancerLoot(game, x, y) {
     amount: healthAmount,
     life: game.config.drops.life + 4
   });
+}
+
+export function dropLeprechaunLoot(game, x, y) {
+  const amountMult = game.getGoldDropAmountMultiplier ? game.getGoldDropAmountMultiplier() : 1;
+  const c = game.config.enemy;
+  const baseAmount =
+    Math.min(c.leprechaunRewardGoldMin, c.leprechaunRewardGoldMax) +
+    Math.floor(Math.random() * (Math.abs(c.leprechaunRewardGoldMax - c.leprechaunRewardGoldMin) + 1));
+  game.drops.push({
+    type: "gold_bag",
+    x,
+    y,
+    size: 24,
+    amount: Math.max(1, Math.floor(baseAmount * amountMult)),
+    life: game.config.drops.life + 16
+  });
+  for (let i = 0; i < 6; i++) {
+    game.drops.push({
+      type: "gold",
+      x: x + (Math.random() - 0.5) * 34,
+      y: y + (Math.random() - 0.5) * 30,
+      size: 10,
+      amount: 20 + Math.floor(Math.random() * 24),
+      life: game.config.drops.life + 10
+    });
+  }
 }
