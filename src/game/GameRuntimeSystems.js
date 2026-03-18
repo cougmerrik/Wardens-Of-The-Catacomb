@@ -186,6 +186,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
         radius,
         life: duration,
         zoneType: "acid",
+        damageMultiplier: Number.isFinite(trapCfg.acidDamageMultiplier) ? Math.max(0, trapCfg.acidDamageMultiplier) : 0.2,
         damageMin: Number.isFinite(this.config.enemy?.armorDamageMin) ? this.config.enemy.armorDamageMin : 20,
         damageMax: Number.isFinite(this.config.enemy?.armorDamageMax) ? this.config.enemy.armorDamageMax : 32,
         touches: new WeakSet(),

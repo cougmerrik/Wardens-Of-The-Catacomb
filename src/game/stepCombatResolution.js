@@ -244,10 +244,11 @@ export function resolveCombatAndDrops({
     }
     if (zone.zoneType === "acid") {
       const touchDamage = () => {
+        const multiplier = Number.isFinite(zone.damageMultiplier) ? Math.max(0, zone.damageMultiplier) : 0.2;
         const rawDamage = typeof game.rollWallTrapDamage === "function"
           ? game.rollWallTrapDamage()
           : game.rollEnemyContactDamage({ damageMin: zone.damageMin, damageMax: zone.damageMax });
-        return rawDamage * game.getEnemyDamageScale();
+        return rawDamage * game.getEnemyDamageScale() * multiplier;
       };
       const touchingPlayer = vecLength(zone.x - game.player.x, zone.y - game.player.y) < zone.radius + playerEnemyRadius * 0.8;
       if (touchingPlayer && !zone.touchingPlayer) {

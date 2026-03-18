@@ -118,7 +118,8 @@ export const BIOMES = {
         acidDuration: 5,
         acidRadius: 12,
         acidSpacingTiles: 0.9,
-        acidMaxSegments: 8
+        acidMaxSegments: 8,
+        acidDamageMultiplier: 0.2
       }
     },
     breakables: {
