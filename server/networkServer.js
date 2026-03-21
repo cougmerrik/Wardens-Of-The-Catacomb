@@ -1,3 +1,4 @@
+import http from "node:http";
 import { WebSocketServer } from "ws";
 import { buildJoinKeyframeState } from "./net/deltaProtocol.js";
 import { handleClientClose, handleClientMessage } from "./net/clientMessageHandler.js";
@@ -9,6 +10,7 @@ import { average, makeSamplePusher, monotonicNowMs, percentile } from "./net/tel
 import { buildDeltaCollection } from "./net/deltaProtocol.js";
 import { buildMapChunkRows } from "./net/mapChunkStreaming.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
+import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
@@ -64,8 +66,22 @@ function getOrCreateRoom(roomId, classType) {
   return room;
 }
 
+const server = http.createServer(async (req, res) => {
+  const method = req.method || "GET";
+  const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+
+  if (requestUrl.pathname === "/api/leaderboard") {
+    await handleLeaderboardApiRequest(req, res, leaderboardStore);
+    return;
+  }
+  res.writeHead(404, {
+    "Content-Type": "application/json; charset=utf-8"
+  });
+  res.end(`${JSON.stringify({ error: "Not found" })}\n`);
+});
+
 const wss = new WebSocketServer({
-  port: PORT,
+  server,
   perMessageDeflate: false
 });
 
@@ -122,4 +138,8 @@ startRoomSchedulers({
   monotonicNowMs
 });
 
-console.log(`Authoritative network server listening on ws://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Authoritative server listening on port ${PORT}`);
+  console.log(`WebSocket gameplay endpoint available on ws://localhost:${PORT}`);
+  console.log(`Leaderboard REST endpoint available on http://localhost:${PORT}/api/leaderboard`);
+});

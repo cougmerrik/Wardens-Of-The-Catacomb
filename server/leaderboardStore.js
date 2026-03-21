@@ -1,22 +1,22 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const DEFAULT_STORE_PATH = resolve(process.cwd(), "data", "leaderboard.json");
-const MAX_GLOBAL_ROWS = 25;
+export const DEFAULT_STORE_PATH = resolve(process.cwd(), "data", "leaderboard.json");
+export const MAX_GLOBAL_ROWS = 25;
 
-function sanitizeHandle(value) {
+export function sanitizeHandle(value) {
   if (typeof value !== "string") return "Player";
   const normalized = value.replace(/\s+/g, " ").trim().slice(0, 20);
   return normalized || "Player";
 }
 
-function normalizeClassType(value) {
+export function normalizeClassType(value) {
   return value === "fighter" || value === "warrior" || value === "necromancer"
     ? (value === "warrior" ? "fighter" : value)
     : "archer";
 }
 
-function normalizeRow(row = {}) {
+export function normalizeRow(row = {}) {
   return {
     handle: sanitizeHandle(row.handle),
     classType: normalizeClassType(row.classType),
@@ -27,7 +27,7 @@ function normalizeRow(row = {}) {
   };
 }
 
-function compareRows(a, b) {
+export function compareRows(a, b) {
   const scoreDiff = b.score - a.score;
   if (scoreDiff !== 0) return scoreDiff;
   const floorDiff = b.floorReached - a.floorReached;

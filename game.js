@@ -42,7 +42,7 @@ import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./src/boots
 import {
   buildLocalRunSummary,
   fetchGlobalLeaderboard,
-  getDefaultLeaderboardServerUrl,
+  getDefaultLeaderboardApiUrl,
   loadStoredPlayerHandle,
   persistPlayerHandle,
   sanitizePlayerHandle,
@@ -134,7 +134,9 @@ if (playerNameInput) {
   playerNameInput.required = true;
 }
 if (serverUrlInput && (!serverUrlInput.value || serverUrlInput.value.trim() === "ws://localhost:8090")) {
-  serverUrlInput.value = getDefaultLeaderboardServerUrl(window.location);
+  const hostname = window.location?.hostname || "localhost";
+  const protocol = window.location?.protocol === "https:" ? "wss" : "ws";
+  serverUrlInput.value = `${protocol}://${hostname}:8090`;
 }
 
 if (devStartOptions) devStartOptions.hidden = !isDevMode;
@@ -187,9 +189,8 @@ function showCharacterSelect(mode) {
   renderMenuScreen();
 }
 
-function getLeaderboardServerUrl() {
-  const explicitUrl = serverUrlInput && serverUrlInput.value ? serverUrlInput.value.trim() : "";
-  return explicitUrl || getDefaultLeaderboardServerUrl(window.location);
+function getLeaderboardApiUrl() {
+  return getDefaultLeaderboardApiUrl(window.location);
 }
 
 function syncStoredHandleFromInput() {
@@ -263,7 +264,7 @@ async function refreshGlobalLeaderboard() {
   leaderboardState.errorText = "";
   renderLeaderboardModal();
   try {
-    const response = await fetchGlobalLeaderboard(getLeaderboardServerUrl());
+    const response = await fetchGlobalLeaderboard(getLeaderboardApiUrl());
     leaderboardState.globalRows = sortLeaderboardRows(response.rows);
   } catch (error) {
     leaderboardState.errorText = error instanceof Error ? error.message : String(error);
@@ -282,7 +283,7 @@ async function submitCompletedLocalRun(game) {
   leaderboardState.errorText = "";
   renderLeaderboardModal();
   try {
-    const response = await submitLocalRunToLeaderboard(getLeaderboardServerUrl(), run);
+    const response = await submitLocalRunToLeaderboard(getLeaderboardApiUrl(), run);
     leaderboardState.globalRows = sortLeaderboardRows(response.rows);
   } catch (error) {
     leaderboardState.errorText = error instanceof Error ? error.message : String(error);

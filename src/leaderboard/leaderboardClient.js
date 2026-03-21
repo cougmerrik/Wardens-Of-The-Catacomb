@@ -35,10 +35,13 @@ export function persistPlayerHandle(handle, storage = globalThis?.localStorage) 
   }
 }
 
-export function getDefaultLeaderboardServerUrl(locationObject = globalThis?.location) {
-  const protocol = locationObject?.protocol === "https:" ? "wss" : "ws";
+export function getDefaultLeaderboardApiUrl(locationObject = globalThis?.location) {
+  const protocol = locationObject?.protocol === "https:" ? "https:" : "http:";
   const hostname = locationObject?.hostname || "localhost";
-  return `${protocol}://${hostname}:8090`;
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+  if (isLocalhost) return `${protocol}//${hostname}:8090/api/leaderboard`;
+  if (locationObject?.origin) return `${locationObject.origin}/api/leaderboard`;
+  return `${protocol}//${hostname}/api/leaderboard`;
 }
 
 export function getClassLabel(classType) {
@@ -89,70 +92,53 @@ export function formatLeaderboardDuration(totalSeconds) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function requestLeaderboard(wsUrl, payload) {
-  return new Promise((resolve, reject) => {
-    if (!wsUrl || typeof WebSocket === "undefined") {
-      reject(new Error("Leaderboard connection is unavailable."));
-      return;
+async function requestLeaderboard(apiUrl, init = {}) {
+  if (!apiUrl || typeof fetch !== "function") {
+    throw new Error("Leaderboard connection is unavailable.");
+  }
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = controller
+    ? setTimeout(() => controller.abort(), LEADERBOARD_REQUEST_TIMEOUT_MS)
+    : null;
+  try {
+    const response = await fetch(apiUrl, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers || {})
+      },
+      signal: controller?.signal
+    });
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch {
+      payload = {};
     }
-    const requestId = `lb_${Math.random().toString(36).slice(2, 10)}`;
-    const socket = new WebSocket(wsUrl);
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try {
-        socket.close();
-      } catch {}
-      reject(new Error("Leaderboard request timed out."));
-    }, LEADERBOARD_REQUEST_TIMEOUT_MS);
-    const finish = (callback) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try {
-        socket.close();
-      } catch {}
-      callback();
+    if (!response.ok) {
+      throw new Error(payload?.error || "Leaderboard request failed.");
+    }
+    return {
+      rows: Array.isArray(payload?.rows) ? payload.rows.map(normalizeLeaderboardRow) : [],
+      accepted: payload?.accepted !== false
     };
-    socket.addEventListener("open", () => {
-      socket.send(JSON.stringify({ ...payload, requestId }));
-    });
-    socket.addEventListener("message", (event) => {
-      let message = null;
-      try {
-        message = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (!message || message.requestId !== requestId) return;
-      if (message.type === "leaderboard.rows") {
-        finish(() => resolve({
-          rows: Array.isArray(message.rows) ? message.rows.map(normalizeLeaderboardRow) : [],
-          accepted: message.accepted !== false
-        }));
-        return;
-      }
-      if (message.type === "error") {
-        finish(() => reject(new Error(message.message || "Leaderboard request failed.")));
-      }
-    });
-    socket.addEventListener("error", () => {
-      finish(() => reject(new Error("Unable to reach the leaderboard server.")));
-    });
-    socket.addEventListener("close", () => {
-      if (!settled) finish(() => reject(new Error("Leaderboard connection closed before completing the request.")));
-    });
-  });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("Leaderboard request timed out.");
+    throw new Error(error instanceof Error ? error.message : "Unable to reach the leaderboard server.");
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
-export function fetchGlobalLeaderboard(wsUrl) {
-  return requestLeaderboard(wsUrl, { type: "leaderboard.get" });
+export function fetchGlobalLeaderboard(apiUrl) {
+  return requestLeaderboard(apiUrl, { method: "GET" });
 }
 
-export function submitLocalRunToLeaderboard(wsUrl, run) {
-  return requestLeaderboard(wsUrl, {
-    type: "leaderboard.submit",
-    run: normalizeLeaderboardRow(run)
+export function submitLocalRunToLeaderboard(apiUrl, run) {
+  return requestLeaderboard(apiUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      run: normalizeLeaderboardRow(run)
+    })
   });
 }
