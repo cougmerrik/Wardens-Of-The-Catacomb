@@ -144,6 +144,9 @@ export function serializeMetaState(source) {
   const musicTrack = source && source.currentMusicTrack ? { ...source.currentMusicTrack } : sim && sim.musicTrack ? { ...sim.musicTrack } : null;
   const floorBoss = sim.floorBoss && typeof sim.floorBoss === "object" ? { ...sim.floorBoss } : null;
   return {
+    roomPhase: typeof source?.phase === "string" ? source.phase : "active",
+    roomOwnerId: typeof source?.roomOwnerId === "string" ? source.roomOwnerId : null,
+    pauseOwnerId: typeof source?.pauseOwnerId === "string" ? source.pauseOwnerId : null,
     floor: sim.floor,
     level: sim.level,
     score: sim.score,

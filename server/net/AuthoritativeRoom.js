@@ -1,5 +1,7 @@
 import { GameSim } from "../../src/sim/GameSim.js";
 
+const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
+
 export class AuthoritativeRoom {
   constructor(id, classType, options) {
     this.id = id;
@@ -10,7 +12,14 @@ export class AuthoritativeRoom {
       viewportHeight: 640
     });
     this.clients = new Map();
-    this.controllerId = null;
+    this.phase = "lobby";
+    this.roomOwnerId = null;
+    this.pauseOwnerId = null;
+    this.lobbyCountdownStartedAt = 0;
+    this.lobbyCountdownEndsAt = 0;
+    this.lobbyCountdownDurationMs = 5000;
+    this.lobbyInlineMessage = "";
+    this.requestedStartFloor = 1;
     this.lastTickMs = Date.now();
     this.lastSnapshotMs = 0;
     this.lastMetaBroadcastMs = 0;
@@ -72,24 +81,166 @@ export class AuthoritativeRoom {
     };
   }
 
+  get controllerId() {
+    return this.pauseOwnerId;
+  }
+
+  set controllerId(value) {
+    this.pauseOwnerId = typeof value === "string" && value ? value : null;
+  }
+
   mapSignature() {
     return `${this.sim.floor}:${this.sim.mapWidth}x${this.sim.mapHeight}`;
+  }
+
+  getNextAvailableColorIndex() {
+    const used = new Set();
+    for (const client of this.clients.values()) {
+      if (Number.isFinite(client.colorIndex)) used.add(client.colorIndex);
+    }
+    for (let i = 0; i < PLAYER_COLOR_PALETTE.length; i++) {
+      if (!used.has(i)) return i;
+    }
+    return 0;
+  }
+
+  getClientRunColor(client) {
+    if (!client) return PLAYER_COLOR_PALETTE[0];
+    const index = Number.isFinite(client.colorIndex) ? Math.max(0, Math.floor(client.colorIndex)) : 0;
+    return PLAYER_COLOR_PALETTE[index % PLAYER_COLOR_PALETTE.length];
+  }
+
+  getRosterEntry(client) {
+    return {
+      id: client.id,
+      handle: client.name,
+      name: client.name,
+      classType: client.classType,
+      locked: !!client.classLocked,
+      ready: !!client.classLocked,
+      colorIndex: Number.isFinite(client.colorIndex) ? client.colorIndex : 0,
+      color: this.getClientRunColor(client),
+      isOwner: client.id === this.roomOwnerId,
+      isPauseOwner: client.id === this.pauseOwnerId
+    };
+  }
+
+  getRosterEntries() {
+    return Array.from(this.clients.values()).map((client) => this.getRosterEntry(client));
+  }
+
+  getLobbyCountdownRemainingMs(nowMs = Date.now()) {
+    if (!(this.phase === "lobby" && this.lobbyCountdownEndsAt > 0)) return 0;
+    return Math.max(0, this.lobbyCountdownEndsAt - nowMs);
+  }
+
+  setLobbyInlineMessage(text = "") {
+    this.lobbyInlineMessage = typeof text === "string" ? text : "";
+  }
+
+  areAllClientsLocked() {
+    if (this.clients.size <= 0) return false;
+    for (const client of this.clients.values()) {
+      if (!client.classLocked) return false;
+    }
+    return true;
+  }
+
+  cancelLobbyCountdown(message = "") {
+    const hadCountdown = this.lobbyCountdownEndsAt > 0;
+    this.lobbyCountdownStartedAt = 0;
+    this.lobbyCountdownEndsAt = 0;
+    if (message) this.setLobbyInlineMessage(message);
+    return hadCountdown;
+  }
+
+  maybeStartLobbyCountdown(nowMs = Date.now(), message = "") {
+    if (this.phase !== "lobby") return false;
+    if (!this.areAllClientsLocked()) return false;
+    this.lobbyCountdownStartedAt = nowMs;
+    this.lobbyCountdownEndsAt = nowMs + this.lobbyCountdownDurationMs;
+    if (message) this.setLobbyInlineMessage(message);
+    return true;
+  }
+
+  refreshLobbyState(nowMs = Date.now(), reasonMessage = "") {
+    if (this.phase !== "lobby") return false;
+    const everyoneLocked = this.areAllClientsLocked();
+    let changed = false;
+    if (!everyoneLocked) {
+      if (this.cancelLobbyCountdown(reasonMessage)) changed = true;
+      else if (reasonMessage) {
+        this.setLobbyInlineMessage(reasonMessage);
+        changed = true;
+      }
+      return changed;
+    }
+    if (this.lobbyCountdownEndsAt <= 0) {
+      this.maybeStartLobbyCountdown(nowMs, reasonMessage);
+      changed = true;
+    } else if (reasonMessage) {
+      this.setLobbyInlineMessage(reasonMessage);
+      changed = true;
+    }
+    return changed;
+  }
+
+  startRun(nowMs = Date.now()) {
+    if (this.phase === "active") return false;
+    if (this.requestedStartFloor > 1 && typeof this.sim.applyDebugStartingFloor === "function") {
+      this.sim.applyDebugStartingFloor(this.requestedStartFloor);
+    }
+    this.phase = "active";
+    this.setLobbyInlineMessage("");
+    this.lobbyCountdownStartedAt = 0;
+    this.lobbyCountdownEndsAt = 0;
+    this.lastTickMs = nowMs;
+    this.broadcast("room.started", {
+      phase: this.phase,
+      ownerId: this.roomOwnerId,
+      pauseOwnerId: this.pauseOwnerId,
+      controllerId: this.pauseOwnerId
+    });
+    this.sendMapState();
+    this.maybeBroadcastMeta(nowMs, true);
+    return true;
   }
 
   addClient(client) {
     if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     client.lastSnapshotAckSeq = 0;
+    client.classLocked = !!client.classLocked;
+    client.colorIndex = Number.isFinite(client.colorIndex) ? client.colorIndex : this.getNextAvailableColorIndex();
     this.clients.set(client.id, client);
     this.clientChunkState.set(client.id, { sent: new Set() });
-    if (!this.controllerId) this.controllerId = client.id;
+    if (!this.roomOwnerId) this.roomOwnerId = client.id;
+    if (!this.pauseOwnerId) this.pauseOwnerId = client.id;
+    if (this.phase === "lobby") this.refreshLobbyState(Date.now());
   }
 
   removeClient(clientId) {
+    const removedClient = this.clients.get(clientId);
+    const previousOwnerId = this.roomOwnerId;
     this.clients.delete(clientId);
     this.clientChunkState.delete(clientId);
-    if (this.controllerId === clientId) {
+    if (this.roomOwnerId === clientId) {
       const next = this.clients.keys().next();
-      this.controllerId = next.done ? null : next.value;
+      this.roomOwnerId = next.done ? null : next.value;
+    }
+    if (this.pauseOwnerId === clientId) {
+      const next = this.clients.keys().next();
+      this.pauseOwnerId = next.done ? null : next.value;
+    }
+    if (this.phase === "lobby") {
+      const handle = removedClient?.name || "A player";
+      const ownerTransferred = previousOwnerId === clientId && this.roomOwnerId;
+      let message = `${handle} left. Countdown restarted.`;
+      if (ownerTransferred) {
+        const nextOwner = this.clients.get(this.roomOwnerId);
+        if (nextOwner?.name) message = `${handle} left. ${nextOwner.name} is now the room owner.`;
+      }
+      this.cancelLobbyCountdown(message);
+      this.refreshLobbyState(Date.now(), message);
     }
   }
 
@@ -98,12 +249,55 @@ export class AuthoritativeRoom {
   }
 
   getControllerInput() {
-    if (!this.controllerId) return this.options.makeDefaultInput();
-    const client = this.clients.get(this.controllerId);
+    if (!this.pauseOwnerId) return this.options.makeDefaultInput();
+    const client = this.clients.get(this.pauseOwnerId);
     return client ? client.input : this.options.makeDefaultInput();
   }
 
+  updateClientLobbyState(clientId, { classType, locked } = {}) {
+    const client = this.clients.get(clientId);
+    if (!client) return false;
+    let changed = false;
+    const wasLocked = !!client.classLocked;
+    if (typeof classType === "string" && classType && client.classType !== classType) {
+      client.classType = classType;
+      changed = true;
+    }
+    if (typeof locked === "boolean" && client.classLocked !== locked) {
+      client.classLocked = locked;
+      changed = true;
+    }
+    if (changed && this.phase === "lobby") {
+      if (wasLocked && !client.classLocked) {
+        this.cancelLobbyCountdown(`${client.name} is no longer ready.`);
+      }
+      this.refreshLobbyState(Date.now(), wasLocked && !client.classLocked ? `${client.name} is no longer ready.` : "");
+    }
+    return changed;
+  }
+
+  updateRequestedStartFloor(clientId, floor = 1) {
+    if (this.phase !== "lobby") return false;
+    if (clientId !== this.roomOwnerId) return false;
+    const nextFloor = Math.max(1, Math.floor(Number.isFinite(floor) ? floor : 1));
+    if (nextFloor === this.requestedStartFloor) return false;
+    this.requestedStartFloor = nextFloor;
+    this.cancelLobbyCountdown("Start floor changed. Countdown restarted.");
+    this.refreshLobbyState(Date.now(), "Start floor changed. Countdown restarted.");
+    return true;
+  }
+
   tick(nowMs, scheduleDriftMs = 0) {
+    if (this.phase === "lobby") {
+      this.lastTickMs = nowMs;
+      const countdownActive = this.lobbyCountdownStartedAt > 0 && this.lobbyCountdownEndsAt > this.lobbyCountdownStartedAt;
+      const countdownElapsed = countdownActive && nowMs - this.lobbyCountdownStartedAt >= this.lobbyCountdownDurationMs;
+      if (countdownElapsed && nowMs >= this.lobbyCountdownEndsAt) {
+        this.startRun(nowMs);
+        this.broadcastRoster();
+      }
+      return;
+    }
     this.sim.activePlayerCount = Math.max(1, this.clients.size);
     if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     this.tickDriftSampleCounter += 1;
@@ -127,9 +321,9 @@ export class AuthoritativeRoom {
     this.lastTickMs = nowMs;
     this.sim.tick(dt, this.getControllerInput());
     if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
-    const controllerClient = this.clients.get(this.controllerId);
+    const controllerClient = this.clients.get(this.pauseOwnerId);
     const taggedSeq = controllerClient ? controllerClient.input?.seq || controllerClient.lastInputSeq || 0 : 0;
-    const ownerId = this.controllerId || null;
+    const ownerId = this.pauseOwnerId || null;
     for (let i = preBulletCount; i < this.sim.bullets.length; i++) {
       const bullet = this.sim.bullets[i];
       if (!bullet || typeof bullet !== "object") continue;
@@ -173,12 +367,15 @@ export class AuthoritativeRoom {
 
   broadcastRoster() {
     this.broadcast("room.roster", {
-      controllerId: this.controllerId,
-      players: Array.from(this.clients.values()).map((client) => ({
-        id: client.id,
-        name: client.name,
-        classType: client.classType
-      }))
+      phase: this.phase,
+      ownerId: this.roomOwnerId,
+      pauseOwnerId: this.pauseOwnerId,
+      controllerId: this.pauseOwnerId,
+      requestedStartFloor: this.requestedStartFloor,
+      lobbyCountdownEndsAt: this.lobbyCountdownEndsAt || 0,
+      lobbyCountdownRemainingMs: this.getLobbyCountdownRemainingMs(),
+      lobbyInlineMessage: this.lobbyInlineMessage,
+      players: this.getRosterEntries()
     });
   }
 
@@ -284,7 +481,7 @@ export class AuthoritativeRoom {
       this.maybeBroadcastMeta(nowMs, true);
     }
     for (const client of this.clients.values()) this.sendMapChunksToClient(client, nowMs);
-    const controllerClient = this.clients.get(this.controllerId);
+    const controllerClient = this.clients.get(this.pauseOwnerId);
     const serializeStart = this.options.monotonicNowMs();
     const fullState = this.options.serializeState(this);
     this.options.pushTelemetrySample(this.telemetry.serializeDurationsMs, this.options.monotonicNowMs() - serializeStart);
@@ -342,7 +539,10 @@ export class AuthoritativeRoom {
     this.broadcast("state.snapshot", {
       serverTime: nowMs,
       snapshotSeq: this.snapshotSeq,
-      controllerId: this.controllerId,
+      phase: this.phase,
+      ownerId: this.roomOwnerId,
+      pauseOwnerId: this.pauseOwnerId,
+      controllerId: this.pauseOwnerId,
       lastInputSeq: controllerClient ? controllerClient.lastInputSeq : 0,
       mapSignature: sig,
       state

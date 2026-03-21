@@ -24,7 +24,7 @@ const MAP_CHUNK_PUSH_MS = Number.parseInt(process.env.MAP_CHUNK_PUSH_MS || "120"
 const DELTA_KEYFRAME_EVERY = Number.parseInt(process.env.DELTA_KEYFRAME_EVERY || "30", 10);
 const SNAPSHOT_ACK_GAP_FORCE_KEYFRAME = Number.parseInt(process.env.SNAPSHOT_ACK_GAP_FORCE_KEYFRAME || "8", 10);
 const MAX_ROOMS = 64;
-const MAX_PEERS_PER_ROOM = 8;
+const MAX_PEERS_PER_ROOM = 6;
 const MAX_WS_BUFFERED_BYTES = Number.parseInt(process.env.MAX_WS_BUFFERED_BYTES || "262144", 10);
 const MAX_TELEMETRY_SAMPLES = Number.parseInt(process.env.MAX_TELEMETRY_SAMPLES || "4096", 10);
 const TICK_DRIFT_EPSILON_MS = Number.parseFloat(process.env.TICK_DRIFT_EPSILON_MS || "0.5");
@@ -105,7 +105,7 @@ wss.on("connection", (ws) => {
     type: "hello",
     playerId: client.id,
     protocol: 2,
-    note: "Server authoritative alpha. One active controller per room; others are spectators."
+    note: "Server authoritative alpha. Multiplayer room scaffolding is in progress."
   });
 
   ws.on("message", (raw) => {

@@ -32,7 +32,7 @@
           <div>
             <p class="menu-kicker">Network Game</p>
             <h2>Connection Setup</h2>
-            <p class="menu-copy">Enter the server URL and room ID before moving on to character select.</p>
+            <p class="menu-copy">Enter the server URL, room ID, and handle before joining the shared lobby.</p>
           </div>
           <button type="button" id="network-setup-back" class="start-game ghost mini">Back</button>
         </div>
@@ -40,8 +40,10 @@
         <input id="net-server-url" class="field-input" type="text" value="ws://localhost:8090" />
         <label class="field-label" for="net-room-id">Room ID</label>
         <input id="net-room-id" class="field-input" type="text" value="lobby" />
+        <label class="field-label" for="net-player-name-setup">Player Handle</label>
+        <input id="net-player-name-setup" class="field-input" type="text" maxlength="20" autocomplete="nickname" required />
         <div class="screen-actions">
-          <button type="button" id="network-setup-next" class="start-game alt">Continue to Character Select</button>
+          <button type="button" id="network-setup-next" class="start-game alt">Join Lobby</button>
         </div>
       </section>
 
@@ -50,7 +52,7 @@
           <div>
             <p id="character-select-mode-label" class="menu-kicker">Single Game</p>
             <h2>Character Select</h2>
-            <p class="menu-copy">Choose a class, enter your handle, and begin the run.</p>
+            <p class="menu-copy">Choose a class and begin the run.</p>
           </div>
           <button type="button" id="character-select-back" class="start-game ghost mini">Back</button>
         </div>
@@ -87,6 +89,76 @@
         </section>
         <div class="screen-actions">
           <button type="button" id="start-game" class="start-game">Start Game</button>
+        </div>
+      </section>
+
+      <section id="network-lobby-screen" class="menu-screen network-lobby-screen" aria-label="Network lobby" hidden>
+        <div class="screen-header">
+          <div>
+            <p class="menu-kicker">Network Lobby</p>
+            <h2>Shared Lobby</h2>
+            <p class="menu-copy">Choose your class, mark yourself ready, and wait for the room countdown to begin.</p>
+          </div>
+          <button type="button" id="network-lobby-leave-top" class="start-game ghost mini">Leave</button>
+        </div>
+        <div class="network-lobby-meta">
+          <div class="network-lobby-room">
+            <span class="network-lobby-label">Room</span>
+            <strong id="network-lobby-room-id">-</strong>
+          </div>
+          <div class="network-lobby-room">
+            <span class="network-lobby-label">Status</span>
+            <strong id="network-lobby-status-text">Connecting...</strong>
+          </div>
+        </div>
+        <p id="network-lobby-inline-message" class="network-lobby-inline-message" hidden></p>
+        <div class="network-lobby-layout">
+          <section class="network-lobby-roster-panel" aria-label="Lobby roster">
+            <div class="network-lobby-panel-header">
+              <h3>Party Roster</h3>
+              <span id="network-lobby-countdown" class="network-lobby-countdown">Waiting for players</span>
+            </div>
+            <div id="network-lobby-roster" class="network-lobby-roster"></div>
+          </section>
+          <section class="network-lobby-loadout-panel" aria-label="Lobby class selection">
+            <div class="network-lobby-panel-header">
+              <h3>Your Loadout</h3>
+              <span id="network-lobby-ready-state" class="network-lobby-ready-state">Choosing</span>
+            </div>
+            <div id="network-lobby-class-grid" class="class-grid network-lobby-class-grid">
+              <button type="button" class="class-option network-lobby-class-option" data-lobby-class-option="archer" data-class-option="archer" aria-pressed="false">
+                <span class="class-option__portrait" aria-hidden="true">
+                  <img class="class-option__portrait-image" src="./assets/images/ranger.png" alt="" />
+                </span>
+                <strong>Elvish Archer</strong>
+                <span>Ranged attacks, flexible kiting, fire arrow skill tree.</span>
+              </button>
+              <button type="button" class="class-option network-lobby-class-option" data-lobby-class-option="warrior" data-class-option="warrior" aria-pressed="false">
+                <span class="class-option__portrait" aria-hidden="true">
+                  <img class="class-option__portrait-image" src="./assets/images/warrior.png" alt="" />
+                </span>
+                <strong>Castle Warrior</strong>
+                <span>Melee cleaves, higher base damage, brawler playstyle.</span>
+              </button>
+              <button type="button" class="class-option network-lobby-class-option" data-lobby-class-option="necromancer" data-class-option="necromancer" aria-pressed="false">
+                <span class="class-option__portrait" aria-hidden="true">
+                  <img class="class-option__portrait-image" src="./assets/images/necromancer.png" alt="" />
+                </span>
+                <strong>Reformed Necromancer</strong>
+                <span>Charm undead pets, sustain them with necrotic light, detonate the dead.</span>
+              </button>
+            </div>
+            <section id="network-lobby-dev-start-options" class="dev-start-options" hidden>
+              <h3>Dev Start</h3>
+              <label class="field-label" for="network-lobby-dev-start-floor">Starting Floor</label>
+              <input id="network-lobby-dev-start-floor" class="field-input" type="number" min="1" step="1" value="1" />
+              <p class="dev-start-hint">Owner-only. Sets the shared starting floor before the run begins.</p>
+            </section>
+            <div class="screen-actions network-lobby-actions">
+              <button type="button" id="network-lobby-toggle-ready" class="start-game alt">Ready</button>
+              <button type="button" id="network-lobby-leave" class="start-game danger">Leave Room</button>
+            </div>
+          </section>
         </div>
       </section>
 

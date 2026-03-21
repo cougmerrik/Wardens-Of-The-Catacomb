@@ -55,6 +55,7 @@ const menuPanel = document.querySelector(".menu-shell");
 const modeSelectScreen = document.getElementById("mode-select");
 const networkSetupScreen = document.getElementById("network-setup-screen");
 const selector = document.getElementById("character-select");
+const networkLobbyScreen = document.getElementById("network-lobby-screen");
 const characterSelectModeLabel = document.getElementById("character-select-mode-label");
 const menuSingleButton = document.getElementById("menu-single");
 const menuNetworkButton = document.getElementById("menu-network");
@@ -67,9 +68,21 @@ const classButtons = Array.from(document.querySelectorAll("[data-class-option]")
 const startButton = document.getElementById("start-game");
 const openLeaderboardButton = document.getElementById("open-leaderboard");
 const serverUrlInput = document.getElementById("net-server-url"), roomIdInput = document.getElementById("net-room-id");
-const playerNameInput = document.getElementById("net-player-name"), networkSession = document.getElementById("network-session");
+const playerNameInput = document.getElementById("net-player-name"), networkPlayerNameInput = document.getElementById("net-player-name-setup"), networkSession = document.getElementById("network-session");
 const networkStatus = document.getElementById("network-status"), networkTakeControl = document.getElementById("network-take-control");
 const networkLeave = document.getElementById("network-leave");
+const networkLobbyRoomId = document.getElementById("network-lobby-room-id");
+const networkLobbyStatusText = document.getElementById("network-lobby-status-text");
+const networkLobbyInlineMessage = document.getElementById("network-lobby-inline-message");
+const networkLobbyRoster = document.getElementById("network-lobby-roster");
+const networkLobbyCountdown = document.getElementById("network-lobby-countdown");
+const networkLobbyReadyState = document.getElementById("network-lobby-ready-state");
+const networkLobbyToggleReady = document.getElementById("network-lobby-toggle-ready");
+const networkLobbyLeave = document.getElementById("network-lobby-leave");
+const networkLobbyLeaveTop = document.getElementById("network-lobby-leave-top");
+const networkLobbyDevStartOptions = document.getElementById("network-lobby-dev-start-options");
+const networkLobbyDevStartFloorInput = document.getElementById("network-lobby-dev-start-floor");
+const networkLobbyClassButtons = Array.from(document.querySelectorAll("[data-lobby-class-option]"));
 const leaderboardModal = document.getElementById("leaderboard-modal");
 const leaderboardTitle = document.getElementById("leaderboard-title");
 const leaderboardSubtitle = document.getElementById("leaderboard-subtitle");
@@ -89,6 +102,11 @@ let selectedClass = "archer";
 let currentGame = null, netClient = null;
 let netInputTimer = 0, netRenderRaf = 0;
 let netPlayerId = null, netControllerId = null;
+let netRoomOwnerId = null, netPauseOwnerId = null, netRoomPhase = "active", netRosterPlayers = [];
+let netJoinedRoomId = "";
+let netLobbyCountdownEndsAt = 0, netLobbyInlineText = "";
+let netRequestedStartFloor = 1;
+let netPendingWsUrl = "", netPendingRoomId = "", netPendingHandle = "";
 let netInputSeq = 0, netLastAckSeq = 0;
 let netPendingInputs = [], netMapSignature = "", netPendingSnapshot = null;
 const NET_INPUT_DT = 1 / 60;
@@ -142,6 +160,10 @@ if (playerNameInput) {
   playerNameInput.value = currentPlayerHandle;
   playerNameInput.required = true;
 }
+if (networkPlayerNameInput) {
+  networkPlayerNameInput.value = currentPlayerHandle;
+  networkPlayerNameInput.required = true;
+}
 if (serverUrlInput) {
   const configuredWsUrl = getConfiguredWsUrl();
   if (configuredWsUrl) {
@@ -176,6 +198,7 @@ function renderMenuScreen() {
   if (modeSelectScreen) modeSelectScreen.hidden = menuState.screen !== "mode";
   if (networkSetupScreen) networkSetupScreen.hidden = menuState.screen !== "network";
   if (selector) selector.hidden = menuState.screen !== "character";
+  if (networkLobbyScreen) networkLobbyScreen.hidden = menuState.screen !== "lobby";
   syncCharacterSelectCopy();
 }
 
@@ -203,15 +226,32 @@ function showCharacterSelect(mode) {
   renderMenuScreen();
 }
 
+function showNetworkLobby() {
+  menuState.mode = MENU_MODE_NETWORK;
+  menuState.screen = "lobby";
+  if (menuPanel) menuPanel.hidden = false;
+  setCanvasVisible(false);
+  renderMenuScreen();
+}
+
 function getLeaderboardApiUrl() {
   const configuredApiUrl = getConfiguredLeaderboardApiUrl();
   if (configuredApiUrl) return configuredApiUrl;
   return getDefaultLeaderboardApiUrl(window.location);
 }
 
+function getActiveHandleInput() {
+  return menuState.mode === MENU_MODE_NETWORK ? networkPlayerNameInput || playerNameInput : playerNameInput || networkPlayerNameInput;
+}
+
+function syncHandleInputs(value) {
+  if (playerNameInput && playerNameInput.value !== value) playerNameInput.value = value;
+  if (networkPlayerNameInput && networkPlayerNameInput.value !== value) networkPlayerNameInput.value = value;
+}
+
 function syncStoredHandleFromInput() {
-  currentPlayerHandle = sanitizePlayerHandle(playerNameInput?.value || "");
-  if (playerNameInput && playerNameInput.value !== currentPlayerHandle) playerNameInput.value = currentPlayerHandle;
+  currentPlayerHandle = sanitizePlayerHandle(getActiveHandleInput()?.value || "");
+  syncHandleInputs(currentPlayerHandle);
   if (currentPlayerHandle) persistPlayerHandle(currentPlayerHandle);
   return currentPlayerHandle;
 }
@@ -219,14 +259,84 @@ function syncStoredHandleFromInput() {
 function ensurePlayerHandle() {
   const handle = syncStoredHandleFromInput();
   if (handle) return handle;
-  if (playerNameInput) {
-    playerNameInput.value = "";
-    playerNameInput.focus();
-    playerNameInput.setCustomValidity("Enter a handle before starting or submitting a run.");
-    playerNameInput.reportValidity();
-    playerNameInput.setCustomValidity("");
+  const input = getActiveHandleInput();
+  if (input) {
+    input.value = "";
+    input.focus();
+    input.setCustomValidity("Enter a handle before starting or submitting a run.");
+    input.reportValidity();
+    input.setCustomValidity("");
   }
   return "";
+}
+
+function setLobbySelectedClass(classType) {
+  selectedClass = setSelectedClass(classType, classButtons);
+  setSelectedClass(classType, networkLobbyClassButtons);
+}
+
+function getLocalRosterEntry() {
+  return Array.isArray(netRosterPlayers) ? netRosterPlayers.find((player) => player && player.id === netPlayerId) || null : null;
+}
+
+function renderNetworkLobby() {
+  if (!networkLobbyScreen || menuState.screen !== "lobby") return;
+  if (networkLobbyRoomId) networkLobbyRoomId.textContent = netJoinedRoomId || netPendingRoomId || "-";
+  if (networkLobbyStatusText) {
+    const owner = netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId;
+    const baseStatus =
+      netRoomPhase === "active"
+        ? "Run starting..."
+        : owner
+        ? "You own this room"
+        : "Waiting for the room owner";
+    networkLobbyStatusText.textContent = baseStatus;
+  }
+  const localEntry = getLocalRosterEntry();
+  if (localEntry?.classType) setLobbySelectedClass(localEntry.classType);
+  if (networkLobbyReadyState) networkLobbyReadyState.textContent = localEntry?.locked ? "Ready" : "Choosing";
+  if (networkLobbyToggleReady) networkLobbyToggleReady.textContent = localEntry?.locked ? "Not Ready" : "Ready";
+  if (networkLobbyCountdown) {
+    const remainingMs = typeof netLobbyCountdownEndsAt === "number" ? Math.max(0, netLobbyCountdownEndsAt - Date.now()) : 0;
+    networkLobbyCountdown.textContent =
+      remainingMs > 0 ? `Starting in ${Math.max(1, Math.ceil(remainingMs / 1000))}` : "Waiting for all players";
+  }
+  if (networkLobbyInlineMessage) {
+    const text = typeof netLobbyInlineText === "string" ? netLobbyInlineText.trim() : "";
+    networkLobbyInlineMessage.hidden = !text;
+    networkLobbyInlineMessage.textContent = text;
+  }
+  if (networkLobbyDevStartOptions) {
+    const isOwner = !!(netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId);
+    networkLobbyDevStartOptions.hidden = !isDevMode;
+    if (networkLobbyDevStartFloorInput) {
+      networkLobbyDevStartFloorInput.disabled = !isOwner;
+      if (document.activeElement !== networkLobbyDevStartFloorInput) {
+        networkLobbyDevStartFloorInput.value = `${Math.max(1, netRequestedStartFloor || 1)}`;
+      }
+    }
+  }
+  if (networkLobbyRoster) {
+    const rows = Array.isArray(netRosterPlayers) ? netRosterPlayers : [];
+    networkLobbyRoster.innerHTML = "";
+    for (const player of rows) {
+      if (!player) continue;
+      const row = document.createElement("article");
+      row.className = `network-lobby-roster-entry${player.id === netPlayerId ? " is-local" : ""}`;
+      const state = player.locked ? "Ready" : "Choosing";
+      row.innerHTML = `
+        <div class="network-lobby-roster-top">
+          <span class="network-lobby-roster-handle" style="color:${player.color || "#f3f2ea"}">${player.handle || player.name || "Player"}</span>
+          <span class="network-lobby-roster-state">${state}</span>
+        </div>
+        <div class="network-lobby-roster-meta">
+          <span class="network-lobby-badge">${player.classType || "No Class Selected"}</span>
+          ${player.isOwner ? '<span class="network-lobby-badge star">★ Owner</span>' : ""}
+        </div>
+      `;
+      networkLobbyRoster.appendChild(row);
+    }
+  }
 }
 
 function getDeathReturnSecondsRemaining() {
@@ -577,6 +687,9 @@ function stopNetworkSession() {
     netClient = null;
   }
   netPlayerId = null; netControllerId = null;
+  netRoomOwnerId = null; netPauseOwnerId = null; netRoomPhase = "active"; netRosterPlayers = [];
+  netJoinedRoomId = ""; netLobbyCountdownEndsAt = 0; netLobbyInlineText = ""; netRequestedStartFloor = 1;
+  netPendingWsUrl = ""; netPendingRoomId = ""; netPendingHandle = "";
   netInputSeq = 0; netLastAckSeq = 0;
   netPendingInputs = []; netMapSignature = ""; netPendingSnapshot = null;
   netSnapshotBuffer.length = 0; netLastInputSendAt = 0; netLastSentInput = null; netLastInputProcessAt = 0;
@@ -755,20 +868,16 @@ function startLocalGame() {
   });
 }
 
-function startNetworkGame() {
-  const handle = ensurePlayerHandle();
-  if (!handle) return;
+function startNetworkGameplay() {
+  const name = netPendingHandle || currentPlayerHandle || "Player";
+  const localEntry = getLocalRosterEntry();
+  if (localEntry?.classType) setLobbySelectedClass(localEntry.classType);
+  if (currentGame) return currentGame;
   menuState.mode = MENU_MODE_NETWORK;
-  stopNetworkSession();
   if (menuPanel) menuPanel.hidden = true;
   setCanvasVisible(true);
   if (networkSession) networkSession.hidden = false;
   currentGame = cleanupCurrentGameRuntime(currentGame);
-
-  const wsUrl = serverUrlInput && serverUrlInput.value ? serverUrlInput.value.trim() : "ws://localhost:8090";
-  const roomId = roomIdInput && roomIdInput.value ? roomIdInput.value.trim() : "lobby";
-  const name = handle;
-
   const game = new Game(canvas, {
     classType: selectedClass,
     onReturnToMenu: returnToMenu,
@@ -784,6 +893,10 @@ function startNetworkGame() {
   game.playerHandle = name;
   game.networkEnabled = true;
   game.networkRole = "Connecting";
+  game.networkRoomPhase = netRoomPhase || "active";
+  game.networkRoomOwnerId = netRoomOwnerId;
+  game.networkPauseOwnerId = netPauseOwnerId;
+  game.networkRosterPlayers = netRosterPlayers.slice();
   game.networkReady = false;
   game.networkHasMap = false;
   game.networkHasChunks = false;
@@ -819,29 +932,85 @@ function startNetworkGame() {
   game.navPlayerTile = { x: -1, y: -1 };
   currentGame = game;
   syncMusicForGame(game);
-  updateNetworkStatusRuntime(networkStatus, currentGame, `Connecting to ${wsUrl}...`);
+  updateNetworkStatusRuntime(networkStatus, currentGame, `Joined "${netJoinedRoomId || netPendingRoomId}"`);
   startNetworkRenderLoop(game);
+  return game;
+}
 
-  netClient = new NetClient(wsUrl);
+function startNetworkGame() {
+  const handle = ensurePlayerHandle();
+  if (!handle) return;
+  menuState.mode = MENU_MODE_NETWORK;
+  stopNetworkSession();
+  if (networkSession) networkSession.hidden = true;
+  currentGame = cleanupCurrentGameRuntime(currentGame);
+  netPendingWsUrl = serverUrlInput && serverUrlInput.value ? serverUrlInput.value.trim() : "ws://localhost:8090";
+  netPendingRoomId = roomIdInput && roomIdInput.value ? roomIdInput.value.trim() : "lobby";
+  netPendingHandle = handle;
+  netJoinedRoomId = netPendingRoomId;
+  showNetworkLobby();
+  renderNetworkLobby();
+  updateNetworkStatusRuntime(networkStatus, currentGame, `Connecting to ${netPendingWsUrl}...`);
+
+  netClient = new NetClient(netPendingWsUrl);
   netClient.on("open", () => {
-    updateNetworkStatusRuntime(networkStatus, currentGame, `Connected. Joining room "${roomId}"...`);
-    netClient.join(roomId, name, selectedClass);
+    updateNetworkStatusRuntime(networkStatus, currentGame, `Connected. Joining room "${netPendingRoomId}"...`);
+    if (networkLobbyStatusText) networkLobbyStatusText.textContent = "Connected";
+    netClient.join(netPendingRoomId, netPendingHandle, selectedClass);
   });
   netClient.on("hello", (msg) => {
     netPlayerId = msg.playerId || null;
+    renderNetworkLobby();
+  });
+  netClient.on("room.started", (msg) => {
+    netRoomPhase = typeof msg.phase === "string" ? msg.phase : "active";
+    netRoomOwnerId = msg.ownerId || netRoomOwnerId;
+    netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
+    netControllerId = msg.controllerId || netControllerId;
+    startNetworkGameplay();
   });
   netClient.on("join.ok", (msg) => {
+    netJoinedRoomId = msg.roomId || netJoinedRoomId || netPendingRoomId;
+    netRoomPhase = typeof msg.phase === "string" ? msg.phase : netRoomPhase;
+    netRoomOwnerId = msg.ownerId || netRoomOwnerId;
+    netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || null;
-    updateNetworkRole(game, isNetworkController(), networkTakeControl);
-    updateNetworkStatusRuntime(networkStatus, currentGame, `Joined "${msg.roomId}" as ${game.networkRole}`);
+    renderNetworkLobby();
+    if (msg.phase === "active") {
+      const game = startNetworkGameplay();
+      game.networkRoomPhase = netRoomPhase;
+      game.networkRoomOwnerId = netRoomOwnerId;
+      game.networkPauseOwnerId = netPauseOwnerId;
+      updateNetworkRole(game, isNetworkController(), networkTakeControl);
+      updateNetworkStatusRuntime(networkStatus, currentGame, `Joined "${msg.roomId}" as ${game.networkRole}`);
+    } else {
+      updateNetworkStatusRuntime(networkStatus, currentGame, `Joined lobby "${msg.roomId}"`);
+    }
   });
   netClient.on("room.roster", (msg) => {
+    netRoomPhase = typeof msg.phase === "string" ? msg.phase : netRoomPhase;
+    netRoomOwnerId = msg.ownerId || netRoomOwnerId;
+    netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || null;
-    updateNetworkRole(game, isNetworkController(), networkTakeControl);
+    netRequestedStartFloor = Number.isFinite(msg.requestedStartFloor) ? Math.max(1, Math.floor(msg.requestedStartFloor)) : netRequestedStartFloor;
+    netLobbyCountdownEndsAt = Number.isFinite(msg.lobbyCountdownEndsAt) ? msg.lobbyCountdownEndsAt : 0;
+    netLobbyInlineText = typeof msg.lobbyInlineMessage === "string" ? msg.lobbyInlineMessage : "";
+    netRosterPlayers = Array.isArray(msg.players) ? msg.players.slice() : [];
+    renderNetworkLobby();
+    const game = currentGame;
+    if (game) {
+      game.networkRoomPhase = netRoomPhase;
+      game.networkRoomOwnerId = netRoomOwnerId;
+      game.networkPauseOwnerId = netPauseOwnerId;
+      game.networkRosterPlayers = netRosterPlayers;
+      updateNetworkRole(game, isNetworkController(), networkTakeControl);
+    }
     const players = Array.isArray(msg.players) ? msg.players.length : 0;
-    updateNetworkStatusRuntime(networkStatus, currentGame, `Room: ${players} connected | Role: ${game.networkRole}`);
+    updateNetworkStatusRuntime(networkStatus, currentGame, game ? `Room: ${players} connected | Role: ${game.networkRole}` : `Lobby: ${players} connected`);
   });
   const handleMapReady = () => {
+    const game = currentGame;
+    if (!game) return;
     const playerX = Number.isFinite(netLastServerPlayer?.x) ? netLastServerPlayer.x : game.player.x;
     const playerY = Number.isFinite(netLastServerPlayer?.y) ? netLastServerPlayer.y : game.player.y;
     netRequiredChunkKeys = updateRequiredChunkReadinessRuntime(
@@ -876,6 +1045,8 @@ function startNetworkGame() {
   };
 
   netClient.on("state.mapMeta", (msg) => {
+    const game = currentGame;
+    if (!game) return;
     netMapSignature = applyMapMetaToGame(game, msg) || netMapSignature;
     netPendingInputs = [];
     netLastAckSeq = 0;
@@ -894,6 +1065,8 @@ function startNetworkGame() {
     updateNetworkStatusRuntime(networkStatus, currentGame, "Loading nearby map chunks...");
   });
   netClient.on("state.mapChunk", (msg) => {
+    const game = currentGame;
+    if (!game) return;
     const chunkSig = typeof msg.mapSignature === "string" ? msg.mapSignature : "";
     if (chunkSig && netMapSignature && chunkSig !== netMapSignature) return;
     if (applyMapChunkToGame(game, msg)) {
@@ -907,6 +1080,8 @@ function startNetworkGame() {
   });
   // Backward-compatibility with pre-chunk servers.
   netClient.on("state.map", (msg) => {
+    const game = currentGame;
+    if (!game) return;
     netMapSignature = applyMapStateToGame(game, msg) || netMapSignature;
     netPendingInputs = [];
     netLastAckSeq = 0;
@@ -923,6 +1098,8 @@ function startNetworkGame() {
     handleMapReady();
   });
   netClient.on("state.meta", (msg) => {
+    const game = currentGame;
+    if (!game) return;
     observeServerTimeIntoState(netClockState, msg.serverTime, NET_CLOCK_OFFSET_SMOOTHING);
     const metaSig = typeof msg.mapSignature === "string" ? msg.mapSignature : "";
     if (metaSig && netMapSignature && metaSig !== netMapSignature) return;
@@ -933,6 +1110,9 @@ function startNetworkGame() {
     const prevTrackSrc = game.musicTrack?.src || "";
     const meta = msg && msg.meta && typeof msg.meta === "object" ? msg.meta : msg;
     applyMetaStateToGame(game, meta);
+    netRoomPhase = typeof game.networkRoomPhase === "string" ? game.networkRoomPhase : netRoomPhase;
+    netRoomOwnerId = game.networkRoomOwnerId || netRoomOwnerId;
+    netPauseOwnerId = game.networkPauseOwnerId || netPauseOwnerId;
     const nextTrackTitle = game.musicTrack?.title || "";
     const nextTrackSrc = game.musicTrack?.src || "";
     if (
@@ -950,6 +1130,8 @@ function startNetworkGame() {
     }
   });
   netClient.on("state.snapshot", (msg) => {
+    const game = currentGame;
+    if (!game) return;
     const recvAt = performance.now();
     if (netLastSnapshotRecvAtMs > 0) {
       const gap = Math.max(0, recvAt - netLastSnapshotRecvAtMs);
@@ -958,7 +1140,13 @@ function startNetworkGame() {
       netSnapshotJitterMs += (Math.abs(gap - netSnapshotIntervalMeanMs) - netSnapshotJitterMs) * 0.18;
     }
     netLastSnapshotRecvAtMs = recvAt;
+    netRoomPhase = typeof msg.phase === "string" ? msg.phase : netRoomPhase;
+    netRoomOwnerId = msg.ownerId || netRoomOwnerId;
+    netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || netControllerId;
+    game.networkRoomPhase = netRoomPhase;
+    game.networkRoomOwnerId = netRoomOwnerId;
+    game.networkPauseOwnerId = netPauseOwnerId;
     observeServerTimeIntoState(netClockState, msg.serverTime, NET_CLOCK_OFFSET_SMOOTHING);
     if (Number.isFinite(msg.snapshotSeq)) {
       netClient.send("state.snapshotAck", { snapshotSeq: Math.floor(msg.snapshotSeq) });
@@ -1027,14 +1215,18 @@ function startNetworkGame() {
   netClient.on("warn", (msg) => updateNetworkStatusRuntime(networkStatus, currentGame, `Warning: ${msg.message || "Server warning"}`));
   netClient.on("error", (msg) => updateNetworkStatusRuntime(networkStatus, currentGame, `Error: ${msg.message || "Connection error"}`));
   netClient.on("close", () => {
-    game.networkReady = false;
-    syncMusicForGame(game);
+    if (currentGame) {
+      currentGame.networkReady = false;
+      syncMusicForGame(currentGame);
+    }
+    if (networkLobbyStatusText && menuState.screen === "lobby") networkLobbyStatusText.textContent = "Disconnected";
     updateNetworkStatusRuntime(networkStatus, currentGame, "Disconnected from server");
   });
   netClient.connect();
 
   netInputTimer = setInterval(() => {
-    if (!netClient || !currentGame || currentGame !== game) return;
+    const game = currentGame;
+    if (!netClient || !game) return;
     const input = collectInput(game, true);
     input.seq = ++netInputSeq;
     const nowMs = performance.now();
@@ -1108,10 +1300,23 @@ if (!canvas) {
   throw new Error("Game canvas not found.");
 }
 
-selectedClass = setSelectedClass("archer", classButtons);
+setLobbySelectedClass("archer");
 for (const button of classButtons) {
   button.addEventListener("click", () => {
-    selectedClass = setSelectedClass(button.dataset.classOption, classButtons);
+    setLobbySelectedClass(button.dataset.classOption);
+  });
+}
+for (const button of networkLobbyClassButtons) {
+  button.addEventListener("click", () => {
+    const nextClass = button.dataset.lobbyClassOption;
+    setLobbySelectedClass(nextClass);
+    const localEntry = getLocalRosterEntry();
+    if (netClient && menuState.screen === "lobby") {
+      netClient.sendLobbyUpdate({
+        classType: nextClass,
+        locked: localEntry?.locked ? false : undefined
+      });
+    }
   });
 }
 
@@ -1135,7 +1340,7 @@ if (networkSetupBackButton) {
 
 if (networkSetupNextButton) {
   networkSetupNextButton.addEventListener("click", () => {
-    showCharacterSelect(MENU_MODE_NETWORK);
+    startNetworkGame();
   });
 }
 
@@ -1151,15 +1356,17 @@ if (startButton) {
   });
 }
 
-if (playerNameInput) {
-  playerNameInput.addEventListener("input", () => {
-    currentPlayerHandle = sanitizePlayerHandle(playerNameInput.value);
-    playerNameInput.setCustomValidity("");
+for (const handleInput of [playerNameInput, networkPlayerNameInput]) {
+  if (!handleInput) continue;
+  handleInput.addEventListener("input", () => {
+    currentPlayerHandle = sanitizePlayerHandle(handleInput.value);
+    syncHandleInputs(currentPlayerHandle);
+    handleInput.setCustomValidity("");
   });
-  playerNameInput.addEventListener("change", () => {
+  handleInput.addEventListener("change", () => {
     syncStoredHandleFromInput();
   });
-  playerNameInput.addEventListener("blur", () => {
+  handleInput.addEventListener("blur", () => {
     syncStoredHandleFromInput();
   });
 }
@@ -1223,6 +1430,43 @@ if (networkLeave) {
   });
 }
 
+if (networkLobbyToggleReady) {
+  networkLobbyToggleReady.addEventListener("click", () => {
+    if (!netClient) return;
+    const localEntry = getLocalRosterEntry();
+    netClient.sendLobbyUpdate({
+      classType: selectedClass,
+      locked: !localEntry?.locked
+    });
+  });
+}
+
+if (networkLobbyDevStartFloorInput) {
+  networkLobbyDevStartFloorInput.addEventListener("change", () => {
+    if (!netClient) return;
+    const nextFloor = Math.max(1, Number.parseInt(networkLobbyDevStartFloorInput.value || "1", 10) || 1);
+    netClient.sendLobbyUpdate({ startingFloor: nextFloor });
+  });
+}
+
+if (networkLobbyLeave) {
+  networkLobbyLeave.addEventListener("click", () => {
+    returnToMenu();
+  });
+}
+
+if (networkLobbyLeaveTop) {
+  networkLobbyLeaveTop.addEventListener("click", () => {
+    returnToMenu();
+  });
+}
+
 renderLeaderboardModal();
 renderMenuScreen();
 startSplashScreen();
+
+const networkLobbyTick = () => {
+  if (menuState.screen === "lobby") renderNetworkLobby();
+  requestAnimationFrame(networkLobbyTick);
+};
+requestAnimationFrame(networkLobbyTick);

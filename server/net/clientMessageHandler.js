@@ -136,23 +136,31 @@ export function handleClientMessage(raw, context) {
       type: "join.ok",
       roomId: room.id,
       playerId: client.id,
+      phase: room.phase,
+      ownerId: room.roomOwnerId,
+      pauseOwnerId: room.pauseOwnerId,
       controllerId: room.controllerId,
       classType: room.sim.classType
     });
-    room.sendMapState(client);
-    const joinFullState = serializeState(room);
-    const joinState = client.protocolVersion >= 2 ? buildJoinKeyframeState(joinFullState) : joinFullState;
-    safeSend(ws, {
-      type: "state.snapshot",
-      roomId: room.id,
-      serverTime: Date.now(),
-      snapshotSeq: room.snapshotSeq,
-      controllerId: room.controllerId,
-      lastInputSeq: room.clients.get(room.controllerId)?.lastInputSeq || 0,
-      mapSignature: room.mapSignature(),
-      state: joinState
-    });
-    room.sendMeta(client, Date.now(), true);
+    if (room.phase === "active") {
+      room.sendMapState(client);
+      const joinFullState = serializeState(room);
+      const joinState = client.protocolVersion >= 2 ? buildJoinKeyframeState(joinFullState) : joinFullState;
+      safeSend(ws, {
+        type: "state.snapshot",
+        roomId: room.id,
+        serverTime: Date.now(),
+        snapshotSeq: room.snapshotSeq,
+        phase: room.phase,
+        ownerId: room.roomOwnerId,
+        pauseOwnerId: room.pauseOwnerId,
+        controllerId: room.controllerId,
+        lastInputSeq: room.clients.get(room.controllerId)?.lastInputSeq || 0,
+        mapSignature: room.mapSignature(),
+        state: joinState
+      });
+      room.sendMeta(client, Date.now(), true);
+    }
     room.broadcastRoster();
     return;
   }
@@ -160,12 +168,29 @@ export function handleClientMessage(raw, context) {
   if (msg.type === "input") {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const room = rooms.get(client.roomId);
+    if (room.phase !== "active") return;
     if (room.controllerId !== client.id) {
       safeSend(ws, { type: "warn", message: "Spectators cannot control this room in phase-1." });
       return;
     }
     client.input = sanitizeInput(msg.input, client.input);
     client.lastInputSeq = client.input.seq || client.lastInputSeq;
+    return;
+  }
+
+  if (msg.type === "room.lobbyUpdate") {
+    if (!client.roomId || !rooms.has(client.roomId)) return;
+    const room = rooms.get(client.roomId);
+    if (room.phase !== "lobby") return;
+    const changed = room.updateClientLobbyState(client.id, {
+      classType: typeof msg.classType === "string" ? normClassType(msg.classType) : undefined,
+      locked: typeof msg.locked === "boolean" ? msg.locked : undefined
+    });
+    const floorChanged = room.updateRequestedStartFloor(
+      client.id,
+      Number.isFinite(msg.startingFloor) ? msg.startingFloor : NaN
+    );
+    if (changed || floorChanged) room.broadcastRoster();
     return;
   }
 
@@ -187,7 +212,7 @@ export function handleClientMessage(raw, context) {
   if (msg.type === "room.takeControl") {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const room = rooms.get(client.roomId);
-    room.controllerId = client.id;
+    room.pauseOwnerId = client.id;
     room.broadcastRoster();
     return;
   }

@@ -261,6 +261,9 @@ function synthesizeEnemyDamageFloatingTexts(game, previousById, { skip = false }
 
 export function applyMetaStateToGame(game, state) {
   if (!state || typeof state !== "object") return;
+  if (typeof state.roomPhase === "string") game.networkRoomPhase = state.roomPhase;
+  if (hasOwn(state, "roomOwnerId")) game.networkRoomOwnerId = typeof state.roomOwnerId === "string" ? state.roomOwnerId : null;
+  if (hasOwn(state, "pauseOwnerId")) game.networkPauseOwnerId = typeof state.pauseOwnerId === "string" ? state.pauseOwnerId : null;
   if (Number.isFinite(state.time)) game.time = state.time;
   if (Number.isFinite(state.floor)) game.floor = state.floor;
   if (Number.isFinite(state.level)) game.level = state.level;
