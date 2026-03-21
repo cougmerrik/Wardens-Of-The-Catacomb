@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node scripts/build-runtime-config.js",
     "serve": "python -m http.server 8080",
     "server:net": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/networkServer.js')).href))\"",
     "dev": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/devLauncher.js')).href))\"",
@@ -18,6 +19,7 @@
     "validate:network-join": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-join.js')).href))\"",
     "validate:network-combat": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-combat.js')).href))\"",
     "validate:network-combat-hit": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-combat-hit.js')).href))\"",
+    "validate:network-two-client-damage": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-two-client-damage.js')).href))\"",
     "validate:network-archer": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-archer.js')).href))\"",
     "validate:network-audio": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-audio.js')).href))\"",
     "validate:network-audio:focus": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-audio.js')).href))\" -- --focus-cycle",
