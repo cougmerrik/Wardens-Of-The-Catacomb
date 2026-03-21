@@ -137,6 +137,32 @@ function drawHudButton(ctx, rect, label, active, activeFill) {
   ctx.textAlign = "left";
 }
 
+function drawNecromancerPetOrbs(ctx, game, x, y) {
+  const cap = Math.max(0, Math.floor(game.getNecromancerControlCap()));
+  const used = Math.max(0, Math.min(cap, Math.floor(game.getControlledUndeadCount())));
+  ctx.fillStyle = "#9fb1d5";
+  ctx.font = "11px Trebuchet MS";
+  ctx.fillText("Pets", x, y);
+  if (cap <= 0) return;
+
+  const radius = 6;
+  const gap = 7;
+  const startX = x + 34;
+  const centerY = y - 4;
+  for (let i = 0; i < cap; i++) {
+    const cx = startX + i * (radius * 2 + gap);
+    ctx.fillStyle = i < used ? "#b8f0bf" : "rgba(91, 109, 145, 0.26)";
+    ctx.beginPath();
+    ctx.arc(cx, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = i < used ? "rgba(228, 255, 232, 0.95)" : "rgba(154, 170, 202, 0.58)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 function getRunStats(game) {
   if (typeof game.ensureRunStats === "function") return game.ensureRunStats();
   return game.runStats || {
@@ -356,8 +382,13 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   const ctx = renderer.ctx;
   const panelX = layout.sidebarX + renderer.sidebarPadding;
   const panelW = layout.sidebarW - renderer.sidebarPadding * 2;
-  const panelH = 142;
+  const isNecromancer = game.isNecromancerClass && game.isNecromancerClass();
+  const panelH = isNecromancer ? 158 : 142;
   const outpace = game.getEnemyOutpacingStatus();
+  const playerHandle = typeof game.playerHandle === "string" && game.playerHandle.trim()
+    ? game.playerHandle.trim()
+    : "Player";
+  const classLabel = game.classSpec?.label || "Unknown";
   ctx.fillStyle = "rgba(8, 12, 18, 0.9)";
   ctx.fillRect(panelX, panelY, panelW, panelH);
   ctx.strokeStyle = "rgba(126, 139, 171, 0.65)";
@@ -366,7 +397,13 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
 
   ctx.fillStyle = "#f2efe3";
   ctx.font = "bold 14px Trebuchet MS";
-  ctx.fillText(game.classSpec?.label || "HUD", panelX + 10, panelY + 19);
+  ctx.fillText(playerHandle, panelX + 10, panelY + 19);
+  ctx.fillStyle = "#aebbd8";
+  ctx.font = "12px Trebuchet MS";
+  ctx.fillText(classLabel, panelX + 10, panelY + 34);
+  if (isNecromancer) {
+    drawNecromancerPetOrbs(ctx, game, panelX + 10, panelY + 49);
+  }
   if (game.hasKey) {
     const badgeW = 132;
     const badgeH = 18;
@@ -381,18 +418,20 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
     ctx.fillStyle = "#f2ffe8";
     ctx.font = "bold 11px Trebuchet MS";
     ctx.fillText("KEY FOUND - EXIT OPEN", badgeX + 8, badgeY + 12);
-    ctx.font = "13px Trebuchet MS";
   }
   ctx.font = "13px Trebuchet MS";
   ctx.fillStyle = "#cfd6e7";
-  ctx.fillText(`Gold ${game.gold}`, panelX + 10, panelY + 42);
-  ctx.fillText(`Lvl ${game.level}`, panelX + 94, panelY + 42);
-  ctx.fillText(`SP ${game.skillPoints}`, panelX + 152, panelY + 42);
-  ctx.fillText(`Enemies ${game.enemies.length}`, panelX + 10, panelY + 63);
-  ctx.fillText("Pace", panelX + 10, panelY + 84);
+  const statsRowY = isNecromancer ? panelY + 70 : panelY + 56;
+  const enemyRowY = isNecromancer ? panelY + 91 : panelY + 77;
+  const paceRowY = isNecromancer ? panelY + 112 : panelY + 98;
+  ctx.fillText(`Gold ${game.gold}`, panelX + 10, statsRowY);
+  ctx.fillText(`Lvl ${game.level}`, panelX + 94, statsRowY);
+  ctx.fillText(`SP ${game.skillPoints}`, panelX + 152, statsRowY);
+  ctx.fillText(`Enemies ${game.enemies.length}`, panelX + 10, enemyRowY);
+  ctx.fillText("Pace", panelX + 10, paceRowY);
   ctx.fillStyle = outpace.color;
-  ctx.fillText(outpace.label, panelX + 42, panelY + 84);
-  drawAbilityCooldownWidget(renderer, game, panelX + panelW - 64, panelY + 30, 42);
+  ctx.fillText(outpace.label, panelX + 42, paceRowY);
+  drawAbilityCooldownWidget(renderer, game, panelX + panelW - 64, isNecromancer ? panelY + 58 : panelY + 44, 42);
 
   const buttonW = Math.floor((panelW - 20) / 3);
   const buttonH = 28;

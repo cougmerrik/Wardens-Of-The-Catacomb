@@ -2,25 +2,16 @@ import { formatTime } from "../../utils.js";
 
 export function drawHud(renderer, game, layout) {
   const ctx = renderer.ctx;
-  const playerHandle = typeof game.playerHandle === "string" && game.playerHandle.trim()
-    ? game.playerHandle.trim()
-    : "Player";
-  const classLabel = game.classSpec?.label || "Unknown";
   ctx.fillStyle = "rgba(5, 8, 14, 0.9)";
   ctx.fillRect(0, 0, layout.playW, layout.topHudH);
   ctx.fillStyle = "#f2efe3";
   ctx.font = "16px Trebuchet MS";
-  ctx.fillText(`${playerHandle} ${classLabel}`, 14, 24);
-  ctx.fillText(`Score: ${game.score}`, 260, 24);
-  ctx.fillText(`Time: ${formatTime(game.time)}`, 446, 24);
-  ctx.fillText(`Floor: ${game.floor}`, 612, 24);
-  if (game.isNecromancerClass && game.isNecromancerClass()) {
-    ctx.fillStyle = "#8fc2ff";
-    ctx.fillText(`Pets: ${game.getControlledUndeadCount()}/${game.getNecromancerControlCap()}`, 720, 24);
-  }
+  ctx.fillText(`Score: ${game.score}`, 14, 24);
+  ctx.fillText(`Time: ${formatTime(game.time)}`, 192, 24);
+  ctx.fillText(`Floor: ${game.floor}`, 340, 24);
   if (game.networkEnabled) {
     ctx.fillStyle = game.networkRole === "Controller" ? "#8fe3a2" : "#dfc670";
-    ctx.fillText(`Net: ${game.networkRole || "Connected"}`, game.isNecromancerClass && game.isNecromancerClass() ? 858 : 744, 24);
+    ctx.fillText(`Net: ${game.networkRole || "Connected"}`, 470, 24);
   }
 
   const objective = typeof game.getFloorObjectiveText === "function" ? game.getFloorObjectiveText() : "";

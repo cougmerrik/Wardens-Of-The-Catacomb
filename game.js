@@ -37,7 +37,7 @@ import {
   sortLeaderboardRows,
   syncLeaderboardModal
 } from "./src/bootstrap/leaderboardUiRuntime.js";
-import { createLocalGame, startIdleSoundMonitor, wireMenuControls } from "./src/bootstrap/gameStartupRuntime.js";
+import { createLocalGame, startIdleSoundMonitor } from "./src/bootstrap/gameStartupRuntime.js";
 import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./src/bootstrap/networkRenderRuntime.js";
 import {
   buildLocalRunSummary,
@@ -51,12 +51,20 @@ import {
 
 const canvas = document.getElementById("game");
 const layout = document.querySelector(".layout");
-const menuPanel = document.querySelector(".panel");
+const menuPanel = document.querySelector(".menu-shell");
+const modeSelectScreen = document.getElementById("mode-select");
+const networkSetupScreen = document.getElementById("network-setup-screen");
 const selector = document.getElementById("character-select");
+const characterSelectModeLabel = document.getElementById("character-select-mode-label");
+const menuSingleButton = document.getElementById("menu-single");
+const menuNetworkButton = document.getElementById("menu-network");
+const networkSetupBackButton = document.getElementById("network-setup-back");
+const networkSetupNextButton = document.getElementById("network-setup-next");
+const characterSelectBackButton = document.getElementById("character-select-back");
 const devStartOptions = document.getElementById("dev-start-options");
 const devStartFloorInput = document.getElementById("dev-start-floor");
 const classButtons = Array.from(document.querySelectorAll("[data-class-option]"));
-const startButton = document.getElementById("start-game"), startNetworkButton = document.getElementById("start-network-game");
+const startButton = document.getElementById("start-game");
 const openLeaderboardButton = document.getElementById("open-leaderboard");
 const serverUrlInput = document.getElementById("net-server-url"), roomIdInput = document.getElementById("net-room-id");
 const playerNameInput = document.getElementById("net-player-name"), networkSession = document.getElementById("network-session");
@@ -75,6 +83,8 @@ const leaderboardSessionBody = document.getElementById("leaderboard-session-body
 const music = new MusicController();
 const splashLogo = new Image();
 const SPLASH_FADE_MS = 1800;
+const MENU_MODE_SINGLE = "single";
+const MENU_MODE_NETWORK = "network";
 let selectedClass = "archer";
 let currentGame = null, netClient = null;
 let netInputTimer = 0, netRenderRaf = 0;
@@ -104,6 +114,10 @@ let netLastSnapshotRecvAtMs = 0, netSnapshotIntervalMeanMs = 33, netSnapshotJitt
 let netInitialSnapshotApplied = false;
 let splashActive = true, splashDismissed = false, splashRaf = 0, splashStartedAt = 0, splashReady = false;
 const isDevMode = new URLSearchParams(window.location.search).get("dev") === "1";
+const menuState = {
+  mode: null,
+  screen: "mode"
+};
 const leaderboardState = {
   activeTab: "global",
   globalRows: [],
@@ -124,6 +138,54 @@ if (serverUrlInput && (!serverUrlInput.value || serverUrlInput.value.trim() === 
 }
 
 if (devStartOptions) devStartOptions.hidden = !isDevMode;
+
+function setCanvasVisible(visible) {
+  if (!canvas) return;
+  canvas.hidden = !visible;
+}
+
+function getCharacterSelectBackLabel() {
+  return menuState.mode === MENU_MODE_NETWORK ? "Back to Network Setup" : "Back to Mode Select";
+}
+
+function syncCharacterSelectCopy() {
+  if (characterSelectModeLabel) {
+    characterSelectModeLabel.textContent = menuState.mode === MENU_MODE_NETWORK ? "Network Game" : "Single Game";
+  }
+  if (characterSelectBackButton) characterSelectBackButton.textContent = getCharacterSelectBackLabel();
+  if (startButton) startButton.textContent = menuState.mode === MENU_MODE_NETWORK ? "Join Network Room" : "Start Single Game";
+}
+
+function renderMenuScreen() {
+  if (modeSelectScreen) modeSelectScreen.hidden = menuState.screen !== "mode";
+  if (networkSetupScreen) networkSetupScreen.hidden = menuState.screen !== "network";
+  if (selector) selector.hidden = menuState.screen !== "character";
+  syncCharacterSelectCopy();
+}
+
+function showModeSelect() {
+  menuState.mode = null;
+  menuState.screen = "mode";
+  if (menuPanel) menuPanel.hidden = false;
+  setCanvasVisible(false);
+  renderMenuScreen();
+}
+
+function showNetworkSetup() {
+  menuState.mode = MENU_MODE_NETWORK;
+  menuState.screen = "network";
+  if (menuPanel) menuPanel.hidden = false;
+  setCanvasVisible(false);
+  renderMenuScreen();
+}
+
+function showCharacterSelect(mode) {
+  menuState.mode = mode;
+  menuState.screen = "character";
+  if (menuPanel) menuPanel.hidden = false;
+  setCanvasVisible(false);
+  renderMenuScreen();
+}
 
 function getLeaderboardServerUrl() {
   const explicitUrl = serverUrlInput && serverUrlInput.value ? serverUrlInput.value.trim() : "";
@@ -475,6 +537,7 @@ function stopNetworkSession() {
 
 function returnToMenu() {
   closeLeaderboardModal();
+  const targetMode = currentGame?.networkEnabled ? MENU_MODE_NETWORK : (menuState.mode || MENU_MODE_SINGLE);
   returnToMenuRuntime({
     stopNetworkSession,
     cleanupCurrentGame: () => {
@@ -483,7 +546,8 @@ function returnToMenu() {
     layout,
     menuPanel,
     selector,
-    music
+    music,
+    showMenu: () => showCharacterSelect(targetMode)
   });
 }
 
@@ -523,6 +587,7 @@ const dismissSplash = () => {
     currentGame,
     menuPanel,
     music,
+    showMenu: showModeSelect,
     startFallbackGame: () => {
       if (!startButton && classButtons.length === 0 && !currentGame) {
         currentGame = createLocalGame({
@@ -547,6 +612,7 @@ const handleSplashKeydown = (event) => {
 };
 
 const startSplashScreen = () => {
+  setCanvasVisible(true);
   const next = startSplashScreenRuntime({
     layout,
     menuPanel,
@@ -612,8 +678,10 @@ function startNetworkRenderLoop(game) {
 
 function startLocalGame() {
   if (!ensurePlayerHandle()) return;
+  menuState.mode = MENU_MODE_SINGLE;
   stopNetworkSession();
-  if (selector) selector.hidden = true;
+  if (menuPanel) menuPanel.hidden = true;
+  setCanvasVisible(true);
   currentGame = cleanupCurrentGameRuntime(currentGame);
   const requestedStartFloor = isDevMode && devStartFloorInput
     ? Math.max(1, Number.parseInt(devStartFloorInput.value || "1", 10) || 1)
@@ -635,8 +703,10 @@ function startLocalGame() {
 function startNetworkGame() {
   const handle = ensurePlayerHandle();
   if (!handle) return;
+  menuState.mode = MENU_MODE_NETWORK;
   stopNetworkSession();
-  if (selector) selector.hidden = true;
+  if (menuPanel) menuPanel.hidden = true;
+  setCanvasVisible(true);
   if (networkSession) networkSession.hidden = false;
   currentGame = cleanupCurrentGameRuntime(currentGame);
 
@@ -953,8 +1023,67 @@ function startNetworkGame() {
   }, 33);
 }
 
+function handlePrimaryStartAction() {
+  if (menuState.mode === MENU_MODE_NETWORK) {
+    startNetworkGame();
+    return;
+  }
+  startLocalGame();
+}
+
+function handleCharacterSelectBack() {
+  if (menuState.mode === MENU_MODE_NETWORK) {
+    showNetworkSetup();
+    return;
+  }
+  showModeSelect();
+}
+
 if (!canvas) {
   throw new Error("Game canvas not found.");
+}
+
+selectedClass = setSelectedClass("archer", classButtons);
+for (const button of classButtons) {
+  button.addEventListener("click", () => {
+    selectedClass = setSelectedClass(button.dataset.classOption, classButtons);
+  });
+}
+
+if (menuSingleButton) {
+  menuSingleButton.addEventListener("click", () => {
+    showCharacterSelect(MENU_MODE_SINGLE);
+  });
+}
+
+if (menuNetworkButton) {
+  menuNetworkButton.addEventListener("click", () => {
+    showNetworkSetup();
+  });
+}
+
+if (networkSetupBackButton) {
+  networkSetupBackButton.addEventListener("click", () => {
+    showModeSelect();
+  });
+}
+
+if (networkSetupNextButton) {
+  networkSetupNextButton.addEventListener("click", () => {
+    showCharacterSelect(MENU_MODE_NETWORK);
+  });
+}
+
+if (characterSelectBackButton) {
+  characterSelectBackButton.addEventListener("click", () => {
+    handleCharacterSelectBack();
+  });
+}
+
+if (startButton) {
+  startButton.addEventListener("click", () => {
+    handlePrimaryStartAction();
+  });
 }
 
 if (playerNameInput) {
@@ -1017,25 +1146,18 @@ const leaderboardUiTick = () => {
 requestAnimationFrame(leaderboardUiTick);
 
 startIdleSoundMonitor(() => currentGame, syncIdleSoundState);
-
-selectedClass = wireMenuControls({
-  selector,
-  startButton,
-  classButtons,
-  setSelectedClass,
-  onClassSelected: (nextClass) => {
-    selectedClass = nextClass;
-  },
-  startLocalGame,
-  startNetworkButton,
-  startNetworkGame,
-  networkTakeControl,
-  takeControl: () => {
+if (networkTakeControl) {
+  networkTakeControl.addEventListener("click", () => {
     if (netClient) netClient.takeControl();
-  },
-  networkLeave,
-  returnToMenu
-});
+  });
+}
+
+if (networkLeave) {
+  networkLeave.addEventListener("click", () => {
+    returnToMenu();
+  });
+}
 
 renderLeaderboardModal();
+renderMenuScreen();
 startSplashScreen();
