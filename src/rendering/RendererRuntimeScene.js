@@ -118,21 +118,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       ctx.fillText("GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 18);
       ctx.fillStyle = `rgba(208, 203, 194, ${subtitleAlpha})`;
       ctx.font = "20px Trebuchet MS";
-      ctx.fillText("Returning to the main menu...", this.canvas.width / 2, this.canvas.height / 2 + 28);
-      const buttonW = 188;
-      const buttonH = 34;
-      const buttonX = this.canvas.width * 0.5 - buttonW * 0.5;
-      const buttonY = this.canvas.height * 0.5 + 54;
-      game.uiRects.gameOverStatsButton = { x: buttonX, y: buttonY, w: buttonW, h: buttonH };
-      ctx.fillStyle = `rgba(39, 53, 79, ${0.92 * subtitleAlpha})`;
-      ctx.fillRect(buttonX, buttonY, buttonW, buttonH);
-      ctx.strokeStyle = `rgba(232, 226, 211, ${0.8 * subtitleAlpha})`;
-      ctx.strokeRect(buttonX, buttonY, buttonW, buttonH);
-      ctx.fillStyle = `rgba(243, 239, 227, ${subtitleAlpha})`;
-      ctx.font = "bold 15px Trebuchet MS";
-      ctx.fillText(game.statsPanelOpen ? "Hide Run Stats" : "View Run Stats", this.canvas.width / 2, buttonY + 22);
+      ctx.fillText("Leaderboard opened. Continue or wait to return to the menu.", this.canvas.width / 2, this.canvas.height / 2 + 28);
       ctx.textAlign = "left";
-      if (game.statsPanelOpen) this.drawPlayerStatsPanel(game, layout, minimapBottom + this.sidebarPadding);
     }
   }
 }

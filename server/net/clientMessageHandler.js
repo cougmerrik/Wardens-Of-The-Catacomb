@@ -58,7 +58,8 @@ export function handleClientMessage(raw, context) {
     sanitizeInput,
     serializeState,
     buildJoinKeyframeState,
-    safeSend
+    safeSend,
+    leaderboardStore
   } = context;
 
   let msg = null;
@@ -71,6 +72,35 @@ export function handleClientMessage(raw, context) {
 
   if (!msg || typeof msg !== "object" || typeof msg.type !== "string") {
     safeSend(ws, { type: "error", message: "Malformed message" });
+    return;
+  }
+
+  if (msg.type === "leaderboard.get") {
+    safeSend(ws, {
+      type: "leaderboard.rows",
+      requestId: typeof msg.requestId === "string" ? msg.requestId : "",
+      rows: leaderboardStore ? leaderboardStore.getRows() : []
+    });
+    return;
+  }
+
+  if (msg.type === "leaderboard.submit") {
+    const run = msg.run && typeof msg.run === "object" ? msg.run : null;
+    if (!run) {
+      safeSend(ws, {
+        type: "error",
+        requestId: typeof msg.requestId === "string" ? msg.requestId : "",
+        message: "Missing leaderboard run payload"
+      });
+      return;
+    }
+    const rows = leaderboardStore ? leaderboardStore.submitRun(run) : [];
+    safeSend(ws, {
+      type: "leaderboard.rows",
+      requestId: typeof msg.requestId === "string" ? msg.requestId : "",
+      accepted: true,
+      rows
+    });
     return;
   }
 

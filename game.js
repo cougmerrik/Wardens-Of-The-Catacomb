@@ -32,8 +32,22 @@ import {
   updateNetworkStatus as updateNetworkStatusRuntime,
   updateRequiredChunkReadiness as updateRequiredChunkReadinessRuntime
 } from "./src/bootstrap/gameUiSessionRuntime.js";
+import {
+  hideLeaderboardModal,
+  sortLeaderboardRows,
+  syncLeaderboardModal
+} from "./src/bootstrap/leaderboardUiRuntime.js";
 import { createLocalGame, startIdleSoundMonitor, wireMenuControls } from "./src/bootstrap/gameStartupRuntime.js";
 import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./src/bootstrap/networkRenderRuntime.js";
+import {
+  buildLocalRunSummary,
+  fetchGlobalLeaderboard,
+  getDefaultLeaderboardServerUrl,
+  loadStoredPlayerHandle,
+  persistPlayerHandle,
+  sanitizePlayerHandle,
+  submitLocalRunToLeaderboard
+} from "./src/leaderboard/leaderboardClient.js";
 
 const canvas = document.getElementById("game");
 const layout = document.querySelector(".layout");
@@ -43,10 +57,21 @@ const devStartOptions = document.getElementById("dev-start-options");
 const devStartFloorInput = document.getElementById("dev-start-floor");
 const classButtons = Array.from(document.querySelectorAll("[data-class-option]"));
 const startButton = document.getElementById("start-game"), startNetworkButton = document.getElementById("start-network-game");
+const openLeaderboardButton = document.getElementById("open-leaderboard");
 const serverUrlInput = document.getElementById("net-server-url"), roomIdInput = document.getElementById("net-room-id");
 const playerNameInput = document.getElementById("net-player-name"), networkSession = document.getElementById("network-session");
 const networkStatus = document.getElementById("network-status"), networkTakeControl = document.getElementById("network-take-control");
 const networkLeave = document.getElementById("network-leave");
+const leaderboardModal = document.getElementById("leaderboard-modal");
+const leaderboardTitle = document.getElementById("leaderboard-title");
+const leaderboardSubtitle = document.getElementById("leaderboard-subtitle");
+const leaderboardStatus = document.getElementById("leaderboard-status");
+const leaderboardClose = document.getElementById("leaderboard-close");
+const leaderboardContinue = document.getElementById("leaderboard-continue");
+const leaderboardTabGlobal = document.getElementById("leaderboard-tab-global");
+const leaderboardTabSession = document.getElementById("leaderboard-tab-session");
+const leaderboardGlobalBody = document.getElementById("leaderboard-global-body");
+const leaderboardSessionBody = document.getElementById("leaderboard-session-body");
 const music = new MusicController();
 const splashLogo = new Image();
 const SPLASH_FADE_MS = 1800;
@@ -79,8 +104,131 @@ let netLastSnapshotRecvAtMs = 0, netSnapshotIntervalMeanMs = 33, netSnapshotJitt
 let netInitialSnapshotApplied = false;
 let splashActive = true, splashDismissed = false, splashRaf = 0, splashStartedAt = 0, splashReady = false;
 const isDevMode = new URLSearchParams(window.location.search).get("dev") === "1";
+const leaderboardState = {
+  activeTab: "global",
+  globalRows: [],
+  sessionRows: [],
+  loading: false,
+  errorText: "",
+  mode: "menu",
+  open: false
+};
+let currentPlayerHandle = loadStoredPlayerHandle();
+
+if (playerNameInput) {
+  playerNameInput.value = currentPlayerHandle;
+  playerNameInput.required = true;
+}
+if (serverUrlInput && (!serverUrlInput.value || serverUrlInput.value.trim() === "ws://localhost:8090")) {
+  serverUrlInput.value = getDefaultLeaderboardServerUrl(window.location);
+}
 
 if (devStartOptions) devStartOptions.hidden = !isDevMode;
+
+function getLeaderboardServerUrl() {
+  const explicitUrl = serverUrlInput && serverUrlInput.value ? serverUrlInput.value.trim() : "";
+  return explicitUrl || getDefaultLeaderboardServerUrl(window.location);
+}
+
+function syncStoredHandleFromInput() {
+  currentPlayerHandle = sanitizePlayerHandle(playerNameInput?.value || "");
+  if (playerNameInput && playerNameInput.value !== currentPlayerHandle) playerNameInput.value = currentPlayerHandle;
+  if (currentPlayerHandle) persistPlayerHandle(currentPlayerHandle);
+  return currentPlayerHandle;
+}
+
+function ensurePlayerHandle() {
+  const handle = syncStoredHandleFromInput();
+  if (handle) return handle;
+  if (playerNameInput) {
+    playerNameInput.value = "";
+    playerNameInput.focus();
+    playerNameInput.setCustomValidity("Enter a handle before starting or submitting a run.");
+    playerNameInput.reportValidity();
+    playerNameInput.setCustomValidity("");
+  }
+  return "";
+}
+
+function getDeathReturnSecondsRemaining() {
+  if (!currentGame || !currentGame.gameOver) return 0;
+  const total = Number.isFinite(currentGame.deathTransitionDuration) ? currentGame.deathTransitionDuration : 10;
+  const elapsed = Number.isFinite(currentGame.deathTransition?.elapsed) ? currentGame.deathTransition.elapsed : 0;
+  return Math.max(0, total - elapsed);
+}
+
+function renderLeaderboardModal() {
+  if (!leaderboardState.open) {
+    hideLeaderboardModal(leaderboardModal);
+    return;
+  }
+  syncLeaderboardModal({
+    modal: leaderboardModal,
+    title: leaderboardTitle,
+    subtitle: leaderboardSubtitle,
+    status: leaderboardStatus,
+    closeButton: leaderboardClose,
+    continueButton: leaderboardContinue,
+    activeTab: leaderboardState.activeTab,
+    globalButton: leaderboardTabGlobal,
+    sessionButton: leaderboardTabSession,
+    globalRows: leaderboardState.globalRows,
+    sessionRows: leaderboardState.sessionRows,
+    globalTableBody: leaderboardGlobalBody,
+    sessionTableBody: leaderboardSessionBody,
+    errorText: leaderboardState.errorText,
+    loading: leaderboardState.loading,
+    mode: leaderboardState.mode,
+    remainingSeconds: getDeathReturnSecondsRemaining()
+  });
+}
+
+function closeLeaderboardModal() {
+  leaderboardState.open = false;
+  leaderboardState.mode = "menu";
+  renderLeaderboardModal();
+}
+
+function openLeaderboardModal(mode = "menu") {
+  leaderboardState.mode = mode;
+  leaderboardState.activeTab = "global";
+  leaderboardState.open = true;
+  renderLeaderboardModal();
+}
+
+async function refreshGlobalLeaderboard() {
+  leaderboardState.loading = true;
+  leaderboardState.errorText = "";
+  renderLeaderboardModal();
+  try {
+    const response = await fetchGlobalLeaderboard(getLeaderboardServerUrl());
+    leaderboardState.globalRows = sortLeaderboardRows(response.rows);
+  } catch (error) {
+    leaderboardState.errorText = error instanceof Error ? error.message : String(error);
+  } finally {
+    leaderboardState.loading = false;
+    renderLeaderboardModal();
+  }
+}
+
+async function submitCompletedLocalRun(game) {
+  const handle = ensurePlayerHandle();
+  const run = buildLocalRunSummary(game, handle || "Player");
+  leaderboardState.sessionRows = sortLeaderboardRows([...leaderboardState.sessionRows, run]);
+  openLeaderboardModal("death");
+  leaderboardState.loading = true;
+  leaderboardState.errorText = "";
+  renderLeaderboardModal();
+  try {
+    const response = await submitLocalRunToLeaderboard(getLeaderboardServerUrl(), run);
+    leaderboardState.globalRows = sortLeaderboardRows(response.rows);
+  } catch (error) {
+    leaderboardState.errorText = error instanceof Error ? error.message : String(error);
+  } finally {
+    leaderboardState.loading = false;
+    renderLeaderboardModal();
+  }
+}
 
 if (typeof window !== "undefined") {
   window.__WOTC_DEBUG__ = {
@@ -326,6 +474,7 @@ function stopNetworkSession() {
 }
 
 function returnToMenu() {
+  closeLeaderboardModal();
   returnToMenuRuntime({
     stopNetworkSession,
     cleanupCurrentGame: () => {
@@ -380,9 +529,13 @@ const dismissSplash = () => {
           Game,
           canvas,
           selectedClass: "archer",
+          playerHandle: currentPlayerHandle || "Player",
           returnToMenu,
           syncMusicForGame,
-          startingFloor: 1
+          startingFloor: 1,
+          onGameOverChanged: (gameOver, nextGame) => {
+            if (gameOver) submitCompletedLocalRun(nextGame);
+          }
         });
       }
     }
@@ -458,6 +611,7 @@ function startNetworkRenderLoop(game) {
 }
 
 function startLocalGame() {
+  if (!ensurePlayerHandle()) return;
   stopNetworkSession();
   if (selector) selector.hidden = true;
   currentGame = cleanupCurrentGameRuntime(currentGame);
@@ -468,13 +622,19 @@ function startLocalGame() {
     Game,
     canvas,
     selectedClass,
+    playerHandle: currentPlayerHandle || "Player",
     returnToMenu,
     syncMusicForGame,
-    startingFloor: requestedStartFloor
+    startingFloor: requestedStartFloor,
+    onGameOverChanged: (gameOver, nextGame) => {
+      if (gameOver) submitCompletedLocalRun(nextGame);
+    }
   });
 }
 
 function startNetworkGame() {
+  const handle = ensurePlayerHandle();
+  if (!handle) return;
   stopNetworkSession();
   if (selector) selector.hidden = true;
   if (networkSession) networkSession.hidden = false;
@@ -482,7 +642,7 @@ function startNetworkGame() {
 
   const wsUrl = serverUrlInput && serverUrlInput.value ? serverUrlInput.value.trim() : "ws://localhost:8090";
   const roomId = roomIdInput && roomIdInput.value ? roomIdInput.value.trim() : "lobby";
-  const name = playerNameInput && playerNameInput.value ? playerNameInput.value.trim() : "Player";
+  const name = handle;
 
   const game = new Game(canvas, {
     classType: selectedClass,
@@ -491,6 +651,7 @@ function startNetworkGame() {
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),
     onGameOverChanged: (_gameOver, nextGame) => syncMusicForGame(nextGame)
   });
+  game.playerHandle = name;
   game.networkEnabled = true;
   game.networkRole = "Connecting";
   game.networkReady = false;
@@ -796,6 +957,65 @@ if (!canvas) {
   throw new Error("Game canvas not found.");
 }
 
+if (playerNameInput) {
+  playerNameInput.addEventListener("input", () => {
+    currentPlayerHandle = sanitizePlayerHandle(playerNameInput.value);
+    playerNameInput.setCustomValidity("");
+  });
+  playerNameInput.addEventListener("change", () => {
+    syncStoredHandleFromInput();
+  });
+  playerNameInput.addEventListener("blur", () => {
+    syncStoredHandleFromInput();
+  });
+}
+
+if (openLeaderboardButton) {
+  openLeaderboardButton.addEventListener("click", async () => {
+    syncStoredHandleFromInput();
+    openLeaderboardModal("menu");
+    await refreshGlobalLeaderboard();
+  });
+}
+
+if (leaderboardClose) {
+  leaderboardClose.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeLeaderboardModal();
+  });
+}
+if (leaderboardContinue) {
+  leaderboardContinue.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    returnToMenu();
+  });
+}
+if (leaderboardTabGlobal) {
+  leaderboardTabGlobal.addEventListener("click", () => {
+    leaderboardState.activeTab = "global";
+    renderLeaderboardModal();
+  });
+}
+if (leaderboardTabSession) {
+  leaderboardTabSession.addEventListener("click", () => {
+    leaderboardState.activeTab = "session";
+    renderLeaderboardModal();
+  });
+}
+if (leaderboardModal) {
+  leaderboardModal.addEventListener("click", (event) => {
+    if (event.target === leaderboardModal && leaderboardState.mode !== "death") closeLeaderboardModal();
+  });
+}
+
+const leaderboardUiTick = () => {
+  if (leaderboardState.open && leaderboardState.mode === "death") renderLeaderboardModal();
+  requestAnimationFrame(leaderboardUiTick);
+};
+requestAnimationFrame(leaderboardUiTick);
+
 startIdleSoundMonitor(() => currentGame, syncIdleSoundState);
 
 selectedClass = wireMenuControls({
@@ -817,4 +1037,5 @@ selectedClass = wireMenuControls({
   returnToMenu
 });
 
+renderLeaderboardModal();
 startSplashScreen();

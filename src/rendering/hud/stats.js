@@ -358,7 +358,6 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   const panelW = layout.sidebarW - renderer.sidebarPadding * 2;
   const panelH = 142;
   const outpace = game.getEnemyOutpacingStatus();
-  const goblinCount = game.enemies.filter((enemy) => enemy.type === "goblin").length;
   ctx.fillStyle = "rgba(8, 12, 18, 0.9)";
   ctx.fillRect(panelX, panelY, panelW, panelH);
   ctx.strokeStyle = "rgba(126, 139, 171, 0.65)";
@@ -390,10 +389,9 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   ctx.fillText(`Lvl ${game.level}`, panelX + 94, panelY + 42);
   ctx.fillText(`SP ${game.skillPoints}`, panelX + 152, panelY + 42);
   ctx.fillText(`Enemies ${game.enemies.length}`, panelX + 10, panelY + 63);
-  ctx.fillText(`Goblins ${goblinCount}`, panelX + 10, panelY + 84);
-  ctx.fillText("Pace", panelX + 10, panelY + 105);
+  ctx.fillText("Pace", panelX + 10, panelY + 84);
   ctx.fillStyle = outpace.color;
-  ctx.fillText(outpace.label, panelX + 42, panelY + 105);
+  ctx.fillText(outpace.label, panelX + 42, panelY + 84);
   drawAbilityCooldownWidget(renderer, game, panelX + panelW - 64, panelY + 30, 42);
 
   const buttonW = Math.floor((panelW - 20) / 3);

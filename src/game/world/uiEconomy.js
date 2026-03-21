@@ -148,8 +148,7 @@ export function handleUiClicks(game) {
   }
   if (game.input.consumeKeyQueued("escape")) {
     if (game.gameOver) {
-      if (game.statsPanelOpen) toggleStatsPanel(game, false);
-      else if (game.onReturnToMenu) game.onReturnToMenu();
+      if (game.onReturnToMenu) game.onReturnToMenu();
     } else if (game.shopOpen) toggleShop(game, false);
     else if (game.skillTreeOpen) toggleSkillTree(game, false);
     else if (game.statsPanelOpen) toggleStatsPanel(game, false);
@@ -164,17 +163,13 @@ export function handleUiClicks(game) {
   if (game.input.consumeKeyQueued("k") && !game.gameOver) {
     toggleSkillTree(game);
   }
-  if (game.input.consumeKeyQueued("c")) {
+  if (game.input.consumeKeyQueued("c") && !game.gameOver) {
     toggleStatsPanel(game);
   }
   const clicks = game.input.consumeUiLeftClicks();
   if (clicks.length === 0) return;
 
   for (const click of clicks) {
-    if (game.gameOver && pointInRect(game, click.x, click.y, game.uiRects.gameOverStatsButton)) {
-      toggleStatsPanel(game);
-      continue;
-    }
     if (pointInRect(game, click.x, click.y, game.uiRects.shopButton)) {
       toggleShop(game);
       continue;

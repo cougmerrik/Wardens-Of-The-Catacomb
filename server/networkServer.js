@@ -9,6 +9,7 @@ import { average, makeSamplePusher, monotonicNowMs, percentile } from "./net/tel
 import { buildDeltaCollection } from "./net/deltaProtocol.js";
 import { buildMapChunkRows } from "./net/mapChunkStreaming.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
+import { LeaderboardStore } from "./leaderboardStore.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
 const TICK_RATE = Number.parseInt(process.env.TICK_RATE || "60", 10);
@@ -29,6 +30,7 @@ const MAX_SNAPSHOT_STEPS_PER_LOOP = Number.parseInt(process.env.MAX_SNAPSHOT_STE
 
 const rooms = new Map();
 const pushTelemetrySample = makeSamplePusher(MAX_TELEMETRY_SAMPLES);
+const leaderboardStore = new LeaderboardStore();
 
 const roomOptions = {
   average,
@@ -101,7 +103,8 @@ wss.on("connection", (ws) => {
       sanitizeInput,
       serializeState,
       buildJoinKeyframeState,
-      safeSend
+      safeSend,
+      leaderboardStore
     });
   });
 
