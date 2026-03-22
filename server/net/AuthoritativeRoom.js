@@ -1,6 +1,40 @@
 import { GameSim } from "../../src/sim/GameSim.js";
+import {
+  createNecromancerBeamState,
+  createSkillState,
+  createUpgradeState
+} from "../../src/game/runtimeBaseStateFactories.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
+
+function cloneSkillState(source = null) {
+  const next = createSkillState();
+  if (!source || typeof source !== "object") return next;
+  for (const [key, skill] of Object.entries(next)) {
+    const raw = source[key];
+    if (!raw || typeof raw !== "object") continue;
+    if (Number.isFinite(raw.points)) skill.points = Math.max(0, Math.min(skill.maxPoints, Math.floor(raw.points)));
+  }
+  return next;
+}
+
+function cloneUpgradeState(source = null) {
+  const next = createUpgradeState();
+  if (!source || typeof source !== "object") return next;
+  for (const [key, upgrade] of Object.entries(next)) {
+    const raw = source[key];
+    if (!raw || typeof raw !== "object") continue;
+    if (Number.isFinite(raw.level)) upgrade.level = Math.max(0, Math.min(upgrade.maxLevel, Math.floor(raw.level)));
+  }
+  return next;
+}
+
+function cloneNecromancerBeamState(source = null) {
+  return {
+    ...createNecromancerBeamState(),
+    ...(source && typeof source === "object" ? source : {})
+  };
+}
 
 export class AuthoritativeRoom {
   constructor(id, classType, options) {
@@ -47,6 +81,9 @@ export class AuthoritativeRoom {
     };
     this.tickDriftSampleCounter = 0;
     this.clientChunkState = new Map();
+    this.activePlayers = new Map();
+    this.completedRunPlayers = new Map();
+    this.finalResults = null;
     this.deltaCache = {
       enemies: new Map(),
       drops: new Map(),
@@ -129,6 +166,495 @@ export class AuthoritativeRoom {
     return Array.from(this.clients.values()).map((client) => this.getRosterEntry(client));
   }
 
+  getClassSpec(classType) {
+    return this.sim.config?.classes?.[classType] || this.sim.config?.classes?.archer || {};
+  }
+
+  createActivePlayerState(client, spawn = null) {
+    const classSpec = this.getClassSpec(client?.classType);
+    const baseMaxHealth = Number.isFinite(classSpec.baseMaxHealth) ? classSpec.baseMaxHealth : this.sim.config?.player?.maxHealth || 100;
+    const x = Number.isFinite(spawn?.x) ? spawn.x : this.sim.player?.x || 0;
+    const y = Number.isFinite(spawn?.y) ? spawn.y : this.sim.player?.y || 0;
+    return {
+      id: client.id,
+      handle: client.name,
+      classType: client.classType,
+      x,
+      y,
+      size: Number.isFinite(this.sim.player?.size) ? this.sim.player.size : 22,
+      speed: Number.isFinite(classSpec.baseMoveSpeed) ? classSpec.baseMoveSpeed : this.sim.config?.player?.speed || 180,
+      health: baseMaxHealth,
+      maxHealth: baseMaxHealth,
+      level: 1,
+      score: 0,
+      gold: 0,
+      experience: 0,
+      expToNextLevel: this.sim.config?.progression?.baseXpToLevel || 10,
+      skillPoints: 0,
+      levelWeaponDamageBonus: 0,
+      kills: 0,
+      damageDealt: 0,
+      goldEarned: 0,
+      fireCooldown: 0,
+      fireArrowCooldown: 0,
+      deathBoltCooldown: 0,
+      skills: cloneSkillState(),
+      upgrades: cloneUpgradeState(),
+      warriorMomentumTimer: 0,
+      warriorRageActiveTimer: 0,
+      warriorRageCooldownTimer: 0,
+      warriorRageVictoryRushPool: 0,
+      warriorRageVictoryRushTimer: 0,
+      necromancerBeam: cloneNecromancerBeamState(),
+      hitCooldown: 0,
+      hpBarTimer: 0,
+      animTime: 0,
+      dirX: 1,
+      dirY: 0,
+      facing: 0,
+      moving: false,
+      alive: true,
+      color: this.getClientRunColor(client)
+    };
+  }
+
+  buildRunParticipantRecord(client, state = null, outcome = "Dead") {
+    const source = state || null;
+    const primaryClient = client && client.id === this.pauseOwnerId ? client : null;
+    const primaryState = primaryClient ? this.syncPrimaryActivePlayerFromSim() : null;
+    const resolved = primaryState && client?.id === primaryState.id ? primaryState : source;
+    const classType = resolved?.classType || client?.classType || this.sim.player?.classType || "archer";
+    const classLabel = this.getClassSpec(classType)?.label || classType;
+    return {
+      id: client?.id || resolved?.id || "",
+      handle: client?.name || resolved?.handle || "Player",
+      classType,
+      classLabel,
+      color: client ? this.getClientRunColor(client) : (resolved?.color || PLAYER_COLOR_PALETTE[0]),
+      level: Number.isFinite(resolved?.level) ? resolved.level : 1,
+      kills: Number.isFinite(resolved?.kills) ? resolved.kills : 0,
+      damageDealt: Math.round(Number.isFinite(resolved?.damageDealt) ? resolved.damageDealt : 0),
+      outcome
+    };
+  }
+
+  recordCompletedRunPlayer(client, state = null, outcome = "Disconnected") {
+    if (!client?.id) return null;
+    const record = this.buildRunParticipantRecord(client, state, outcome);
+    this.completedRunPlayers.set(client.id, record);
+    return record;
+  }
+
+  buildFinalResults() {
+    const roster = [];
+    const seen = new Set();
+    for (const client of this.clients.values()) {
+      const state = client.id === this.pauseOwnerId ? this.syncPrimaryActivePlayerFromSim() : this.activePlayers.get(client.id);
+      const outcome = Number.isFinite(state?.health) && state.health > 0 ? "Alive" : "Dead";
+      const record = this.buildRunParticipantRecord(client, state, outcome);
+      roster.push(record);
+      seen.add(client.id);
+    }
+    for (const [id, record] of this.completedRunPlayers.entries()) {
+      if (seen.has(id)) continue;
+      roster.push({ ...record });
+    }
+    return {
+      teamOutcome: "Defeat",
+      totalParticipants: roster.length,
+      players: roster
+    };
+  }
+
+  initializeActivePlayers() {
+    this.activePlayers.clear();
+    const baseSpawn = { x: this.sim.player?.x || 0, y: this.sim.player?.y || 0 };
+    const tile = this.sim.config?.map?.tile || 32;
+    let slot = 0;
+    for (const client of this.clients.values()) {
+      const angle = slot * ((Math.PI * 2) / Math.max(1, this.clients.size));
+      const offsetX = Math.cos(angle) * tile * 0.85;
+      const offsetY = Math.sin(angle) * tile * 0.85;
+      const candidate =
+        slot === 0 || typeof this.sim.findNearestSafePoint !== "function"
+          ? baseSpawn
+          : this.sim.findNearestSafePoint(baseSpawn.x + offsetX, baseSpawn.y + offsetY, 8);
+      this.activePlayers.set(client.id, this.createActivePlayerState(client, candidate));
+      slot += 1;
+    }
+    this.syncPrimaryActivePlayerFromSim();
+  }
+
+  syncPrimaryActivePlayerFromSim() {
+    if (!this.pauseOwnerId) return null;
+    const client = this.clients.get(this.pauseOwnerId);
+    if (!client) return null;
+    const state = this.activePlayers.get(client.id) || this.createActivePlayerState(client, this.sim.player);
+    state.handle = client.name;
+    state.classType = client.classType;
+    state.x = this.sim.player.x;
+    state.y = this.sim.player.y;
+    state.size = this.sim.player.size;
+    state.health = this.sim.player.health;
+    state.maxHealth = this.sim.player.maxHealth;
+    state.fireCooldown = this.sim.player.fireCooldown;
+    state.fireArrowCooldown = this.sim.player.fireArrowCooldown;
+    state.deathBoltCooldown = this.sim.player.deathBoltCooldown;
+    state.skills = cloneSkillState(this.sim.skills);
+    state.upgrades = cloneUpgradeState(this.sim.upgrades);
+    state.score = this.sim.score;
+    state.gold = this.sim.gold;
+    state.experience = this.sim.experience;
+    state.expToNextLevel = this.sim.expToNextLevel;
+    state.skillPoints = this.sim.skillPoints;
+    state.levelWeaponDamageBonus = this.sim.levelWeaponDamageBonus;
+    state.kills = this.sim.runStats?.totalKills || 0;
+    state.damageDealt = this.sim.runStats?.damageDealt || 0;
+    state.goldEarned = this.sim.runStats?.goldEarned || 0;
+    state.warriorMomentumTimer = this.sim.warriorMomentumTimer || 0;
+    state.warriorRageActiveTimer = this.sim.warriorRageActiveTimer || 0;
+    state.warriorRageCooldownTimer = this.sim.warriorRageCooldownTimer || 0;
+    state.warriorRageVictoryRushPool = this.sim.warriorRageVictoryRushPool || 0;
+    state.warriorRageVictoryRushTimer = this.sim.warriorRageVictoryRushTimer || 0;
+    state.necromancerBeam = cloneNecromancerBeamState(this.sim.necromancerBeam);
+    state.hitCooldown = this.sim.player.hitCooldown;
+    state.hpBarTimer = this.sim.player.hpBarTimer;
+    state.animTime = this.sim.player.animTime;
+    state.level = this.sim.level;
+    state.dirX = this.sim.player.dirX;
+    state.dirY = this.sim.player.dirY;
+    state.facing = this.sim.player.facing;
+    state.moving = !!this.sim.player.moving;
+    state.alive = this.sim.player.health > 0;
+    state.color = this.getClientRunColor(client);
+    this.activePlayers.set(client.id, state);
+    return state;
+  }
+
+  createPlayerSimulationContext(state) {
+    if (!state) return null;
+    const context = Object.create(this.sim);
+    context.player = state;
+    context.classType = state.classType;
+    context.classSpec = this.getClassSpec(state.classType);
+    context.level = Number.isFinite(state.level) ? state.level : 1;
+    context.score = Number.isFinite(state.score) ? state.score : 0;
+    context.gold = Number.isFinite(state.gold) ? state.gold : 0;
+    context.experience = Number.isFinite(state.experience) ? state.experience : 0;
+    context.expToNextLevel = Number.isFinite(state.expToNextLevel)
+      ? state.expToNextLevel
+      : this.sim.config?.progression?.baseXpToLevel || 10;
+    context.skillPoints = Number.isFinite(state.skillPoints) ? state.skillPoints : 0;
+    context.levelWeaponDamageBonus = Number.isFinite(state.levelWeaponDamageBonus) ? state.levelWeaponDamageBonus : 0;
+    context.skills = cloneSkillState(state.skills);
+    context.upgrades = cloneUpgradeState(state.upgrades);
+    context.warriorMomentumTimer = Number.isFinite(state.warriorMomentumTimer) ? state.warriorMomentumTimer : 0;
+    context.warriorRageActiveTimer = Number.isFinite(state.warriorRageActiveTimer) ? state.warriorRageActiveTimer : 0;
+    context.warriorRageCooldownTimer = Number.isFinite(state.warriorRageCooldownTimer) ? state.warriorRageCooldownTimer : 0;
+    context.warriorRageVictoryRushPool = Number.isFinite(state.warriorRageVictoryRushPool) ? state.warriorRageVictoryRushPool : 0;
+    context.warriorRageVictoryRushTimer = Number.isFinite(state.warriorRageVictoryRushTimer) ? state.warriorRageVictoryRushTimer : 0;
+    context.necromancerBeam = cloneNecromancerBeamState(state.necromancerBeam);
+    context.recordRunGoldSpent = () => {};
+    context.recordClassSpecificStat = () => {};
+    return context;
+  }
+
+  syncActivePlayerStateFromContext(state, context) {
+    if (!state || !context) return;
+    state.classType = context.classType;
+    state.level = Number.isFinite(context.level) ? context.level : state.level;
+    state.score = Number.isFinite(context.score) ? context.score : state.score;
+    state.gold = Number.isFinite(context.gold) ? context.gold : state.gold;
+    state.experience = Number.isFinite(context.experience) ? context.experience : state.experience;
+    state.expToNextLevel = Number.isFinite(context.expToNextLevel) ? context.expToNextLevel : state.expToNextLevel;
+    state.skillPoints = Number.isFinite(context.skillPoints) ? context.skillPoints : state.skillPoints;
+    state.levelWeaponDamageBonus = Number.isFinite(context.levelWeaponDamageBonus)
+      ? context.levelWeaponDamageBonus
+      : state.levelWeaponDamageBonus;
+    state.skills = cloneSkillState(context.skills);
+    state.upgrades = cloneUpgradeState(context.upgrades);
+    state.warriorMomentumTimer = Number.isFinite(context.warriorMomentumTimer) ? context.warriorMomentumTimer : 0;
+    state.warriorRageActiveTimer = Number.isFinite(context.warriorRageActiveTimer) ? context.warriorRageActiveTimer : 0;
+    state.warriorRageCooldownTimer = Number.isFinite(context.warriorRageCooldownTimer) ? context.warriorRageCooldownTimer : 0;
+    state.warriorRageVictoryRushPool = Number.isFinite(context.warriorRageVictoryRushPool) ? context.warriorRageVictoryRushPool : 0;
+    state.warriorRageVictoryRushTimer = Number.isFinite(context.warriorRageVictoryRushTimer) ? context.warriorRageVictoryRushTimer : 0;
+    state.necromancerBeam = cloneNecromancerBeamState(context.necromancerBeam);
+    if (typeof context.getPlayerMoveSpeed === "function") state.speed = context.getPlayerMoveSpeed();
+  }
+
+  beamHasLineOfSight(x0, y0, x1, y1) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= 1) return true;
+    const tile = this.sim.config?.map?.tile || 32;
+    const step = Math.max(8, tile * 0.35);
+    const steps = Math.max(1, Math.ceil(dist / step));
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const sx = x0 + dx * t;
+      const sy = y0 + dy * t;
+      if (this.sim.isWallAt(sx, sy, false)) return false;
+    }
+    return true;
+  }
+
+  getAimLineDistance(state, input, target, aimLen = 1) {
+    return Math.abs(
+      (input.aimY - state.y) * target.x -
+      (input.aimX - state.x) * target.y +
+      input.aimX * state.y -
+      input.aimY * state.x
+    ) / Math.max(1, aimLen);
+  }
+
+  processRemoteNecromancerBeam(state, input, dt) {
+    if (!state) return false;
+    const context = this.createPlayerSimulationContext(state);
+    if (!context || typeof input !== "object") return false;
+    const beam = context.necromancerBeam || (context.necromancerBeam = cloneNecromancerBeamState());
+    for (const enemy of this.sim.enemies || []) {
+      if (enemy) enemy.charmLocked = false;
+    }
+    const held = !!input.firePrimaryHeld && !!input.hasAim;
+    const beamRange = (this.sim.config?.necromancer?.controlRangeTiles || 10) * (this.sim.config?.map?.tile || 32);
+    const beamWidth = Number.isFinite(this.sim.config?.necromancer?.beamWidth) ? this.sim.config.necromancer.beamWidth : 11;
+    beam.active = held;
+    beam.targetId = null;
+    beam.targetEnemy = null;
+    beam.targetX = Number.isFinite(input.aimX) ? input.aimX : state.x;
+    beam.targetY = Number.isFinite(input.aimY) ? input.aimY : state.y;
+    if (!held) {
+      beam.progress = 0;
+      beam.healTickTimer = 0;
+      this.syncActivePlayerStateFromContext(state, context);
+      return false;
+    }
+
+    const aimLen = Math.hypot((input.aimX || state.x) - state.x, (input.aimY || state.y) - state.y) || 1;
+    let hitBreakable = null;
+    let bestBreakableDist = Number.POSITIVE_INFINITY;
+    for (const br of this.sim.breakables || []) {
+      if (!br || (br.hp || 0) <= 0) continue;
+      const beamDist = Math.hypot(br.x - state.x, br.y - state.y);
+      if (beamDist > beamRange) continue;
+      if (!this.beamHasLineOfSight(state.x, state.y, br.x, br.y)) continue;
+      const lineDist = this.getAimLineDistance(state, input, br, aimLen);
+      if (lineDist > beamWidth + (br.size || 20) * 0.35) continue;
+      const distToAim = Math.hypot(br.x - input.aimX, br.y - input.aimY);
+      if (distToAim < bestBreakableDist) {
+        hitBreakable = br;
+        bestBreakableDist = distToAim;
+      }
+    }
+    if (hitBreakable) {
+      beam.targetX = hitBreakable.x;
+      beam.targetY = hitBreakable.y;
+      beam.progress = 0;
+      beam.healTickTimer = 0;
+      hitBreakable.hp = 0;
+      this.syncActivePlayerStateFromContext(state, context);
+      return true;
+    }
+
+    let bestTarget = null;
+    let bestTargetDist = Number.POSITIVE_INFINITY;
+    for (const enemy of this.sim.enemies || []) {
+      if (!enemy || (enemy.hp || 0) <= 0) continue;
+      if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
+      const beamDist = Math.hypot(enemy.x - state.x, enemy.y - state.y);
+      if (beamDist > beamRange) continue;
+      if (!this.beamHasLineOfSight(state.x, state.y, enemy.x, enemy.y)) continue;
+      const lineDist = this.getAimLineDistance(state, input, enemy, aimLen);
+      if (lineDist > beamWidth) continue;
+      const distToAim = Math.hypot(enemy.x - input.aimX, enemy.y - input.aimY);
+      if (distToAim < bestTargetDist) {
+        bestTarget = enemy;
+        bestTargetDist = distToAim;
+      }
+    }
+
+    const canTarget =
+      !!bestTarget &&
+      context.isUndeadEnemy(bestTarget) &&
+      (context.isControlledUndead(bestTarget)
+        ? context.getControlledUndeadOwnerId(bestTarget) === state.id
+        : context.canControlMoreUndead(state));
+
+    if (!canTarget) {
+      beam.active = false;
+      beam.progress = 0;
+      beam.healTickTimer = 0;
+      this.syncActivePlayerStateFromContext(state, context);
+      return false;
+    }
+
+    beam.targetEnemy = bestTarget;
+    beam.targetX = bestTarget.x;
+    beam.targetY = bestTarget.y;
+    beam.targetId = bestTarget.id || null;
+    if (context.isControlledUndead(bestTarget)) {
+      beam.progress = 0;
+      beam.healTickTimer = (beam.healTickTimer || 0) + Math.max(0, Number.isFinite(dt) ? dt : 0);
+      const healPeriod = this.sim.config?.necromancer?.healTickSeconds || 0.2;
+      while (beam.healTickTimer >= healPeriod) {
+        beam.healTickTimer -= healPeriod;
+        context.healControlledUndead(bestTarget, context.getNecroticBeamHealAmount());
+      }
+    } else {
+      beam.healTickTimer = 0;
+      bestTarget.charmLocked = true;
+      beam.progress += Math.max(0, Number.isFinite(dt) ? dt : 0);
+      if (beam.progress >= context.getNecromancerCharmDurationForPlayer(state)) {
+        if (context.markUndeadAsControlled(bestTarget, state)) {
+          beam.progress = 0;
+          context.spawnFloatingText(bestTarget.x, bestTarget.y - bestTarget.size * 0.7, "Charmed", "#8eb8ff", 0.9, 14);
+        }
+      }
+    }
+    this.syncActivePlayerStateFromContext(state, context);
+    return true;
+  }
+
+  tagNewProjectilesForPlayer(beforeCounts, ownerId, spawnSeq = 0) {
+    const bulletStart = Number.isFinite(beforeCounts?.bullets) ? beforeCounts.bullets : this.sim.bullets.length;
+    const fireArrowStart = Number.isFinite(beforeCounts?.fireArrows) ? beforeCounts.fireArrows : this.sim.fireArrows.length;
+    const meleeStart = Number.isFinite(beforeCounts?.meleeSwings) ? beforeCounts.meleeSwings : this.sim.meleeSwings.length;
+    for (let i = bulletStart; i < this.sim.bullets.length; i++) {
+      const bullet = this.sim.bullets[i];
+      if (!bullet || typeof bullet !== "object") continue;
+      bullet.spawnSeq = spawnSeq;
+      bullet.ownerId = ownerId;
+    }
+    for (let i = fireArrowStart; i < this.sim.fireArrows.length; i++) {
+      const arrow = this.sim.fireArrows[i];
+      if (!arrow || typeof arrow !== "object") continue;
+      arrow.spawnSeq = spawnSeq;
+      arrow.ownerId = ownerId;
+    }
+    for (let i = meleeStart; i < this.sim.meleeSwings.length; i++) {
+      const swing = this.sim.meleeSwings[i];
+      if (!swing || typeof swing !== "object") continue;
+      swing.ownerId = ownerId;
+    }
+  }
+
+  performActionForActivePlayer(clientId, fn) {
+    if (!clientId || typeof fn !== "function") return false;
+    const state = this.activePlayers.get(clientId);
+    if (!state || state.alive === false || (state.health || 0) <= 0) return false;
+    const context = this.createPlayerSimulationContext(state);
+    if (!context) return false;
+    const beforeCounts = {
+      bullets: this.sim.bullets.length,
+      fireArrows: this.sim.fireArrows.length,
+      meleeSwings: this.sim.meleeSwings.length
+    };
+    const result = fn(context, state);
+    this.syncActivePlayerStateFromContext(state, context);
+    this.tagNewProjectilesForPlayer(beforeCounts, clientId, this.clients.get(clientId)?.lastInputSeq || 0);
+    return result;
+  }
+
+  getSimulationPlayerEntities() {
+    const primary = this.syncPrimaryActivePlayerFromSim();
+    if (primary) {
+      this.sim.player.id = primary.id;
+      this.sim.player.handle = primary.handle;
+      this.sim.player.classType = primary.classType;
+      this.sim.player.color = primary.color;
+      this.sim.player.alive = primary.alive;
+    }
+    const out = [];
+    for (const client of this.clients.values()) {
+      if (client.id === this.pauseOwnerId) out.push(this.sim.player);
+      else {
+        const state = this.activePlayers.get(client.id);
+        if (state) out.push(state);
+      }
+    }
+    return out;
+  }
+
+  updateRemoteActivePlayers(dt) {
+    for (const client of this.clients.values()) {
+      if (!client || client.id === this.pauseOwnerId) continue;
+      const state = this.activePlayers.get(client.id);
+      if (!state) continue;
+      const input = client.input || this.options.makeDefaultInput();
+      const alive = state.alive !== false && (state.health || 0) > 0;
+      if (!alive) {
+        state.moving = false;
+        input.moveX = 0;
+        input.moveY = 0;
+        input.firePrimaryQueued = false;
+        input.firePrimaryHeld = false;
+        input.fireAltQueued = false;
+        continue;
+      }
+      const mx = Number.isFinite(input.moveX) ? input.moveX : 0;
+      const my = Number.isFinite(input.moveY) ? input.moveY : 0;
+      if (mx || my) {
+        const len = Math.hypot(mx, my) || 1;
+        this.sim.moveWithCollision(state, (mx / len) * state.speed * dt, (my / len) * state.speed * dt);
+      }
+      state.moving = !!(mx || my);
+      if (input.hasAim) {
+        if (Number.isFinite(input.aimDirX) && Number.isFinite(input.aimDirY)) {
+          const alen = Math.hypot(input.aimDirX, input.aimDirY) || 1;
+          state.dirX = input.aimDirX / alen;
+          state.dirY = input.aimDirY / alen;
+        } else if (Number.isFinite(input.aimX) && Number.isFinite(input.aimY)) {
+          const ax = input.aimX - state.x;
+          const ay = input.aimY - state.y;
+          const alen = Math.hypot(ax, ay) || 1;
+          state.dirX = ax / alen;
+          state.dirY = ay / alen;
+        }
+        const angle = Math.atan2(state.dirY || 0, state.dirX || 1);
+        state.facing = Math.max(0, Math.min(7, Math.round(((angle + Math.PI) / (Math.PI * 2)) * 8) % 8));
+      }
+      state.handle = client.name;
+      state.classType = client.classType;
+      state.color = this.getClientRunColor(client);
+      this.applyRemotePlayerCombat(client, state, input, dt);
+      input.firePrimaryQueued = false;
+      input.fireAltQueued = false;
+    }
+  }
+
+  applyRemotePlayerCombat(client, state, input, dt) {
+    if (!client || !state || !input || state.alive === false || (state.health || 0) <= 0) return;
+    const wantsPrimary = !!input.firePrimaryQueued || (!!input.firePrimaryHeld && !!input.hasAim);
+    if (state.classType === "necromancer") {
+      this.processRemoteNecromancerBeam(state, input, dt);
+    } else if (wantsPrimary) {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.fire !== "function") return false;
+        context.fire(state.dirX || 1, state.dirY || 0);
+        return true;
+      });
+    }
+    if (!input.fireAltQueued) return;
+    this.performActionForActivePlayer(client.id, (context) => {
+      if (typeof context.fireFireArrow !== "function") return false;
+      context.fireFireArrow(state.dirX || 1, state.dirY || 0);
+      return true;
+    });
+  }
+
+  getActivePlayerStates() {
+    return Array.from(this.activePlayers.values());
+  }
+
+  getLastInputSeqByPlayer() {
+    const out = {};
+    for (const client of this.clients.values()) {
+      out[client.id] = Number.isFinite(client.lastInputSeq) ? client.lastInputSeq : 0;
+    }
+    return out;
+  }
+
   getLobbyCountdownRemainingMs(nowMs = Date.now()) {
     if (!(this.phase === "lobby" && this.lobbyCountdownEndsAt > 0)) return 0;
     return Math.max(0, this.lobbyCountdownEndsAt - nowMs);
@@ -190,6 +716,9 @@ export class AuthoritativeRoom {
     if (this.requestedStartFloor > 1 && typeof this.sim.applyDebugStartingFloor === "function") {
       this.sim.applyDebugStartingFloor(this.requestedStartFloor);
     }
+    this.initializeActivePlayers();
+    this.completedRunPlayers.clear();
+    this.finalResults = null;
     this.phase = "active";
     this.setLobbyInlineMessage("");
     this.lobbyCountdownStartedAt = 0;
@@ -215,11 +744,16 @@ export class AuthoritativeRoom {
     this.clientChunkState.set(client.id, { sent: new Set() });
     if (!this.roomOwnerId) this.roomOwnerId = client.id;
     if (!this.pauseOwnerId) this.pauseOwnerId = client.id;
+    if (this.phase === "active") this.activePlayers.set(client.id, this.createActivePlayerState(client, this.sim.player));
     if (this.phase === "lobby") this.refreshLobbyState(Date.now());
   }
 
   removeClient(clientId) {
     const removedClient = this.clients.get(clientId);
+    const removedState =
+      removedClient?.id && removedClient.id === this.pauseOwnerId
+        ? this.syncPrimaryActivePlayerFromSim()
+        : this.activePlayers.get(clientId) || null;
     const previousOwnerId = this.roomOwnerId;
     this.clients.delete(clientId);
     this.clientChunkState.delete(clientId);
@@ -242,6 +776,15 @@ export class AuthoritativeRoom {
       this.cancelLobbyCountdown(message);
       this.refreshLobbyState(Date.now(), message);
     }
+    if (this.phase === "active" && removedClient) {
+      this.recordCompletedRunPlayer(removedClient, removedState, "Disconnected");
+      this.finalResults = null;
+      if (this.clients.size <= 0) {
+        this.sim.gameOver = true;
+        this.finalResults = this.buildFinalResults();
+      }
+    }
+    this.activePlayers.delete(clientId);
   }
 
   isEmpty() {
@@ -251,7 +794,9 @@ export class AuthoritativeRoom {
   getControllerInput() {
     if (!this.pauseOwnerId) return this.options.makeDefaultInput();
     const client = this.clients.get(this.pauseOwnerId);
-    return client ? client.input : this.options.makeDefaultInput();
+    if (!client) return this.options.makeDefaultInput();
+    if ((this.sim.player?.health || 0) <= 0) return this.options.makeDefaultInput();
+    return client.input;
   }
 
   updateClientLobbyState(clientId, { classType, locked } = {}) {
@@ -319,7 +864,13 @@ export class AuthoritativeRoom {
     const preFireArrowCount = this.sim.fireArrows.length;
     const dt = Math.min((nowMs - this.lastTickMs) / 1000, 0.05);
     this.lastTickMs = nowMs;
+    this.sim.networkActivePlayers = this.getSimulationPlayerEntities();
     this.sim.tick(dt, this.getControllerInput());
+    this.updateRemoteActivePlayers(dt);
+    this.syncPrimaryActivePlayerFromSim();
+    if (this.sim.gameOver && !this.finalResults) {
+      this.finalResults = this.buildFinalResults();
+    }
     if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     const controllerClient = this.clients.get(this.pauseOwnerId);
     const taggedSeq = controllerClient ? controllerClient.input?.seq || controllerClient.lastInputSeq || 0 : 0;
@@ -328,14 +879,14 @@ export class AuthoritativeRoom {
       const bullet = this.sim.bullets[i];
       if (!bullet || typeof bullet !== "object") continue;
       if (bullet.projectileType === "trapArrow" || bullet.projectileType === "ratArrow") continue;
-      bullet.spawnSeq = taggedSeq;
-      bullet.ownerId = ownerId;
+      if (!(Number.isFinite(bullet.spawnSeq) && bullet.spawnSeq > 0)) bullet.spawnSeq = taggedSeq;
+      if (!(typeof bullet.ownerId === "string" && bullet.ownerId)) bullet.ownerId = ownerId;
     }
     for (let i = preFireArrowCount; i < this.sim.fireArrows.length; i++) {
       const fireArrow = this.sim.fireArrows[i];
       if (!fireArrow || typeof fireArrow !== "object") continue;
-      fireArrow.spawnSeq = taggedSeq;
-      fireArrow.ownerId = ownerId;
+      if (!(Number.isFinite(fireArrow.spawnSeq) && fireArrow.spawnSeq > 0)) fireArrow.spawnSeq = taggedSeq;
+      if (!(typeof fireArrow.ownerId === "string" && fireArrow.ownerId)) fireArrow.ownerId = ownerId;
     }
     if (controllerClient) {
       controllerClient.input.firePrimaryQueued = false;
@@ -434,8 +985,9 @@ export class AuthoritativeRoom {
     const chunkState = this.clientChunkState.get(client.id);
     if (!chunkState) return;
     const tile = this.sim.config.map.tile || 32;
-    const ptx = Math.floor((this.sim.player?.x || 0) / tile);
-    const pty = Math.floor((this.sim.player?.y || 0) / tile);
+    const chunkPlayer = this.activePlayers.get(client.id) || this.sim.player;
+    const ptx = Math.floor((chunkPlayer?.x || 0) / tile);
+    const pty = Math.floor((chunkPlayer?.y || 0) / tile);
     const centerCx = Math.floor(ptx / this.options.mapChunkSize);
     const centerCy = Math.floor(pty / this.options.mapChunkSize);
     const sig = this.mapSignature();
@@ -524,6 +1076,7 @@ export class AuthoritativeRoom {
       mapSignature: fullState.mapSignature,
       time: fullState.time,
       player: fullState.player,
+      players: fullState.players,
       delta
     };
     if (keyframe || floorStateChanged) state.floor = fullState.floor;

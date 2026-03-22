@@ -28,6 +28,31 @@ export const rendererEffectsProjectileMethods = {
       }
     }
 
+    for (const player of game.remotePlayers || []) {
+      if (!player || player.alive === false || player.classType !== "necromancer") continue;
+      const beam = player.necromancerBeam;
+      if (!beam?.active) continue;
+      const sx = player.x - cameraX;
+      const sy = player.y - cameraY - 8;
+      const tx = (Number.isFinite(beam.targetX) ? beam.targetX : player.x) - cameraX;
+      const ty = (Number.isFinite(beam.targetY) ? beam.targetY : player.y) - cameraY;
+      const grad = ctx.createLinearGradient(sx, sy, tx, ty);
+      grad.addColorStop(0, "rgba(112, 255, 170, 0.18)");
+      grad.addColorStop(0.5, "rgba(121, 255, 141, 0.72)");
+      grad.addColorStop(1, "rgba(185, 255, 218, 0.28)");
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 4.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+      if ((beam.progress || 0) > 0) {
+        ctx.fillStyle = "rgba(158, 255, 186, 0.92)";
+        ctx.fillRect(tx - 12, ty - 20, 24 * Math.max(0, Math.min(1, beam.progress / (game.config.necromancer?.charmDuration || 2))), 4);
+      }
+    }
+
     const drawArrowLikeProjectile = (projectile, alpha = 1) => {
       const x = projectile.x - cameraX;
       const y = projectile.y - cameraY;
@@ -175,6 +200,8 @@ export const rendererEffectsProjectileMethods = {
     const end = swing.angle + arc * 0.5;
     const dirX = Math.cos(swing.angle);
     const dirY = Math.sin(swing.angle);
+    const originPlayer = player && Number.isFinite(player.x) && Number.isFinite(player.y) ? player : null;
+    if (![x, y, range, arc, start, end, dirX, dirY].every(Number.isFinite)) return;
 
     ctx.save();
     ctx.globalAlpha = 0.55 * alpha;
@@ -214,10 +241,12 @@ export const rendererEffectsProjectileMethods = {
     const bladeY = y + dirY * (range * 0.72);
     ctx.strokeStyle = swing.executeProc ? "#ffd0d0" : "#e9e0d1";
     ctx.lineWidth = swing.executeProc ? 2.3 : 2;
-    ctx.beginPath();
-    ctx.moveTo(player.x - cameraX + dirX * 12, player.y - cameraY + dirY * 12);
-    ctx.lineTo(bladeX, bladeY);
-    ctx.stroke();
+    if (originPlayer) {
+      ctx.beginPath();
+      ctx.moveTo(originPlayer.x - cameraX + dirX * 12, originPlayer.y - cameraY + dirY * 12);
+      ctx.lineTo(bladeX, bladeY);
+      ctx.stroke();
+    }
     ctx.restore();
   },
 

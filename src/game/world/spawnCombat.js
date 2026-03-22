@@ -102,7 +102,7 @@ export function spawnSkeleton(game, x, y, options) {
   return spawnSkeletonEntity(game, x, y, options);
 }
 
-export function applyEnemyDamage(game, enemy, amount, damageType = "physical") {
+export function applyEnemyDamage(game, enemy, amount, damageType = "physical", ownerId = null) {
   if (!Number.isFinite(amount) || amount <= 0) return;
   if (enemy?.invincible) return;
   if (enemy?.type === "skeleton_warrior" && enemy.collapsed) {
@@ -129,9 +129,11 @@ export function applyEnemyDamage(game, enemy, amount, damageType = "physical") {
   const enemyHpBefore = Number.isFinite(enemy.hp) ? Math.max(0, enemy.hp) : 0;
   const dealt = Math.min(effective, enemyHpBefore);
   enemy.lastDamageType = damageType;
+  if (ownerId) enemy.lastDamageOwnerId = ownerId;
   enemy.hp -= effective;
-  if (!(game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) && typeof game.recordRunDamageDealt === "function") {
-    game.recordRunDamageDealt(dealt);
+  if (!(game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy))) {
+    const owner = typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(ownerId) : game.player;
+    if (typeof game.recordDamageDealtByPlayerEntity === "function") game.recordDamageDealtByPlayerEntity(owner, dealt);
   }
   const lifeLeech = game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy) ? 0 : game.getLifeLeechPercent();
   if (lifeLeech > 0 && dealt > 0) {

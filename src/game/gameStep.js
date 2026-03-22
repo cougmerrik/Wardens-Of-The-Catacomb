@@ -51,6 +51,7 @@ export function stepGame(game, dt, controls = {}) {
   if (typeof game.isActive === "function" && !game.isActive()) return;
 
   game.time += dt;
+  if (typeof game.tickActivePlayerEntities === "function") game.tickActivePlayerEntities(dt);
   if (typeof game.updateNavigationField === "function") game.updateNavigationField();
   if (typeof game.updateFloorBossTrigger === "function") game.updateFloorBossTrigger();
   if (typeof game.syncFloorBossFeedback === "function") game.syncFloorBossFeedback();
@@ -66,28 +67,23 @@ export function stepGame(game, dt, controls = {}) {
     }
   }
   game.player.speed = game.getPlayerMoveSpeed();
-  game.player.fireCooldown = Math.max(0, game.player.fireCooldown - dt);
-  game.player.fireArrowCooldown = Math.max(0, game.player.fireArrowCooldown - dt);
-  game.player.deathBoltCooldown = Math.max(0, (Number.isFinite(game.player.deathBoltCooldown) ? game.player.deathBoltCooldown : 0) - dt);
-  game.player.hitCooldown = Math.max(0, game.player.hitCooldown - dt);
-  game.player.hpBarTimer = Math.max(0, game.player.hpBarTimer - dt);
   game.player.knockbackTimer = Math.max(0, (Number.isFinite(game.player.knockbackTimer) ? game.player.knockbackTimer : 0) - dt);
   game.warriorMomentumTimer = Math.max(0, game.warriorMomentumTimer - dt);
   game.warriorRageActiveTimer = Math.max(0, (Number.isFinite(game.warriorRageActiveTimer) ? game.warriorRageActiveTimer : 0) - dt);
   game.warriorRageCooldownTimer = Math.max(0, (Number.isFinite(game.warriorRageCooldownTimer) ? game.warriorRageCooldownTimer : 0) - dt);
   game.warriorRageVictoryRushTimer = Math.max(0, (Number.isFinite(game.warriorRageVictoryRushTimer) ? game.warriorRageVictoryRushTimer : 0) - dt);
   game.passiveRegenTimer = Math.max(-4, (Number.isFinite(game.passiveRegenTimer) ? game.passiveRegenTimer : 2) - dt);
-  game.player.animTime += dt;
   for (const ft of game.floatingTexts) {
     ft.life -= dt;
     ft.y -= ft.vy * dt;
   }
   game.floatingTexts = game.floatingTexts.filter((ft) => ft.life > 0);
 
+  const primaryPlayerAlive = game.player.health > 0;
   if (
     (game.warriorRageVictoryRushPool || 0) > 0 &&
     (game.warriorRageVictoryRushTimer || 0) > 0 &&
-    game.player.health > 0
+    primaryPlayerAlive
   ) {
     const timer = Math.max(dt, game.warriorRageVictoryRushTimer);
     const healAmount = Math.min(game.warriorRageVictoryRushPool, (game.warriorRageVictoryRushPool / timer) * dt);
@@ -100,7 +96,7 @@ export function stepGame(game, dt, controls = {}) {
   while (game.passiveRegenTimer <= 0) {
     game.passiveRegenTimer += 2;
     const regenPct = Number.isFinite(game.classSpec.passiveRegenPct) ? Math.max(0, game.classSpec.passiveRegenPct) : 0;
-    if (regenPct <= 0 || game.player.health <= 0 || game.player.health >= game.player.maxHealth) continue;
+    if (regenPct <= 0 || !primaryPlayerAlive || game.player.health >= game.player.maxHealth) continue;
     const healAmount = Math.max(1, Math.floor(game.player.maxHealth * regenPct));
     game.applyPlayerHealing(healAmount);
   }
@@ -109,14 +105,16 @@ export function stepGame(game, dt, controls = {}) {
   const my = Number.isFinite(controls.moveY) ? controls.moveY : 0;
   game.player.lastX = game.player.x;
   game.player.lastY = game.player.y;
-  if ((game.player.knockbackTimer || 0) > 0) {
+  if (!primaryPlayerAlive) {
+    game.player.moving = false;
+  } else if ((game.player.knockbackTimer || 0) > 0) {
     game.moveWithCollision(game.player, (game.player.knockbackVx || 0) * dt, (game.player.knockbackVy || 0) * dt);
   } else if (mx || my) {
     const len = vecLength(mx, my) || 1;
     game.moveWithCollision(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
   }
   game.player.moving = !!(mx || my);
-  game.revealAroundPlayer();
+  if (primaryPlayerAlive) game.revealAroundPlayer();
 
   const trapCfg = game.config?.traps?.wall || {};
   const moveLen = vecLength(mx, my) || 1;
@@ -128,16 +126,18 @@ export function stepGame(game, dt, controls = {}) {
   const playerEnemyRadius = typeof game.getPlayerEnemyCollisionRadius === "function"
     ? game.getPlayerEnemyCollisionRadius()
     : game.player.size * 0.5;
-  const isPlayerInTrapLane = (trap) => {
+  const livingPlayers = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
+  const isPlayerInTrapLane = (trap, player) => {
     if (!trap) return false;
     const trapOriginX = trap.x + trap.dirX * game.config.map.tile * 0.5;
     const trapOriginY = trap.y + trap.dirY * game.config.map.tile * 0.5;
-    const dx = game.player.x - trapOriginX;
-    const dy = game.player.y - trapOriginY;
+    const dx = player.x - trapOriginX;
+    const dy = player.y - trapOriginY;
     const forward = dx * trap.dirX + dy * trap.dirY;
     if (forward <= 0 || forward > trapSightRange) return false;
     const side = Math.abs(dx * -trap.dirY + dy * trap.dirX);
-    if (side > playerEnemyRadius + game.config.map.tile * 0.18) return false;
+    const playerRadius = typeof game.getPlayerEnemyCollisionRadiusFor === "function" ? game.getPlayerEnemyCollisionRadiusFor(player) : playerEnemyRadius;
+    if (side > playerRadius + game.config.map.tile * 0.18) return false;
     const samples = Math.max(1, Math.ceil(forward / Math.max(8, game.config.map.tile * 0.35)));
     for (let i = 1; i < samples; i++) {
       const t = i / samples;
@@ -150,7 +150,7 @@ export function stepGame(game, dt, controls = {}) {
   for (const trap of game.wallTraps || []) {
     trap.cooldown = Math.max(0, (Number.isFinite(trap.cooldown) ? trap.cooldown : 0) - dt);
     if (!trap.spotted && !trap.detectionChecked) {
-      if (vecLength(game.player.x - trap.x, game.player.y - trap.y) <= trapDetectRange) {
+      if (livingPlayers.some((player) => vecLength(player.x - trap.x, player.y - trap.y) <= trapDetectRange)) {
         trap.detectionChecked = true;
         const moveDot = (mx || my) ? moveDirX * trap.dirX + moveDirY * trap.dirY : -1;
         const baseChance = trapDetectBaseChance * Math.max(0, Math.min(1, (moveDot + 1) * 0.5));
@@ -159,12 +159,12 @@ export function stepGame(game, dt, controls = {}) {
         if (Math.random() < spotChance) trap.spotted = true;
       }
     }
-    if (trap.cooldown <= 0 && isPlayerInTrapLane(trap) && typeof game.fireWallTrap === "function") {
+    if (trap.cooldown <= 0 && livingPlayers.some((player) => isPlayerInTrapLane(trap, player)) && typeof game.fireWallTrap === "function") {
       game.fireWallTrap(trap);
     }
   }
 
-  if (controls.hasAim) {
+  if (primaryPlayerAlive && controls.hasAim) {
     const hasAimDir = Number.isFinite(controls.aimDirX) && Number.isFinite(controls.aimDirY);
     if (hasAimDir) {
       const aimLen = vecLength(controls.aimDirX, controls.aimDirY);
@@ -185,7 +185,7 @@ export function stepGame(game, dt, controls = {}) {
     }
   }
 
-  if (game.isNecromancerClass && game.isNecromancerClass()) {
+  if (primaryPlayerAlive && game.isNecromancerClass && game.isNecromancerClass()) {
     const beam = game.necromancerBeam || (game.necromancerBeam = {
       active: false,
       targetId: null,
@@ -318,13 +318,13 @@ export function stepGame(game, dt, controls = {}) {
       beam.progress = 0;
       beam.healTickTimer = 0;
     }
-  } else {
+  } else if (primaryPlayerAlive) {
     if (controls.firePrimaryQueued) game.fire(game.player.dirX, game.player.dirY);
     if (!controls.firePrimaryQueued && controls.firePrimaryHeld && controls.hasAim) {
       game.fire(game.player.dirX, game.player.dirY);
     }
   }
-  if (controls.fireAltQueued) game.fireFireArrow(game.player.dirX, game.player.dirY);
+  if (primaryPlayerAlive && controls.fireAltQueued) game.fireFireArrow(game.player.dirX, game.player.dirY);
 
   const activeBounds = game.getActiveBounds ? game.getActiveBounds(8) : null;
   const isActive = (obj, extra = 0) => {

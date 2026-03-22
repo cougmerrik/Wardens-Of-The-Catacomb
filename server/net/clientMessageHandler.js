@@ -1,48 +1,89 @@
-export function handleActionMessage(room, action) {
+export function handleActionMessage(room, clientId, action) {
   if (!action || typeof action !== "object" || typeof action.kind !== "string") return;
   const kind = action.kind;
   const sim = room.sim;
+  const isPauseOwner = room.pauseOwnerId === clientId;
+  const playerAlive = (sim.player?.health || 0) > 0;
   if (kind === "escape") {
-    if (sim.shopOpen) sim.toggleShop(false);
-    else if (sim.skillTreeOpen) sim.toggleSkillTree(false);
+    if (!isPauseOwner) return;
+    if (sim.shopOpen) {
+      sim.toggleShop(false);
+      sim.paused = false;
+    } else if (sim.skillTreeOpen) {
+      sim.toggleSkillTree(false);
+      sim.paused = false;
+    }
     else if (sim.statsPanelOpen) sim.toggleStatsPanel(false);
     else if (!sim.gameOver) sim.paused = !sim.paused;
     return;
   }
   if (kind === "toggleShop") {
-    sim.toggleShop();
+    if (!isPauseOwner) return;
+    if (!playerAlive) return;
+    const nextOpen = !sim.shopOpen;
+    sim.toggleShop(nextOpen);
+    sim.paused = nextOpen;
     return;
   }
   if (kind === "closeShop") {
+    if (!isPauseOwner) return;
     sim.toggleShop(false);
+    sim.paused = false;
     return;
   }
   if (kind === "toggleSkillTree") {
-    sim.toggleSkillTree();
+    if (!isPauseOwner) return;
+    if (!playerAlive) return;
+    const nextOpen = !sim.skillTreeOpen;
+    sim.toggleSkillTree(nextOpen);
+    sim.paused = nextOpen;
     return;
   }
   if (kind === "closeSkillTree") {
+    if (!isPauseOwner) return;
     sim.toggleSkillTree(false);
+    sim.paused = false;
     return;
   }
   if (kind === "toggleStats") {
+    if (!isPauseOwner) return;
     sim.toggleStatsPanel();
     return;
   }
   if (kind === "closeStats") {
+    if (!isPauseOwner) return;
     sim.toggleStatsPanel(false);
     return;
   }
   if (kind === "setStatsView" && (action.view === "run" || action.view === "character")) {
+    if (!isPauseOwner) return;
     sim.statsPanelView = action.view;
     return;
   }
   if (kind === "buyUpgrade" && typeof action.key === "string") {
-    sim.buyUpgrade(action.key);
+    if (isPauseOwner) {
+      if (!playerAlive) return;
+      sim.buyUpgrade(action.key);
+      return;
+    }
+    if (room.phase !== "active" || typeof room.performActionForActivePlayer !== "function") return;
+    room.performActionForActivePlayer(clientId, (context) => {
+      if (typeof context.buyUpgrade !== "function") return false;
+      return context.buyUpgrade(action.key);
+    });
     return;
   }
   if (kind === "spendSkill" && typeof action.key === "string") {
-    sim.spendSkillPoint(action.key);
+    if (isPauseOwner) {
+      if (!playerAlive) return;
+      sim.spendSkillPoint(action.key);
+      return;
+    }
+    if (room.phase !== "active" || typeof room.performActionForActivePlayer !== "function") return;
+    room.performActionForActivePlayer(clientId, (context) => {
+      if (typeof context.spendSkillPoint !== "function") return false;
+      return context.spendSkillPoint(action.key);
+    });
   }
 }
 
@@ -169,10 +210,6 @@ export function handleClientMessage(raw, context) {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const room = rooms.get(client.roomId);
     if (room.phase !== "active") return;
-    if (room.controllerId !== client.id) {
-      safeSend(ws, { type: "warn", message: "Spectators cannot control this room in phase-1." });
-      return;
-    }
     client.input = sanitizeInput(msg.input, client.input);
     client.lastInputSeq = client.input.seq || client.lastInputSeq;
     return;
@@ -204,8 +241,7 @@ export function handleClientMessage(raw, context) {
   if (msg.type === "action") {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const room = rooms.get(client.roomId);
-    if (room.controllerId !== client.id) return;
-    handleActionMessage(room, msg.action);
+    handleActionMessage(room, client.id, msg.action);
     return;
   }
 

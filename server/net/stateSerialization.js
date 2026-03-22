@@ -5,10 +5,61 @@ function shallowPlayerState(simPlayer) {
     size: simPlayer.size,
     health: simPlayer.health,
     maxHealth: simPlayer.maxHealth,
+    level: simPlayer.level,
+    score: simPlayer.score,
+    gold: simPlayer.gold,
+    experience: simPlayer.experience,
+    expToNextLevel: simPlayer.expToNextLevel,
+    skillPoints: simPlayer.skillPoints,
     dirX: simPlayer.dirX,
     dirY: simPlayer.dirY,
     facing: simPlayer.facing,
     classType: simPlayer.classType
+  };
+}
+
+function shallowActivePlayerState(player) {
+  return {
+    id: player.id,
+    handle: player.handle,
+    classType: player.classType,
+    x: player.x,
+    y: player.y,
+    size: player.size,
+    health: player.health,
+    maxHealth: player.maxHealth,
+    level: player.level,
+    score: player.score,
+    gold: player.gold,
+    experience: player.experience,
+    expToNextLevel: player.expToNextLevel,
+    skillPoints: player.skillPoints,
+    levelWeaponDamageBonus: player.levelWeaponDamageBonus,
+    fireCooldown: player.fireCooldown,
+    fireArrowCooldown: player.fireArrowCooldown,
+    deathBoltCooldown: player.deathBoltCooldown,
+    warriorMomentumTimer: player.warriorMomentumTimer,
+    warriorRageActiveTimer: player.warriorRageActiveTimer,
+    warriorRageCooldownTimer: player.warriorRageCooldownTimer,
+    warriorRageVictoryRushPool: player.warriorRageVictoryRushPool,
+    warriorRageVictoryRushTimer: player.warriorRageVictoryRushTimer,
+    necromancerBeam: player.necromancerBeam
+      ? {
+          active: !!player.necromancerBeam.active,
+          targetId: typeof player.necromancerBeam.targetId === "string" ? player.necromancerBeam.targetId : null,
+          targetX: Number.isFinite(player.necromancerBeam.targetX) ? player.necromancerBeam.targetX : 0,
+          targetY: Number.isFinite(player.necromancerBeam.targetY) ? player.necromancerBeam.targetY : 0,
+          progress: Number.isFinite(player.necromancerBeam.progress) ? player.necromancerBeam.progress : 0
+        }
+      : null,
+    skills: player.skills,
+    upgrades: player.upgrades,
+    dirX: player.dirX,
+    dirY: player.dirY,
+    facing: player.facing,
+    moving: !!player.moving,
+    alive: player.alive !== false,
+    color: player.color
   };
 }
 
@@ -143,6 +194,14 @@ export function serializeMetaState(source) {
   const sim = source && source.sim ? source.sim : source;
   const musicTrack = source && source.currentMusicTrack ? { ...source.currentMusicTrack } : sim && sim.musicTrack ? { ...sim.musicTrack } : null;
   const floorBoss = sim.floorBoss && typeof sim.floorBoss === "object" ? { ...sim.floorBoss } : null;
+  const finalResults =
+    source?.finalResults && typeof source.finalResults === "object"
+      ? {
+          teamOutcome: typeof source.finalResults.teamOutcome === "string" ? source.finalResults.teamOutcome : "Defeat",
+          totalParticipants: Number.isFinite(source.finalResults.totalParticipants) ? source.finalResults.totalParticipants : 0,
+          players: Array.isArray(source.finalResults.players) ? source.finalResults.players.map((player) => ({ ...player })) : []
+        }
+      : null;
   return {
     roomPhase: typeof source?.phase === "string" ? source.phase : "active",
     roomOwnerId: typeof source?.roomOwnerId === "string" ? source.roomOwnerId : null,
@@ -169,6 +228,7 @@ export function serializeMetaState(source) {
     warriorRageVictoryRushTimer: sim.warriorRageVictoryRushTimer || 0,
     floorBoss,
     runStats: sim.runStats,
+    finalResults,
     portal: sim.portal ? { ...sim.portal } : null,
     musicTrack,
     skills: sim.skills,
@@ -191,12 +251,18 @@ export function serializeState(room) {
   const activeFireArrows = sim.fireArrows.filter((a) => isInsideBounds(a, activeBounds, 144));
   const activeFireZones = sim.fireZones.filter((z) => isInsideBounds(z, activeBounds, (Number.isFinite(z.radius) ? z.radius : 0) + 28));
   const activeMeleeSwings = sim.meleeSwings.filter((s) => isInsideBounds(s, activeBounds, (Number.isFinite(s.range) ? s.range : 0) + 24));
+  const activePlayers = typeof room.getActivePlayerStates === "function" ? room.getActivePlayerStates() : [];
+  const primaryPlayer =
+    (typeof room.syncPrimaryActivePlayerFromSim === "function" ? room.syncPrimaryActivePlayerFromSim() : null) ||
+    activePlayers[0] ||
+    sim.player;
   return {
     mapSignature: `${sim.floor}:${sim.mapWidth}x${sim.mapHeight}`,
     time: sim.time,
     floor: sim.floor,
     floorBoss,
-    player: shallowPlayerState(sim.player),
+    player: shallowPlayerState(primaryPlayer),
+    players: activePlayers.map((player) => shallowActivePlayerState(player)),
     door: { ...sim.door },
     pickup: { ...sim.pickup },
     portal: sim.portal ? { ...sim.portal } : null,

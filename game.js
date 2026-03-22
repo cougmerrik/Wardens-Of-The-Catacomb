@@ -820,6 +820,15 @@ function applySnapshot(game, state, controller = false, ackSeq = 0) {
   netInitialSnapshotApplied = true;
 }
 
+function getSnapshotLocalPlayerState(state) {
+  const snapshotPlayers = Array.isArray(state?.players) ? state.players : [];
+  if (netPlayerId) {
+    const exact = snapshotPlayers.find((player) => player && player.id === netPlayerId);
+    if (exact) return exact;
+  }
+  return state?.player && typeof state.player === "object" ? state.player : snapshotPlayers[0] || null;
+}
+
 function startNetworkRenderLoop(game) {
   startNetworkRenderLoopRuntime({
     game,
@@ -883,15 +892,13 @@ function startNetworkGameplay() {
     onReturnToMenu: returnToMenu,
     onPauseChanged: (_paused, nextGame) => syncMusicForGame(nextGame),
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),
-    onGameOverChanged: (gameOver, nextGame) => {
+    onGameOverChanged: (_gameOver, nextGame) => {
       syncMusicForGame(nextGame);
-      if (!gameOver) return;
-      const includeSessionRun = nextGame?.networkRole === "Controller";
-      showNetworkGameOverLeaderboardOnce(nextGame, { includeSessionRun });
     }
   });
   game.playerHandle = name;
   game.networkEnabled = true;
+  game.networkLocalPlayerId = netPlayerId;
   game.networkRole = "Connecting";
   game.networkRoomPhase = netRoomPhase || "active";
   game.networkRoomOwnerId = netRoomOwnerId;
@@ -912,7 +919,31 @@ function startNetworkGameplay() {
     blockedSnapCount: 0
   };
   game.networkGameOverLeaderboardShown = false;
+  game.networkFinalResults = null;
+  game.multiplayerNotificationQueue = [];
+  game.multiplayerNotificationCurrent = null;
+  game.pushMultiplayerNotification = (text) => {
+    if (typeof text !== "string") return;
+    const message = text.trim();
+    if (!message) return;
+    game.multiplayerNotificationQueue.push({ text: message, duration: 2.5 });
+    if (!game.multiplayerNotificationCurrent) {
+      game.multiplayerNotificationCurrent = game.multiplayerNotificationQueue.shift() || null;
+    }
+  };
+  game.tickMultiplayerNotifications = (dt) => {
+    if (game.gameOver) return;
+    if (game.paused) return;
+    if (!game.multiplayerNotificationCurrent && game.multiplayerNotificationQueue.length > 0) {
+      game.multiplayerNotificationCurrent = game.multiplayerNotificationQueue.shift() || null;
+    }
+    if (!game.multiplayerNotificationCurrent) return;
+    game.multiplayerNotificationCurrent.duration -= Math.max(0, Number.isFinite(dt) ? dt : 0);
+    if (game.multiplayerNotificationCurrent.duration > 0) return;
+    game.multiplayerNotificationCurrent = game.multiplayerNotificationQueue.shift() || null;
+  };
   game.networkPredictedProjectiles = netPredictedProjectiles;
+  game.remotePlayers = [];
   game.map = [];
   game.mapWidth = 0;
   game.mapHeight = 0;
@@ -981,6 +1012,7 @@ function startNetworkGame() {
       game.networkRoomPhase = netRoomPhase;
       game.networkRoomOwnerId = netRoomOwnerId;
       game.networkPauseOwnerId = netPauseOwnerId;
+      game.networkLocalPlayerId = netPlayerId;
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       updateNetworkStatusRuntime(networkStatus, currentGame, `Joined "${msg.roomId}" as ${game.networkRole}`);
     } else {
@@ -988,6 +1020,8 @@ function startNetworkGame() {
     }
   });
   netClient.on("room.roster", (msg) => {
+    const previousRoster = Array.isArray(netRosterPlayers) ? netRosterPlayers.slice() : [];
+    const previousPauseOwnerId = netPauseOwnerId;
     netRoomPhase = typeof msg.phase === "string" ? msg.phase : netRoomPhase;
     netRoomOwnerId = msg.ownerId || netRoomOwnerId;
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
@@ -1002,7 +1036,19 @@ function startNetworkGame() {
       game.networkRoomPhase = netRoomPhase;
       game.networkRoomOwnerId = netRoomOwnerId;
       game.networkPauseOwnerId = netPauseOwnerId;
+      game.networkLocalPlayerId = netPlayerId;
       game.networkRosterPlayers = netRosterPlayers;
+      if (netRoomPhase === "active" && typeof game.pushMultiplayerNotification === "function") {
+        const nextIds = new Set(netRosterPlayers.filter((player) => player?.id).map((player) => player.id));
+        for (const player of previousRoster) {
+          if (!player?.id || nextIds.has(player.id)) continue;
+          game.pushMultiplayerNotification(`${player.handle || player.name || "Player"} disconnected`);
+        }
+        if (previousPauseOwnerId && previousPauseOwnerId !== netPauseOwnerId) {
+          const nextOwner = netRosterPlayers.find((player) => player?.id === netPauseOwnerId);
+          if (nextOwner?.handle) game.pushMultiplayerNotification(`${nextOwner.handle} is now the pause owner.`);
+        }
+      }
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
     }
     const players = Array.isArray(msg.players) ? msg.players.length : 0;
@@ -1124,10 +1170,6 @@ function startNetworkGame() {
     ) {
       syncMusicForGame(game);
     }
-    if (!prevGameOver && game.gameOver) {
-      const includeSessionRun = game.networkRole === "Controller";
-      showNetworkGameOverLeaderboardOnce(game, { includeSessionRun });
-    }
   });
   netClient.on("state.snapshot", (msg) => {
     const game = currentGame;
@@ -1147,6 +1189,7 @@ function startNetworkGame() {
     game.networkRoomPhase = netRoomPhase;
     game.networkRoomOwnerId = netRoomOwnerId;
     game.networkPauseOwnerId = netPauseOwnerId;
+    game.networkLocalPlayerId = netPlayerId;
     observeServerTimeIntoState(netClockState, msg.serverTime, NET_CLOCK_OFFSET_SMOOTHING);
     if (Number.isFinite(msg.snapshotSeq)) {
       netClient.send("state.snapshotAck", { snapshotSeq: Math.floor(msg.snapshotSeq) });
@@ -1193,7 +1236,7 @@ function startNetworkGame() {
       }
       return;
     }
-    const p = msg?.state?.player;
+    const p = getSnapshotLocalPlayerState(msg?.state);
     if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
       netLastServerPlayer = { x: p.x, y: p.y };
       netRequiredChunkKeys = updateRequiredChunkReadinessRuntime(
@@ -1248,11 +1291,7 @@ function startNetworkGame() {
       firePrimaryQueued: input.firePrimaryQueued,
       fireAltQueued: input.fireAltQueued
     };
-    if (!isNetworkController()) {
-      input.firePrimaryQueued = false;
-      input.firePrimaryHeld = false;
-      input.fireAltQueued = false;
-    } else {
+    if (isNetworkController()) {
       netNextHeldPrimaryPredictAtMs = predictProjectileSpawn(
         game,
         input,

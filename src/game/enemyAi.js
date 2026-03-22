@@ -68,8 +68,8 @@ export function updateGhost(game, enemy, dt, speedScale) {
   while (dist <= siphonRange && enemy.siphonTickTimer <= 0) {
     enemy.siphonTickTimer += siphonTickInterval;
     const scaledDamage = siphonDps * siphonTickInterval * game.getEnemyDamageScale();
-    if (target === game.player) {
-      game.applyPlayerDamage(game.getPlayerDamageTaken(scaledDamage, "unholy"));
+    if (game.isPlayerEntity && game.isPlayerEntity(target)) {
+      game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, scaledDamage, "unholy"), "unholy");
     } else if (target && (target.hp || 0) > 0) {
       game.applyEnemyDamage(target, scaledDamage, "necrotic");
     }
@@ -81,12 +81,12 @@ export function updateGhost(game, enemy, dt, speedScale) {
     if (dist <= diveAttackRange && (enemy.contactAttackCooldown || 0) <= 0) {
       enemy.contactAttackCooldown = 0.7;
       enemy.diveDuration = 0;
-      if (target === game.player) {
-        if (game.player.hitCooldown <= 0) {
-          game.player.hitCooldown = 1.0;
+      if (game.isPlayerEntity && game.isPlayerEntity(target)) {
+        if ((target.hitCooldown || 0) <= 0) {
+          target.hitCooldown = 1.0;
           const rawDamage = game.rollEnemyContactDamage(enemy);
           const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
-          game.applyPlayerDamage(game.getPlayerDamageTaken(scaledEnemyDamage, "physical"));
+          game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, scaledEnemyDamage, "physical"), "physical");
         }
       } else if (target && (target.hp || 0) > 0) {
         game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
@@ -160,13 +160,13 @@ export function updateGoblin(game, enemy, dt, speedScale) {
     return;
   }
   if (isStrong && playerDist <= enrageRange) {
-    if (threat === game.player && game.player.hitCooldown <= 0) {
-      game.player.hitCooldown = 1.0;
+    if (game.isPlayerEntity && game.isPlayerEntity(threat) && (threat.hitCooldown || 0) <= 0) {
+      threat.hitCooldown = 1.0;
       const rawDamage = game.rollEnemyContactDamage(enemy);
       const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
-      game.applyPlayerDamage(game.getPlayerDamageTaken(scaledEnemyDamage, "physical"));
+      game.applyDamageToPlayerEntity(threat, game.getDamageTakenForPlayerEntity(threat, scaledEnemyDamage, "physical"), "physical");
       enemy.contactAttackCooldown = 0.55;
-    } else if (threat !== game.player) {
+    } else if (!game.isPlayerEntity || !game.isPlayerEntity(threat)) {
       game.applyEnemyDamage(threat, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
       enemy.contactAttackCooldown = 0.55;
     }
@@ -252,12 +252,12 @@ export function updateMimic(game, enemy, dt, speedScale) {
     enemy.tongueCooldown = tongueCooldownMax;
     enemy.tongueTimer = tongueWindup;
     enemy.tongueLength = Math.min(tongueRange, playerDist);
-    if (target === game.player && game.player.hitCooldown <= 0) {
-      game.player.hitCooldown = 1.0;
+    if (game.isPlayerEntity && game.isPlayerEntity(target) && (target.hitCooldown || 0) <= 0) {
+      target.hitCooldown = 1.0;
       const rawDamage = game.rollEnemyContactDamage(enemy);
       const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
-      game.applyPlayerDamage(game.getPlayerDamageTaken(scaledEnemyDamage, "physical"));
-    } else if (target !== game.player) {
+      game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, scaledEnemyDamage, "physical"), "physical");
+    } else if (!game.isPlayerEntity || !game.isPlayerEntity(target)) {
       game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
     }
     return;
@@ -320,28 +320,28 @@ export function updatePrisoner(game, enemy, dt, speedScale) {
         while (diff < -Math.PI) diff += Math.PI * 2;
         return Math.abs(diff) <= halfArc;
       };
-      if (target === game.player && inSwingArc(game.player.x, game.player.y, game.getPlayerEnemyCollisionRadius())) {
-        if (game.player.hitCooldown <= 0) {
-          game.player.hitCooldown = 1.0;
+      if (game.isPlayerEntity && game.isPlayerEntity(target) && inSwingArc(target.x, target.y, game.getPlayerEnemyCollisionRadiusFor(target))) {
+        if ((target.hitCooldown || 0) <= 0) {
+          target.hitCooldown = 1.0;
           const rawDamage = game.rollEnemyContactDamage(enemy);
           const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
           const reducedByDefense = Math.max(1, Math.round(scaledEnemyDamage - game.getDefenseFlatReduction()));
           const damageTaken = game.getWarriorRageDamageTaken(reducedByDefense);
-          game.applyPlayerDamage(damageTaken);
+          game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, damageTaken, "physical"), "physical");
         }
-      } else if (target && target !== game.player && inSwingArc(target.x, target.y, (target.size || 20) * 0.5)) {
+      } else if (target && (!game.isPlayerEntity || !game.isPlayerEntity(target)) && inSwingArc(target.x, target.y, (target.size || 20) * 0.5)) {
         game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
       }
       for (const bullet of game.bullets || []) {
         if ((bullet.life || 0) <= 0 || bullet.faction === "enemy" || bullet.projectileType === "trapArrow" || bullet.projectileType === "ratArrow") continue;
         if (!inSwingArc(bullet.x, bullet.y, (bullet.size || 6) * 0.5)) continue;
-        if (bullet.projectileType === "deathBolt") game.triggerDeathBoltExplosion(bullet.x, bullet.y);
+        if (bullet.projectileType === "deathBolt") game.triggerDeathBoltExplosion(bullet.x, bullet.y, bullet);
         bullet.life = 0;
       }
       for (const arrow of game.fireArrows || []) {
         if ((arrow.life || 0) <= 0) continue;
         if (!inSwingArc(arrow.x, arrow.y, (arrow.size || 8) * 0.5)) continue;
-        game.triggerFireExplosion(arrow.x, arrow.y);
+        game.triggerFireExplosion(arrow.x, arrow.y, arrow);
         arrow.life = 0;
       }
     }
