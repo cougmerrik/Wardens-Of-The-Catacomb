@@ -703,7 +703,25 @@ function stopNetworkSession() {
   if (networkSession) networkSession.hidden = true;
 }
 
+function returnNetworkGameToLobby() {
+  closeLeaderboardModal();
+  currentGame = cleanupCurrentGameRuntime(currentGame);
+  netRoomPhase = "lobby";
+  netLobbyCountdownEndsAt = 0;
+  netLobbyInlineText = "";
+  if (menuPanel) menuPanel.hidden = false;
+  setCanvasVisible(false);
+  showNetworkLobby();
+  renderNetworkLobby();
+  music.playMenuMusic();
+}
+
 function returnToMenu() {
+  if (currentGame?.networkEnabled && currentGame?.gameOver && netClient) {
+    netClient.returnRoomToLobby();
+    returnNetworkGameToLobby();
+    return;
+  }
   closeLeaderboardModal();
   const targetMode = currentGame?.networkEnabled ? MENU_MODE_NETWORK : (menuState.mode || MENU_MODE_SINGLE);
   returnToMenuRuntime({
@@ -715,7 +733,10 @@ function returnToMenu() {
     menuPanel,
     selector,
     music,
-    showMenu: () => showCharacterSelect(targetMode)
+    showMenu: () => {
+      if (targetMode === MENU_MODE_NETWORK) showNetworkSetup();
+      else showCharacterSelect(targetMode);
+    }
   });
 }
 
@@ -1032,27 +1053,31 @@ function startNetworkGame() {
     netRosterPlayers = Array.isArray(msg.players) ? msg.players.slice() : [];
     renderNetworkLobby();
     const game = currentGame;
-    if (game) {
-      game.networkRoomPhase = netRoomPhase;
-      game.networkRoomOwnerId = netRoomOwnerId;
-      game.networkPauseOwnerId = netPauseOwnerId;
-      game.networkLocalPlayerId = netPlayerId;
-      game.networkRosterPlayers = netRosterPlayers;
-      if (netRoomPhase === "active" && typeof game.pushMultiplayerNotification === "function") {
+    if (netRoomPhase === "lobby" && game?.networkEnabled) {
+      returnNetworkGameToLobby();
+    }
+    const activeGame = currentGame;
+    if (activeGame) {
+      activeGame.networkRoomPhase = netRoomPhase;
+      activeGame.networkRoomOwnerId = netRoomOwnerId;
+      activeGame.networkPauseOwnerId = netPauseOwnerId;
+      activeGame.networkLocalPlayerId = netPlayerId;
+      activeGame.networkRosterPlayers = netRosterPlayers;
+      if (netRoomPhase === "active" && typeof activeGame.pushMultiplayerNotification === "function") {
         const nextIds = new Set(netRosterPlayers.filter((player) => player?.id).map((player) => player.id));
         for (const player of previousRoster) {
           if (!player?.id || nextIds.has(player.id)) continue;
-          game.pushMultiplayerNotification(`${player.handle || player.name || "Player"} disconnected`);
+          activeGame.pushMultiplayerNotification(`${player.handle || player.name || "Player"} disconnected`);
         }
         if (previousPauseOwnerId && previousPauseOwnerId !== netPauseOwnerId) {
           const nextOwner = netRosterPlayers.find((player) => player?.id === netPauseOwnerId);
-          if (nextOwner?.handle) game.pushMultiplayerNotification(`${nextOwner.handle} is now the pause owner.`);
+          if (nextOwner?.handle) activeGame.pushMultiplayerNotification(`${nextOwner.handle} is now the pause owner.`);
         }
       }
-      updateNetworkRole(game, isNetworkController(), networkTakeControl);
+      updateNetworkRole(activeGame, isNetworkController(), networkTakeControl);
     }
     const players = Array.isArray(msg.players) ? msg.players.length : 0;
-    updateNetworkStatusRuntime(networkStatus, currentGame, game ? `Room: ${players} connected | Role: ${game.networkRole}` : `Lobby: ${players} connected`);
+    updateNetworkStatusRuntime(networkStatus, currentGame, activeGame ? `Room: ${players} connected | Role: ${activeGame.networkRole}` : `Lobby: ${players} connected`);
   });
   const handleMapReady = () => {
     const game = currentGame;

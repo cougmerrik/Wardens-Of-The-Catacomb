@@ -413,11 +413,13 @@ export function stepGame(game, dt, controls = {}) {
   }
 
   let armorActivations = 0;
+  const livingPlayersForWake = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
   for (const stand of game.armorStands) {
     if (!stand.animated || stand.activated) continue;
     if (floorBossActive) break;
     if (game.enemies.length >= activeEnemyCap || armorActivations >= 4) break;
-    if (vecLength(game.player.x - stand.x, game.player.y - stand.y) < game.config.enemy.armorWakeRadius) {
+    const shouldWake = livingPlayersForWake.some((player) => player && vecLength((player.x || 0) - stand.x, (player.y || 0) - stand.y) < game.config.enemy.armorWakeRadius);
+    if (shouldWake) {
       stand.activated = true;
       game.enemies.push(game.spawnAnimatedArmor(stand.x, stand.y));
       armorActivations += 1;

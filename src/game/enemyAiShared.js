@@ -36,6 +36,10 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   if (!enemy) return game.player;
   const sourceFriendly = isFriendlyToPlayer(game, enemy);
   const livingPlayers = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
+  const controllingPlayer =
+    sourceFriendly && typeof game?.getControllingPlayerEntityForEnemy === "function"
+      ? game.getControllingPlayerEntityForEnemy(enemy)
+      : null;
   let best = null;
   let bestDist = Number.POSITIVE_INFINITY;
   if (!sourceFriendly) {
@@ -59,7 +63,9 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
       bestDist = dist;
     }
   }
-  return best || livingPlayers[0] || game.player;
+  if (best) return best;
+  if (sourceFriendly) return controllingPlayer || game.player;
+  return livingPlayers[0] || game.player;
 }
 
 export function moveEnemyTowardPoint(game, enemy, target, dt, speedScale, minDistance = 0) {

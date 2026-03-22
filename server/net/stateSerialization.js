@@ -63,6 +63,21 @@ function shallowActivePlayerState(player) {
   };
 }
 
+function resolveControlledEnemyColor(room, enemy) {
+  const ownerId = typeof enemy?.controllerPlayerId === "string" && enemy.controllerPlayerId ? enemy.controllerPlayerId : null;
+  if (!ownerId || !room) return null;
+  const players = typeof room.getSimulationPlayerEntities === "function"
+    ? room.getSimulationPlayerEntities()
+    : typeof room.getActivePlayerStates === "function"
+    ? room.getActivePlayerStates()
+    : [];
+  for (const player of players) {
+    if (!player || player.id !== ownerId) continue;
+    return typeof player.color === "string" && player.color ? player.color : null;
+  }
+  return null;
+}
+
 export function getStableId(room, domain, prefix, obj) {
   if (!obj || typeof obj !== "object") return `${prefix}_0`;
   const map = room.idMaps[domain];
@@ -104,6 +119,10 @@ function serializeEnemy(room, e) {
     maxHp: e.maxHp,
     hpBarTimer: e.hpBarTimer || 0
   };
+  if (e.isControlledUndead) base.isControlledUndead = true;
+  if (typeof e.controllerPlayerId === "string" && e.controllerPlayerId) base.controllerPlayerId = e.controllerPlayerId;
+  const controlledColor = resolveControlledEnemyColor(room, e);
+  if (controlledColor) base.controlledColor = controlledColor;
   switch (e.type) {
     case "rat_archer":
       base.dirX = e.dirX;
@@ -166,19 +185,38 @@ function makeActiveBounds(sim, padTiles = 10) {
   const pad = Math.max(0, padTiles) * tile;
   const playW = typeof sim.getPlayAreaWidth === "function" ? sim.getPlayAreaWidth() : 960;
   const viewH = Number.isFinite(sim?.canvas?.height) ? sim.canvas.height : 640;
-  const cam =
-    typeof sim.getCamera === "function"
-      ? sim.getCamera()
-      : {
-          x: Math.max(0, (sim.player?.x || 0) - playW / 2),
-          y: Math.max(0, (sim.player?.y || 0) - viewH / 2)
-        };
-  return {
-    left: cam.x - pad,
-    top: cam.y - pad,
-    right: cam.x + playW + pad,
-    bottom: cam.y + viewH + pad
-  };
+  const players = typeof sim.getLivingPlayerEntities === "function" ? sim.getLivingPlayerEntities() : [sim.player];
+  const activePlayers = Array.isArray(players) && players.length > 0 ? players.filter((player) => !!player) : [sim.player];
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const player of activePlayers) {
+    const px = Number.isFinite(player?.x) ? player.x : (sim.player?.x || 0);
+    const py = Number.isFinite(player?.y) ? player.y : (sim.player?.y || 0);
+    const camX = Math.max(0, Math.min((sim.worldWidth || playW) - playW, px - playW / 2));
+    const camY = Math.max(0, Math.min((sim.worldHeight || viewH) - viewH, py - viewH / 2));
+    left = Math.min(left, camX - pad);
+    top = Math.min(top, camY - pad);
+    right = Math.max(right, camX + playW + pad);
+    bottom = Math.max(bottom, camY + viewH + pad);
+  }
+  if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(right) || !Number.isFinite(bottom)) {
+    const cam =
+      typeof sim.getCamera === "function"
+        ? sim.getCamera()
+        : {
+            x: Math.max(0, (sim.player?.x || 0) - playW / 2),
+            y: Math.max(0, (sim.player?.y || 0) - viewH / 2)
+          };
+    return {
+      left: cam.x - pad,
+      top: cam.y - pad,
+      right: cam.x + playW + pad,
+      bottom: cam.y + viewH + pad
+    };
+  }
+  return { left, top, right, bottom };
 }
 
 function isInsideBounds(obj, bounds, extra = 0) {

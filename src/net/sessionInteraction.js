@@ -3,7 +3,7 @@ export function collectInput(game, consumeQueued = true) {
     game.input.refreshAimWorldPosition();
   }
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
-  const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen || !!game?.statsPanelOpen;
+  const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen;
   const playerX = Number.isFinite(game?.player?.x) ? game.player.x : 0;
   const playerY = Number.isFinite(game?.player?.y) ? game.player.y : 0;
   const rawAimX = game.input.mouse.worldX - playerX;
@@ -42,8 +42,10 @@ export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, 
     input.hasAim &&
     previous.hasAim &&
     (Math.abs((input.aimDirX || 0) - (previous.aimDirX || 0)) > 0.01 || Math.abs((input.aimDirY || 0) - (previous.aimDirY || 0)) > 0.01);
-  const hasAction = !!input.firePrimaryQueued || !!input.fireAltQueued;
-  if (changedMove || changedAimMode || changedAimPos || changedAimDir || hasAction) return true;
+  const changedPrimaryHold = !!input.firePrimaryHeld !== !!previous.firePrimaryHeld;
+  const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued;
+  const hasContinuousInput = !!input.firePrimaryHeld || !!input.moveX || !!input.moveY;
+  if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || hasQueuedAction || hasContinuousInput) return true;
   return nowMs - lastInputSendAt >= forceSendIdleMs;
 }
 

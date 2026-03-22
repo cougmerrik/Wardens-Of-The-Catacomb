@@ -61,6 +61,10 @@ export class NetClient {
     return this.send("action", { action });
   }
 
+  returnRoomToLobby() {
+    return this.send("room.returnToLobby", {});
+  }
+
   disconnect() {
     if (this.ws) this.ws.close();
     this.ws = null;

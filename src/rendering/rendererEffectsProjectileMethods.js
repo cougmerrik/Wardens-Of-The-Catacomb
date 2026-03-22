@@ -1,3 +1,18 @@
+function hexToRgba(color, alpha) {
+  if (typeof color !== "string") return `rgba(121, 255, 141, ${alpha})`;
+  const hex = color.trim();
+  const expanded = hex.length === 4
+    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+    : hex;
+  const match = /^#([0-9a-f]{6})$/i.exec(expanded);
+  if (!match) return `rgba(121, 255, 141, ${alpha})`;
+  const int = Number.parseInt(match[1], 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export const rendererEffectsProjectileMethods = {
   drawProjectiles(game, cameraX, cameraY) {
     const ctx = this.ctx;
@@ -34,12 +49,16 @@ export const rendererEffectsProjectileMethods = {
       if (!beam?.active) continue;
       const sx = player.x - cameraX;
       const sy = player.y - cameraY - 8;
-      const tx = (Number.isFinite(beam.targetX) ? beam.targetX : player.x) - cameraX;
-      const ty = (Number.isFinite(beam.targetY) ? beam.targetY : player.y) - cameraY;
+      const fallbackTx = player.x + (Number.isFinite(player.dirX) ? player.dirX : 1) * ((game.config?.necromancer?.controlRangeTiles || 10) * (game.config?.map?.tile || 32) * 0.45);
+      const fallbackTy = player.y + (Number.isFinite(player.dirY) ? player.dirY : 0) * ((game.config?.necromancer?.controlRangeTiles || 10) * (game.config?.map?.tile || 32) * 0.45);
+      const tx = (Number.isFinite(beam.targetX) ? beam.targetX : fallbackTx) - cameraX;
+      const ty = (Number.isFinite(beam.targetY) ? beam.targetY : fallbackTy) - cameraY;
+      if (![sx, sy, tx, ty].every(Number.isFinite)) continue;
+      const color = typeof player.color === "string" && player.color ? player.color : "#79ff8d";
       const grad = ctx.createLinearGradient(sx, sy, tx, ty);
-      grad.addColorStop(0, "rgba(112, 255, 170, 0.18)");
-      grad.addColorStop(0.5, "rgba(121, 255, 141, 0.72)");
-      grad.addColorStop(1, "rgba(185, 255, 218, 0.28)");
+      grad.addColorStop(0, hexToRgba(color, 0.18));
+      grad.addColorStop(0.5, hexToRgba(color, 0.76));
+      grad.addColorStop(1, hexToRgba(color, 0.3));
       ctx.strokeStyle = grad;
       ctx.lineWidth = 4.5;
       ctx.lineCap = "round";
@@ -48,7 +67,7 @@ export const rendererEffectsProjectileMethods = {
       ctx.lineTo(tx, ty);
       ctx.stroke();
       if ((beam.progress || 0) > 0) {
-        ctx.fillStyle = "rgba(158, 255, 186, 0.92)";
+        ctx.fillStyle = hexToRgba(color, 0.92);
         ctx.fillRect(tx - 12, ty - 20, 24 * Math.max(0, Math.min(1, beam.progress / (game.config.necromancer?.charmDuration || 2))), 4);
       }
     }

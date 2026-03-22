@@ -125,7 +125,13 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, ownerSpeed * 1.1);
       const aggro = (this.config.necromancer?.aggroRangeTiles || 6.5) * this.config.map.tile;
       const follow = (this.config.necromancer?.followDistanceTiles || 2.2) * this.config.map.tile;
-      if (target !== owner && vecLength(target.x - enemy.x, target.y - enemy.y) <= aggro) {
+      const leash = (this.config.necromancer?.controlRangeTiles || 10) * this.config.map.tile;
+      const distToOwner = vecLength(owner.x - enemy.x, owner.y - enemy.y);
+      const targetDist = target ? vecLength(target.x - enemy.x, target.y - enemy.y) : Number.POSITIVE_INFINITY;
+      const targetDistFromOwner = target ? vecLength(target.x - owner.x, target.y - owner.y) : Number.POSITIVE_INFINITY;
+      if (distToOwner > leash) {
+        this.moveEnemyTowardTarget(enemy, owner, speedScale, dt, Math.max(8, follow * 0.6));
+      } else if (target !== owner && targetDist <= aggro && targetDistFromOwner <= leash) {
         this.moveEnemyTowardTarget(enemy, target, speedScale, dt, 6);
       } else {
         const anchor = this.getControlledUndeadFormationPoint(enemy);

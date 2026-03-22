@@ -231,6 +231,15 @@ export function handleClientMessage(raw, context) {
     return;
   }
 
+  if (msg.type === "room.returnToLobby") {
+    if (!client.roomId || !rooms.has(client.roomId)) return;
+    const room = rooms.get(client.roomId);
+    if (room.phase !== "active") return;
+    if (!room.sim?.gameOver) return;
+    if (typeof room.resetToLobby === "function") room.resetToLobby(Date.now());
+    return;
+  }
+
   if (msg.type === "state.snapshotAck") {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const seq = Number.isFinite(msg.snapshotSeq) ? Math.max(0, Math.floor(msg.snapshotSeq)) : 0;

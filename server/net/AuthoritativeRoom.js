@@ -40,6 +40,7 @@ export class AuthoritativeRoom {
   constructor(id, classType, options) {
     this.id = id;
     this.options = options;
+    this.initialClassType = classType;
     this.sim = new GameSim({
       classType,
       viewportWidth: 960,
@@ -128,6 +129,14 @@ export class AuthoritativeRoom {
 
   mapSignature() {
     return `${this.sim.floor}:${this.sim.mapWidth}x${this.sim.mapHeight}`;
+  }
+
+  createFreshSim(classType = this.initialClassType) {
+    return new GameSim({
+      classType,
+      viewportWidth: 960,
+      viewportHeight: 640
+    });
   }
 
   getNextAvailableColorIndex() {
@@ -457,6 +466,8 @@ export class AuthoritativeRoom {
       return true;
     }
 
+    let invalidTarget = null;
+    let invalidTargetDist = Number.POSITIVE_INFINITY;
     let bestTarget = null;
     let bestTargetDist = Number.POSITIVE_INFINITY;
     for (const enemy of this.sim.enemies || []) {
@@ -468,10 +479,27 @@ export class AuthoritativeRoom {
       const lineDist = this.getAimLineDistance(state, input, enemy, aimLen);
       if (lineDist > beamWidth) continue;
       const distToAim = Math.hypot(enemy.x - input.aimX, enemy.y - input.aimY);
+      if (distToAim < invalidTargetDist) {
+        invalidTarget = enemy;
+        invalidTargetDist = distToAim;
+      }
+      if (!context.isUndeadEnemy(enemy)) continue;
       if (distToAim < bestTargetDist) {
         bestTarget = enemy;
         bestTargetDist = distToAim;
       }
+    }
+
+    if (
+      !hitBreakable &&
+      invalidTarget &&
+      (!context.isUndeadEnemy(invalidTarget) || (!context.isControlledUndead(invalidTarget) && !context.canControlMoreUndead(state)))
+    ) {
+      beam.active = false;
+      beam.progress = 0;
+      beam.healTickTimer = 0;
+      this.syncActivePlayerStateFromContext(state, context);
+      return false;
     }
 
     const canTarget =
@@ -482,11 +510,10 @@ export class AuthoritativeRoom {
         : context.canControlMoreUndead(state));
 
     if (!canTarget) {
-      beam.active = false;
       beam.progress = 0;
       beam.healTickTimer = 0;
       this.syncActivePlayerStateFromContext(state, context);
-      return false;
+      return beam.active;
     }
 
     beam.targetEnemy = bestTarget;
@@ -731,6 +758,78 @@ export class AuthoritativeRoom {
       controllerId: this.pauseOwnerId
     });
     this.sendMapState();
+    this.maybeBroadcastMeta(nowMs, true);
+    return true;
+  }
+
+  resetToLobby(nowMs = Date.now()) {
+    const nextClassType = this.roomOwnerId && this.clients.get(this.roomOwnerId)?.classType
+      ? this.clients.get(this.roomOwnerId).classType
+      : this.initialClassType;
+    this.sim = this.createFreshSim(nextClassType);
+    this.phase = "lobby";
+    this.activePlayers.clear();
+    this.completedRunPlayers.clear();
+    this.finalResults = null;
+    this.lobbyCountdownStartedAt = 0;
+    this.lobbyCountdownEndsAt = 0;
+    this.setLobbyInlineMessage("");
+    this.lastTickMs = nowMs;
+    this.lastSnapshotMs = 0;
+    this.lastMetaBroadcastMs = 0;
+    this.lastMetaPayloadJson = "";
+    this.lastChunkPushMs = 0;
+    this.lastMapSignature = this.mapSignature();
+    this.lastSnapshotFloor = null;
+    this.lastSnapshotBossPhase = null;
+    this.lastSnapshotDoorOpen = null;
+    this.lastSnapshotPickupTaken = null;
+    this.lastSnapshotPortalActive = null;
+    this.snapshotCounter = 0;
+    this.snapshotSeq = 0;
+    this.deltaCache = {
+      enemies: new Map(),
+      drops: new Map(),
+      breakables: new Map(),
+      wallTraps: new Map(),
+      bullets: new Map(),
+      fireArrows: new Map(),
+      fireZones: new Map(),
+      meleeSwings: new Map()
+    };
+    this.idCounters = {
+      enemy: 1,
+      drop: 1,
+      bullet: 1,
+      fireArrow: 1,
+      fireZone: 1,
+      meleeSwing: 1,
+      armorStand: 1,
+      breakable: 1,
+      wallTrap: 1
+    };
+    this.idMaps = {
+      enemy: new WeakMap(),
+      drop: new WeakMap(),
+      bullet: new WeakMap(),
+      fireArrow: new WeakMap(),
+      fireZone: new WeakMap(),
+      meleeSwing: new WeakMap(),
+      armorStand: new WeakMap(),
+      breakable: new WeakMap(),
+      wallTrap: new WeakMap()
+    };
+    for (const client of this.clients.values()) {
+      client.input = this.options.makeDefaultInput();
+      client.lastInputSeq = 0;
+      client.lastSnapshotAckSeq = 0;
+      client.classLocked = false;
+    }
+    for (const state of this.clientChunkState.values()) {
+      if (state?.sent instanceof Set) state.sent.clear();
+    }
+    this.refreshLobbyState(nowMs);
+    this.broadcastRoster();
     this.maybeBroadcastMeta(nowMs, true);
     return true;
   }
