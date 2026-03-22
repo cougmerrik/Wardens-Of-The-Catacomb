@@ -78,7 +78,11 @@ export function startNetworkRenderLoopRuntime({
     const targetServerTime = Number.isFinite(estimatedServerNow) ? estimatedServerNow - renderDelay : NaN;
     const pkt = consumeSnapshotForRender(netSnapshotBuffer, targetServerTime, targetRecvTime, maxSnapshotBuffer);
     if (pkt) {
-      applySnapshot(game, pkt.state, isNetworkController(), Number.isFinite(pkt.lastInputSeq) ? pkt.lastInputSeq : 0);
+      const stateWithServerTime =
+        pkt?.state && typeof pkt.state === "object" && Number.isFinite(pkt.serverTime)
+          ? { ...pkt.state, serverTime: pkt.serverTime }
+          : pkt.state;
+      applySnapshot(game, stateWithServerTime, isNetworkController(), Number.isFinite(pkt.lastInputSeq) ? pkt.lastInputSeq : 0);
     }
     if (isNetworkController()) {
       const input = collectInput(game, false);

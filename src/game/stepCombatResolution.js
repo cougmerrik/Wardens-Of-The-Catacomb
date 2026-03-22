@@ -341,8 +341,10 @@ export function resolveCombatAndDrops({
       if (vecLength(a.x - b.x, a.y - b.y) > minDist) continue;
       const friendly = aFriendly ? a : b;
       const hostile = aFriendly ? b : a;
+      const friendlyOwnerId =
+        typeof friendly?.controllerPlayerId === "string" && friendly.controllerPlayerId ? friendly.controllerPlayerId : null;
       if ((friendly.contactAttackCooldown || 0) <= 0) {
-        game.applyEnemyDamage(hostile, game.rollEnemyContactDamage(friendly) * game.getEnemyDamageScale(), "physical");
+        game.applyEnemyDamage(hostile, game.rollEnemyContactDamage(friendly) * game.getEnemyDamageScale(), "physical", friendlyOwnerId);
         friendly.contactAttackCooldown = 0.55;
       }
       if ((hostile.contactAttackCooldown || 0) <= 0) {
@@ -374,7 +376,12 @@ export function resolveCombatAndDrops({
   for (const enemy of game.enemies) {
     if (!(game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy))) continue;
     if ((enemy.hp || 0) <= 0) continue;
-    if (vecLength(enemy.x - game.player.x, enemy.y - game.player.y) > maxPetDistance) enemy.hp = 0;
+    const owner = typeof game.getControllingPlayerEntityForEnemy === "function" ? game.getControllingPlayerEntityForEnemy(enemy) : game.player;
+    if (!owner || (typeof game.isLivingPlayerEntity === "function" && !game.isLivingPlayerEntity(owner))) {
+      enemy.hp = 0;
+      continue;
+    }
+    if (vecLength(enemy.x - owner.x, enemy.y - owner.y) > maxPetDistance) enemy.hp = 0;
   }
 
   let removeBossSummons = false;

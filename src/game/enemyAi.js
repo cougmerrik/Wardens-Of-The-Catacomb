@@ -1,6 +1,7 @@
 import { vecLength } from "../utils.js";
 import { applyGoblinGrowth, findNearestGoldDrop } from "./enemyRewards.js";
 import {
+  getEnemyAttackOwnerId,
   getPriorityTarget,
   hasLineOfSight,
   isProjectileThreatening,
@@ -12,6 +13,7 @@ export { updateLeprechaunBoss } from "./enemyLeprechaunAi.js";
 export { updateMinotaur, updateNecromancer, updateRatArcher, updateSkeletonWarrior } from "./enemyAdvancedAi.js";
 
 export function updateGhost(game, enemy, dt, speedScale) {
+  const ownerId = getEnemyAttackOwnerId(game, enemy);
   if (isFriendlyToPlayer(game, enemy) && typeof game.getPlayerMoveSpeed === "function") {
     enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, game.getPlayerMoveSpeed() * 1.1);
   }
@@ -71,7 +73,7 @@ export function updateGhost(game, enemy, dt, speedScale) {
     if (game.isPlayerEntity && game.isPlayerEntity(target)) {
       game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, scaledDamage, "unholy"), "unholy");
     } else if (target && (target.hp || 0) > 0) {
-      game.applyEnemyDamage(target, scaledDamage, "necrotic");
+      game.applyEnemyDamage(target, scaledDamage, "necrotic", ownerId);
     }
   }
 
@@ -89,7 +91,7 @@ export function updateGhost(game, enemy, dt, speedScale) {
           game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, scaledEnemyDamage, "physical"), "physical");
         }
       } else if (target && (target.hp || 0) > 0) {
-        game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
+        game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical", ownerId);
       }
     }
     return;
@@ -111,6 +113,7 @@ export function updateGhost(game, enemy, dt, speedScale) {
 }
 
 export function updateGoblin(game, enemy, dt, speedScale) {
+  const ownerId = getEnemyAttackOwnerId(game, enemy);
   if (isFriendlyToPlayer(game, enemy) && typeof game.getPlayerMoveSpeed === "function") {
     enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, game.getPlayerMoveSpeed() * 1.1);
   }
@@ -167,7 +170,7 @@ export function updateGoblin(game, enemy, dt, speedScale) {
       game.applyDamageToPlayerEntity(threat, game.getDamageTakenForPlayerEntity(threat, scaledEnemyDamage, "physical"), "physical");
       enemy.contactAttackCooldown = 0.55;
     } else if (!game.isPlayerEntity || !game.isPlayerEntity(threat)) {
-      game.applyEnemyDamage(threat, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
+      game.applyEnemyDamage(threat, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical", ownerId);
       enemy.contactAttackCooldown = 0.55;
     }
     return;
@@ -206,6 +209,7 @@ export function updateMummy(game, enemy, dt, speedScale) {
 }
 
 export function updateMimic(game, enemy, dt, speedScale) {
+  const ownerId = getEnemyAttackOwnerId(game, enemy);
   if (isFriendlyToPlayer(game, enemy) && typeof game.getPlayerMoveSpeed === "function") {
     enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, game.getPlayerMoveSpeed() * 1.1);
   }
@@ -258,7 +262,7 @@ export function updateMimic(game, enemy, dt, speedScale) {
       const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
       game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, scaledEnemyDamage, "physical"), "physical");
     } else if (!game.isPlayerEntity || !game.isPlayerEntity(target)) {
-      game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
+      game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical", ownerId);
     }
     return;
   }

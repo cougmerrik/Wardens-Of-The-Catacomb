@@ -5,6 +5,7 @@ import {
   findNecromancerTeleportPoint,
   findRatCoverTarget,
   findSkeletonSummonPoint,
+  getEnemyAttackOwnerId,
   getPriorityTarget,
   hasLineOfSight,
   isFriendlyToPlayer,
@@ -144,6 +145,7 @@ export function updateRatArcher(game, enemy, dt, speedScale) {
 }
 
 export function updateSkeletonWarrior(game, enemy, dt, speedScale) {
+  const ownerId = getEnemyAttackOwnerId(game, enemy);
   if (isFriendlyToPlayer(game, enemy) && typeof game.getPlayerMoveSpeed === "function") {
     enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, game.getPlayerMoveSpeed() * 1.1);
   }
@@ -187,7 +189,7 @@ export function updateSkeletonWarrior(game, enemy, dt, speedScale) {
       const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
       game.applyDamageToPlayerEntity(target, game.getDamageTakenForPlayerEntity(target, scaledEnemyDamage, "physical"), "physical");
     } else if (!game.isPlayerEntity || !game.isPlayerEntity(target)) {
-      game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical");
+      game.applyEnemyDamage(target, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical", ownerId);
     }
     return;
   }

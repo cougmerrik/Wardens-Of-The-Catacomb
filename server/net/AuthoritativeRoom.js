@@ -291,7 +291,54 @@ export class AuthoritativeRoom {
       this.activePlayers.set(client.id, this.createActivePlayerState(client, candidate));
       slot += 1;
     }
+    this.syncSimPrimaryPlayerState();
     this.syncPrimaryActivePlayerFromSim();
+  }
+
+  syncSimPrimaryPlayerState() {
+    if (!this.pauseOwnerId) return null;
+    const client = this.clients.get(this.pauseOwnerId);
+    const state = client ? this.activePlayers.get(client.id) : null;
+    if (!client || !state) return null;
+    const classSpec = this.getClassSpec(state.classType);
+    this.sim.classType = state.classType;
+    this.sim.classSpec = classSpec;
+    this.sim.player.classType = state.classType;
+    this.sim.player.id = state.id;
+    this.sim.player.handle = state.handle;
+    this.sim.player.color = state.color;
+    this.sim.player.x = Number.isFinite(state.x) ? state.x : this.sim.player.x;
+    this.sim.player.y = Number.isFinite(state.y) ? state.y : this.sim.player.y;
+    this.sim.player.size = Number.isFinite(state.size) ? state.size : this.sim.player.size;
+    this.sim.player.speed = Number.isFinite(state.speed) ? state.speed : this.sim.player.speed;
+    this.sim.player.health = Number.isFinite(state.health) ? state.health : this.sim.player.health;
+    this.sim.player.maxHealth = Number.isFinite(state.maxHealth) ? state.maxHealth : this.sim.player.maxHealth;
+    this.sim.player.fireCooldown = Number.isFinite(state.fireCooldown) ? state.fireCooldown : 0;
+    this.sim.player.fireArrowCooldown = Number.isFinite(state.fireArrowCooldown) ? state.fireArrowCooldown : 0;
+    this.sim.player.deathBoltCooldown = Number.isFinite(state.deathBoltCooldown) ? state.deathBoltCooldown : 0;
+    this.sim.player.hitCooldown = Number.isFinite(state.hitCooldown) ? state.hitCooldown : 0;
+    this.sim.player.hpBarTimer = Number.isFinite(state.hpBarTimer) ? state.hpBarTimer : 0;
+    this.sim.player.animTime = Number.isFinite(state.animTime) ? state.animTime : 0;
+    this.sim.player.dirX = Number.isFinite(state.dirX) ? state.dirX : this.sim.player.dirX;
+    this.sim.player.dirY = Number.isFinite(state.dirY) ? state.dirY : this.sim.player.dirY;
+    this.sim.player.facing = Number.isFinite(state.facing) ? state.facing : this.sim.player.facing;
+    this.sim.player.moving = !!state.moving;
+    this.sim.level = Number.isFinite(state.level) ? state.level : this.sim.level;
+    this.sim.score = Number.isFinite(state.score) ? state.score : this.sim.score;
+    this.sim.gold = Number.isFinite(state.gold) ? state.gold : this.sim.gold;
+    this.sim.experience = Number.isFinite(state.experience) ? state.experience : this.sim.experience;
+    this.sim.expToNextLevel = Number.isFinite(state.expToNextLevel) ? state.expToNextLevel : this.sim.expToNextLevel;
+    this.sim.skillPoints = Number.isFinite(state.skillPoints) ? state.skillPoints : this.sim.skillPoints;
+    this.sim.levelWeaponDamageBonus = Number.isFinite(state.levelWeaponDamageBonus) ? state.levelWeaponDamageBonus : this.sim.levelWeaponDamageBonus;
+    this.sim.skills = cloneSkillState(state.skills);
+    this.sim.upgrades = cloneUpgradeState(state.upgrades);
+    this.sim.warriorMomentumTimer = Number.isFinite(state.warriorMomentumTimer) ? state.warriorMomentumTimer : 0;
+    this.sim.warriorRageActiveTimer = Number.isFinite(state.warriorRageActiveTimer) ? state.warriorRageActiveTimer : 0;
+    this.sim.warriorRageCooldownTimer = Number.isFinite(state.warriorRageCooldownTimer) ? state.warriorRageCooldownTimer : 0;
+    this.sim.warriorRageVictoryRushPool = Number.isFinite(state.warriorRageVictoryRushPool) ? state.warriorRageVictoryRushPool : 0;
+    this.sim.warriorRageVictoryRushTimer = Number.isFinite(state.warriorRageVictoryRushTimer) ? state.warriorRageVictoryRushTimer : 0;
+    this.sim.necromancerBeam = cloneNecromancerBeamState(state.necromancerBeam);
+    return state;
   }
 
   syncPrimaryActivePlayerFromSim() {
@@ -584,6 +631,7 @@ export class AuthoritativeRoom {
   }
 
   getSimulationPlayerEntities() {
+    this.syncSimPrimaryPlayerState();
     const primary = this.syncPrimaryActivePlayerFromSim();
     if (primary) {
       this.sim.player.id = primary.id;
@@ -663,11 +711,27 @@ export class AuthoritativeRoom {
       });
     }
     if (!input.fireAltQueued) return;
-    this.performActionForActivePlayer(client.id, (context) => {
-      if (typeof context.fireFireArrow !== "function") return false;
-      context.fireFireArrow(state.dirX || 1, state.dirY || 0);
-      return true;
-    });
+    if (state.classType === "archer") {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.fireFireArrow !== "function") return false;
+        context.fireFireArrow(state.dirX || 1, state.dirY || 0);
+        return true;
+      });
+      return;
+    }
+    if (state.classType === "fighter") {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.activateWarriorRage !== "function") return false;
+        return context.activateWarriorRage();
+      });
+      return;
+    }
+    if (state.classType === "necromancer") {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.fireDeathBolt !== "function") return false;
+        return context.fireDeathBolt(state.dirX || 1, state.dirY || 0);
+      });
+    }
   }
 
   getActivePlayerStates() {
@@ -864,6 +928,7 @@ export class AuthoritativeRoom {
       const next = this.clients.keys().next();
       this.pauseOwnerId = next.done ? null : next.value;
     }
+    if (this.phase === "active" && this.pauseOwnerId) this.syncSimPrimaryPlayerState();
     if (this.phase === "lobby") {
       const handle = removedClient?.name || "A player";
       const ownerTransferred = previousOwnerId === clientId && this.roomOwnerId;
@@ -1116,6 +1181,11 @@ export class AuthoritativeRoom {
   }
 
   maybeBroadcastSnapshot(nowMs) {
+    return this.broadcastSnapshot(nowMs, false);
+  }
+
+  broadcastSnapshot(nowMs, force = false) {
+    if (this.phase !== "active") return false;
     const sig = this.mapSignature();
     if (sig !== this.lastMapSignature) {
       this.lastMapSignature = sig;
@@ -1199,7 +1269,9 @@ export class AuthoritativeRoom {
       mapSignature: sig,
       state
     });
+    this.lastSnapshotMs = nowMs;
     this.maybeBroadcastMeta(nowMs);
+    return true;
   }
 
   maybeBroadcastMeta(nowMs, force = false) {

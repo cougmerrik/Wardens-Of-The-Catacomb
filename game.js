@@ -128,6 +128,7 @@ let netMapChunksReceived = 0, netMapChunkSize = 24;
 let netRequiredChunkKeys = new Set(), netReceivedChunkKeys = new Set(), netLastServerPlayer = null;
 const netClockState = { offsetMs: 0, ready: false };
 let netPredictedProjectiles = new Map(), netNextHeldPrimaryPredictAtMs = 0;
+let netLatestLocalVitals = null;
 let netLastSnapshotRecvAtMs = 0, netSnapshotIntervalMeanMs = 33, netSnapshotJitterMs = 0, netLastSnapshotGapMs = 33;
 let netInitialSnapshotApplied = false;
 let splashActive = true, splashDismissed = false, splashRaf = 0, splashStartedAt = 0, splashReady = false;
@@ -821,9 +822,43 @@ const startSplashScreen = () => {
 const isNetworkController = () => !!(netControllerId && netPlayerId && netControllerId === netPlayerId);
 
 function applySnapshot(game, state, controller = false, ackSeq = 0) {
+  let nextState = state;
+  if (
+    nextState &&
+    typeof nextState === "object" &&
+    netLatestLocalVitals &&
+    Number.isFinite(netLatestLocalVitals.serverTime) &&
+    Number.isFinite(netLatestLocalVitals.health)
+  ) {
+    const snapshotServerTime = Number.isFinite(nextState.serverTime) ? nextState.serverTime : NaN;
+    if (!Number.isFinite(snapshotServerTime) || snapshotServerTime < netLatestLocalVitals.serverTime) {
+      const patchedState = { ...nextState };
+      if (patchedState.player && typeof patchedState.player === "object") {
+        patchedState.player = {
+          ...patchedState.player,
+          health: netLatestLocalVitals.health,
+          maxHealth: netLatestLocalVitals.maxHealth,
+          hpBarTimer: netLatestLocalVitals.hpBarTimer
+        };
+      }
+      if (Array.isArray(patchedState.players) && netPlayerId) {
+        patchedState.players = patchedState.players.map((player) =>
+          player && player.id === netPlayerId
+            ? {
+                ...player,
+                health: netLatestLocalVitals.health,
+                maxHealth: netLatestLocalVitals.maxHealth,
+                hpBarTimer: netLatestLocalVitals.hpBarTimer
+              }
+            : player
+        );
+      }
+      nextState = patchedState;
+    }
+  }
   const next = applyNetworkSnapshot({
     game,
-    state,
+    state: nextState,
     controller,
     ackSeq,
     applySnapshotToGame,
@@ -1231,6 +1266,7 @@ function startNetworkGame() {
       netLastServerPlayer = null;
       netSnapshotBuffer.length = 0;
       netPredictedProjectiles.clear();
+      netLatestLocalVitals = null;
       netInitialSnapshotApplied = false;
       updateNetworkStatusRuntime(networkStatus, currentGame, "Synchronizing floor data...");
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
@@ -1243,6 +1279,7 @@ function startNetworkGame() {
       netLastServerPlayer = null;
       netSnapshotBuffer.length = 0;
       netPredictedProjectiles.clear();
+      netLatestLocalVitals = null;
       netInitialSnapshotApplied = false;
       updateNetworkStatusRuntime(networkStatus, currentGame, "Waiting for map meta...");
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
@@ -1262,6 +1299,20 @@ function startNetworkGame() {
       return;
     }
     const p = getSnapshotLocalPlayerState(msg?.state);
+    if (p && typeof p === "object") {
+      netLatestLocalVitals = {
+        serverTime: Number.isFinite(msg.serverTime) ? msg.serverTime : Date.now(),
+        health: Number.isFinite(p.health) ? p.health : game.player.health,
+        maxHealth: Number.isFinite(p.maxHealth) ? p.maxHealth : game.player.maxHealth,
+        hpBarTimer: Number.isFinite(p.hpBarTimer) ? p.hpBarTimer : game.player.hpBarTimer
+      };
+      if (Number.isFinite(p.health)) {
+        game.player.health = p.health;
+        game.player.alive = p.health > 0;
+      }
+      if (Number.isFinite(p.maxHealth)) game.player.maxHealth = p.maxHealth;
+      if (Number.isFinite(p.hpBarTimer)) game.player.hpBarTimer = p.hpBarTimer;
+    }
     if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
       netLastServerPlayer = { x: p.x, y: p.y };
       netRequiredChunkKeys = updateRequiredChunkReadinessRuntime(

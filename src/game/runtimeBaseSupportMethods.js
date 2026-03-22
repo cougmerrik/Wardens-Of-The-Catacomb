@@ -305,6 +305,19 @@ export const runtimeBaseSupportMethods = {
   handlePlayerEntityDeath(entity) {
     if (!entity) return;
     entity.alive = false;
+    const entityId = typeof entity.id === "string" && entity.id ? entity.id : null;
+    if (entityId) {
+      for (const enemy of this.enemies || []) {
+        if (!enemy || !this.isControlledUndead(enemy)) continue;
+        if (enemy.controllerPlayerId !== entityId) continue;
+        enemy.hp = 0;
+        enemy.collapsed = false;
+        enemy.collapseTimer = 0;
+        enemy.reanimateTimer = 0;
+        enemy.reviveAtEnd = false;
+        enemy.reanimating = false;
+      }
+    }
     const othersAlive = this.getLivingPlayerEntities().some((player) => player !== entity);
     if (this.isPrimaryPlayerEntity(entity)) {
       this.shopOpen = false;

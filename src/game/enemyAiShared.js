@@ -32,6 +32,11 @@ export function isActiveCharmTarget(game, enemy) {
   return !!game?.necromancerBeam?.active && game.necromancerBeam.targetEnemy === enemy;
 }
 
+export function getEnemyAttackOwnerId(game, enemy) {
+  if (!enemy || !isFriendlyToPlayer(game, enemy)) return null;
+  return typeof enemy.controllerPlayerId === "string" && enemy.controllerPlayerId ? enemy.controllerPlayerId : null;
+}
+
 export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   if (!enemy) return game.player;
   const sourceFriendly = isFriendlyToPlayer(game, enemy);

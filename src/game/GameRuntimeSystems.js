@@ -125,7 +125,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, ownerSpeed * 1.1);
       const aggro = (this.config.necromancer?.aggroRangeTiles || 6.5) * this.config.map.tile;
       const follow = (this.config.necromancer?.followDistanceTiles || 2.2) * this.config.map.tile;
-      const leash = (this.config.necromancer?.controlRangeTiles || 10) * this.config.map.tile;
+      const leash = 5 * this.config.map.tile;
       const distToOwner = vecLength(owner.x - enemy.x, owner.y - enemy.y);
       const targetDist = target ? vecLength(target.x - enemy.x, target.y - enemy.y) : Number.POSITIVE_INFINITY;
       const targetDistFromOwner = target ? vecLength(target.x - owner.x, target.y - owner.y) : Number.POSITIVE_INFINITY;
