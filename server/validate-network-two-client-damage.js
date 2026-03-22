@@ -149,18 +149,25 @@ async function tapMovement(page, dx, dy, durationMs = 90) {
   for (const key of keys.reverse()) await page.keyboard.up(key);
 }
 
-async function joinRoom(page, { wsUrl, roomId, playerName, classType }) {
+async function openLobby(page, { wsUrl, roomId, playerName, classType }) {
   await page.goto(GAME_URL, { waitUntil: "networkidle" });
   await page.keyboard.press("Space");
-  await page.locator("#character-select").waitFor({ state: "visible", timeout: 10000 });
-  await page.locator(`[data-class-option="${classType}"]`).click();
+  await page.locator("#mode-select").waitFor({ state: "visible", timeout: 10000 });
+  await page.locator("#menu-network").click();
+  await page.locator("#network-setup-screen").waitFor({ state: "visible", timeout: 10000 });
   await page.locator("#net-server-url").fill(wsUrl);
   await page.locator("#net-room-id").fill(roomId);
-  await page.locator("#net-player-name").fill(playerName);
-  await page.locator("#start-network-game").click();
+  await page.locator("#net-player-name-setup").fill(playerName);
+  await page.locator("#network-setup-next").click();
+  await page.locator("#network-lobby-screen").waitFor({ state: "visible", timeout: 10000 });
+  await page.locator(`[data-lobby-class-option="${classType}"]`).click();
 }
 
-async function waitForRole(page, expectedRole, timeoutMs = 15000) {
+async function setReady(page) {
+  await page.locator("#network-lobby-toggle-ready").click();
+}
+
+async function waitForRole(page, expectedRole, timeoutMs = 25000) {
   await page.waitForFunction((role) => {
     const state = window.__WOTC_DEBUG__?.getState?.();
     return !!state && state.networkReady === true && state.networkRole === role;
@@ -312,20 +319,24 @@ async function main() {
   let spectatorState = null;
   try {
     const wsUrl = `ws://127.0.0.1:${WS_PORT}`;
-    await joinRoom(controllerPage, {
+    await openLobby(controllerPage, {
       wsUrl,
       roomId: ROOM_ID,
       playerName: "ControllerRegression",
       classType: "warrior"
     });
-    controllerState = await waitForRole(controllerPage, "Controller");
 
-    await joinRoom(spectatorPage, {
+    await openLobby(spectatorPage, {
       wsUrl,
       roomId: ROOM_ID,
       playerName: "SpectatorRegression",
       classType: "archer"
     });
+
+    await setReady(controllerPage);
+    await setReady(spectatorPage);
+
+    controllerState = await waitForRole(controllerPage, "Controller");
     spectatorState = await waitForRole(spectatorPage, "Spectator");
 
     assert(controllerState?.walkable === true, `controller spawned in blocked space: ${JSON.stringify(controllerState?.tile)}`);
@@ -356,6 +367,8 @@ async function main() {
     );
     assert(controllerState?.networkReady === true, "controller lost network readiness after damage");
     assert(spectatorState?.networkReady === true, "spectator lost network readiness after damage");
+    assert(controllerState?.player?.hpBarVisible === true, "controller self health bar did not become visible after taking damage");
+    assert((controllerState?.player?.hpBarTimer || 0) > 0, "controller self hp bar timer did not activate after taking damage");
     assert((controllerState?.networkPerf?.appliedSnapshotCount || 0) > controllerSnapshotBase, "controller snapshots stopped advancing");
     assert((spectatorState?.networkPerf?.appliedSnapshotCount || 0) > spectatorSnapshotBase, "spectator snapshots stopped advancing");
     assert((spectatorState?.player?.health || Infinity) <= damageResult.baselineHealth, "spectator did not observe synced player health");

@@ -459,6 +459,52 @@ function showNetworkGameOverLeaderboardOnce(game, { includeSessionRun = false } 
 }
 
 if (typeof window !== "undefined") {
+  function getPauseBannerText(game) {
+    if (!game?.networkEnabled || !game?.paused) return "";
+    const localId = typeof game.networkLocalPlayerId === "string" ? game.networkLocalPlayerId : null;
+    const pauseOwnerId = typeof game.networkPauseOwnerId === "string" ? game.networkPauseOwnerId : null;
+    if (!pauseOwnerId || !localId || pauseOwnerId === localId) return "";
+    const roster = Array.isArray(game.networkRosterPlayers) ? game.networkRosterPlayers : [];
+    const owner = roster.find((player) => player?.id === pauseOwnerId);
+    const handle = typeof owner?.handle === "string" && owner.handle.trim() ? owner.handle.trim() : "Player";
+    return `${handle} paused the game.`;
+  }
+
+  function runDebugCommand(action, payload = {}) {
+    const game = currentGame;
+    if (!game) return { ok: false, error: "no active game" };
+    if (typeof action !== "string" || !action) return { ok: false, error: "missing action" };
+    if (action === "damageNearestHostile") {
+      if (typeof game.applyEnemyDamage !== "function") return { ok: false, error: "damage API unavailable" };
+      const playerX = Number.isFinite(game.player?.x) ? game.player.x : 0;
+      const playerY = Number.isFinite(game.player?.y) ? game.player.y : 0;
+      const enemies = Array.isArray(game.enemies) ? game.enemies : [];
+      let nearest = null;
+      let nearestDist = Infinity;
+      for (const enemy of enemies) {
+        if (!enemy || (enemy.hp || 0) <= 0) continue;
+        if (typeof game.isEnemyFriendlyToPlayer === "function" && game.isEnemyFriendlyToPlayer(enemy)) continue;
+        const dist = Math.hypot((enemy.x || 0) - playerX, (enemy.y || 0) - playerY);
+        if (dist < nearestDist) {
+          nearest = enemy;
+          nearestDist = dist;
+        }
+      }
+      if (!nearest) return { ok: false, error: "no hostile enemy found" };
+      const amount = Number.isFinite(payload.amount) ? Math.max(0, payload.amount) : Math.max(1, nearest.hp || 1);
+      const ownerId = typeof payload.ownerId === "string" && payload.ownerId ? payload.ownerId : null;
+      game.applyEnemyDamage(nearest, amount, typeof payload.damageType === "string" ? payload.damageType : "debug", ownerId);
+      return {
+        ok: true,
+        enemyId: nearest.id || null,
+        amount,
+        ownerId,
+        enemyHpAfter: nearest.hp || 0
+      };
+    }
+    return { ok: false, error: `unknown action: ${action}` };
+  }
+
   window.__WOTC_DEBUG__ = {
     getState() {
       const game = currentGame;
@@ -506,7 +552,15 @@ if (typeof window !== "undefined") {
           x: playerX,
           y: playerY,
           size: game.player?.size || 0,
+          alive: (game.player?.health || 0) > 0,
           health: game.player?.health || 0,
+          maxHealth: game.player?.maxHealth || 0,
+          hpBarTimer: game.player?.hpBarTimer || 0,
+          hpBarVisible: typeof game.showPlayerHealthBar === "function" ? !!game.showPlayerHealthBar() : false,
+          level: game.player?.level || 1,
+          xp: game.player?.xp || 0,
+          score: game.score || 0,
+          gold: game.gold || 0,
           classType: game.player?.classType || game.classType || "",
           dirX: game.player?.dirX || 0,
           dirY: game.player?.dirY || 0,
@@ -594,6 +648,9 @@ if (typeof window !== "undefined") {
         net: {
           controllerId: netControllerId,
           playerId: netPlayerId,
+          roomOwnerId: netRoomOwnerId,
+          pauseOwnerId: netPauseOwnerId,
+          roomPhase: netRoomPhase,
           lastAckSeq: netLastAckSeq,
           pendingInputs: netPendingInputs.length,
           snapshotBuffer: netSnapshotBuffer.length,
@@ -613,6 +670,8 @@ if (typeof window !== "undefined") {
             }
           : null,
         ui: {
+          paused: !!game.paused,
+          pauseBannerText: getPauseBannerText(game),
           shopOpen: !!game.shopOpen,
           skillTreeOpen: !!game.skillTreeOpen,
           statsPanelOpen: !!game.statsPanelOpen,
@@ -653,10 +712,28 @@ if (typeof window !== "undefined") {
               }
             : null
         },
+        spectate: {
+          targetId: typeof game.spectateTargetId === "string" ? game.spectateTargetId : null
+        },
+        remotePlayers: Array.isArray(game.remotePlayers)
+          ? game.remotePlayers.map((player) => ({
+              id: player?.id || null,
+              handle: player?.handle || "",
+              alive: !!player?.alive,
+              health: player?.health || 0,
+              maxHealth: player?.maxHealth || 0,
+              level: player?.level || 1,
+              classType: player?.classType || "",
+              isPauseOwner: !!player?.isPauseOwner
+            }))
+          : [],
         audio: typeof music.getDebugState === "function" ? music.getDebugState() : null,
         documentHasFocus: typeof document.hasFocus === "function" ? document.hasFocus() : null,
         documentVisibilityState: typeof document.visibilityState === "string" ? document.visibilityState : ""
       };
+    },
+    run(action, payload) {
+      return runDebugCommand(action, payload);
     }
   };
 }

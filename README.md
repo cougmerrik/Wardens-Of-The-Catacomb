@@ -20,8 +20,9 @@ Wardens of the Catacomb is a top-down action roguelite built with vanilla JavaSc
 ## Local Run Flow
 - Enter a `Player Handle` before starting a local or network run. The game trims the value to 20 characters and persists it in local storage.
 - After the splash screen, choose either `Single` or `Network`.
-- `Single` goes directly to Character Select. `Network` goes to server URL and room ID first, then Character Select.
-- Character Select includes the player handle field, class portraits, class descriptions, and the run start button for the active mode.
+- `Single` goes directly to Character Select. `Network` goes to Connection Setup first, then into a dedicated shared room lobby.
+- Single-player Character Select includes class portraits, class descriptions, and the local run start button.
+- Network class selection happens inside the shared room lobby. Players can change class there, mark ready, see the room roster, and auto-start after the shared countdown when everyone is ready.
 - Open `Leaderboard` from the start menu to view the persistent global top 25 local solo runs and the current browser session's local results.
 - After a local run ends, the leaderboard opens automatically, submits the run to the server-backed global board, and returns to Character Select for the same mode after 10 seconds unless you continue immediately.
 - Add `?dev=1` to the URL to expose `Dev Start`, which lets you begin a local run on floors 2-5 with the matching minimum entry level applied automatically.
@@ -32,8 +33,10 @@ Wardens of the Catacomb is a top-down action roguelite built with vanilla JavaSc
 - `npm run server:net`: start the authoritative WebSocket server only
 - `npm run check`: syntax check all JavaScript files
 - `npm run validate:core`: syntax, LOC, and core validation grouping
-- `npm run validate:gameplay`: boss, tactics, minotaur, and gameplay regression grouping
-- `npm run validate:network`: browser-driven network join, combat, hit-confirmation, archer, audio, and UI grouping
+- `npm run validate:gameplay`: boss, tactics, minotaur, solo XP attribution, and gameplay regression grouping
+- `npm run validate:network`: browser-driven network join, combat, hit-confirmation, two-client damage, archer, audio, pause-flow, and UI grouping
+- `npm run validate:solo-xp`: solo kill reward / XP attribution regression coverage
+- `npm run validate:network-pause`: pause-owner overlay isolation regression coverage
 - `npm run validate:dev-start`: verify higher-floor dev starts load and spawn correctly
 - `npm run validate:pre-commit`: run the recommended pre-commit validation suite
 - `npm run validate:closeout`: run the full branch closeout validation suite
@@ -51,7 +54,10 @@ Wardens of the Catacomb is a top-down action roguelite built with vanilla JavaSc
 - Expanded in-run HUD with class-aware cooldown widgets, floor objective tracking, boss health bars, a top status bar for run state, and a right panel for player identity and controls
 - Stats panel split into character-build and run-telemetry views, including class-specific activity totals, economy stats, damage totals, kill breakdowns, and scaling readouts
 - Necromancer-specific right-panel pet-capacity display using orb slots with pale-green filled active summons
-- Authoritative network mode with one active controller per room and spectator clients that can request control
+- Authoritative network mode with a shared pre-run lobby, up to 6 connected players, duplicate classes, stable per-run player colors, and a dedicated pause owner instead of the old controller/spectator gameplay model
+- True multiplayer gameplay with per-player avatars, per-player progression/build state, remote world handles, minimap teammate markers, compact party status UI, and class-colored necromancer summons
+- Multiplayer death flow where dead players spectate living teammates, runs only end when all connected players are dead, and completed network runs return to the room lobby instead of kicking players back to setup
+- Multiplayer final-results overlay with team roster, per-player level/outcome, kills, and damage dealt; multiplayer leaderboard submission is intentionally disabled for now
 - Persistent server-backed leaderboard storage in `data/leaderboard.json` for the global top 25 local solo runs, plus per-session local leaderboard tracking in the browser
 - Browser-driven regression coverage for network join, combat, hit confirmation, audio, archer projectile behavior, UI interaction, dev-start flow, and browser perf
 
