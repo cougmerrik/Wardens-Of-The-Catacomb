@@ -252,6 +252,46 @@ function findSnapshotLocalPlayer(state, localPlayerId) {
   return snapshotPlayers[0] && typeof snapshotPlayers[0] === "object" ? snapshotPlayers[0] : null;
 }
 
+function getPredictionPressure(game) {
+  const hostiles = Array.isArray(game?.enemies)
+    ? game.enemies.filter((enemy) => enemy && (enemy.hp || 0) > 0 && (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)))
+    : [];
+  const playerX = Number.isFinite(game?.player?.x) ? game.player.x : 0;
+  const playerY = Number.isFinite(game?.player?.y) ? game.player.y : 0;
+  let closestHostilePx = Infinity;
+  let nearbyHostileCount = 0;
+  for (const enemy of hostiles) {
+    const dist = Math.hypot((enemy.x || 0) - playerX, (enemy.y || 0) - playerY);
+    if (dist < closestHostilePx) closestHostilePx = dist;
+    if (dist <= 132) nearbyHostileCount += 1;
+  }
+  const perf = game?.networkPerf && typeof game.networkPerf === "object" ? game.networkPerf : null;
+  const recentCorrections = Array.isArray(perf?.recentCorrections) ? perf.recentCorrections : [];
+  const recentMaxCorrectionPx = recentCorrections.reduce((max, entry) => {
+    const errorPx = Number.isFinite(entry?.errorPx) ? entry.errorPx : 0;
+    return errorPx > max ? errorPx : max;
+  }, 0);
+  const lastCorrectionPx = Number.isFinite(perf?.lastCorrectionPx) ? perf.lastCorrectionPx : 0;
+  const hasCrowding = closestHostilePx <= 72 || nearbyHostileCount >= 3;
+  const strong =
+    lastCorrectionPx >= 40 ||
+    recentMaxCorrectionPx >= 40 ||
+    (hasCrowding && (lastCorrectionPx >= 20 || recentMaxCorrectionPx >= 20));
+  const moderate =
+    strong ||
+    lastCorrectionPx >= 24 ||
+    recentMaxCorrectionPx >= 24 ||
+    (hasCrowding && (lastCorrectionPx >= 12 || recentMaxCorrectionPx >= 12));
+  return {
+    strong,
+    moderate,
+    closestHostilePx: Number.isFinite(closestHostilePx) ? closestHostilePx : null,
+    nearbyHostileCount,
+    recentMaxCorrectionPx,
+    lastCorrectionPx
+  };
+}
+
 function syncRemotePlayers(game, state, localPlayerId, positionAlpha) {
   const snapshotPlayers = Array.isArray(state?.players) ? state.players : [];
   const remotes = snapshotPlayers.filter((player) => player && player.id !== localPlayerId);
@@ -428,14 +468,26 @@ export function applySnapshotToGame({
         let keepFrom = 0;
         while (keepFrom < netPendingInputs.length && netPendingInputs[keepFrom].seq <= netLastAckSeq) keepFrom += 1;
         if (keepFrom > 0) netPendingInputs.splice(0, keepFrom);
+        const predictionPressure = getPredictionPressure(game);
         const probe = { x: baseX, y: baseY, size: game.player.size };
-        for (const entry of netPendingInputs) {
+        let replayInputs = netPendingInputs;
+        let replayMode = "all";
+        if (predictionPressure.strong) {
+          replayInputs = [];
+          replayMode = "skip";
+        } else if (predictionPressure.moderate && netPendingInputs.length > 1) {
+          replayInputs = netPendingInputs.slice(-1);
+          replayMode = "tail";
+        }
+        game.networkPerf.lastReplayMode = replayMode;
+        game.networkPerf.lastPredictionPressure = predictionPressure;
+        for (const entry of replayInputs) {
           const mx = entry.moveX;
           const my = entry.moveY;
           if (mx || my) {
             const len = Math.hypot(mx, my) || 1;
             const speed = game.getPlayerMoveSpeed();
-            game.moveWithCollision(probe, (mx / len) * speed * entry.dt, (my / len) * speed * entry.dt);
+            game.moveWithCollisionSubsteps(probe, (mx / len) * speed * entry.dt, (my / len) * speed * entry.dt);
           }
         }
         correctedX = probe.x;
@@ -554,6 +606,23 @@ export function applySnapshotToGame({
     if (!p || !controller || !isNetworkController) return p;
     if (!netPredictedProjectiles || typeof netPredictedProjectiles.get !== "function") return p;
     if (typeof p.ownerId === "string" && localPlayerId && p.ownerId !== localPlayerId) return p;
+    const recordAuthoritativeShot = (matched = null, rejected = false) => {
+      if (typeof game?.recordPlayerShotTelemetry !== "function") return;
+      game.recordPlayerShotTelemetry({
+        source: rejected ? "authoritativeProjectileRejected" : "authoritativeProjectile",
+        projectileType: type,
+        playerX: Number.isFinite(game.player?.x) ? game.player.x : 0,
+        playerY: Number.isFinite(game.player?.y) ? game.player.y : 0,
+        authoritativeX: Number.isFinite(p.x) ? p.x : null,
+        authoritativeY: Number.isFinite(p.y) ? p.y : null,
+        authoritativeAngle: Number.isFinite(p.angle) ? p.angle : null,
+        intendedAngle: matched && Number.isFinite(matched.angle) ? matched.angle : (Number.isFinite(p.angle) ? p.angle : null),
+        predictedX: matched && Number.isFinite(matched.x) ? matched.x : null,
+        predictedY: matched && Number.isFinite(matched.y) ? matched.y : null,
+        spawnSeq: Number.isFinite(p.spawnSeq) ? Math.floor(p.spawnSeq) : 0,
+        rejected
+      });
+    };
     const seq = Number.isFinite(p.spawnSeq) ? Math.floor(p.spawnSeq) : 0;
     if (seq <= 0) return p;
     const bucket = netPredictedProjectiles.get(seq);
@@ -585,11 +654,16 @@ export function applySnapshotToGame({
     const maxPosError = type === "fireArrow" ? 56 : 48;
     const maxPosErrorSq = maxPosError * maxPosError;
     if (bestPosDistSq > maxPosErrorSq) {
+      const rejectedMatch = bucket[bestIdx];
       game.networkPerf.projectileReconcileRejects = (game.networkPerf.projectileReconcileRejects || 0) + 1;
+      bucket.splice(bestIdx, 1);
+      if (bucket.length === 0) netPredictedProjectiles.delete(seq);
+      recordAuthoritativeShot(rejectedMatch, true);
       return p;
     }
     const matched = bucket.splice(bestIdx, 1)[0];
     if (bucket.length === 0) netPredictedProjectiles.delete(seq);
+    recordAuthoritativeShot(matched, false);
     const blend = Number.isFinite(p.life) && p.life > 0.85 ? 0.86 : 0.62;
     const leadSeconds = Math.max(0, Math.min(0.06, frameGapMs / 1000));
     const predictedAngle = Number.isFinite(matched.angle) ? matched.angle : p.angle;

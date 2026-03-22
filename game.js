@@ -639,12 +639,18 @@ if (typeof window !== "undefined") {
                 playerY: shot.playerY,
                 aimX: shot.aimX,
                 aimY: shot.aimY,
+                predictedX: shot.predictedX,
+                predictedY: shot.predictedY,
+                authoritativeX: shot.authoritativeX,
+                authoritativeY: shot.authoritativeY,
                 intendedAngle: shot.intendedAngle,
+                authoritativeAngle: shot.authoritativeAngle,
                 volleyAngles: Array.isArray(shot.volleyAngles) ? shot.volleyAngles.slice() : [],
                 multishotCount: shot.multishotCount || 0,
                 projectileSpeed: shot.projectileSpeed || 0,
                 fireCooldown: shot.fireCooldown || 0,
-                seq: shot.seq || 0
+                rejected: !!shot.rejected,
+                seq: shot.seq || shot.spawnSeq || 0
               }))
             : []
         },
@@ -674,6 +680,8 @@ if (typeof window !== "undefined") {
               softCorrectionCount: game.networkPerf.softCorrectionCount || 0,
               settleCorrectionCount: game.networkPerf.settleCorrectionCount || 0,
               blockedSnapCount: game.networkPerf.blockedSnapCount || 0,
+              lastReplayMode: game.networkPerf.lastReplayMode || "",
+              lastPredictionPressure: game.networkPerf.lastPredictionPressure || null,
               projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
               recentCorrections: Array.isArray(game.networkPerf.recentCorrections)
                 ? game.networkPerf.recentCorrections.slice(-8)
@@ -1005,6 +1013,16 @@ function startNetworkRenderLoop(game) {
       netRenderRaf = value;
     }
   });
+}
+
+function shouldBypassSnapshotBuffer(game = currentGame) {
+  return !!(
+    game &&
+    game.networkEnabled &&
+    game.networkHasMap &&
+    game.networkHasChunks &&
+    hasLocalPrediction(game)
+  );
 }
 
 function startLocalGame() {
@@ -1421,6 +1439,13 @@ function startNetworkGame() {
         netMapChunkSize,
         netReceivedChunkKeys
       );
+    }
+    if (shouldBypassSnapshotBuffer(game)) {
+      netSnapshotBuffer.length = 0;
+      applySnapshot(game, msg.state, true, getAckSeqForMessage(msg));
+      if (game.networkHasMap && game.networkHasChunks) handleMapReady();
+      updateNetworkRole(game, isNetworkController(), networkTakeControl);
+      return;
     }
     netSnapshotBuffer.push({ recvTime: recvAt, ...msg });
     if (netSnapshotBuffer.length > NET_MAX_SNAPSHOT_BUFFER * 2) {

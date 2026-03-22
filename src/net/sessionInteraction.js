@@ -298,7 +298,11 @@ export function predictFromInput(game, input, dt, canRunPredictedCollision) {
   const mx = Number.isFinite(input.moveX) ? input.moveX : 0;
   const my = Number.isFinite(input.moveY) ? input.moveY : 0;
   if (mx || my) {
-    if (typeof game.moveWithCollision === "function") {
+    if (typeof game.moveWithCollisionSubsteps === "function") {
+      const len = Math.hypot(mx, my) || 1;
+      const speed = game.getPlayerMoveSpeed();
+      game.moveWithCollisionSubsteps(game.player, (mx / len) * speed * dt, (my / len) * speed * dt);
+    } else if (typeof game.moveWithCollision === "function") {
       const len = Math.hypot(mx, my) || 1;
       const speed = game.getPlayerMoveSpeed();
       game.moveWithCollision(game.player, (mx / len) * speed * dt, (my / len) * speed * dt);
@@ -335,8 +339,18 @@ export function predictFromInput(game, input, dt, canRunPredictedCollision) {
   }
 }
 
+function hasRecentCorrectionPressure(game) {
+  const perf = game?.networkPerf;
+  if (!perf || typeof perf !== "object") return false;
+  if (Number.isFinite(perf.lastCorrectionPx) && perf.lastCorrectionPx >= 56) return true;
+  const recent = Array.isArray(perf.recentCorrections) ? perf.recentCorrections : [];
+  const last = recent[recent.length - 1];
+  return !!last && Number.isFinite(last.errorPx) && last.errorPx >= 56;
+}
+
 export function canRunPredictedCollision(game, isKnownMapTileAt) {
   if (!game || !game.player) return false;
+  if (hasRecentCorrectionPressure(game)) return false;
   const r = (game.player.size || 22) * 0.5;
   return (
     isKnownMapTileAt(game, game.player.x - r, game.player.y - r) &&
@@ -348,10 +362,12 @@ export function canRunPredictedCollision(game, isKnownMapTileAt) {
 
 export function updateNetworkRole(game, isController, networkTakeControl) {
   if (!game) return;
-  const role = isController ? "Controller" : "Spectator";
+  const playerAlive = Number.isFinite(game?.player?.health) ? game.player.health > 0 : true;
+  const inActiveRoom = game.networkRoomPhase === "active";
+  const role = inActiveRoom ? (playerAlive ? "Active" : "Spectating") : (isController ? "Controller" : "Connected");
   game.networkEnabled = true;
   game.networkRole = role;
-  if (networkTakeControl) networkTakeControl.disabled = role === "Controller";
+  if (networkTakeControl) networkTakeControl.disabled = !!isController;
 }
 
 export function setSelectedClass(classType, classButtons) {

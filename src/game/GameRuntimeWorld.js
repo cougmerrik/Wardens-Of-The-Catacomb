@@ -10,6 +10,7 @@ import {
   moveEnemyTowardPlayer,
   moveEnemyTowardTargetPoint,
   moveWithCollision,
+  moveWithCollisionSubsteps,
   separateEnemyFromPlayer
 } from "./world/navigationCollision.js";
 import {
@@ -93,6 +94,10 @@ export class GameRuntimeWorld extends GameRuntimeBase {
 
   moveWithCollision(entity, dx, dy) {
     moveWithCollision(this, entity, dx, dy);
+  }
+
+  moveWithCollisionSubsteps(entity, dx, dy, maxStep = 4) {
+    moveWithCollisionSubsteps(this, entity, dx, dy, maxStep);
   }
 
   separateEnemyFromPlayer(enemy) {

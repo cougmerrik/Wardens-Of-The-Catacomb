@@ -671,7 +671,7 @@ export class AuthoritativeRoom {
       const my = Number.isFinite(input.moveY) ? input.moveY : 0;
       if (mx || my) {
         const len = Math.hypot(mx, my) || 1;
-        this.sim.moveWithCollision(state, (mx / len) * state.speed * dt, (my / len) * state.speed * dt);
+        this.sim.moveWithCollisionSubsteps(state, (mx / len) * state.speed * dt, (my / len) * state.speed * dt);
       }
       state.moving = !!(mx || my);
       if (input.hasAim) {

@@ -108,10 +108,10 @@ export function stepGame(game, dt, controls = {}) {
   if (!primaryPlayerAlive) {
     game.player.moving = false;
   } else if ((game.player.knockbackTimer || 0) > 0) {
-    game.moveWithCollision(game.player, (game.player.knockbackVx || 0) * dt, (game.player.knockbackVy || 0) * dt);
+    game.moveWithCollisionSubsteps(game.player, (game.player.knockbackVx || 0) * dt, (game.player.knockbackVy || 0) * dt);
   } else if (mx || my) {
     const len = vecLength(mx, my) || 1;
-    game.moveWithCollision(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
+    game.moveWithCollisionSubsteps(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
   }
   game.player.moving = !!(mx || my);
   if (primaryPlayerAlive) game.revealAroundPlayer();
