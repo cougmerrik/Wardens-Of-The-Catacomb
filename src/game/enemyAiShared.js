@@ -69,7 +69,14 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
     }
   }
   if (best) return best;
-  if (sourceFriendly) return controllingPlayer || game.player;
+  if (sourceFriendly && controllingPlayer) {
+    return {
+      id: controllingPlayer.id || null,
+      x: controllingPlayer.x,
+      y: controllingPlayer.y,
+      anchorOnly: true
+    };
+  }
   return livingPlayers[0] || game.player;
 }
 

@@ -73,6 +73,9 @@ export const rendererEffectsPlayerMethods = {
 
   drawPlayer(game, cameraX, cameraY) {
     const p = game.player;
+    if (!p) return;
+    const isDead = Number.isFinite(p.health) ? p.health <= 0 : p.alive === false;
+    if (isDead && game?.networkEnabled && !game?.gameOver) return;
     const frameSize = this.config.player.spriteFrame;
     const renderSize = this.config.player.spriteRenderSize || frameSize;
     const playerScreenX = p.x - cameraX;
@@ -251,9 +254,11 @@ export const rendererEffectsPlayerMethods = {
   },
 
   drawPlayerHealthBar(game, cameraX, cameraY) {
+    const p = game.player;
+    const isDead = Number.isFinite(p?.health) ? p.health <= 0 : p?.alive === false;
+    if (isDead && game?.networkEnabled && !game?.gameOver) return;
     if (!game.shouldShowPlayerHealthBar || !game.shouldShowPlayerHealthBar()) return;
     const ctx = this.ctx;
-    const p = game.player;
     const ratio = p.maxHealth > 0 ? Math.max(0, Math.min(1, p.health / p.maxHealth)) : 0;
     const width = 52;
     const height = 6;

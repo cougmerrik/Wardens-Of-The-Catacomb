@@ -71,7 +71,7 @@ function drawMultiplayerResultsOverlay(ctx, game, canvas) {
   );
   ctx.fillStyle = "#d3dbeb";
   ctx.font = "13px Trebuchet MS";
-  ctx.fillText(`Returning to menu in ${Math.ceil(remaining)}s`, panelX + 20, panelY + panelH - 18);
+  ctx.fillText(`Returning to lobby in ${Math.ceil(remaining)}s`, panelX + 20, panelY + panelH - 18);
   ctx.restore();
   return true;
 }
