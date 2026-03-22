@@ -197,6 +197,7 @@ export function handleClientMessage(raw, context) {
         pauseOwnerId: room.pauseOwnerId,
         controllerId: room.controllerId,
         lastInputSeq: room.clients.get(room.controllerId)?.lastInputSeq || 0,
+        lastInputSeqByPlayer: room.getLastInputSeqByPlayer(),
         mapSignature: room.mapSignature(),
         state: joinState
       });

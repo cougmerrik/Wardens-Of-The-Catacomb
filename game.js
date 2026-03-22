@@ -78,7 +78,6 @@ const networkLobbyRoster = document.getElementById("network-lobby-roster");
 const networkLobbyCountdown = document.getElementById("network-lobby-countdown");
 const networkLobbyReadyState = document.getElementById("network-lobby-ready-state");
 const networkLobbyToggleReady = document.getElementById("network-lobby-toggle-ready");
-const networkLobbyLeave = document.getElementById("network-lobby-leave");
 const networkLobbyLeaveTop = document.getElementById("network-lobby-leave-top");
 const networkLobbyDevStartOptions = document.getElementById("network-lobby-dev-start-options");
 const networkLobbyDevStartFloorInput = document.getElementById("network-lobby-dev-start-floor");
@@ -207,6 +206,7 @@ function showModeSelect() {
   menuState.mode = null;
   menuState.screen = "mode";
   if (menuPanel) menuPanel.hidden = false;
+  if (networkSession) networkSession.hidden = true;
   setCanvasVisible(false);
   renderMenuScreen();
 }
@@ -215,6 +215,7 @@ function showNetworkSetup() {
   menuState.mode = MENU_MODE_NETWORK;
   menuState.screen = "network";
   if (menuPanel) menuPanel.hidden = false;
+  if (networkSession) networkSession.hidden = true;
   setCanvasVisible(false);
   renderMenuScreen();
 }
@@ -223,6 +224,7 @@ function showCharacterSelect(mode) {
   menuState.mode = mode;
   menuState.screen = "character";
   if (menuPanel) menuPanel.hidden = false;
+  if (networkSession) networkSession.hidden = true;
   setCanvasVisible(false);
   renderMenuScreen();
 }
@@ -231,6 +233,7 @@ function showNetworkLobby() {
   menuState.mode = MENU_MODE_NETWORK;
   menuState.screen = "lobby";
   if (menuPanel) menuPanel.hidden = false;
+  if (networkSession) networkSession.hidden = true;
   setCanvasVisible(false);
   renderMenuScreen();
 }
@@ -652,11 +655,15 @@ if (typeof window !== "undefined") {
           pauseOwnerId: netPauseOwnerId,
           roomPhase: netRoomPhase,
           lastAckSeq: netLastAckSeq,
+          lastSentSeq: netInputSeq,
+          unackedInputs: Math.max(0, netInputSeq - netLastAckSeq),
           pendingInputs: netPendingInputs.length,
           snapshotBuffer: netSnapshotBuffer.length,
           pendingSnapshot: !!netPendingSnapshot,
           jitterMs: netSnapshotJitterMs,
-          gapMs: netLastSnapshotGapMs
+          gapMs: netLastSnapshotGapMs,
+          msSinceLastSend: netLastInputSendAt > 0 ? Math.max(0, Math.round(performance.now() - netLastInputSendAt)) : null,
+          msSinceLastSnapshot: netLastSnapshotRecvAtMs > 0 ? Math.max(0, Math.round(performance.now() - netLastSnapshotRecvAtMs)) : null
         },
         networkPerf: game.networkPerf && typeof game.networkPerf === "object"
           ? {
@@ -666,7 +673,11 @@ if (typeof window !== "undefined") {
               hardSnapCount: game.networkPerf.hardSnapCount || 0,
               softCorrectionCount: game.networkPerf.softCorrectionCount || 0,
               settleCorrectionCount: game.networkPerf.settleCorrectionCount || 0,
-              blockedSnapCount: game.networkPerf.blockedSnapCount || 0
+              blockedSnapCount: game.networkPerf.blockedSnapCount || 0,
+              projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
+              recentCorrections: Array.isArray(game.networkPerf.recentCorrections)
+                ? game.networkPerf.recentCorrections.slice(-8)
+                : []
             }
           : null,
         ui: {
@@ -788,6 +799,7 @@ function returnNetworkGameToLobby() {
   netLobbyCountdownEndsAt = 0;
   netLobbyInlineText = "";
   if (menuPanel) menuPanel.hidden = false;
+  if (networkSession) networkSession.hidden = true;
   setCanvasVisible(false);
   showNetworkLobby();
   renderNetworkLobby();
@@ -897,6 +909,15 @@ const startSplashScreen = () => {
   splashRaf = next.splashRaf;
 };
 const isNetworkController = () => !!(netControllerId && netPlayerId && netControllerId === netPlayerId);
+const hasLocalPrediction = (game = currentGame) => !!(game?.networkEnabled && netPlayerId && (game.networkRoomPhase || netRoomPhase) === "active");
+
+function getAckSeqForMessage(msg) {
+  const byPlayer = msg?.lastInputSeqByPlayer;
+  if (byPlayer && typeof byPlayer === "object" && netPlayerId && Number.isFinite(byPlayer[netPlayerId])) {
+    return byPlayer[netPlayerId];
+  }
+  return Number.isFinite(msg?.lastInputSeq) ? msg.lastInputSeq : 0;
+}
 
 function applySnapshot(game, state, controller = false, ackSeq = 0) {
   let nextState = state;
@@ -939,7 +960,7 @@ function applySnapshot(game, state, controller = false, ackSeq = 0) {
     controller,
     ackSeq,
     applySnapshotToGame,
-    isNetworkController: isNetworkController(),
+    isNetworkController: hasLocalPrediction(game),
     localPlayerId: netPlayerId,
     netPredictedProjectiles,
     netPendingInputs,
@@ -968,8 +989,8 @@ function startNetworkRenderLoop(game) {
     getCurrentGame: () => currentGame,
     handleNetworkUiActions,
     getNetClient: () => netClient,
-    isNetworkController,
-    getRenderDelayMs: () => getRenderDelayForRole(isNetworkController, NET_RENDER_DELAY_MS_CONTROLLER, NET_RENDER_DELAY_MS_SPECTATOR),
+    isNetworkController: () => hasLocalPrediction(game),
+    getRenderDelayMs: () => getRenderDelayForRole(() => hasLocalPrediction(game), NET_RENDER_DELAY_MS_CONTROLLER, NET_RENDER_DELAY_MS_SPECTATOR),
     estimateServerNowMs: () => estimateServerNowMsFromState(netClockState),
     consumeSnapshotForRender,
     netSnapshotBuffer,
@@ -1018,7 +1039,7 @@ function startNetworkGameplay() {
   menuState.mode = MENU_MODE_NETWORK;
   if (menuPanel) menuPanel.hidden = true;
   setCanvasVisible(true);
-  if (networkSession) networkSession.hidden = false;
+  if (networkSession) networkSession.hidden = true;
   currentGame = cleanupCurrentGameRuntime(currentGame);
   const game = new Game(canvas, {
     classType: selectedClass,
@@ -1211,8 +1232,8 @@ function startNetworkGame() {
       applySnapshot(
         game,
         initialPending.state,
-        isNetworkController(),
-        Number.isFinite(initialPending.lastInputSeq) ? initialPending.lastInputSeq : 0
+        hasLocalPrediction(game),
+        getAckSeqForMessage(initialPending)
       );
       netPendingSnapshot = null;
     }
@@ -1363,7 +1384,7 @@ function startNetworkGame() {
       return;
     }
     if (game.networkHasMap && game.networkHasChunks && !game.networkReady && netSnapshotBuffer.length === 0) {
-      applySnapshot(game, msg.state, isNetworkController(), Number.isFinite(msg.lastInputSeq) ? msg.lastInputSeq : 0);
+      applySnapshot(game, msg.state, hasLocalPrediction(game), getAckSeqForMessage(msg));
       if (netInitialSnapshotApplied) {
         updateNetworkRole(game, isNetworkController(), networkTakeControl);
         updateNetworkStatusRuntime(networkStatus, currentGame, `Room synced | Role: ${game.networkRole}`);
@@ -1441,15 +1462,16 @@ function startNetworkGame() {
       aimY: input.aimY,
       aimDirX: input.aimDirX,
       aimDirY: input.aimDirY,
+      firePrimaryHeld: input.firePrimaryHeld,
       firePrimaryQueued: input.firePrimaryQueued,
       fireAltQueued: input.fireAltQueued
     };
-    if (isNetworkController()) {
+    if (hasLocalPrediction(game)) {
       netNextHeldPrimaryPredictAtMs = predictProjectileSpawn(
         game,
         input,
         nowMs,
-        isNetworkController(),
+        hasLocalPrediction(game),
         netPredictedProjectiles,
         netNextHeldPrimaryPredictAtMs
       );
@@ -1638,12 +1660,6 @@ if (networkLobbyDevStartFloorInput) {
     if (!netClient) return;
     const nextFloor = Math.max(1, Number.parseInt(networkLobbyDevStartFloorInput.value || "1", 10) || 1);
     netClient.sendLobbyUpdate({ startingFloor: nextFloor });
-  });
-}
-
-if (networkLobbyLeave) {
-  networkLobbyLeave.addEventListener("click", () => {
-    returnToMenu();
   });
 }
 

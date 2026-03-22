@@ -391,9 +391,25 @@ export function applySnapshotToGame({
       hardSnapCount: 0,
       softCorrectionCount: 0,
       settleCorrectionCount: 0,
-      blockedSnapCount: 0
+      blockedSnapCount: 0,
+      projectileReconcileRejects: 0,
+      recentCorrections: []
     };
   }
+  const recordCorrection = (kind, errorDist, extra = {}) => {
+    if (!Array.isArray(game.networkPerf.recentCorrections)) game.networkPerf.recentCorrections = [];
+    game.networkPerf.recentCorrections.push({
+      atMs: Math.round(performance.now()),
+      kind,
+      errorPx: Math.round(errorDist),
+      ackSeq: Number.isFinite(ackSeq) ? ackSeq : 0,
+      pendingInputs: Array.isArray(netPendingInputs) ? netPendingInputs.length : 0,
+      ...extra
+    });
+    if (game.networkPerf.recentCorrections.length > 24) {
+      game.networkPerf.recentCorrections.splice(0, game.networkPerf.recentCorrections.length - 24);
+    }
+  };
   game.networkPerf.appliedSnapshotCount += 1;
   const isInitialControllerSync = !!controller && ackSeq <= 0 && !!state?.delta?.keyframe;
   const snapshotLocalPlayer = findSnapshotLocalPlayer(state, localPlayerId);
@@ -450,10 +466,15 @@ export function applySnapshotToGame({
       if (isInitialControllerSync || localPlayerBlocked || errorDist > hardSnapDist) {
         game.networkPerf.hardSnapCount += 1;
         if (localPlayerBlocked) game.networkPerf.blockedSnapCount += 1;
+        recordCorrection(localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+          correctedX: Math.round(correctedX),
+          correctedY: Math.round(correctedY)
+        });
         game.player.x = correctedX;
         game.player.y = correctedY;
       } else if (ackSeq > 0 && errorDist > softSnapDist) {
         game.networkPerf.softCorrectionCount += 1;
+        recordCorrection("softCorrection", errorDist);
         const denom = Math.max(1, hardSnapDist - softSnapDist);
         const errorNorm = Math.max(0, Math.min(1, (errorDist - softSnapDist) / denom));
         const jitterDamping = Math.max(0.5, 1 - jitterMs / 26);
@@ -469,6 +490,7 @@ export function applySnapshotToGame({
         }
       } else if (ackSeq > 0 && errorDist > settleDist) {
         game.networkPerf.settleCorrectionCount += 1;
+        recordCorrection("settleCorrection", errorDist);
         game.player.x += dx * 0.05;
         game.player.y += dy * 0.05;
       }
@@ -537,7 +559,8 @@ export function applySnapshotToGame({
     const bucket = netPredictedProjectiles.get(seq);
     if (!Array.isArray(bucket) || bucket.length === 0) return p;
     let bestIdx = -1;
-    let bestDistSq = Infinity;
+    let bestScore = Infinity;
+    let bestPosDistSq = Infinity;
     for (let i = 0; i < bucket.length; i++) {
       const candidate = bucket[i];
       if (!candidate || candidate.type !== type) continue;
@@ -552,12 +575,19 @@ export function applySnapshotToGame({
         const anglePenalty = Math.abs(angleDiff) * 180;
         score += anglePenalty * anglePenalty;
       }
-      if (score < bestDistSq) {
-        bestDistSq = score;
+      if (score < bestScore) {
+        bestScore = score;
+        bestPosDistSq = d2;
         bestIdx = i;
       }
     }
     if (bestIdx < 0) return p;
+    const maxPosError = type === "fireArrow" ? 56 : 48;
+    const maxPosErrorSq = maxPosError * maxPosError;
+    if (bestPosDistSq > maxPosErrorSq) {
+      game.networkPerf.projectileReconcileRejects = (game.networkPerf.projectileReconcileRejects || 0) + 1;
+      return p;
+    }
     const matched = bucket.splice(bestIdx, 1)[0];
     if (bucket.length === 0) netPredictedProjectiles.delete(seq);
     const blend = Number.isFinite(p.life) && p.life > 0.85 ? 0.86 : 0.62;

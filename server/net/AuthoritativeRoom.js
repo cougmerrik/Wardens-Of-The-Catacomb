@@ -1266,6 +1266,7 @@ export class AuthoritativeRoom {
       pauseOwnerId: this.pauseOwnerId,
       controllerId: this.pauseOwnerId,
       lastInputSeq: controllerClient ? controllerClient.lastInputSeq : 0,
+      lastInputSeqByPlayer: this.getLastInputSeqByPlayer(),
       mapSignature: sig,
       state
     });
