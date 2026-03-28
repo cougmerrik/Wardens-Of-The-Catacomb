@@ -40,11 +40,18 @@ export function getEnemyAttackOwnerId(game, enemy) {
 export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   if (!enemy) return game.player;
   const sourceFriendly = isFriendlyToPlayer(game, enemy);
+  const tile = game.config?.map?.tile || 32;
   const livingPlayers = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
   const controllingPlayer =
     sourceFriendly && typeof game?.getControllingPlayerEntityForEnemy === "function"
       ? game.getControllingPlayerEntityForEnemy(enemy)
       : null;
+  const friendlyAggroRange = sourceFriendly
+    ? Math.max(tile * 2.5, (game.config?.necromancer?.aggroRangeTiles || 6.5) * tile)
+    : maxRange;
+  const friendlyOwnerLeash = sourceFriendly
+    ? Math.max(tile * 3, (game.config?.necromancer?.followDistanceTiles || 2.2) * tile * 2.35)
+    : Infinity;
   let best = null;
   let bestDist = Number.POSITIVE_INFINITY;
   if (!sourceFriendly) {
@@ -62,7 +69,11 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
     if (sourceFriendly && isActiveCharmTarget(game, other)) continue;
     if (other.type === "skeleton_warrior" && other.collapsed) continue;
     const dist = vecLength(other.x - enemy.x, other.y - enemy.y);
-    if (dist > maxRange) continue;
+    if (dist > maxRange || (sourceFriendly && dist > friendlyAggroRange)) continue;
+    if (sourceFriendly && controllingPlayer) {
+      const ownerDist = vecLength(other.x - controllingPlayer.x, other.y - controllingPlayer.y);
+      if (ownerDist > friendlyOwnerLeash) continue;
+    }
     if (dist < bestDist) {
       best = other;
       bestDist = dist;

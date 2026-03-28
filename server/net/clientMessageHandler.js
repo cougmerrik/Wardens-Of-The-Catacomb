@@ -1,4 +1,4 @@
-import { normalizeBoardType } from "../leaderboardStore.js";
+import { normalizeBoardType, sanitizeHandle } from "../leaderboardStore.js";
 
 export function handleActionMessage(room, clientId, action) {
   if (!action || typeof action !== "object" || typeof action.kind !== "string") return;
@@ -169,7 +169,7 @@ export function handleClientMessage(raw, context) {
     }
 
     client.roomId = room.id;
-    client.name = typeof msg.name === "string" && msg.name.trim() ? msg.name.trim().slice(0, 20) : `Player-${client.id.slice(-4)}`;
+    client.name = typeof msg.name === "string" ? sanitizeHandle(msg.name) : `Player-${client.id.slice(-4)}`;
     client.classType = classType;
     client.protocolVersion =
       Number.isFinite(msg.protocolVersion) && msg.protocolVersion >= 1 ? Math.floor(msg.protocolVersion) : client.protocolVersion;
@@ -230,7 +230,7 @@ export function handleClientMessage(raw, context) {
     const floorChanged = Object.prototype.hasOwnProperty.call(msg, "startingFloor")
       ? room.updateRequestedStartFloor(
         client.id,
-        Number.isFinite(msg.startingFloor) ? msg.startingFloor : NaN
+        Number.isFinite(msg.startingFloor) ? Math.max(1, Math.min(15, Math.floor(msg.startingFloor))) : NaN
       )
       : false;
     const bossChanged = Object.prototype.hasOwnProperty.call(msg, "bossOverride")

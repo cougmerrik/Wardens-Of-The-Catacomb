@@ -76,7 +76,7 @@
         <label class="field-label" for="net-room-id">Room ID</label>
         <input id="net-room-id" class="field-input" type="text" value="lobby" />
         <label class="field-label" for="net-player-name-setup">Player Handle</label>
-        <input id="net-player-name-setup" class="field-input" type="text" maxlength="20" autocomplete="nickname" required />
+        <input id="net-player-name-setup" class="field-input" type="text" maxlength="12" pattern="[A-Za-z0-9 ]+" autocomplete="nickname" required />
         <div class="screen-actions">
           <button type="button" id="network-setup-next" class="start-game alt">Join Lobby</button>
         </div>
@@ -92,7 +92,7 @@
           <button type="button" id="character-select-back" class="start-game ghost mini">Back</button>
         </div>
         <label class="field-label" for="net-player-name">Player Handle</label>
-        <input id="net-player-name" class="field-input" type="text" maxlength="20" autocomplete="nickname" required />
+        <input id="net-player-name" class="field-input" type="text" maxlength="12" pattern="[A-Za-z0-9 ]+" autocomplete="nickname" required />
         <div class="class-grid">
           <button type="button" class="class-option" data-class-option="archer" aria-pressed="false">
             <span class="class-option__portrait" aria-hidden="true">
@@ -119,7 +119,7 @@
         <section id="dev-start-options" class="dev-start-options" hidden>
           <h3>Dev Start</h3>
           <label class="field-label" for="dev-start-floor">Starting Floor</label>
-          <input id="dev-start-floor" class="field-input" type="number" min="1" step="1" value="1" />
+          <input id="dev-start-floor" class="field-input" type="number" min="1" max="15" step="1" value="1" />
           <p class="dev-start-hint">Sets local run floor and boosts the character to that floor's minimum entry level.</p>
         </section>
         <div class="screen-actions">
@@ -186,7 +186,7 @@
             <section id="network-lobby-dev-start-options" class="dev-start-options" hidden>
               <h3>Dev Start</h3>
               <label class="field-label" for="network-lobby-dev-start-floor">Starting Floor</label>
-              <input id="network-lobby-dev-start-floor" class="field-input" type="number" min="1" step="1" value="1" />
+              <input id="network-lobby-dev-start-floor" class="field-input" type="number" min="1" max="15" step="1" value="1" />
               <p class="dev-start-hint">Sets the shared starting floor before the run begins.</p>
             </section>
             <section id="network-lobby-game-rules" class="network-lobby-game-rules" aria-label="Game rules">

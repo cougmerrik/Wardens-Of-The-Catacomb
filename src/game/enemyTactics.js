@@ -5,6 +5,7 @@ import {
   updateMimic,
   updatePrisoner,
   updateRatArcher,
+  updateSkeleton,
   updateSkeletonWarrior,
   updateNecromancer,
   updateMinotaur,
@@ -79,8 +80,8 @@ const TACTIC_DEFINITIONS = {
   },
   skeleton: {
     key: "skeleton",
-    label: "Direct Pressure",
-    update: updateGenericTactic
+    label: "Bodyguard Pressure",
+    update: updateSkeleton
   },
   mummy: {
     key: "mummy",

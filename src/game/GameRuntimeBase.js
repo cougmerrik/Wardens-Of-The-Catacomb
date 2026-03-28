@@ -8,6 +8,7 @@ import { runtimeBaseSupportMethods } from "./runtimeBaseSupportMethods.js";
 import { runtimeBaseDifficultyMethods } from "./runtimeBaseDifficultyMethods.js";
 import { runtimeCombatStatsMethods } from "./runtimeCombatStatsMethods.js";
 import { runtimeFloorBossMethods } from "./runtimeFloorBossMethods.js";
+import { createRunStats } from "./runtimeBaseStateFactories.js";
 import { initializeRuntimeBaseState } from "./runtimeBaseStateInit.js";
 
 export class GameRuntimeBase {
@@ -248,7 +249,7 @@ export class GameRuntimeBase {
   }
 
   isUndeadEnemy(enemy) {
-    return enemy?.type === "ghost" || enemy?.type === "skeleton_warrior";
+    return enemy?.type === "ghost" || enemy?.type === "skeleton_warrior" || enemy?.type === "skeleton";
   }
 
   isControlledUndead(enemy) {
@@ -406,9 +407,14 @@ export class GameRuntimeBase {
     return base * (1 + 0.45 * Math.log1p(1.15 * p));
   }
 
-  getDeathBoltRadius() {
+  getDeathBoltRadius(points = this.skills.deathBolt.points) {
     const tile = this.config.map.tile;
-    return (Number.isFinite(this.config.deathBolt?.impactRadiusTiles) ? this.config.deathBolt.impactRadiusTiles : 2) * tile;
+    const p = Number.isFinite(points) ? Math.max(0, points) : 0;
+    const maxPoints = Number.isFinite(this.skills?.deathBolt?.maxPoints) ? this.skills.deathBolt.maxPoints : 8;
+    const norm = Math.log1p(1.2 * p) / Math.log1p(1.2 * Math.max(1, maxPoints));
+    const baseTiles = Number.isFinite(this.config.deathBolt?.impactRadiusTiles) ? this.config.deathBolt.impactRadiusTiles : 2;
+    const bonusTiles = 1.25 * Math.max(0, Math.min(1, norm));
+    return (baseTiles + bonusTiles) * tile;
   }
 
   getExplodingDeathRadius() {

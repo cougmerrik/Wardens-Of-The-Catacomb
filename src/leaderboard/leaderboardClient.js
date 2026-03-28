@@ -12,7 +12,11 @@ const CLASS_LABELS = {
 
 export function sanitizePlayerHandle(value, fallback = "") {
   if (typeof value !== "string") return fallback;
-  const normalized = value.replace(/\s+/g, " ").trim().slice(0, 20);
+  const normalized = value
+    .replace(/[^A-Za-z0-9 ]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 12);
   return normalized || fallback;
 }
 

@@ -1,4 +1,5 @@
 import { vecLength } from "../utils.js";
+import { finalizeProjectilesAndTransientState, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
 
 export function resolveCombatAndDrops({
   game,
@@ -44,6 +45,15 @@ export function resolveCombatAndDrops({
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     b.life -= dt;
+    if (b.projectileType === "deathBolt" && Number.isFinite(b.detonateX) && Number.isFinite(b.detonateY)) {
+      const remaining = vecLength((b.detonateX || 0) - b.x, (b.detonateY || 0) - b.y);
+      const stepDistance = vecLength(b.x - prevX, b.y - prevY);
+      if (remaining <= Math.max(b.size || 10, stepDistance)) {
+        b.x = b.detonateX;
+        b.y = b.detonateY;
+        b.pendingDeathBoltExplosion = true;
+      }
+    }
     for (const br of activeBreakables) {
       if ((br.hp || 0) <= 0) continue;
       const half = (br.size || 20) * 0.5 + (b.size || 6) * 0.5;
@@ -80,176 +90,20 @@ export function resolveCombatAndDrops({
   for (const z of game.fireZones) z.life -= dt;
   for (const s of game.meleeSwings) s.life -= dt;
 
-  for (const bullet of game.bullets) {
-    if (bullet.projectileType === "deathBolt" && bullet.life > 0 && game.isWallAt(bullet.x, bullet.y, false)) {
-      game.triggerDeathBoltExplosion(bullet.x, bullet.y, bullet);
-      bullet.life = 0;
-    }
-    if (bullet.projectileType === "sonyaFireball" && bullet.life > 0 && game.isWallAt(bullet.x, bullet.y, false)) {
-      if (bullet.leaveFirePatch) {
-        game.fireZones.push({
-          x: bullet.x,
-          y: bullet.y,
-          radius: (game.config.enemy.sonyaFirePatchRadiusTiles || 1.1) * (game.config.map?.tile || 32),
-          life: game.config.enemy.sonyaFirePatchDuration || 3.6,
-          zoneType: "sonyaFire",
-          ownerId: bullet.ownerId || null,
-          dps: game.config.enemy.sonyaFirePatchDps || 14,
-          tickInterval: 0.35,
-          tickTimer: 0.05
-        });
-      }
-      bullet.life = 0;
-    }
-  }
-  game.bullets = game.bullets.filter((b) => !game.isWallAt(b.x, b.y, false) && b.life > 0);
-  for (const arrow of game.fireArrows) {
-    if (arrow.life <= 0 || game.isWallAt(arrow.x, arrow.y, false)) {
-      game.triggerFireExplosion(arrow.x, arrow.y, arrow);
-      arrow.life = 0;
-    }
-  }
-  game.fireArrows = game.fireArrows.filter((arrow) => arrow.life > 0);
-  game.drops = game.drops.filter((drop) => drop.life > 0);
-  game.fireZones = game.fireZones.filter((zone) => zone.life > 0);
-  game.meleeSwings = game.meleeSwings.filter((s) => s.life > 0);
+  finalizeProjectilesAndTransientState(game);
 
   for (const b of game.bullets) {
     if (b.life <= 0) continue;
-    if (b.projectileType === "ratArrow") {
-      let ratArrowHit = false;
-      for (const enemy of activeEnemies) {
-        if (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)) continue;
-        if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
-        if (vecLength(b.x - enemy.x, b.y - enemy.y) <= (enemy.size + b.size) * 0.5) {
-          const rawDamage = game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-          game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), "arrow", b.ownerId || null);
-          b.life = 0;
-          ratArrowHit = true;
-          break;
-        }
-      }
-      if (ratArrowHit) continue;
-      for (const player of getLivingPlayers()) {
-        const playerRadius = typeof game.getPlayerEnemyCollisionRadiusFor === "function" ? game.getPlayerEnemyCollisionRadiusFor(player) : playerEnemyRadius;
-        if (vecLength(b.x - player.x, b.y - player.y) > playerRadius + b.size * 0.5) continue;
-        const rawDamage = game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-        const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
-        damagePlayer(player, scaledEnemyDamage, "arrow");
-        b.life = 0;
-        break;
-      }
-      continue;
-    }
-    if (b.projectileType === "deathBolt") {
-      let hit = false;
-      for (const br of activeBreakables) {
-        if (vecLength(b.x - br.x, b.y - br.y) < (br.size + b.size) * 0.45) {
-          br.hp = 0;
-          hit = true;
-          break;
-        }
-      }
-      if (!hit) {
-        for (const enemy of activeEnemies) {
-          if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
-            hit = true;
-            break;
-          }
-        }
-      }
-      if (hit) {
-        game.triggerDeathBoltExplosion(b.x, b.y, b);
-        b.life = 0;
-      }
-      continue;
-    }
-    if (b.projectileType === "trapArrow") {
-      for (const br of activeBreakables) {
-        if (vecLength(b.x - br.x, b.y - br.y) < (br.size + b.size) * 0.45) {
-          b.life = 0;
-          break;
-        }
-      }
-      if (b.life <= 0) continue;
-      let hitPlayer = false;
-      for (const player of getLivingPlayers()) {
-        const playerRadius = typeof game.getPlayerEnemyCollisionRadiusFor === "function" ? game.getPlayerEnemyCollisionRadiusFor(player) : playerEnemyRadius;
-        if (vecLength(b.x - player.x, b.y - player.y) > playerRadius + b.size * 0.5) continue;
-        const rawDamage = typeof game.rollWallTrapDamage === "function"
-          ? game.rollWallTrapDamage()
-          : game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-        const scaledTrapDamage = rawDamage * game.getEnemyDamageScale();
-        damagePlayer(player, scaledTrapDamage, "arrow");
-        b.life = 0;
-        hitPlayer = true;
-        break;
-      }
-      if (hitPlayer) continue;
-      for (const enemy of activeEnemies) {
-        if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
-        if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
-          if (skeletonIgnoresArrow(enemy)) continue;
-          const rawDamage = typeof game.rollWallTrapDamage === "function"
-            ? game.rollWallTrapDamage()
-            : game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-          game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), "arrow", b.ownerId || null);
-          b.life = 0;
-          break;
-        }
-      }
-      continue;
-    }
-    if (b.projectileType === "sonyaFireball") {
-      let hit = false;
-      for (const br of activeBreakables) {
-        if (vecLength(b.x - br.x, b.y - br.y) < (br.size + b.size) * 0.45) {
-          br.hp = 0;
-          hit = true;
-          break;
-        }
-      }
-      if (!hit) {
-        for (const enemy of activeEnemies) {
-          if (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)) continue;
-          if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
-          if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
-            const rawDamage = Number.isFinite(b.damage) ? b.damage : game.config.enemy.sonyaFireballDamage || 18;
-            game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), "fire", b.ownerId || null);
-            hit = true;
-            break;
-          }
-        }
-      }
-      if (!hit) {
-        for (const player of getLivingPlayers()) {
-          if (vecLength(b.x - player.x, b.y - player.y) >= ((player.size || game.player.size) + b.size) * 0.5) continue;
-          const rawDamage = Number.isFinite(b.damage) ? b.damage : game.config.enemy.sonyaFireballDamage || 18;
-          const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
-          damagePlayer(player, scaledEnemyDamage, "fire");
-          if (scaledEnemyDamage > 0 && player.health <= 0 && b.ownerId === "sonya") {
-            game.gameOverTitle = "Haley Wins";
-          }
-          hit = true;
-          break;
-        }
-      }
-      if (hit) {
-        if (b.leaveFirePatch) {
-          game.fireZones.push({
-            x: b.x,
-            y: b.y,
-            radius: (game.config.enemy.sonyaFirePatchRadiusTiles || 1.1) * (game.config.map?.tile || 32),
-            life: game.config.enemy.sonyaFirePatchDuration || 3.6,
-            zoneType: "sonyaFire",
-            ownerId: b.ownerId || null,
-            dps: game.config.enemy.sonyaFirePatchDps || 14,
-            tickInterval: 0.35,
-            tickTimer: 0.05
-          });
-        }
-        b.life = 0;
-      }
+    if (resolveSpecialProjectileCollision({
+      game,
+      projectile: b,
+      activeEnemies,
+      activeBreakables,
+      getLivingPlayers,
+      playerEnemyRadius,
+      damagePlayer,
+      skeletonIgnoresArrow
+    })) {
       continue;
     }
     if (!b.hitTargets) b.hitTargets = new Set();

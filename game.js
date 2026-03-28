@@ -188,6 +188,12 @@ let currentPlayerHandle = loadStoredPlayerHandle();
 let selectedBossOverride = getStoredFloorBossOverride();
 let selectedNetworkDeathRulesMode = getStoredNetworkDeathRulesMode();
 const runtimeConfig = window.__WOTC_CONFIG__ && typeof window.__WOTC_CONFIG__ === "object" ? window.__WOTC_CONFIG__ : {};
+const MIN_DEV_START_FLOOR = 1;
+const MAX_DEV_START_FLOOR = 15;
+
+function normalizeDevStartingFloor(value) {
+  return Math.max(MIN_DEV_START_FLOOR, Math.min(MAX_DEV_START_FLOOR, Number.parseInt(value || "1", 10) || 1));
+}
 
 function syncMenuVolumeControl() {
   if (!menuVolumeInput) return;
@@ -1176,7 +1182,7 @@ function startLocalGame() {
   setCanvasVisible(true);
   currentGame = cleanupCurrentGameRuntime(currentGame);
   const requestedStartFloor = isDevMode && devStartFloorInput
-    ? Math.max(1, Number.parseInt(devStartFloorInput.value || "1", 10) || 1)
+    ? normalizeDevStartingFloor(devStartFloorInput.value)
     : 1;
   currentGame = createLocalGame({
     Game,
@@ -1348,6 +1354,7 @@ function startNetworkGame() {
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || null;
     netRequestedStartFloor = Number.isFinite(msg.requestedStartFloor) ? Math.max(1, Math.floor(msg.requestedStartFloor)) : netRequestedStartFloor;
+    netRequestedStartFloor = normalizeDevStartingFloor(netRequestedStartFloor);
     netRequestedBossOverride = normalizeFloorBossOverride(msg.requestedBossOverride);
     netRequestedDeathRulesMode = normalizeNetworkDeathRulesMode(msg.requestedDeathRulesMode);
     netLobbyCountdownEndsAt = Number.isFinite(msg.lobbyCountdownEndsAt) ? msg.lobbyCountdownEndsAt : 0;
@@ -1800,6 +1807,12 @@ for (const handleInput of [playerNameInput, networkPlayerNameInput]) {
   });
 }
 
+if (devStartFloorInput) {
+  devStartFloorInput.addEventListener("change", () => {
+    devStartFloorInput.value = `${normalizeDevStartingFloor(devStartFloorInput.value)}`;
+  });
+}
+
 if (openLeaderboardButton) {
   openLeaderboardButton.addEventListener("click", async () => {
     syncStoredHandleFromInput();
@@ -1888,7 +1901,8 @@ if (networkLobbyToggleReady) {
 if (networkLobbyDevStartFloorInput) {
   networkLobbyDevStartFloorInput.addEventListener("change", () => {
     if (!netClient) return;
-    const nextFloor = Math.max(1, Number.parseInt(networkLobbyDevStartFloorInput.value || "1", 10) || 1);
+    const nextFloor = normalizeDevStartingFloor(networkLobbyDevStartFloorInput.value);
+    networkLobbyDevStartFloorInput.value = `${nextFloor}`;
     netClient.sendLobbyUpdate({ startingFloor: nextFloor });
   });
 }

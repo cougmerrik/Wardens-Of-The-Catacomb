@@ -13,6 +13,80 @@ import {
   moveEnemyTowardPoint
 } from "./enemyAiShared.js";
 
+function findControlledSkeletonGuardTarget(game, enemy, owner) {
+  if (!game || !enemy || !owner) return null;
+  const tile = game.config?.map?.tile || 32;
+  const follow = (game.config?.necromancer?.followDistanceTiles || 2.2) * tile;
+  const guardRadius = Math.max(tile * 2.25, follow * 1.2);
+  const interceptRadius = Math.max(tile * 1.5, follow * 0.95);
+  let best = null;
+  let bestOwnerDist = Number.POSITIVE_INFINITY;
+  let bestEnemyDist = Number.POSITIVE_INFINITY;
+  for (const other of game.enemies || []) {
+    if (!other || other === enemy || (other.hp || 0) <= 0) continue;
+    if (isFriendlyToPlayer(game, other)) continue;
+    if (other.type === "mimic" && other.dormant) continue;
+    if (other.type === "skeleton_warrior" && other.collapsed) continue;
+    const ownerDist = vecLength((other.x || 0) - owner.x, (other.y || 0) - owner.y);
+    const enemyDist = vecLength((other.x || 0) - enemy.x, (other.y || 0) - enemy.y);
+    if (ownerDist > guardRadius && enemyDist > interceptRadius) continue;
+    if (ownerDist < bestOwnerDist || (ownerDist <= bestOwnerDist + 0.001 && enemyDist < bestEnemyDist)) {
+      best = other;
+      bestOwnerDist = ownerDist;
+      bestEnemyDist = enemyDist;
+    }
+  }
+  return best;
+}
+
+function updateFriendlySkeletonBodyguard(game, enemy, dt, speedScale, attackRange = 0, ownerId = null) {
+  const owner =
+    typeof game.getControllingPlayerEntityForEnemy === "function"
+      ? game.getControllingPlayerEntityForEnemy(enemy)
+      : game.player;
+  if (!owner) return false;
+  const ownerSpeed = typeof game.getPlayerMoveSpeedFor === "function" ? game.getPlayerMoveSpeedFor(owner) : game.getPlayerMoveSpeed();
+  enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, ownerSpeed * 1.05);
+  const tile = game.config?.map?.tile || 32;
+  const follow = (game.config?.necromancer?.followDistanceTiles || 2.2) * tile;
+  const anchor =
+    typeof game.getControlledUndeadFormationPoint === "function"
+      ? game.getControlledUndeadFormationPoint(enemy)
+      : { x: owner.x, y: owner.y };
+  const distToOwner = vecLength(owner.x - enemy.x, owner.y - enemy.y);
+  const distToAnchor = vecLength(anchor.x - enemy.x, anchor.y - enemy.y);
+  const hardLeash = Math.max(tile * 2.8, follow * 1.7);
+  const guardThreat = findControlledSkeletonGuardTarget(game, enemy, owner);
+
+  if (distToOwner > hardLeash) {
+    if (typeof game.setEnemyTacticPhase === "function") game.setEnemyTacticPhase(enemy, "return");
+    moveEnemyTowardPoint(game, enemy, anchor, dt, Math.max(1.05, speedScale), Math.max(8, tile * 0.3));
+    return true;
+  }
+
+  if (guardThreat) {
+    const dx = guardThreat.x - enemy.x;
+    const dy = guardThreat.y - enemy.y;
+    const dist = vecLength(dx, dy) || 1;
+    enemy.dirX = dx / dist;
+    enemy.dirY = dy / dist;
+    if (typeof game.setEnemyTacticPhase === "function") game.setEnemyTacticPhase(enemy, "guard");
+    if (attackRange > 0 && dist <= attackRange && (enemy.attackCooldown || 0) <= 0) {
+      enemy.attackCooldown = game.config.enemy.skeletonWarriorAttackCooldown || 1.0;
+      game.applyEnemyDamage(guardThreat, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical", ownerId);
+      return true;
+    }
+    moveEnemyTowardPoint(game, enemy, guardThreat, dt, Math.max(0.95, speedScale), Math.max(6, tile * 0.18));
+    return true;
+  }
+
+  if (typeof game.setEnemyTacticPhase === "function") game.setEnemyTacticPhase(enemy, "escort");
+  if (distToAnchor > Math.max(tile * 0.35, follow * 0.22)) {
+    moveEnemyTowardPoint(game, enemy, anchor, dt, Math.max(0.92, speedScale), Math.max(6, tile * 0.18));
+  }
+  return true;
+}
+
 export function updateRatArcher(game, enemy, dt, speedScale) {
   if (isFriendlyToPlayer(game, enemy) && typeof game.getPlayerMoveSpeed === "function") {
     enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, game.getPlayerMoveSpeed() * 1.1);
@@ -173,6 +247,10 @@ export function updateSkeletonWarrior(game, enemy, dt, speedScale) {
     }
     return;
   }
+  if (isFriendlyToPlayer(game, enemy)) {
+    updateFriendlySkeletonBodyguard(game, enemy, dt, speedScale, game.config.enemy.skeletonWarriorAttackRange || 42, ownerId);
+    return;
+  }
   if (typeof game.setEnemyTacticPhase === "function") game.setEnemyTacticPhase(enemy, "advancing");
   const range = game.config.enemy.skeletonWarriorAttackRange || 42;
   const target = getPriorityTarget(game, enemy, range * 4);
@@ -195,6 +273,21 @@ export function updateSkeletonWarrior(game, enemy, dt, speedScale) {
   }
   if (typeof game.moveEnemyTowardTarget === "function") game.moveEnemyTowardTarget(enemy, target, speedScale, dt, 6);
   else game.moveEnemyTowardPlayer(enemy, speedScale, dt);
+}
+
+export function updateSkeleton(game, enemy, dt, speedScale) {
+  if (isFriendlyToPlayer(game, enemy)) {
+    updateFriendlySkeletonBodyguard(game, enemy, dt, speedScale);
+    return;
+  }
+  if (typeof game.setEnemyTacticPhase === "function") game.setEnemyTacticPhase(enemy, "advancing");
+  const target = getPriorityTarget(game, enemy);
+  const dx = target.x - enemy.x;
+  const dy = target.y - enemy.y;
+  const dist = vecLength(dx, dy) || 1;
+  enemy.dirX = dx / dist;
+  enemy.dirY = dy / dist;
+  moveEnemyTowardPoint(game, enemy, target, dt, speedScale, 6);
 }
 
 export function updateNecromancer(game, enemy, dt, speedScale) {
