@@ -1,3 +1,5 @@
+import { normalizeBoardType } from "../leaderboardStore.js";
+
 export function handleActionMessage(room, clientId, action) {
   if (!action || typeof action !== "object" || typeof action.kind !== "string") return;
   const kind = action.kind;
@@ -117,10 +119,11 @@ export function handleClientMessage(raw, context) {
   }
 
   if (msg.type === "leaderboard.get") {
+    const boardType = normalizeBoardType(msg.boardType);
     safeSend(ws, {
       type: "leaderboard.rows",
       requestId: typeof msg.requestId === "string" ? msg.requestId : "",
-      rows: leaderboardStore ? leaderboardStore.getRows() : []
+      rows: leaderboardStore ? leaderboardStore.getRows(boardType) : []
     });
     return;
   }
@@ -135,7 +138,7 @@ export function handleClientMessage(raw, context) {
       });
       return;
     }
-    const rows = leaderboardStore ? leaderboardStore.submitRun(run) : [];
+    const rows = leaderboardStore ? leaderboardStore.submitRun({ ...run, boardType: msg.boardType || run.boardType }) : [];
     safeSend(ws, {
       type: "leaderboard.rows",
       requestId: typeof msg.requestId === "string" ? msg.requestId : "",
