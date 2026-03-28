@@ -115,6 +115,8 @@ const leaderboardTitle = document.getElementById("leaderboard-title");
 const leaderboardSubtitle = document.getElementById("leaderboard-subtitle");
 const leaderboardStatus = document.getElementById("leaderboard-status");
 const leaderboardClose = document.getElementById("leaderboard-close");
+const leaderboardDeathActions = document.querySelector(".leaderboard-death-actions");
+const leaderboardStats = document.getElementById("leaderboard-stats");
 const leaderboardContinue = document.getElementById("leaderboard-continue");
 const leaderboardBoardSolo = document.getElementById("leaderboard-board-solo");
 const leaderboardBoardGroup = document.getElementById("leaderboard-board-group");
@@ -527,6 +529,8 @@ function renderLeaderboardModal() {
     subtitle: leaderboardSubtitle,
     status: leaderboardStatus,
     closeButton: leaderboardClose,
+    statsButton: leaderboardStats,
+    deathActions: leaderboardDeathActions,
     continueButton: leaderboardContinue,
     activeBoard: leaderboardState.activeBoard,
     soloButton: leaderboardBoardSolo,
@@ -559,6 +563,31 @@ function closeLeaderboardModal() {
   leaderboardState.mode = "menu";
   renderLeaderboardModal();
   syncDeathLeaderboardCanvasVisibility();
+}
+
+function resetDeathReturnCountdown(game = currentGame) {
+  if (!game?.deathTransition) return;
+  game.deathTransition.active = true;
+  game.deathTransition.elapsed = 0;
+  game.deathTransition.returnTriggered = false;
+}
+
+function openDeathStatsScreen(game = currentGame) {
+  if (!game?.gameOver) return;
+  leaderboardState.open = false;
+  renderLeaderboardModal();
+  game.statsPanelView = "run";
+  game.statsPanelOpen = true;
+  game.statsPanelPausedGame = false;
+  if (menuPanel?.hidden) setCanvasVisible(true);
+}
+
+function returnFromDeathStatsToLeaderboard(game = currentGame) {
+  if (!game?.gameOver) return;
+  game.statsPanelOpen = false;
+  game.statsPanelPausedGame = false;
+  resetDeathReturnCountdown(game);
+  openLeaderboardModal("death", leaderboardState.activeBoard);
 }
 
 function openLeaderboardModal(mode = "menu", boardType = leaderboardState.activeBoard) {
@@ -976,6 +1005,14 @@ function syncIdleSoundState(game) {
 }
 
 function syncMusicForGame(game) {
+  if (game?.gameOver) {
+    if (!game.__deathMusicStarted) {
+      game.__deathMusicStarted = true;
+      syncMusicControllerForGame(music, splashActive, game);
+    }
+    return;
+  }
+  if (game) game.__deathMusicStarted = false;
   syncMusicControllerForGame(music, splashActive, game);
 }
 
@@ -1259,6 +1296,8 @@ function startLocalGame() {
       if (gameOver) submitCompletedLocalRun(nextGame);
     }
   });
+  currentGame.deathTransitionDuration = 12;
+  currentGame.onDeathStatsBackToLeaderboard = () => returnFromDeathStatsToLeaderboard(currentGame);
 }
 
 function startNetworkGameplay() {
@@ -1286,6 +1325,8 @@ function startNetworkGameplay() {
   }
   game.networkDeathRulesMode = normalizeNetworkDeathRulesMode(netRequestedDeathRulesMode);
   game.playerHandle = name;
+  game.deathTransitionDuration = 12;
+  game.onDeathStatsBackToLeaderboard = () => returnFromDeathStatsToLeaderboard(game);
   game.networkEnabled = true;
   game.networkLocalPlayerId = netPlayerId;
   game.networkRole = "Connecting";
@@ -1897,6 +1938,13 @@ if (leaderboardContinue) {
     returnToMenu();
   });
 }
+if (leaderboardStats) {
+  leaderboardStats.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openDeathStatsScreen();
+  });
+}
 if (leaderboardBoardSolo) {
   leaderboardBoardSolo.addEventListener("click", async () => {
     leaderboardState.activeBoard = LEADERBOARD_BOARD_SOLO;
@@ -1936,7 +1984,7 @@ const leaderboardUiTick = () => {
 };
 requestAnimationFrame(leaderboardUiTick);
 
-startIdleSoundMonitor(() => currentGame, syncIdleSoundState);
+startIdleSoundMonitor(() => currentGame, syncIdleSoundState, syncMusicForGame);
 if (networkTakeControl) {
   networkTakeControl.addEventListener("click", () => {
     if (netClient) netClient.takeControl();

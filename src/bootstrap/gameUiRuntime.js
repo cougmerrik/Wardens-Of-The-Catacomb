@@ -17,6 +17,11 @@ export function syncIdleSoundState(music, splashActive, game) {
   if (!idleGameplayActive) music.resetIdleTimer();
 }
 
+function isFloorBossMusicActive(game) {
+  if (!game || game.gameOver) return false;
+  return game.floorBoss?.phase === "active";
+}
+
 export function syncMusicForGame(music, splashActive, game) {
   if (splashActive) return;
   syncIdleSoundState(music, splashActive, game);
@@ -25,7 +30,29 @@ export function syncMusicForGame(music, splashActive, game) {
     return;
   }
   if (game.gameOver) {
-    music.playDeathMusic();
+    if (music.currentMode !== "death") music.playDeathMusic();
+    return;
+  }
+  const defeatedAtTime = game.floorBoss?.defeatedAtTime;
+  const bossPhase = game.floorBoss?.phase;
+  const victoryKey = Number.isFinite(defeatedAtTime) ? `boss-defeat:${defeatedAtTime}` : "";
+  if (
+    Number.isFinite(defeatedAtTime) &&
+    (bossPhase === "defeated" || bossPhase === "portal") &&
+    !(typeof music.hasPlayedBossVictoryCue === "function" && music.hasPlayedBossVictoryCue(victoryKey))
+  ) {
+    music.playBossVictoryCue(victoryKey);
+    if (game.paused) music.pauseCurrentTrack();
+    else music.playCurrentTrack();
+    return;
+  }
+  if (isFloorBossMusicActive(game)) {
+    music.playBossMusic({
+      floor: game.floor,
+      biomeKey: typeof game.biomeKey === "string" ? game.biomeKey : ""
+    });
+    if (game.paused) music.pauseCurrentTrack();
+    else music.playCurrentTrack();
     return;
   }
   if (game.networkEnabled) {

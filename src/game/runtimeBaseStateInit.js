@@ -20,7 +20,7 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.hasKey = false;
   game.gameOver = false;
   game.gameOverTitle = "GAME OVER";
-  game.deathTransitionDuration = 7;
+  game.deathTransitionDuration = 12;
   game.deathTransition = {
     active: false,
     elapsed: 0,
