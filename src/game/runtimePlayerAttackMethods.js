@@ -192,19 +192,32 @@ export const runtimePlayerAttackMethods = {
     const hpCost = Math.max(1, this.player.maxHealth * (this.config.deathBolt?.hpCostPct || 0.05));
     if (this.player.health <= hpCost) return false;
     const origin = this.getBowMuzzleOrigin(dx, dy);
+    const speed = this.config.deathBolt?.speed || 165;
+    const life = this.config.deathBolt?.life || 1.6;
+    const maxTravelDistance = speed * life;
+    const clickedX = Number.isFinite(this.input?.mouse?.worldX) ? this.input.mouse.worldX : (origin.x + origin.dirX * maxTravelDistance);
+    const clickedY = Number.isFinite(this.input?.mouse?.worldY) ? this.input.mouse.worldY : (origin.y + origin.dirY * maxTravelDistance);
+    const toClickX = clickedX - origin.x;
+    const toClickY = clickedY - origin.y;
+    const clickDistance = vecLength(toClickX, toClickY);
+    const travelDistance = Math.min(maxTravelDistance, clickDistance || maxTravelDistance);
+    const detonateX = origin.x + origin.dirX * travelDistance;
+    const detonateY = origin.y + origin.dirY * travelDistance;
     this.player.health = Math.max(1, this.player.health - hpCost);
     this.markPlayerHealthBarVisible();
     this.player.deathBoltCooldown = this.config.deathBolt?.cooldown || 10;
     this.bullets.push({
       x: origin.x,
       y: origin.y,
-      vx: origin.dirX * (this.config.deathBolt?.speed || 165),
-      vy: origin.dirY * (this.config.deathBolt?.speed || 165),
+      vx: origin.dirX * speed,
+      vy: origin.dirY * speed,
       angle: Math.atan2(origin.dirY, origin.dirX),
-      life: this.config.deathBolt?.life || 1.6,
+      life,
       size: 10,
       projectileType: "deathBolt",
       ownerId: this.player.id || null,
+      detonateX,
+      detonateY,
       deathBoltDamage: this.getDeathBoltBaseDamage(),
       deathBoltHealAmount: this.getDeathBoltHealAmount(),
       deathBoltPetDamageMultiplier: this.getDeathBoltPetDamageMultiplier(),

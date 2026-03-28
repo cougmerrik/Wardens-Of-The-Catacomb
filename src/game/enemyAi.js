@@ -10,15 +10,22 @@ import {
 } from "./enemyAiShared.js";
 export { updateLeprechaunBoss } from "./enemyLeprechaunAi.js";
 
-export { updateMinotaur, updateNecromancer, updateRatArcher, updateSkeletonWarrior } from "./enemyAdvancedAi.js";
+export { updateMinotaur, updateNecromancer, updateRatArcher, updateSkeleton, updateSkeletonWarrior, updateSonyaBoss } from "./enemyAdvancedAi.js";
 
 export function updateGhost(game, enemy, dt, speedScale) {
   const ownerId = getEnemyAttackOwnerId(game, enemy);
-  if (isFriendlyToPlayer(game, enemy) && typeof game.getPlayerMoveSpeed === "function") {
+  const friendly = isFriendlyToPlayer(game, enemy);
+  const owner =
+    friendly && typeof game.getControllingPlayerEntityForEnemy === "function"
+      ? game.getControllingPlayerEntityForEnemy(enemy)
+      : null;
+  if (friendly && typeof game.getPlayerMoveSpeed === "function") {
     enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, game.getPlayerMoveSpeed() * 1.1);
   }
   const tile = game.config?.map?.tile || 32;
   const target = getPriorityTarget(game, enemy, tile * 12);
+  const distToOwner = owner ? vecLength(owner.x - enemy.x, owner.y - enemy.y) : 0;
+  const ownerLeash = Math.max(tile * 3.25, (game.config?.necromancer?.followDistanceTiles || 2.2) * tile * 2.15);
   const dx = target.x - enemy.x;
   const dy = target.y - enemy.y;
   const dist = vecLength(dx, dy) || 1;
@@ -38,6 +45,26 @@ export function updateGhost(game, enemy, dt, speedScale) {
   const diveDurationMax = Math.max(0.2, game.config.enemy.ghostDiveDuration || 0.65);
   const diveAttackRange = Math.max(tile * 0.4, (game.config.enemy.ghostDiveAttackRangeTiles || 0.95) * tile);
   enemy.siphoning = false;
+
+  if (friendly && owner) {
+    const formationTarget =
+      typeof game.getControlledUndeadFormationPoint === "function"
+        ? game.getControlledUndeadFormationPoint(enemy)
+        : { x: owner.x, y: owner.y };
+    if (target?.anchorOnly) {
+      enemy.diveDuration = 0;
+      enemy.diveTimer = Math.max(enemy.diveTimer || 0, 0.3);
+      const holdDistance = Math.max(10, tile * 0.45);
+      const anchorDist = vecLength(formationTarget.x - enemy.x, formationTarget.y - enemy.y);
+      if (anchorDist > holdDistance) moveEnemyTowardPoint(game, enemy, formationTarget, dt, Math.max(0.9, speedScale), holdDistance * 0.7);
+      return;
+    }
+    if (distToOwner > ownerLeash) {
+      enemy.diveDuration = 0;
+      moveEnemyTowardPoint(game, enemy, formationTarget, dt, Math.max(1.05, speedScale), Math.max(10, tile * 0.35));
+      return;
+    }
+  }
 
   enemy.orbitSwapTimer = Math.max(0, (enemy.orbitSwapTimer || 0) - dt);
   enemy.siphonTickTimer = Math.max(0, (enemy.siphonTickTimer || 0) - dt);

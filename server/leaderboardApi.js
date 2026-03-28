@@ -1,5 +1,6 @@
 import { LeaderboardStore } from "./leaderboardStore.js";
 import { UpstashLeaderboardStore } from "./upstashLeaderboardStore.js";
+import { normalizeBoardType } from "./leaderboardStore.js";
 
 function writeJson(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -39,6 +40,8 @@ export function createLeaderboardApiStore() {
 
 export async function handleLeaderboardApiRequest(req, res, store = createLeaderboardApiStore()) {
   const method = req.method || "GET";
+  const requestUrl = new URL(req.url || "/", "http://localhost");
+  const boardType = normalizeBoardType(requestUrl.searchParams.get("board"));
 
   if (method === "OPTIONS") {
     res.statusCode = 204;
@@ -52,7 +55,7 @@ export async function handleLeaderboardApiRequest(req, res, store = createLeader
   }
 
   if (method === "GET") {
-    const rows = await store.getRows();
+    const rows = await store.getRows(boardType);
     writeJson(res, 200, { rows });
     return;
   }
@@ -65,7 +68,7 @@ export async function handleLeaderboardApiRequest(req, res, store = createLeader
         writeJson(res, 400, { error: "Missing leaderboard run payload" });
         return;
       }
-      const rows = await store.submitRun(run);
+      const rows = await store.submitRun({ ...run, boardType: body?.boardType || run.boardType || boardType });
       writeJson(res, 200, { accepted: true, rows });
     } catch (error) {
       writeJson(res, 400, { error: error instanceof Error ? error.message : "Invalid JSON" });

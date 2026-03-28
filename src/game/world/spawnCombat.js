@@ -10,6 +10,7 @@ import {
   spawnSkeletonWarrior as spawnSkeletonWarriorEntity,
   spawnNecromancer as spawnNecromancerEntity,
   spawnMinotaur as spawnMinotaurEntity,
+  spawnSonyaBoss as spawnSonyaBossEntity,
   spawnLeprechaunBoss as spawnLeprechaunBossEntity,
   spawnSkeleton as spawnSkeletonEntity
 } from "../enemySystems.js";
@@ -102,6 +103,10 @@ export function spawnMinotaur(game, x, y) {
   return spawnMinotaurEntity(game, x, y);
 }
 
+export function spawnSonyaBoss(game, x, y) {
+  return spawnSonyaBossEntity(game, x, y);
+}
+
 export function spawnLeprechaunBoss(game, x, y) {
   return spawnLeprechaunBossEntity(game, x, y);
 }
@@ -145,7 +150,7 @@ export function applyEnemyDamage(game, enemy, amount, damageType = "physical", o
   }
   const lifeLeech = game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy) ? 0 : game.getLifeLeechPercent();
   if (lifeLeech > 0 && dealt > 0) {
-    game.applyPlayerHealing(Math.max(1, Math.ceil(dealt * lifeLeech)));
+    game.applyPlayerHealing(dealt * lifeLeech);
   }
   enemy.hpBarTimer = game.config.enemy.hpBarDuration;
   if (effective >= 1 || (enemy.damageTextTimer || 0) <= 0) {

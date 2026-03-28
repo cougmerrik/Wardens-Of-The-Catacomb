@@ -1,4 +1,5 @@
 import { vecLength } from "../utils.js";
+import { finalizeProjectilesAndTransientState, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
 
 export function resolveCombatAndDrops({
   game,
@@ -44,6 +45,15 @@ export function resolveCombatAndDrops({
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     b.life -= dt;
+    if (b.projectileType === "deathBolt" && Number.isFinite(b.detonateX) && Number.isFinite(b.detonateY)) {
+      const remaining = vecLength((b.detonateX || 0) - b.x, (b.detonateY || 0) - b.y);
+      const stepDistance = vecLength(b.x - prevX, b.y - prevY);
+      if (remaining <= Math.max(b.size || 10, stepDistance)) {
+        b.x = b.detonateX;
+        b.y = b.detonateY;
+        b.pendingDeathBoltExplosion = true;
+      }
+    }
     for (const br of activeBreakables) {
       if ((br.hp || 0) <= 0) continue;
       const half = (br.size || 20) * 0.5 + (b.size || 6) * 0.5;
@@ -80,108 +90,20 @@ export function resolveCombatAndDrops({
   for (const z of game.fireZones) z.life -= dt;
   for (const s of game.meleeSwings) s.life -= dt;
 
-  for (const bullet of game.bullets) {
-    if (bullet.projectileType === "deathBolt" && bullet.life > 0 && game.isWallAt(bullet.x, bullet.y, false)) {
-      game.triggerDeathBoltExplosion(bullet.x, bullet.y, bullet);
-      bullet.life = 0;
-    }
-  }
-  game.bullets = game.bullets.filter((b) => !game.isWallAt(b.x, b.y, false) && b.life > 0);
-  for (const arrow of game.fireArrows) {
-    if (arrow.life <= 0 || game.isWallAt(arrow.x, arrow.y, false)) {
-      game.triggerFireExplosion(arrow.x, arrow.y, arrow);
-      arrow.life = 0;
-    }
-  }
-  game.fireArrows = game.fireArrows.filter((arrow) => arrow.life > 0);
-  game.drops = game.drops.filter((drop) => drop.life > 0);
-  game.fireZones = game.fireZones.filter((zone) => zone.life > 0);
-  game.meleeSwings = game.meleeSwings.filter((s) => s.life > 0);
+  finalizeProjectilesAndTransientState(game);
 
   for (const b of game.bullets) {
     if (b.life <= 0) continue;
-    if (b.projectileType === "ratArrow") {
-      let ratArrowHit = false;
-      for (const enemy of activeEnemies) {
-        if (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)) continue;
-        if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
-        if (vecLength(b.x - enemy.x, b.y - enemy.y) <= (enemy.size + b.size) * 0.5) {
-          const rawDamage = game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-          game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), "arrow", b.ownerId || null);
-          b.life = 0;
-          ratArrowHit = true;
-          break;
-        }
-      }
-      if (ratArrowHit) continue;
-      for (const player of getLivingPlayers()) {
-        const playerRadius = typeof game.getPlayerEnemyCollisionRadiusFor === "function" ? game.getPlayerEnemyCollisionRadiusFor(player) : playerEnemyRadius;
-        if (vecLength(b.x - player.x, b.y - player.y) > playerRadius + b.size * 0.5) continue;
-        const rawDamage = game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-        const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
-        damagePlayer(player, scaledEnemyDamage, "arrow");
-        b.life = 0;
-        break;
-      }
-      continue;
-    }
-    if (b.projectileType === "deathBolt") {
-      let hit = false;
-      for (const br of activeBreakables) {
-        if (vecLength(b.x - br.x, b.y - br.y) < (br.size + b.size) * 0.45) {
-          br.hp = 0;
-          hit = true;
-          break;
-        }
-      }
-      if (!hit) {
-        for (const enemy of activeEnemies) {
-          if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
-            hit = true;
-            break;
-          }
-        }
-      }
-      if (hit) {
-        game.triggerDeathBoltExplosion(b.x, b.y, b);
-        b.life = 0;
-      }
-      continue;
-    }
-    if (b.projectileType === "trapArrow") {
-      for (const br of activeBreakables) {
-        if (vecLength(b.x - br.x, b.y - br.y) < (br.size + b.size) * 0.45) {
-          b.life = 0;
-          break;
-        }
-      }
-      if (b.life <= 0) continue;
-      let hitPlayer = false;
-      for (const player of getLivingPlayers()) {
-        const playerRadius = typeof game.getPlayerEnemyCollisionRadiusFor === "function" ? game.getPlayerEnemyCollisionRadiusFor(player) : playerEnemyRadius;
-        if (vecLength(b.x - player.x, b.y - player.y) > playerRadius + b.size * 0.5) continue;
-        const rawDamage = typeof game.rollWallTrapDamage === "function"
-          ? game.rollWallTrapDamage()
-          : game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-        const scaledTrapDamage = rawDamage * game.getEnemyDamageScale();
-        damagePlayer(player, scaledTrapDamage, "arrow");
-        b.life = 0;
-        hitPlayer = true;
-        break;
-      }
-      if (hitPlayer) continue;
-      for (const enemy of activeEnemies) {
-        if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
-        if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
-          if (skeletonIgnoresArrow(enemy)) continue;
-          const rawDamage = typeof game.rollWallTrapDamage === "function"
-            ? game.rollWallTrapDamage()
-            : game.rollEnemyContactDamage({ damageMin: b.damageMin, damageMax: b.damageMax });
-          game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), "arrow", b.ownerId || null);
-          b.life = 0;
-          break;
-        }
-      }
+    if (resolveSpecialProjectileCollision({
+      game,
+      projectile: b,
+      activeEnemies,
+      activeBreakables,
+      getLivingPlayers,
+      playerEnemyRadius,
+      damagePlayer,
+      skeletonIgnoresArrow
+    })) {
       continue;
     }
     if (!b.hitTargets) b.hitTargets = new Set();
@@ -304,6 +226,31 @@ export function resolveCombatAndDrops({
         } else {
           zone.touches.delete(enemy);
         }
+      }
+      continue;
+    }
+    if (zone.zoneType === "sonyaFire") {
+      const tickInterval = Math.max(0.12, zone.tickInterval || 0.35);
+      zone.tickTimer = Math.max(-2, (Number.isFinite(zone.tickTimer) ? zone.tickTimer : tickInterval) - dt);
+      for (const br of activeBreakables) {
+        if (vecLength(zone.x - br.x, zone.y - br.y) < zone.radius + br.size * 0.32) br.hp = 0;
+      }
+      while (zone.life > 0 && zone.tickTimer <= 0) {
+        const pulseDamage = (zone.dps || game.config.enemy.sonyaFirePatchDps || 14) * tickInterval * game.getEnemyDamageScale();
+        for (const player of getLivingPlayers()) {
+          const playerRadius = typeof game.getPlayerEnemyCollisionRadiusFor === "function" ? game.getPlayerEnemyCollisionRadiusFor(player) : playerEnemyRadius;
+          if (vecLength(zone.x - player.x, zone.y - player.y) >= zone.radius + playerRadius * 0.8) continue;
+          damagePlayer(player, pulseDamage, "fire");
+          if (player.health <= 0 && zone.ownerId === "sonya") game.gameOverTitle = "Haley Wins";
+        }
+        for (const enemy of activeEnemies) {
+          if (!(game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy))) continue;
+          if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
+          if (vecLength(zone.x - enemy.x, zone.y - enemy.y) < zone.radius + enemy.size * 0.35) {
+            game.applyEnemyDamage(enemy, pulseDamage, "fire", zone.ownerId || null);
+          }
+        }
+        zone.tickTimer += tickInterval;
       }
       continue;
     }
@@ -444,7 +391,7 @@ export function resolveCombatAndDrops({
       else if (enemy.type === "prisoner") rewardScore = 22;
       else if (enemy.type === "rat_archer") rewardScore = 16;
       else if (enemy.type === "skeleton_warrior") rewardScore = 10;
-      else if (enemy.type === "necromancer") rewardScore = 250;
+      else if (enemy.type === "necromancer" || enemy.type === "sonya") rewardScore = 250;
       else if (enemy.type === "leprechaun") rewardScore = 500;
       else if (enemy.type === "minotaur") rewardScore = 320;
       else if (enemy.type === "skeleton") rewardScore = 12;
@@ -456,7 +403,7 @@ export function resolveCombatAndDrops({
       else if (enemy.type === "mimic") game.dropTreasureBag(enemy.x, enemy.y, 24);
       else if (enemy.type === "mummy") game.maybeSpawnDrop(enemy.x, enemy.y);
       else if (enemy.type === "prisoner" || enemy.type === "rat_archer" || enemy.type === "skeleton_warrior" || enemy.type === "skeleton") game.maybeSpawnDrop(enemy.x, enemy.y);
-      else if (enemy.type === "necromancer" || enemy.type === "leprechaun") {
+      else if (enemy.type === "necromancer" || enemy.type === "sonya" || enemy.type === "leprechaun") {
         if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
         removeBossSummons = true;
         if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);

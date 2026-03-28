@@ -40,10 +40,27 @@ import {
 import { createLocalGame, startIdleSoundMonitor } from "./src/bootstrap/gameStartupRuntime.js";
 import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./src/bootstrap/networkRenderRuntime.js";
 import {
+  getNetworkDeathRulesHint,
+  getStoredNetworkDeathRulesMode,
+  normalizeNetworkDeathRulesMode,
+  persistNetworkDeathRulesMode
+} from "./src/net/networkDeathRules.js";
+import {
+  FLOOR_BOSS_OVERRIDE_AUTO,
+  FLOOR_BOSS_OVERRIDE_OPTIONS,
+  getStoredFloorBossOverride,
+  normalizeFloorBossOverride,
+  persistFloorBossOverride
+} from "./src/game/floorBossDebugOverride.js";
+import {
+  buildGroupRunSummary,
   buildLocalRunSummary,
   fetchGlobalLeaderboard,
   getDefaultLeaderboardApiUrl,
+  LEADERBOARD_BOARD_GROUP,
+  LEADERBOARD_BOARD_SOLO,
   loadStoredPlayerHandle,
+  normalizeLeaderboardBoardType,
   persistPlayerHandle,
   sanitizePlayerHandle,
   submitLocalRunToLeaderboard
@@ -60,6 +77,14 @@ const networkLobbyScreen = document.getElementById("network-lobby-screen");
 const characterSelectModeLabel = document.getElementById("character-select-mode-label");
 const menuSingleButton = document.getElementById("menu-single");
 const menuNetworkButton = document.getElementById("menu-network");
+const menuOptionsButton = document.getElementById("menu-options");
+const optionsScreen = document.getElementById("options-screen");
+const optionsBackButton = document.getElementById("options-back");
+const menuVolumeInput = document.getElementById("menu-volume");
+const menuVolumeValue = document.getElementById("menu-volume-value");
+const devBossOptionsPanel = document.getElementById("dev-boss-options");
+const devBossOverrideSelect = document.getElementById("dev-boss-override");
+const devBossOverrideHint = document.getElementById("dev-boss-override-hint");
 const networkSetupBackButton = document.getElementById("network-setup-back");
 const networkSetupNextButton = document.getElementById("network-setup-next");
 const characterSelectBackButton = document.getElementById("character-select-back");
@@ -82,6 +107,8 @@ const networkLobbyToggleReady = document.getElementById("network-lobby-toggle-re
 const networkLobbyLeaveTop = document.getElementById("network-lobby-leave-top");
 const networkLobbyDevStartOptions = document.getElementById("network-lobby-dev-start-options");
 const networkLobbyDevStartFloorInput = document.getElementById("network-lobby-dev-start-floor");
+const networkLobbyGameRulesPanel = document.getElementById("network-lobby-game-rules");
+const networkLobbyDeathRulesInputs = Array.from(document.querySelectorAll('input[name="network-lobby-death-rules"]'));
 const networkLobbyClassButtons = Array.from(document.querySelectorAll("[data-lobby-class-option]"));
 const leaderboardModal = document.getElementById("leaderboard-modal");
 const leaderboardTitle = document.getElementById("leaderboard-title");
@@ -89,6 +116,8 @@ const leaderboardSubtitle = document.getElementById("leaderboard-subtitle");
 const leaderboardStatus = document.getElementById("leaderboard-status");
 const leaderboardClose = document.getElementById("leaderboard-close");
 const leaderboardContinue = document.getElementById("leaderboard-continue");
+const leaderboardBoardSolo = document.getElementById("leaderboard-board-solo");
+const leaderboardBoardGroup = document.getElementById("leaderboard-board-group");
 const leaderboardTabGlobal = document.getElementById("leaderboard-tab-global");
 const leaderboardTabSession = document.getElementById("leaderboard-tab-session");
 const leaderboardGlobalBody = document.getElementById("leaderboard-global-body");
@@ -106,6 +135,8 @@ let netRoomOwnerId = null, netPauseOwnerId = null, netRoomPhase = "active", netR
 let netJoinedRoomId = "";
 let netLobbyCountdownEndsAt = 0, netLobbyInlineText = "";
 let netRequestedStartFloor = 1;
+let netRequestedBossOverride = FLOOR_BOSS_OVERRIDE_AUTO;
+let netRequestedDeathRulesMode = getStoredNetworkDeathRulesMode();
 let netPendingWsUrl = "", netPendingRoomId = "", netPendingHandle = "";
 let netInputSeq = 0, netLastAckSeq = 0;
 let netPendingInputs = [], netMapSignature = "", netPendingSnapshot = null;
@@ -138,16 +169,62 @@ const menuState = {
   screen: "mode"
 };
 const leaderboardState = {
+  activeBoard: LEADERBOARD_BOARD_SOLO,
   activeTab: "global",
-  globalRows: [],
-  sessionRows: [],
+  globalRows: {
+    [LEADERBOARD_BOARD_SOLO]: [],
+    [LEADERBOARD_BOARD_GROUP]: []
+  },
+  sessionRows: {
+    [LEADERBOARD_BOARD_SOLO]: [],
+    [LEADERBOARD_BOARD_GROUP]: []
+  },
   loading: false,
   errorText: "",
   mode: "menu",
   open: false
 };
 let currentPlayerHandle = loadStoredPlayerHandle();
+let selectedBossOverride = getStoredFloorBossOverride();
+let selectedNetworkDeathRulesMode = getStoredNetworkDeathRulesMode();
 const runtimeConfig = window.__WOTC_CONFIG__ && typeof window.__WOTC_CONFIG__ === "object" ? window.__WOTC_CONFIG__ : {};
+const MIN_DEV_START_FLOOR = 1;
+const MAX_DEV_START_FLOOR = 15;
+
+function normalizeDevStartingFloor(value) {
+  return Math.max(MIN_DEV_START_FLOOR, Math.min(MAX_DEV_START_FLOOR, Number.parseInt(value || "1", 10) || 1));
+}
+
+function syncMenuVolumeControl() {
+  if (!menuVolumeInput) return;
+  const percent = Math.round(music.masterVolume * 100);
+  menuVolumeInput.value = String(percent);
+  if (menuVolumeValue) menuVolumeValue.textContent = `${percent}%`;
+}
+
+function getBossOverrideHint(override) {
+  const normalized = normalizeFloorBossOverride(override);
+  return FLOOR_BOSS_OVERRIDE_OPTIONS.find((option) => option.value === normalized)?.hint
+    || FLOOR_BOSS_OVERRIDE_OPTIONS[0].hint;
+}
+
+function syncDevBossOverrideControl() {
+  if (devBossOptionsPanel) devBossOptionsPanel.hidden = !isDevMode;
+  if (!devBossOverrideSelect) return;
+  const normalized = normalizeFloorBossOverride(selectedBossOverride);
+  devBossOverrideSelect.value = normalized;
+  if (devBossOverrideHint) devBossOverrideHint.textContent = getBossOverrideHint(normalized);
+}
+
+function syncNetworkDeathRulesControl({ owner = false, roomMode = selectedNetworkDeathRulesMode } = {}) {
+  if (!networkLobbyGameRulesPanel || networkLobbyDeathRulesInputs.length === 0) return;
+  const normalized = normalizeNetworkDeathRulesMode(roomMode);
+  for (const input of networkLobbyDeathRulesInputs) {
+    if (!input) continue;
+    input.disabled = !owner;
+    input.checked = input.value === normalized;
+  }
+}
 
 function getConfiguredWsUrl() {
   return typeof runtimeConfig.defaultWsUrl === "string" ? runtimeConfig.defaultWsUrl.trim() : "";
@@ -177,6 +254,8 @@ if (serverUrlInput) {
 }
 
 if (devStartOptions) devStartOptions.hidden = !isDevMode;
+syncMenuVolumeControl();
+syncDevBossOverrideControl();
 
 function setCanvasVisible(visible) {
   if (!canvas) return;
@@ -197,6 +276,7 @@ function syncCharacterSelectCopy() {
 
 function renderMenuScreen() {
   if (modeSelectScreen) modeSelectScreen.hidden = menuState.screen !== "mode";
+  if (optionsScreen) optionsScreen.hidden = menuState.screen !== "options";
   if (networkSetupScreen) networkSetupScreen.hidden = menuState.screen !== "network";
   if (selector) selector.hidden = menuState.screen !== "character";
   if (networkLobbyScreen) networkLobbyScreen.hidden = menuState.screen !== "lobby";
@@ -215,6 +295,14 @@ function showModeSelect() {
 function showNetworkSetup() {
   menuState.mode = MENU_MODE_NETWORK;
   menuState.screen = "network";
+  if (menuPanel) menuPanel.hidden = false;
+  if (networkSession) networkSession.hidden = true;
+  setCanvasVisible(false);
+  renderMenuScreen();
+}
+
+function showOptionsScreen() {
+  menuState.screen = "options";
   if (menuPanel) menuPanel.hidden = false;
   if (networkSession) networkSession.hidden = true;
   setCanvasVisible(false);
@@ -243,6 +331,16 @@ function getLeaderboardApiUrl() {
   const configuredApiUrl = getConfiguredLeaderboardApiUrl();
   if (configuredApiUrl) return configuredApiUrl;
   return getDefaultLeaderboardApiUrl(window.location);
+}
+
+function getLeaderboardRows(bucket, boardType = leaderboardState.activeBoard) {
+  const normalizedBoardType = normalizeLeaderboardBoardType(boardType);
+  return Array.isArray(bucket?.[normalizedBoardType]) ? bucket[normalizedBoardType] : [];
+}
+
+function setLeaderboardRows(bucket, rows, boardType = leaderboardState.activeBoard) {
+  const normalizedBoardType = normalizeLeaderboardBoardType(boardType);
+  bucket[normalizedBoardType] = sortLeaderboardRows(rows);
 }
 
 function getActiveHandleInput() {
@@ -321,6 +419,13 @@ function renderNetworkLobby() {
       }
     }
   }
+  if (networkLobbyGameRulesPanel) {
+    const isOwner = !!(netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId);
+    syncNetworkDeathRulesControl({
+      owner: isOwner,
+      roomMode: netRequestedDeathRulesMode
+    });
+  }
   if (networkLobbyRoster) {
     const rows = Array.isArray(netRosterPlayers) ? netRosterPlayers : [];
     networkLobbyRoster.innerHTML = "";
@@ -363,11 +468,14 @@ function renderLeaderboardModal() {
     status: leaderboardStatus,
     closeButton: leaderboardClose,
     continueButton: leaderboardContinue,
+    activeBoard: leaderboardState.activeBoard,
+    soloButton: leaderboardBoardSolo,
+    groupButton: leaderboardBoardGroup,
     activeTab: leaderboardState.activeTab,
     globalButton: leaderboardTabGlobal,
     sessionButton: leaderboardTabSession,
-    globalRows: leaderboardState.globalRows,
-    sessionRows: leaderboardState.sessionRows,
+    globalRows: getLeaderboardRows(leaderboardState.globalRows),
+    sessionRows: getLeaderboardRows(leaderboardState.sessionRows),
     globalTableBody: leaderboardGlobalBody,
     sessionTableBody: leaderboardSessionBody,
     errorText: leaderboardState.errorText,
@@ -393,21 +501,23 @@ function closeLeaderboardModal() {
   syncDeathLeaderboardCanvasVisibility();
 }
 
-function openLeaderboardModal(mode = "menu") {
+function openLeaderboardModal(mode = "menu", boardType = leaderboardState.activeBoard) {
   leaderboardState.mode = mode;
+  leaderboardState.activeBoard = normalizeLeaderboardBoardType(boardType);
   leaderboardState.activeTab = "global";
   leaderboardState.open = true;
   renderLeaderboardModal();
   syncDeathLeaderboardCanvasVisibility();
 }
 
-async function refreshGlobalLeaderboard() {
+async function refreshGlobalLeaderboard(boardType = leaderboardState.activeBoard) {
+  const normalizedBoardType = normalizeLeaderboardBoardType(boardType);
   leaderboardState.loading = true;
   leaderboardState.errorText = "";
   renderLeaderboardModal();
   try {
-    const response = await fetchGlobalLeaderboard(getLeaderboardApiUrl());
-    leaderboardState.globalRows = sortLeaderboardRows(response.rows);
+    const response = await fetchGlobalLeaderboard(getLeaderboardApiUrl(), normalizedBoardType);
+    setLeaderboardRows(leaderboardState.globalRows, response.rows, normalizedBoardType);
   } catch (error) {
     leaderboardState.errorText = error instanceof Error ? error.message : String(error);
   } finally {
@@ -419,14 +529,14 @@ async function refreshGlobalLeaderboard() {
 async function submitCompletedLocalRun(game) {
   const handle = ensurePlayerHandle();
   const run = buildLocalRunSummary(game, handle || "Player");
-  leaderboardState.sessionRows = sortLeaderboardRows([...leaderboardState.sessionRows, run]);
-  openLeaderboardModal("death");
+  setLeaderboardRows(leaderboardState.sessionRows, [...getLeaderboardRows(leaderboardState.sessionRows, LEADERBOARD_BOARD_SOLO), run], LEADERBOARD_BOARD_SOLO);
+  openLeaderboardModal("death", LEADERBOARD_BOARD_SOLO);
   leaderboardState.loading = true;
   leaderboardState.errorText = "";
   renderLeaderboardModal();
   try {
     const response = await submitLocalRunToLeaderboard(getLeaderboardApiUrl(), run);
-    leaderboardState.globalRows = sortLeaderboardRows(response.rows);
+    setLeaderboardRows(leaderboardState.globalRows, response.rows, LEADERBOARD_BOARD_SOLO);
   } catch (error) {
     leaderboardState.errorText = error instanceof Error ? error.message : String(error);
   } finally {
@@ -436,18 +546,20 @@ async function submitCompletedLocalRun(game) {
 }
 
 async function showNetworkGameOverLeaderboard(game, { includeSessionRun = false } = {}) {
-  if (includeSessionRun && game) {
-    const handle = sanitizePlayerHandle(game.playerHandle || currentPlayerHandle || "Player", "Player");
-    const run = buildLocalRunSummary(game, handle);
-    leaderboardState.sessionRows = sortLeaderboardRows([...leaderboardState.sessionRows, run]);
+  const run = game ? buildGroupRunSummary(game) : null;
+  if (includeSessionRun && run) {
+    setLeaderboardRows(leaderboardState.sessionRows, [...getLeaderboardRows(leaderboardState.sessionRows, LEADERBOARD_BOARD_GROUP), run], LEADERBOARD_BOARD_GROUP);
   }
-  openLeaderboardModal("death");
+  openLeaderboardModal("death", LEADERBOARD_BOARD_GROUP);
   leaderboardState.loading = true;
   leaderboardState.errorText = "";
   renderLeaderboardModal();
   try {
-    const response = await fetchGlobalLeaderboard(getLeaderboardApiUrl());
-    leaderboardState.globalRows = sortLeaderboardRows(response.rows);
+    const isOwner = !!(game?.networkRoomOwnerId && game?.networkLocalPlayerId && game.networkRoomOwnerId === game.networkLocalPlayerId);
+    const response = isOwner && run
+      ? await submitLocalRunToLeaderboard(getLeaderboardApiUrl(), run)
+      : await fetchGlobalLeaderboard(getLeaderboardApiUrl(), LEADERBOARD_BOARD_GROUP);
+    setLeaderboardRows(leaderboardState.globalRows, response.rows, LEADERBOARD_BOARD_GROUP);
   } catch (error) {
     leaderboardState.errorText = error instanceof Error ? error.message : String(error);
   } finally {
@@ -1070,7 +1182,7 @@ function startLocalGame() {
   setCanvasVisible(true);
   currentGame = cleanupCurrentGameRuntime(currentGame);
   const requestedStartFloor = isDevMode && devStartFloorInput
-    ? Math.max(1, Number.parseInt(devStartFloorInput.value || "1", 10) || 1)
+    ? normalizeDevStartingFloor(devStartFloorInput.value)
     : 1;
   currentGame = createLocalGame({
     Game,
@@ -1080,6 +1192,7 @@ function startLocalGame() {
     returnToMenu,
     syncMusicForGame,
     startingFloor: requestedStartFloor,
+    bossOverride: selectedBossOverride,
     onGameOverChanged: (gameOver, nextGame) => {
       if (gameOver) submitCompletedLocalRun(nextGame);
     }
@@ -1101,10 +1214,15 @@ function startNetworkGameplay() {
     onReturnToMenu: returnToMenu,
     onPauseChanged: (_paused, nextGame) => syncMusicForGame(nextGame),
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),
-    onGameOverChanged: (_gameOver, nextGame) => {
+    onGameOverChanged: (gameOver, nextGame) => {
       syncMusicForGame(nextGame);
+      if (gameOver) showNetworkGameOverLeaderboardOnce(nextGame, { includeSessionRun: true });
     }
   });
+  if (typeof game.applyDebugBossOverride === "function") {
+    game.applyDebugBossOverride(netRequestedBossOverride);
+  }
+  game.networkDeathRulesMode = normalizeNetworkDeathRulesMode(netRequestedDeathRulesMode);
   game.playerHandle = name;
   game.networkEnabled = true;
   game.networkLocalPlayerId = netPlayerId;
@@ -1236,9 +1354,22 @@ function startNetworkGame() {
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || null;
     netRequestedStartFloor = Number.isFinite(msg.requestedStartFloor) ? Math.max(1, Math.floor(msg.requestedStartFloor)) : netRequestedStartFloor;
+    netRequestedStartFloor = normalizeDevStartingFloor(netRequestedStartFloor);
+    netRequestedBossOverride = normalizeFloorBossOverride(msg.requestedBossOverride);
+    netRequestedDeathRulesMode = normalizeNetworkDeathRulesMode(msg.requestedDeathRulesMode);
     netLobbyCountdownEndsAt = Number.isFinite(msg.lobbyCountdownEndsAt) ? msg.lobbyCountdownEndsAt : 0;
     netLobbyInlineText = typeof msg.lobbyInlineMessage === "string" ? msg.lobbyInlineMessage : "";
     netRosterPlayers = Array.isArray(msg.players) ? msg.players.slice() : [];
+    if (isDevMode && netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId) {
+      const desiredBossOverride = normalizeFloorBossOverride(selectedBossOverride);
+      if (netClient && desiredBossOverride !== netRequestedBossOverride) {
+        netClient.sendLobbyUpdate({ bossOverride: desiredBossOverride });
+      }
+      const desiredDeathRulesMode = normalizeNetworkDeathRulesMode(selectedNetworkDeathRulesMode);
+      if (netClient && desiredDeathRulesMode !== netRequestedDeathRulesMode) {
+        netClient.sendLobbyUpdate({ deathRulesMode: desiredDeathRulesMode });
+      }
+    }
     renderNetworkLobby();
     const game = currentGame;
     if (netRoomPhase === "lobby" && game?.networkEnabled) {
@@ -1251,6 +1382,7 @@ function startNetworkGame() {
       activeGame.networkPauseOwnerId = netPauseOwnerId;
       activeGame.networkLocalPlayerId = netPlayerId;
       activeGame.networkRosterPlayers = netRosterPlayers;
+      activeGame.networkDeathRulesMode = normalizeNetworkDeathRulesMode(netRequestedDeathRulesMode);
       if (netRoomPhase === "active" && typeof activeGame.pushMultiplayerNotification === "function") {
         const nextIds = new Set(netRosterPlayers.filter((player) => player?.id).map((player) => player.id));
         for (const player of previousRoster) {
@@ -1608,6 +1740,34 @@ if (menuNetworkButton) {
   });
 }
 
+if (menuOptionsButton) {
+  menuOptionsButton.addEventListener("click", () => {
+    showOptionsScreen();
+  });
+}
+
+if (menuVolumeInput) {
+  menuVolumeInput.addEventListener("input", () => {
+    const nextVolume = Number(menuVolumeInput.value) / 100;
+    music.setMasterVolume(nextVolume);
+    syncMenuVolumeControl();
+  });
+}
+
+if (devBossOverrideSelect) {
+  devBossOverrideSelect.addEventListener("change", () => {
+    selectedBossOverride = normalizeFloorBossOverride(devBossOverrideSelect.value);
+    persistFloorBossOverride(selectedBossOverride);
+    syncDevBossOverrideControl();
+  });
+}
+
+if (optionsBackButton) {
+  optionsBackButton.addEventListener("click", () => {
+    showModeSelect();
+  });
+}
+
 if (networkSetupBackButton) {
   networkSetupBackButton.addEventListener("click", () => {
     showModeSelect();
@@ -1647,11 +1807,17 @@ for (const handleInput of [playerNameInput, networkPlayerNameInput]) {
   });
 }
 
+if (devStartFloorInput) {
+  devStartFloorInput.addEventListener("change", () => {
+    devStartFloorInput.value = `${normalizeDevStartingFloor(devStartFloorInput.value)}`;
+  });
+}
+
 if (openLeaderboardButton) {
   openLeaderboardButton.addEventListener("click", async () => {
     syncStoredHandleFromInput();
-    openLeaderboardModal("menu");
-    await refreshGlobalLeaderboard();
+    openLeaderboardModal("menu", LEADERBOARD_BOARD_SOLO);
+    await refreshGlobalLeaderboard(LEADERBOARD_BOARD_SOLO);
   });
 }
 
@@ -1669,10 +1835,25 @@ if (leaderboardContinue) {
     returnToMenu();
   });
 }
+if (leaderboardBoardSolo) {
+  leaderboardBoardSolo.addEventListener("click", async () => {
+    leaderboardState.activeBoard = LEADERBOARD_BOARD_SOLO;
+    renderLeaderboardModal();
+    if (leaderboardState.activeTab === "global") await refreshGlobalLeaderboard(LEADERBOARD_BOARD_SOLO);
+  });
+}
+if (leaderboardBoardGroup) {
+  leaderboardBoardGroup.addEventListener("click", async () => {
+    leaderboardState.activeBoard = LEADERBOARD_BOARD_GROUP;
+    renderLeaderboardModal();
+    if (leaderboardState.activeTab === "global") await refreshGlobalLeaderboard(LEADERBOARD_BOARD_GROUP);
+  });
+}
 if (leaderboardTabGlobal) {
-  leaderboardTabGlobal.addEventListener("click", () => {
+  leaderboardTabGlobal.addEventListener("click", async () => {
     leaderboardState.activeTab = "global";
     renderLeaderboardModal();
+    await refreshGlobalLeaderboard();
   });
 }
 if (leaderboardTabSession) {
@@ -1720,8 +1901,24 @@ if (networkLobbyToggleReady) {
 if (networkLobbyDevStartFloorInput) {
   networkLobbyDevStartFloorInput.addEventListener("change", () => {
     if (!netClient) return;
-    const nextFloor = Math.max(1, Number.parseInt(networkLobbyDevStartFloorInput.value || "1", 10) || 1);
+    const nextFloor = normalizeDevStartingFloor(networkLobbyDevStartFloorInput.value);
+    networkLobbyDevStartFloorInput.value = `${nextFloor}`;
     netClient.sendLobbyUpdate({ startingFloor: nextFloor });
+  });
+}
+
+for (const input of networkLobbyDeathRulesInputs) {
+  input.addEventListener("change", () => {
+    selectedNetworkDeathRulesMode = normalizeNetworkDeathRulesMode(input.value);
+    netRequestedDeathRulesMode = selectedNetworkDeathRulesMode;
+    persistNetworkDeathRulesMode(selectedNetworkDeathRulesMode);
+    syncNetworkDeathRulesControl({
+      owner: !!(netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId),
+      roomMode: selectedNetworkDeathRulesMode
+    });
+    if (netClient && netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId) {
+      netClient.sendLobbyUpdate({ deathRulesMode: selectedNetworkDeathRulesMode });
+    }
   });
 }
 

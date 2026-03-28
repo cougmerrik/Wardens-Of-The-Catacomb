@@ -1,4 +1,17 @@
+import { getStoredMasterVolume, normalizeMasterVolume } from "../audio/audioSettings.js";
+import { FLOOR_BOSS_OVERRIDE_AUTO, getForcedFloorBossVariant, normalizeFloorBossOverride } from "./floorBossDebugOverride.js";
+
 export const runtimeFloorBossMethods = {
+  applyDebugBossOverride(override = FLOOR_BOSS_OVERRIDE_AUTO) {
+    this.debugBossOverride = normalizeFloorBossOverride(override);
+    this._floorBossVariantByFloor = {};
+    if (this.floorBoss) {
+      this.floorBoss = this.createFloorBossState(this.floor);
+      this.lastFloorBossFeedbackPhase = null;
+    }
+    return this.debugBossOverride;
+  },
+
   getResolvedFloorBossVariant(floor = this.floor) {
     const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
     if (!this._floorBossVariantByFloor || typeof this._floorBossVariantByFloor !== "object") {
@@ -22,10 +35,18 @@ export const runtimeFloorBossMethods = {
     return date >= start && date <= end;
   },
 
+  isHaleyBirthday(date = new Date()) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+    return date.getMonth() === 2 && date.getDate() === 24;
+  },
+
   rollFloorBossVariant(floor = this.floor) {
     const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
+    const forcedVariant = getForcedFloorBossVariant(safeFloor, this.debugBossOverride);
+    if (forcedVariant) return forcedVariant;
     const bossType = this.getFloorBossType(safeFloor);
     if (bossType === "minotaur") return "minotaur";
+    if (safeFloor === 1 && this.isHaleyBirthday()) return "sonya";
     if (safeFloor === 1 && this.isStPatricksWeek()) {
       const chance = Number.isFinite(this.config?.progression?.floorOneLeprechaunBossChance)
         ? Math.max(0, Math.min(1, this.config.progression.floorOneLeprechaunBossChance))
@@ -40,6 +61,7 @@ export const runtimeFloorBossMethods = {
   },
 
   getFloorBossDisplayName(variant = this.floorBoss?.variant || this.getFloorBossVariant()) {
+    if (variant === "sonya") return "Sonya";
     if (variant === "leprechaun") return "Leprechaun";
     if (variant === "minotaur") return "Minotaur";
     return "Necromancer";
@@ -224,14 +246,19 @@ export const runtimeFloorBossMethods = {
   getFloorObjectiveText() {
     const boss = this.syncFloorBossState();
     const name = boss.bossName || this.getFloorBossDisplayName(boss.variant);
+    const objectiveName = boss.variant === "sonya" ? name : `the ${name.toLowerCase()}`;
     if (this.portal?.active || boss.phase === "portal") return "Objective: Enter the portal";
-    if (boss.phase === "active" || boss.phase === "defeated") return `Objective: Defeat the ${name.toLowerCase()}`;
+    if (boss.phase === "active" || boss.phase === "defeated") return `Objective: Defeat ${objectiveName}`;
     const targetLevel = Number.isFinite(boss.triggerLevel) ? boss.triggerLevel : this.getFloorBossTriggerLevel();
     const levelsRemaining = Math.max(0, targetLevel - (Number.isFinite(this.level) ? this.level : 1));
-    if (boss.phase === "queued") return `Objective: Survive the ${name.toLowerCase()} encounter`;
+    if (boss.phase === "queued") return boss.variant === "sonya" ? "Objective: Survive Sonya's encounter" : `Objective: Survive the ${name.toLowerCase()} encounter`;
     return levelsRemaining > 0
-      ? `Objective: Reach Lv ${targetLevel} to summon the ${name.toLowerCase()}`
-      : `Objective: Prepare for the ${name.toLowerCase()}`;
+      ? boss.variant === "sonya"
+        ? `Objective: Reach Lv ${targetLevel} to summon Sonya`
+        : `Objective: Reach Lv ${targetLevel} to summon the ${name.toLowerCase()}`
+      : boss.variant === "sonya"
+        ? "Objective: Prepare for Sonya"
+        : `Objective: Prepare for the ${name.toLowerCase()}`;
   },
 
   getFloorObjectiveDetail() {
@@ -240,6 +267,24 @@ export const runtimeFloorBossMethods = {
     if (this.portal?.active || boss.phase === "portal") return "Portal open. Step into it to descend.";
     if (boss.phase === "active") {
       const activeBoss = this.getActiveFloorBossEnemy();
+      if (boss.variant === "sonya") {
+        if (boss.encounterPhase === "intro") return "Sonya appears in a burst of flame and sings for Haley.";
+        if (boss.encounterPhase === "chorus") return "She is weaving a wider fireball fan. Keep moving.";
+        if (boss.encounterPhase === "candlestorm") return "Fire patches linger now. Don't stand in the flames.";
+        if (activeBoss) {
+          const dx = activeBoss.x - this.player.x;
+          const dy = activeBoss.y - this.player.y;
+          const distTiles = Math.max(0, Math.round(Math.hypot(dx, dy) / this.config.map.tile));
+          const horizontal = Math.abs(dx) >= this.config.map.tile * 0.75 ? (dx > 0 ? "E" : "W") : "";
+          const vertical = Math.abs(dy) >= this.config.map.tile * 0.75 ? (dy > 0 ? "S" : "N") : "";
+          const dir = `${vertical}${horizontal}` || "HERE";
+          const hint = boss.encounterPhase === "candlestorm"
+            ? "Avoid fire patches and blink follow-ups."
+            : "Watch the fireball windup and stay at an angle.";
+          return `Sonya ${distTiles} tiles ${dir}. ${hint}`;
+        }
+        return "Birthday boss active. Dodge fireballs and avoid burning ground.";
+      }
       if (boss.variant === "leprechaun") {
         const timer = this.getRemainingFloorBossTimer();
         if (boss.encounterPhase === "intro") return "He rushes in first, just to bait the chase.";
@@ -266,6 +311,7 @@ export const runtimeFloorBossMethods = {
         : "Mini-boss active. Avoid volleys and skeleton summons.";
     }
     if (boss.phase === "queued") {
+      if (boss.variant === "sonya") return "A birthday melody echoes through the catacombs.";
       return boss.variant === "leprechaun"
         ? "You hear jingling gold in the distance."
         : `The ritual is complete. The ${bossName.toLowerCase()} is arriving.`;
@@ -281,6 +327,13 @@ export const runtimeFloorBossMethods = {
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (typeof AudioCtor !== "function") return null;
     this.feedbackAudioContext = new AudioCtor();
+    this.feedbackAudioMasterGain = typeof this.feedbackAudioContext.createGain === "function"
+      ? this.feedbackAudioContext.createGain()
+      : null;
+    if (this.feedbackAudioMasterGain) {
+      this.feedbackAudioMasterGain.gain.value = normalizeMasterVolume(window.__WOTC_MASTER_VOLUME__, getStoredMasterVolume());
+      this.feedbackAudioMasterGain.connect(this.feedbackAudioContext.destination);
+    }
     return this.feedbackAudioContext;
   },
 
@@ -291,6 +344,9 @@ export const runtimeFloorBossMethods = {
     if (audio.state === "suspended" && typeof audio.resume === "function") {
       audio.resume().catch(() => {});
     }
+    if (this.feedbackAudioMasterGain) {
+      this.feedbackAudioMasterGain.gain.value = normalizeMasterVolume(window.__WOTC_MASTER_VOLUME__, getStoredMasterVolume());
+    }
     const startAt = audio.currentTime + 0.01;
     for (const tone of sequence) {
       const oscillator = audio.createOscillator();
@@ -299,7 +355,7 @@ export const runtimeFloorBossMethods = {
       oscillator.frequency.value = Number.isFinite(tone.frequency) ? tone.frequency : 440;
       gain.gain.value = 0.0001;
       oscillator.connect(gain);
-      gain.connect(audio.destination);
+      gain.connect(this.feedbackAudioMasterGain || audio.destination);
       const toneStart = startAt + Math.max(0, tone.at || 0);
       const duration = Math.max(0.04, Number.isFinite(tone.duration) ? tone.duration : 0.12);
       const toneEnd = toneStart + duration;
@@ -328,6 +384,17 @@ export const runtimeFloorBossMethods = {
       ]);
     }
     return false;
+  },
+
+  playHappyBirthdayCue() {
+    return this.playToneSequence([
+      { at: 0.00, frequency: 392.0, duration: 0.22, gain: 0.04, type: "triangle" },
+      { at: 0.24, frequency: 392.0, duration: 0.18, gain: 0.04, type: "triangle" },
+      { at: 0.46, frequency: 440.0, duration: 0.36, gain: 0.04, type: "triangle" },
+      { at: 0.86, frequency: 392.0, duration: 0.34, gain: 0.04, type: "triangle" },
+      { at: 1.24, frequency: 523.25, duration: 0.34, gain: 0.042, type: "triangle" },
+      { at: 1.62, frequency: 493.88, duration: 0.54, gain: 0.042, type: "triangle" }
+    ]);
   },
 
   syncFloorBossFeedback() {

@@ -1,3 +1,5 @@
+import { normalizeBoardType, sanitizeHandle } from "../leaderboardStore.js";
+
 export function handleActionMessage(room, clientId, action) {
   if (!action || typeof action !== "object" || typeof action.kind !== "string") return;
   const kind = action.kind;
@@ -117,10 +119,11 @@ export function handleClientMessage(raw, context) {
   }
 
   if (msg.type === "leaderboard.get") {
+    const boardType = normalizeBoardType(msg.boardType);
     safeSend(ws, {
       type: "leaderboard.rows",
       requestId: typeof msg.requestId === "string" ? msg.requestId : "",
-      rows: leaderboardStore ? leaderboardStore.getRows() : []
+      rows: leaderboardStore ? leaderboardStore.getRows(boardType) : []
     });
     return;
   }
@@ -135,7 +138,7 @@ export function handleClientMessage(raw, context) {
       });
       return;
     }
-    const rows = leaderboardStore ? leaderboardStore.submitRun(run) : [];
+    const rows = leaderboardStore ? leaderboardStore.submitRun({ ...run, boardType: msg.boardType || run.boardType }) : [];
     safeSend(ws, {
       type: "leaderboard.rows",
       requestId: typeof msg.requestId === "string" ? msg.requestId : "",
@@ -166,7 +169,7 @@ export function handleClientMessage(raw, context) {
     }
 
     client.roomId = room.id;
-    client.name = typeof msg.name === "string" && msg.name.trim() ? msg.name.trim().slice(0, 20) : `Player-${client.id.slice(-4)}`;
+    client.name = typeof msg.name === "string" ? sanitizeHandle(msg.name) : `Player-${client.id.slice(-4)}`;
     client.classType = classType;
     client.protocolVersion =
       Number.isFinite(msg.protocolVersion) && msg.protocolVersion >= 1 ? Math.floor(msg.protocolVersion) : client.protocolVersion;
@@ -224,11 +227,25 @@ export function handleClientMessage(raw, context) {
       classType: typeof msg.classType === "string" ? normClassType(msg.classType) : undefined,
       locked: typeof msg.locked === "boolean" ? msg.locked : undefined
     });
-    const floorChanged = room.updateRequestedStartFloor(
-      client.id,
-      Number.isFinite(msg.startingFloor) ? msg.startingFloor : NaN
-    );
-    if (changed || floorChanged) room.broadcastRoster();
+    const floorChanged = Object.prototype.hasOwnProperty.call(msg, "startingFloor")
+      ? room.updateRequestedStartFloor(
+        client.id,
+        Number.isFinite(msg.startingFloor) ? Math.max(1, Math.min(15, Math.floor(msg.startingFloor))) : NaN
+      )
+      : false;
+    const bossChanged = Object.prototype.hasOwnProperty.call(msg, "bossOverride")
+      ? room.updateRequestedBossOverride(
+        client.id,
+        typeof msg.bossOverride === "string" ? msg.bossOverride : undefined
+      )
+      : false;
+    const deathRulesChanged = Object.prototype.hasOwnProperty.call(msg, "deathRulesMode")
+      ? room.updateRequestedDeathRulesMode(
+        client.id,
+        typeof msg.deathRulesMode === "string" ? msg.deathRulesMode : undefined
+      )
+      : false;
+    if (changed || floorChanged || bossChanged || deathRulesChanged) room.broadcastRoster();
     return;
   }
 

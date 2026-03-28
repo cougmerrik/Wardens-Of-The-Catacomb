@@ -1,4 +1,4 @@
-import { compareRows, MAX_GLOBAL_ROWS, normalizeRow } from "./leaderboardStore.js";
+import { compareRows, LEADERBOARD_BOARD_GROUP, LEADERBOARD_BOARD_SOLO, MAX_GLOBAL_ROWS, normalizeBoardType, normalizeRow } from "./leaderboardStore.js";
 
 const DEFAULT_UPSTASH_KEY = "wardens:leaderboard";
 
@@ -41,21 +41,47 @@ export class UpstashLeaderboardStore {
     this.key = key;
   }
 
-  async getRows() {
+  async readAllRows() {
     const raw = await upstashRequest(this.url, this.token, "get", this.key);
     if (!raw) return [];
     try {
       const parsed = JSON.parse(String(raw));
       const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
-      return rows.map(normalizeRow).sort(compareRows).slice(0, MAX_GLOBAL_ROWS);
+      const nextRows = [];
+      const byBoard = new Map();
+      for (const row of rows.map(normalizeRow)) {
+        const boardType = normalizeBoardType(row.boardType);
+        if (!byBoard.has(boardType)) byBoard.set(boardType, []);
+        byBoard.get(boardType).push(row);
+      }
+      for (const boardType of [LEADERBOARD_BOARD_SOLO, LEADERBOARD_BOARD_GROUP]) {
+        nextRows.push(...(byBoard.get(boardType) || []).sort(compareRows).slice(0, MAX_GLOBAL_ROWS));
+      }
+      return nextRows;
     } catch {
       return [];
     }
   }
 
+  async getRows(boardType = LEADERBOARD_BOARD_SOLO) {
+    const normalizedBoardType = normalizeBoardType(boardType);
+    return (await this.readAllRows())
+      .filter((row) => normalizeBoardType(row.boardType) === normalizedBoardType)
+      .sort(compareRows)
+      .slice(0, MAX_GLOBAL_ROWS)
+      .map((row) => ({ ...row }));
+  }
+
   async submitRun(run) {
-    const rows = [...await this.getRows(), normalizeRow(run)].sort(compareRows).slice(0, MAX_GLOBAL_ROWS);
-    await upstashRequest(this.url, this.token, "set", this.key, JSON.stringify({ rows }));
-    return rows.map((row) => ({ ...row }));
+    const normalizedRun = normalizeRow(run);
+    const boardType = normalizeBoardType(normalizedRun.boardType);
+    const allRows = await this.readAllRows();
+    const preservedRows = allRows.filter((row) => normalizeBoardType(row.boardType) !== boardType);
+    const boardRows = [...allRows.filter((row) => normalizeBoardType(row.boardType) === boardType), normalizedRun]
+      .map(normalizeRow)
+      .sort(compareRows)
+      .slice(0, MAX_GLOBAL_ROWS);
+    await upstashRequest(this.url, this.token, "set", this.key, JSON.stringify({ rows: [...preservedRows, ...boardRows] }));
+    return boardRows.map((row) => ({ ...row }));
   }
 }
