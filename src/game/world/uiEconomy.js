@@ -166,7 +166,8 @@ export function handleUiClicks(game) {
   }
   if (game.input.consumeKeyQueued("escape")) {
     if (game.gameOver) {
-      if (game.onReturnToMenu) game.onReturnToMenu();
+      if (game.statsPanelOpen && typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
+      else if (game.onReturnToMenu) game.onReturnToMenu();
     } else if (game.shopOpen) toggleShop(game, false);
     else if (game.skillTreeOpen) toggleSkillTree(game, false);
     else if (game.statsPanelOpen) toggleStatsPanel(game, false);
@@ -199,11 +200,21 @@ export function handleUiClicks(game) {
       continue;
     }
     if (pointInRect(game, click.x, click.y, game.uiRects.statsButton)) {
-      toggleStatsPanel(game);
+      if (game.gameOver && game.statsPanelOpen && typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
+      else toggleStatsPanel(game);
+      continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.gameOverLeaderboardButton)) {
+      if (typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
+      continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.gameOverMenuButton)) {
+      if (game.onReturnToMenu) game.onReturnToMenu();
       continue;
     }
     if (pointInRect(game, click.x, click.y, game.uiRects.statsClose)) {
-      toggleStatsPanel(game, false);
+      if (game.gameOver && typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
+      else toggleStatsPanel(game, false);
       continue;
     }
     if (pointInRect(game, click.x, click.y, game.uiRects.statsRunTab)) {

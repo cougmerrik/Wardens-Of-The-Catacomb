@@ -5,6 +5,7 @@ import { Renderer } from "../Renderer.js";
 import { runtimeBaseBiomeMethods } from "./runtimeBaseBiomeMethods.js";
 import { runtimeBasePlacementMethods } from "./runtimeBasePlacementMethods.js";
 import { runtimeBaseSupportMethods } from "./runtimeBaseSupportMethods.js";
+import { runtimeBaseDevStartMethods } from "./runtimeBaseDevStartMethods.js";
 import { runtimeBaseDifficultyMethods } from "./runtimeBaseDifficultyMethods.js";
 import { runtimeCombatStatsMethods } from "./runtimeCombatStatsMethods.js";
 import { runtimeFloorBossMethods } from "./runtimeFloorBossMethods.js";
@@ -193,7 +194,7 @@ export class GameRuntimeBase {
     this.experience = 0;
     this.expToNextLevel = this.config.progression.baseXpToLevel;
     this.skillPoints = 0;
-    this.gold = 0;
+    this.gold = this.estimateDebugStartingGoldForFloor(safeFloor);
     this.score = 0;
     this.runStats = createRunStats();
     this.levelWeaponDamageBonus = 0;
@@ -480,6 +481,7 @@ export class GameRuntimeBase {
 Object.assign(GameRuntimeBase.prototype, runtimeBasePlacementMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeBaseBiomeMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeBaseSupportMethods);
+Object.assign(GameRuntimeBase.prototype, runtimeBaseDevStartMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeBaseDifficultyMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeFloorBossMethods);
 Object.assign(GameRuntimeBase.prototype, runtimeCombatStatsMethods);
