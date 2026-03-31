@@ -12,6 +12,33 @@ export function createSkillState() {
   };
 }
 
+export function createRangerRuntimeState() {
+  return {
+    danceActiveTimer: 0,
+    danceMoveTimer: 0,
+    foxstepCooldown: 0,
+    foxstepActiveTimer: 0,
+    foxstepHealPool: 0,
+    foxstepHealTickTimer: 0
+  };
+}
+
+export function createWarriorRuntimeState() {
+  return {
+    cleaveCounter: 0,
+    lastProtectedByWarriorId: null,
+    rageCritReady: false,
+    butcherCritReady: false,
+    secondWindPool: 0,
+    secondWindTimer: 0,
+    secondWindTotalDuration: 0,
+    tempHp: 0,
+    tempHpTimer: 0,
+    rageArcTimer: 0,
+    cheatDeathCooldown: 0
+  };
+}
+
 export function createRunStats() {
   return {
     totalKills: 0,
@@ -83,6 +110,8 @@ export function createPlayerState(classType, classSpec, fallbackMaxHealth) {
     knockbackVx: 0,
     knockbackVy: 0,
     knockbackTimer: 0,
-    classType
+    classType,
+    rangerRuntime: createRangerRuntimeState(),
+    warriorRuntime: createWarriorRuntimeState()
   };
 }

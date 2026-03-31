@@ -1,5 +1,6 @@
 import { vecLength, directionIndexFromVector } from "../utils.js";
 import { resolveCombatAndDrops } from "./stepCombatResolution.js";
+import { getWarriorPassiveRegenBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
 
 export function stepGame(game, dt, controls = {}) {
   const segmentRectHit = (x0, y0, x1, y1, left, top, right, bottom) => {
@@ -72,6 +73,9 @@ export function stepGame(game, dt, controls = {}) {
   game.warriorRageActiveTimer = Math.max(0, (Number.isFinite(game.warriorRageActiveTimer) ? game.warriorRageActiveTimer : 0) - dt);
   game.warriorRageCooldownTimer = Math.max(0, (Number.isFinite(game.warriorRageCooldownTimer) ? game.warriorRageCooldownTimer : 0) - dt);
   game.warriorRageVictoryRushTimer = Math.max(0, (Number.isFinite(game.warriorRageVictoryRushTimer) ? game.warriorRageVictoryRushTimer : 0) - dt);
+  game.warriorRuntime = game.warriorRuntime && typeof game.warriorRuntime === "object" ? game.warriorRuntime : {};
+  game.rangerDanceMoveTimer = Math.max(0, (Number.isFinite(game.rangerDanceMoveTimer) ? game.rangerDanceMoveTimer : 0) - dt);
+  game.rangerDanceOfThornsTimer = Math.max(0, (Number.isFinite(game.rangerDanceOfThornsTimer) ? game.rangerDanceOfThornsTimer : 0) - dt);
   game.passiveRegenTimer = Math.max(-4, (Number.isFinite(game.passiveRegenTimer) ? game.passiveRegenTimer : 2) - dt);
   for (const ft of game.floatingTexts) {
     ft.life -= dt;
@@ -92,10 +96,10 @@ export function stepGame(game, dt, controls = {}) {
   } else if ((game.warriorRageVictoryRushTimer || 0) <= 0) {
     game.warriorRageVictoryRushPool = 0;
   }
-
   while (game.passiveRegenTimer <= 0) {
     game.passiveRegenTimer += 2;
-    const regenPct = Number.isFinite(game.classSpec.passiveRegenPct) ? Math.max(0, game.classSpec.passiveRegenPct) : 0;
+    let regenPct = Number.isFinite(game.classSpec.passiveRegenPct) ? Math.max(0, game.classSpec.passiveRegenPct) : 0;
+    if (isWarriorTalentGame(game)) regenPct += getWarriorPassiveRegenBonusPct(game);
     if (regenPct <= 0 || !primaryPlayerAlive || game.player.health >= game.player.maxHealth) continue;
     const healAmount = Math.max(1, Math.floor(game.player.maxHealth * regenPct));
     game.applyPlayerHealing(healAmount);
@@ -114,6 +118,16 @@ export function stepGame(game, dt, controls = {}) {
     game.moveWithCollisionSubsteps(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
   }
   game.player.moving = !!(mx || my);
+  if (game.isArcherClass && game.isArcherClass()) {
+    if (game.player.moving) {
+      game.rangerDanceMoveTimer = (Number.isFinite(game.rangerDanceMoveTimer) ? game.rangerDanceMoveTimer : 0) + dt;
+      if (game.rangerDanceMoveTimer >= 6 && (game.rangerTalents?.danceOfThorns?.points || 0) > 0) {
+        game.rangerDanceOfThornsTimer = Math.max(game.rangerDanceOfThornsTimer || 0, 0.3);
+      }
+    } else {
+      game.rangerDanceMoveTimer = 0;
+    }
+  }
   if (primaryPlayerAlive) game.revealAroundPlayer();
 
   const trapCfg = typeof game.getWallTrapConfig === "function" ? game.getWallTrapConfig() : game.config?.traps?.wall || {};
@@ -451,6 +465,10 @@ export function stepGame(game, dt, controls = {}) {
   for (const enemy of game.enemies) {
     enemy.lastX = enemy.x;
     enemy.lastY = enemy.y;
+    enemy.burningTimer = Math.max(0, (Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0) - dt);
+    if ((enemy.burningTimer || 0) <= 0) enemy.burningDps = 0;
+    enemy.pinningSlowTimer = Math.max(0, (Number.isFinite(enemy.pinningSlowTimer) ? enemy.pinningSlowTimer : 0) - dt);
+    if ((enemy.pinningSlowTimer || 0) <= 0) enemy.pinningSlowPct = 0;
     enemy.hpBarTimer = Math.max(0, (enemy.hpBarTimer || 0) - dt);
     enemy.damageTextTimer = Math.max(0, (enemy.damageTextTimer || 0) - dt);
     enemy.damageBuffTimer = Math.max(0, (enemy.damageBuffTimer || 0) - dt);
@@ -458,9 +476,10 @@ export function stepGame(game, dt, controls = {}) {
     if (!alwaysActiveBoss && !isActive(enemy, 72)) continue;
     activeEnemies.push(enemy);
     if (enemy.charmLocked) continue;
-    if (typeof game.updateEnemyTactics === "function") game.updateEnemyTactics(enemy, dt, enemySpeedScale);
-    else if (typeof game.updateGenericEnemy === "function") game.updateGenericEnemy(enemy, dt, enemySpeedScale);
-    else game.moveEnemyTowardPlayer(enemy, enemySpeedScale, dt);
+    const appliedEnemySpeedScale = enemySpeedScale * (1 - Math.max(0, Math.min(0.85, enemy.pinningSlowPct || 0)));
+    if (typeof game.updateEnemyTactics === "function") game.updateEnemyTactics(enemy, dt, appliedEnemySpeedScale);
+    else if (typeof game.updateGenericEnemy === "function") game.updateGenericEnemy(enemy, dt, appliedEnemySpeedScale);
+    else game.moveEnemyTowardPlayer(enemy, appliedEnemySpeedScale, dt);
   }
   for (const br of game.breakables || []) {
     if (!isActive(br, 64)) continue;

@@ -282,11 +282,12 @@ function buildCharacterColumns(game) {
   let classKit = null;
   if (game.isArcherClass && game.isArcherClass()) {
     classKit = createSection("Ranger Kit", [
-      ["Fire Arrow", game.isFireArrowUnlocked() ? `Lv ${game.skills.fireArrow.points}` : "Locked"],
+      ["Fire Arrow", game.isFireArrowUnlocked() ? "Unlocked" : "Locked"],
       ["Fire Cooldown", game.player.fireArrowCooldown > 0 ? `${game.player.fireArrowCooldown.toFixed(1)}s` : "Ready"],
       ["Fire AoE Radius", game.isFireArrowUnlocked() ? game.getFireArrowBlastRadius().toFixed(1) : "-"],
       ["Pierce Chance", `${(game.getPiercingChance() * 100).toFixed(1)}%`],
-      ["Multiarrow", `${game.getMultiarrowCount()} (${game.getMultiarrowSpreadDeg().toFixed(1)}deg)`]
+      ["Multiarrow", `${game.getMultiarrowCount()} (${game.getMultiarrowSpreadDeg().toFixed(1)}deg)`],
+      ["Tree SP", `${game.skillPoints} available`]
     ]);
   } else if (game.isWarriorClass && game.isWarriorClass()) {
     classKit = createSection("Warrior Kit", [

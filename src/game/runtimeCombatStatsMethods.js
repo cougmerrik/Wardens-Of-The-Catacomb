@@ -1,3 +1,65 @@
+import {
+  canSpendRangerNode,
+  canSpendRangerUtility,
+  getRangerCritChance,
+  getRangerCritMultiplier,
+  getRangerDamageBonus,
+  getRangerDanceAttackSpeedBonus,
+  getRangerDanceDefenseBonus,
+  getRangerFireArrowDurationMultiplier,
+  getRangerFireDamageBonus,
+  getRangerFireArrowImpactMultiplier,
+  getRangerFireRadiusBonus,
+  getRangerLinebreakerDamagePerHit,
+  getRangerMaxHealthBonusPct,
+  getRangerMoveSpeedBonus,
+  getRangerMultishotBonus,
+  getRangerProjectileSpeedBonus,
+  getRangerStationaryPierceBonus,
+  getRangerTalentPoints,
+  getRangerVolleyCooldownReduction,
+  hasFireMastery,
+  hasPinningShot,
+  spendRangerNode,
+  spendRangerUtility
+} from "./rangerTalentTree.js";
+import {
+  canSpendWarriorNode,
+  canSpendWarriorUtility,
+  getWarriorBattleFrenzyDamageBonus,
+  getWarriorBattleFrenzyDuration,
+  getWarriorBattleFrenzyMoveSpeedBonus,
+  getWarriorBloodheatAttackSpeedBonus,
+  getWarriorBloodheatMoveSpeedBonus,
+  getWarriorBloodheatRageMoveSpeedBonus,
+  getWarriorExecutionerExecuteChance,
+  getWarriorExecutionerRageRangeBonus,
+  getWarriorHeavyHandDamageBonus,
+  getWarriorIronGuardMaxHealthFlat,
+  getWarriorPassiveRegenBonusPct,
+  getWarriorRageMasteryAttackSpeedBonus,
+  getWarriorRageMasteryMoveSpeedBonus,
+  getWarriorRedTempestMoveSpeedBonus,
+  getWarriorRedTempestTempHpPct,
+  getWarriorSecondWindAllyHealPct,
+  getWarriorSecondWindHealPct,
+  getWarriorStonewallAllyDefenseAuraPct,
+  getWarriorStonewallLifeLeechBonus,
+  getWarriorTalentPoints,
+  getWarriorUnbrokenDamageReduction,
+  getWarriorUnbrokenLifeLeechBonus,
+  hasWarriorCleaveDiscipline,
+  hasWarriorButchersPath,
+  hasWarriorRageMastery,
+  hasWarriorRedTempest,
+  hasWarriorStonewall,
+  hasWarriorUnbrokenCheatDeath,
+  isWarriorRaging,
+  isWarriorTalentGame,
+  spendWarriorNode,
+  spendWarriorUtility
+} from "./warriorTalentTree.js";
+
 export const runtimeCombatStatsMethods = {
   getPlayerResistancePct(damageType = "physical") {
     const normalized = typeof damageType === "string" ? damageType.toLowerCase() : "physical";
@@ -15,14 +77,17 @@ export const runtimeCombatStatsMethods = {
     const resistancePct = this.getPlayerResistancePct(damageType);
     const resisted = Math.max(1, Math.round(safeDamage * (1 - resistancePct)));
     const reducedByDefense = Math.max(1, Math.round(resisted - this.getDefenseFlatReduction()));
-    return this.getWarriorRageDamageTaken(reducedByDefense);
+    return this.getWarriorRageDamageTaken(reducedByDefense, damageType);
   },
 
   getPlayerFireCooldown() {
     const levelAttackBonusPct = Number.isFinite(this.classSpec.levelAttackSpeedPct)
       ? Math.max(0, this.classSpec.levelAttackSpeedPct) * Math.max(0, this.level - 1)
       : 0;
-    const attackMultiplier = this.getAttackSpeedMultiplier() * (1 + levelAttackBonusPct);
+    let attackMultiplier = this.getAttackSpeedMultiplier() * (1 + levelAttackBonusPct);
+    if (isWarriorTalentGame(this) && isWarriorRaging(this)) {
+      attackMultiplier *= 1 + getWarriorRageMasteryAttackSpeedBonus(this);
+    }
     return Math.max(this.classSpec.minAttackCooldown, this.classSpec.baseAttackCooldown / attackMultiplier);
   },
 
@@ -68,11 +133,19 @@ export const runtimeCombatStatsMethods = {
   getLifeLeechPercent() {
     const base = Number.isFinite(this.classSpec.baseLifeLeech) ? this.classSpec.baseLifeLeech : 0;
     const levelGain = Number.isFinite(this.classSpec.levelLifeLeechGain) ? Math.max(0, this.classSpec.levelLifeLeechGain) * Math.max(0, this.level - 1) : 0;
+    if (isWarriorTalentGame(this)) {
+      const hpRatio = this.player?.maxHealth > 0 ? (this.player?.health || 0) / this.player.maxHealth : 1;
+      return Math.max(0, base + levelGain + getWarriorUnbrokenLifeLeechBonus(this, hpRatio) + getWarriorStonewallLifeLeechBonus(this));
+    }
     return Math.max(0, base + levelGain);
   },
 
   getProjectileSpeed() {
     const speed = this.classSpec.projectileSpeed;
+    const baseSpeed = Number.isFinite(speed) && speed > 0 ? speed : this.config.player.projectileSpeed;
+    if (this.isArcherClass && this.isArcherClass()) {
+      return baseSpeed * (1 + getRangerProjectileSpeedBonus(this));
+    }
     if (Number.isFinite(speed) && speed > 0) return speed;
     return this.config.player.projectileSpeed;
   },
@@ -94,12 +167,20 @@ export const runtimeCombatStatsMethods = {
   },
 
   getFireArrowBlastRadius(points = this.skills.fireArrow.points) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      const base = this.config.fireArrow.baseBlastRadius;
+      return base * (1 + getRangerFireRadiusBonus(this));
+    }
     const p = Number.isFinite(points) ? Math.max(0, points) : 0;
     const bonus = 18 * Math.log1p(1.35 * p);
     return this.config.fireArrow.baseBlastRadius + bonus;
   },
 
   getFireArrowImpactDamage(points = this.skills.fireArrow.points) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      const base = Number.isFinite(this.config.fireArrow.impactDamage) ? this.config.fireArrow.impactDamage : 3.2;
+      return base * getRangerFireArrowImpactMultiplier(this);
+    }
     const p = Number.isFinite(points) ? points : 0;
     const mult = 1 + 0.8 * Math.log1p(1.25 * Math.max(0, p));
     const base = Number.isFinite(this.config.fireArrow.impactDamage) ? this.config.fireArrow.impactDamage : 3.2;
@@ -107,6 +188,10 @@ export const runtimeCombatStatsMethods = {
   },
 
   getFireArrowLingerDps(points = this.skills.fireArrow.points) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      const base = Number.isFinite(this.config.fireArrow.lingerDps) ? this.config.fireArrow.lingerDps : 3.6;
+      return base * (1 + getRangerFireDamageBonus(this));
+    }
     const p = Number.isFinite(points) ? points : 0;
     const mult = 1 + 0.7 * Math.log1p(1.2 * Math.max(0, p));
     const base = Number.isFinite(this.config.fireArrow.lingerDps) ? this.config.fireArrow.lingerDps : 3.6;
@@ -114,6 +199,11 @@ export const runtimeCombatStatsMethods = {
   },
 
   getPiercingChance(points = this.skills.piercingStrike.points) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      let chance = 0;
+      if (!this.player?.moving) chance += getRangerStationaryPierceBonus(this);
+      return Math.max(0, Math.min(0.95, chance));
+    }
     const p = Number.isFinite(points) ? points : 0;
     const maxChance = 0.65;
     const scaled = Math.log1p(1.2 * Math.max(0, p)) / Math.log1p(1.2 * this.skills.piercingStrike.maxPoints);
@@ -121,6 +211,9 @@ export const runtimeCombatStatsMethods = {
   },
 
   getMultiarrowCount(points = this.skills.multiarrow.points) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      return 1 + getRangerMultishotBonus(this);
+    }
     const p = Number.isFinite(points) ? Math.max(0, Math.floor(points)) : 0;
     const maxPoints = Number.isFinite(this.skills?.multiarrow?.maxPoints) ? this.skills.multiarrow.maxPoints : 8;
     const clamped = Math.min(maxPoints, p);
@@ -128,6 +221,9 @@ export const runtimeCombatStatsMethods = {
   },
 
   getMultiarrowDamageMultiplier(points = this.skills.multiarrow.points) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      return 1 + getRangerMultishotBonus(this) * 0.06;
+    }
     const p = Number.isFinite(points) ? Math.max(0, points) : 0;
     const maxPoints = Number.isFinite(this.skills?.multiarrow?.maxPoints) ? this.skills.multiarrow.maxPoints : 8;
     const norm = Math.log1p(1.35 * p) / Math.log1p(1.35 * Math.max(1, maxPoints));
@@ -153,6 +249,11 @@ export const runtimeCombatStatsMethods = {
   },
 
   getMultiarrowSpreadDeg(points = this.skills.multiarrow.points) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      const count = this.getMultiarrowCount(points);
+      if (count <= 1) return 0;
+      return 10 + (count - 2) * 4;
+    }
     const count = this.getMultiarrowCount(points);
     if (count <= 1) return 0;
     const p = Number.isFinite(points) ? points : 0;
@@ -175,31 +276,89 @@ export const runtimeCombatStatsMethods = {
   },
 
   isFireArrowUnlocked() {
+    if (this.isArcherClass && this.isArcherClass()) {
+      return getRangerTalentPoints(this, "fireArrowActive") > 0;
+    }
     return this.skills.fireArrow.points > 0;
   },
 
+  getRangerCritChance() {
+    return this.isArcherClass && this.isArcherClass() ? getRangerCritChance(this) : 0;
+  },
+
+  getRangerCritMultiplier() {
+    return getRangerCritMultiplier();
+  },
+
+  getRangerLinebreakerDamageBonus(hitCount = 0) {
+    if (!(this.isArcherClass && this.isArcherClass())) return 0;
+    const count = Number.isFinite(hitCount) ? Math.max(0, hitCount) : 0;
+    return count * getRangerLinebreakerDamagePerHit(this);
+  },
+
+  getRangerFireArrowCooldown() {
+    const base = Number.isFinite(this.config.fireArrow?.cooldown) ? this.config.fireArrow.cooldown : 2;
+    if (!(this.isArcherClass && this.isArcherClass())) return base;
+    return Math.max(0.2, base - getRangerVolleyCooldownReduction(this));
+  },
+
+  getRangerFireArrowDurationMultiplier() {
+    return this.isArcherClass && this.isArcherClass() ? getRangerFireArrowDurationMultiplier(this) : 1;
+  },
+
+  hasRangerPinningShot() {
+    return this.isArcherClass && this.isArcherClass() ? hasPinningShot(this) : false;
+  },
+
+  hasRangerFireMastery() {
+    return this.isArcherClass && this.isArcherClass() ? hasFireMastery(this) : false;
+  },
+
   getWarriorMomentumDuration(points = this.skills.warriorMomentum.points) {
+    if (isWarriorTalentGame(this)) return getWarriorBattleFrenzyDuration();
     const p = Number.isFinite(points) ? points : 0;
     return 0.85 + 0.9 * Math.log1p(1.2 * Math.max(0, p));
   },
 
   getWarriorMomentumMoveBonus(points = this.skills.warriorMomentum.points) {
+    if (isWarriorTalentGame(this)) return getWarriorBattleFrenzyMoveSpeedBonus(this);
     const p = Number.isFinite(points) ? points : 0;
     return 0.2 + 0.33 * Math.log1p(1.3 * Math.max(0, p));
   },
 
   getWarriorMomentumMultiplier() {
     if (this.classSpec.usesRanged) return 1;
-    if (this.warriorMomentumTimer <= 0) return 1;
-    return 1 + this.getWarriorMomentumMoveBonus();
+    let bonus = 0;
+    const nearbyThreat = (this.enemies || []).some((enemy) =>
+      enemy &&
+      (enemy.hp || 0) > 0 &&
+      !this.isEnemyFriendlyToPlayer(enemy) &&
+      Math.hypot((enemy.x || 0) - (this.player?.x || 0), (enemy.y || 0) - (this.player?.y || 0)) <= (this.config?.map?.tile || 32) * 5
+    );
+    if (nearbyThreat || isWarriorRaging(this) || (this.warriorMomentumTimer || 0) > 0) {
+      bonus += getWarriorBloodheatMoveSpeedBonus(this);
+    }
+    if ((this.warriorMomentumTimer || 0) > 0) bonus += this.getWarriorMomentumMoveBonus();
+    if (isWarriorRaging(this)) {
+      bonus += getWarriorBloodheatRageMoveSpeedBonus(this);
+      bonus += getWarriorRageMasteryMoveSpeedBonus(this);
+      bonus += getWarriorRedTempestMoveSpeedBonus(this);
+    }
+    return 1 + bonus;
   },
 
   getWarriorRageDuration() {
     const c = this.config.warriorRage || {};
-    return Number.isFinite(c.duration) ? c.duration : 10;
+    const base = Number.isFinite(c.duration) ? c.duration : 10;
+    if (isWarriorTalentGame(this) && hasWarriorRageMastery(this)) return base * 1.15;
+    return base;
   },
 
   getWarriorRageCooldown(points = this.skills.warriorRage.points) {
+    if (isWarriorTalentGame(this)) {
+      const c = this.config.warriorRage || {};
+      return Number.isFinite(c.cooldown) ? c.cooldown : 20;
+    }
     const c = this.config.warriorRage || {};
     const base = Number.isFinite(c.cooldown) ? c.cooldown : 20;
     const maxReduction = Number.isFinite(c.maxCooldownReductionPct) ? c.maxCooldownReductionPct : 0.4;
@@ -213,6 +372,9 @@ export const runtimeCombatStatsMethods = {
 
   getWarriorRageBaseDamageBonus(points = this.skills.warriorRage.points) {
     if (this.classSpec.usesRanged) return 0;
+    if (isWarriorTalentGame(this)) {
+      return 0.3;
+    }
     const c = this.config.warriorRage || {};
     const baseBonus = Number.isFinite(c.baseDamageBonus) ? c.baseDamageBonus : 0.3;
     const perPoint = Number.isFinite(c.baseDamageBonusPerPoint) ? c.baseDamageBonusPerPoint : 0.14;
@@ -221,17 +383,28 @@ export const runtimeCombatStatsMethods = {
   },
 
   getActiveWarriorRageBaseDamageBonus() {
-    if (this.classSpec.usesRanged || this.warriorRageActiveTimer <= 0) return 0;
+    if (this.classSpec.usesRanged || !isWarriorRaging(this)) return 0;
     return this.getWarriorRageBaseDamageBonus();
   },
 
-  getWarriorRageDamageTaken(rawDamage) {
-    if (this.classSpec.usesRanged || this.warriorRageActiveTimer <= 0) return rawDamage;
+  getWarriorRageDamageTaken(rawDamage, damageType = "physical") {
+    if (this.classSpec.usesRanged || !isWarriorRaging(this)) return rawDamage;
     const safe = Number.isFinite(rawDamage) ? rawDamage : 0;
+    if (isWarriorTalentGame(this)) {
+      const normalized = typeof damageType === "string" ? damageType.toLowerCase() : "physical";
+      const physicalLike = normalized === "physical" || normalized === "melee" || normalized === "arrow";
+      if (!physicalLike) return safe;
+      return Math.floor(Math.max(0, safe) * 0.5);
+    }
     return Math.floor(Math.max(0, safe) * 0.5);
   },
 
   getWarriorRageVictoryRushPerKillPct(points = this.skills.warriorRage.points) {
+    if (isWarriorTalentGame(this)) {
+      const rank = getWarriorTalentPoints(this, "battleFrenzy");
+      if (rank <= 0) return 0;
+      return rank * 0.01;
+    }
     if (this.classSpec.usesRanged) return 0;
     const c = this.config.warriorRage || {};
     const p = Math.max(0, Number.isFinite(points) ? points : 0);
@@ -245,22 +418,38 @@ export const runtimeCombatStatsMethods = {
   },
 
   getWarriorRageVictoryRushHeal(points = this.skills.warriorRage.points) {
-    if (this.classSpec.usesRanged || this.warriorRageActiveTimer <= 0) return 0;
+    if (this.classSpec.usesRanged) return 0;
+    if (isWarriorTalentGame(this)) {
+      if (!isWarriorRaging(this)) return 0;
+    } else if (this.warriorRageActiveTimer <= 0) {
+      return 0;
+    }
     return Math.max(1, Math.round(this.player.maxHealth * this.getWarriorRageVictoryRushPerKillPct(points)));
   },
 
   getWarriorRageVictoryRushPoolCap() {
+    if (isWarriorTalentGame(this)) {
+      const rank = getWarriorTalentPoints(this, "battleFrenzy");
+      if (rank <= 0) return 0;
+      return Math.max(1, this.player.maxHealth * (0.05 * rank));
+    }
     const c = this.config.warriorRage || {};
     const capPct = Number.isFinite(c.victoryRushPoolCapPct) ? Math.max(0, c.victoryRushPoolCapPct) : 0.2;
     return Math.max(1, this.player.maxHealth * capPct);
   },
 
   getWarriorRageVictoryRushHotDuration() {
+    if (isWarriorTalentGame(this)) return 4;
     const c = this.config.warriorRage || {};
     return Number.isFinite(c.victoryRushHotDuration) ? Math.max(0.5, c.victoryRushHotDuration) : 15;
   },
 
   getWarriorExecuteChance(points = this.skills.warriorExecute.points) {
+    if (isWarriorTalentGame(this)) {
+      let chance = getWarriorExecutionerExecuteChance(this);
+      if (isWarriorRaging(this) && hasWarriorButchersPath(this)) chance *= 2;
+      return Math.max(0, Math.min(1, chance));
+    }
     if (this.classSpec.usesRanged) return 0;
     const p = Number.isFinite(points) ? Math.max(0, points) : 0;
     if (p <= 0) return 0;
@@ -271,6 +460,7 @@ export const runtimeCombatStatsMethods = {
   },
 
   getWarriorExecuteThreshold(points = this.skills.warriorExecute.points) {
+    if (isWarriorTalentGame(this)) return 0.3;
     if (this.classSpec.usesRanged) return 0;
     const p = Number.isFinite(points) ? Math.max(0, points) : 0;
     if (p <= 0) return 0;
@@ -281,6 +471,7 @@ export const runtimeCombatStatsMethods = {
   },
 
   isWarriorRageUnlocked() {
+    if (isWarriorTalentGame(this)) return getWarriorTalentPoints(this, "rageActive") > 0;
     return !this.classSpec.usesRanged && (this.skills?.warriorRage?.points || 0) > 0;
   },
 
@@ -294,11 +485,47 @@ export const runtimeCombatStatsMethods = {
     if (!this.canActivateWarriorRage()) return false;
     this.warriorRageActiveTimer = this.getWarriorRageDuration();
     this.warriorRageCooldownTimer = this.getWarriorRageCooldown();
+    this.warriorRuntime = this.warriorRuntime && typeof this.warriorRuntime === "object"
+      ? this.warriorRuntime
+      : (this.player?.warriorRuntime && typeof this.player.warriorRuntime === "object" ? this.player.warriorRuntime : {});
+    if (this.player) this.player.warriorRuntime = this.warriorRuntime;
+    this.warriorRuntime.rageCritReady = hasWarriorCleaveDiscipline(this);
+    this.warriorRuntime.cleaveCounter = 0;
+    this.warriorRuntime.rageArcTimer = 0;
+    const secondWindPct = getWarriorSecondWindHealPct(this);
+    if (secondWindPct > 0) {
+      this.warriorRuntime.secondWindPool = Math.max(1, this.player.maxHealth * secondWindPct);
+      this.warriorRuntime.secondWindTimer = 10;
+      this.warriorRuntime.secondWindTotalDuration = 10;
+    }
+    const allyPct = getWarriorSecondWindAllyHealPct(this);
+    if (allyPct > 0 && typeof this.getActivePlayerEntities === "function") {
+      for (const ally of this.getActivePlayerEntities()) {
+        if (!ally || ally === this.player || (ally.health || 0) <= 0) continue;
+        ally.warriorRuntime = ally.warriorRuntime && typeof ally.warriorRuntime === "object" ? ally.warriorRuntime : {};
+        ally.warriorRuntime.secondWindPool = Math.max(1, (ally.maxHealth || 1) * allyPct);
+        ally.warriorRuntime.secondWindTimer = 10;
+        ally.warriorRuntime.secondWindTotalDuration = 10;
+      }
+    }
+    const tempHpPct = getWarriorRedTempestTempHpPct(this);
+    if (tempHpPct > 0) {
+      this.warriorRuntime.tempHp = Math.max(0, Math.round(this.player.maxHealth * tempHpPct));
+      this.warriorRuntime.tempHpTimer = this.warriorRageActiveTimer;
+      this.warriorRuntime.rageArcTimer = hasWarriorRedTempest(this) ? 5 : 0;
+    }
     return true;
   },
 
   triggerWarriorMomentumOnKill() {
     if (this.classSpec.usesRanged) return;
+    if (isWarriorTalentGame(this)) {
+      if (getWarriorTalentPoints(this, "battleFrenzy") <= 0) return;
+      const wasInactive = (this.warriorMomentumTimer || 0) <= 0;
+      this.warriorMomentumTimer = Math.max(this.warriorMomentumTimer || 0, this.getWarriorMomentumDuration()) + 0.1;
+      if (wasInactive && typeof this.recordClassSpecificStat === "function") this.recordClassSpecificStat("warrior", "frenzies", 1);
+      return;
+    }
     if ((this.skills.warriorMomentum.points || 0) <= 0) return;
     const wasInactive = (this.warriorMomentumTimer || 0) <= 0;
     this.warriorMomentumTimer = Math.max(this.warriorMomentumTimer, this.getWarriorMomentumDuration());
@@ -306,6 +533,48 @@ export const runtimeCombatStatsMethods = {
   },
 
   spendSkillPoint(skillKey) {
+    if (this.isArcherClass && this.isArcherClass()) {
+      if (spendRangerUtility(this, skillKey)) {
+        if (skillKey === "defense") this.spawnFloatingText(this.player.x, this.player.y - 26, "Defense training improved", "#b7e38a", 0.85, 14);
+        else this.spawnFloatingText(this.player.x, this.player.y - 26, "Training improved", "#b7e38a", 0.85, 14);
+        return true;
+      }
+      if (!canSpendRangerNode(this, skillKey) && !canSpendRangerUtility(this, skillKey)) return false;
+      if (spendRangerNode(this, skillKey)) {
+        if (skillKey === "fleetstep") {
+          const hpGain = Math.max(1, this.player.maxHealth * 0.02);
+          this.player.maxHealth += hpGain;
+          this.player.health = Math.min(this.player.maxHealth, this.player.health + hpGain);
+          this.markPlayerHealthBarVisible();
+        }
+        if (skillKey === "fireArrowActive") {
+          this.spawnFloatingText(this.player.x, this.player.y - 26, "Fire Arrow Unlocked!", "#f6b36a", 1.0, 15);
+        } else {
+          this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent improved", "#9fd9ff", 0.85, 14);
+        }
+        return true;
+      }
+      return false;
+    }
+    if (isWarriorTalentGame(this)) {
+      if (spendWarriorUtility(this, skillKey)) {
+        this.spawnFloatingText(this.player.x, this.player.y - 26, "Training improved", "#b7e38a", 0.85, 14);
+        return true;
+      }
+      if (!canSpendWarriorNode(this, skillKey) && !canSpendWarriorUtility(this, skillKey)) return false;
+      if (spendWarriorNode(this, skillKey)) {
+        if (skillKey === "ironGuard" || skillKey === "stonewall") {
+          const hpGain = skillKey === "ironGuard" ? 8 : 20;
+          this.player.maxHealth += hpGain;
+          this.player.health = Math.min(this.player.maxHealth, this.player.health + hpGain);
+          this.markPlayerHealthBarVisible();
+        }
+        if (skillKey === "rageActive") this.spawnFloatingText(this.player.x, this.player.y - 26, "Rage Unlocked!", "#ff9d8e", 1.0, 15);
+        else this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent improved", "#ffcf9b", 0.85, 14);
+        return true;
+      }
+      return false;
+    }
     const skill = this.skills[skillKey];
     if (!skill) return false;
     if (this.skillPoints <= 0) return false;

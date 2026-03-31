@@ -23,7 +23,18 @@ export const rendererEffectsPlayerMethods = {
     const frameY = (Number.isFinite(player.facing) ? player.facing : 0) * frameSize;
     const drawX = screenX - renderSize / 2;
     const drawY = screenY - renderSize * 0.56;
-    this.drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, null, 0);
+    const foxstepActive = (player?.rangerRuntime?.foxstepActiveTimer || 0) > 0;
+    this.drawPlayerSpriteFrame(
+      frameX,
+      frameY,
+      frameSize,
+      drawX,
+      drawY,
+      renderSize,
+      null,
+      0,
+      foxstepActive ? "saturate(50%) brightness(0.95)" : "none"
+    );
     return { movingVisual, walkPhase: movingVisual ? player._renderAnimPhase * 0.1 : 0 };
   },
 
@@ -98,6 +109,7 @@ export const rendererEffectsPlayerMethods = {
     const frameY = p.facing * frameSize;
     const drawX = playerScreenX - renderSize / 2;
     const drawY = playerScreenY - renderSize * 0.56;
+    const foxstepActive = (game.rangerRuntime?.foxstepActiveTimer || 0) > 0;
     let tintColor = null;
     let tintAlpha = 0;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
@@ -112,10 +124,22 @@ export const rendererEffectsPlayerMethods = {
         tintAlpha = 0.32;
       }
     }
-    this.drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor, tintAlpha);
+    this.drawPlayerSpriteFrame(
+      frameX,
+      frameY,
+      frameSize,
+      drawX,
+      drawY,
+      renderSize,
+      tintColor,
+      tintAlpha,
+      foxstepActive ? "saturate(50%) brightness(0.95)" : "none"
+    );
     const baseCd = game.getPlayerFireCooldown ? game.getPlayerFireCooldown() : this.config.player.baseFireCooldown;
     const firePulse = baseCd > 0 ? Math.max(0, Math.min(1, p.fireCooldown / baseCd)) : 0;
     const walkPhase = movingVisual ? p._renderAnimPhase * 0.1 : 0;
+    if (foxstepActive) this.ctx.save();
+    if (foxstepActive) this.ctx.filter = "saturate(50%) brightness(0.95)";
     if (game.isNecromancerClass && game.isNecromancerClass()) {
       this.drawPlayerNecromancerRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
     } else if (game.classSpec && !game.classSpec.usesRanged) {
@@ -123,12 +147,16 @@ export const rendererEffectsPlayerMethods = {
     } else {
       this.drawPlayerAimingRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
     }
+    if (foxstepActive) this.ctx.restore();
   },
 
-  drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor = null, tintAlpha = 0) {
+  drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor = null, tintAlpha = 0, filter = "none") {
     const ctx = this.ctx;
     if (!tintColor || tintAlpha <= 0) {
+      ctx.save();
+      ctx.filter = filter || "none";
       ctx.drawImage(this.playerSpriteSheet, frameX, frameY, frameSize, frameSize, drawX, drawY, renderSize, renderSize);
+      ctx.restore();
       return;
     }
     const cache = this._playerTintCanvas || document.createElement("canvas");
@@ -146,7 +174,10 @@ export const rendererEffectsPlayerMethods = {
     cctx.globalAlpha = 1;
     cctx.globalCompositeOperation = "source-over";
     this._playerTintCanvas = cache;
+    ctx.save();
+    ctx.filter = filter || "none";
     ctx.drawImage(cache, 0, 0, frameSize, frameSize, drawX, drawY, renderSize, renderSize);
+    ctx.restore();
   },
 
   drawPlayerFighterRig(player, screenX, screenY, walkPhase = 0, attackPulse = 0) {

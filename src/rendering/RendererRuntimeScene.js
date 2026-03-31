@@ -108,6 +108,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     game.uiRects.shopScrollMax = 0;
     game.uiRects.skillTreeButton = null;
     game.uiRects.skillTreeClose = null;
+    game.uiRects.skillTreeNodes = [];
     game.uiRects.skillTreeScrollArea = null;
     game.uiRects.skillTreeScrollMax = 0;
     game.uiRects.skillFireArrowNode = null;

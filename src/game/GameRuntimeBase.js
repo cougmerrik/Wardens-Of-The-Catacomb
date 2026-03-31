@@ -65,6 +65,23 @@ export class GameRuntimeBase {
     this.player.hpBarTimer = this.config.player.hpBarDuration;
   }
 
+  getDamageTextColor(damageType = "physical") {
+    const type = typeof damageType === "string" ? damageType.toLowerCase() : "physical";
+    if (type === "fire") return "#ff9a3c";
+    if (type === "acid") return "#4fe44a";
+    if (type === "poison") return "#b7d94c";
+    if (type === "necrotic" || type === "death" || type === "unholy") return "#b38dff";
+    if (type === "arrow") return "#ff7676";
+    if (type === "melee" || type === "physical") return "#ef5f5f";
+    if (type === "sonic") return "#8edbff";
+    if (type === "lightning") return "#f7ee74";
+    return "#ef5f5f";
+  }
+
+  getHealingTextColor() {
+    return "#79e59a";
+  }
+
   applyPlayerHealing(amount, options = {}) {
     if (amount <= 0) return;
     const suppressText = !!options.suppressText;
@@ -74,7 +91,7 @@ export class GameRuntimeBase {
       const healed = this.player.health - before;
       this.markPlayerHealthBarVisible();
       if (!suppressText) {
-        this.spawnFloatingText(this.player.x, this.player.y - 26, `+${Math.max(1, Math.round(healed))}`, "#79e59a", 0.8, 14);
+        this.spawnFloatingText(this.player.x, this.player.y - 26, `+${Math.max(1, Math.round(healed))}`, this.getHealingTextColor(), 0.8, 14);
       }
     }
   }
@@ -86,7 +103,7 @@ export class GameRuntimeBase {
 
   applyPlayerDamage(amount) {
     if (amount <= 0) return;
-    this.spawnFloatingText(this.player.x, this.player.y - 18, `-${Math.round(amount)}`, "#ef6d6d");
+    this.spawnFloatingText(this.player.x, this.player.y - 18, `-${Math.round(amount)}`, this.getDamageTextColor("physical"));
     this.player.health = Math.max(0, this.player.health - amount);
     this.markPlayerHealthBarVisible();
     if (this.player.health <= 0) this.triggerGameOver();

@@ -1,5 +1,7 @@
 import { DEFAULT_BIOME_KEY, getBiomeDefinition } from "../biomes.js";
-import { createNecromancerBeamState, createPlayerState, createRunStats, createSkillState, createUpgradeState } from "./runtimeBaseStateFactories.js";
+import { createNecromancerBeamState, createPlayerState, createRangerRuntimeState, createRunStats, createSkillState, createUpgradeState, createWarriorRuntimeState } from "./runtimeBaseStateFactories.js";
+import { createRangerTalentState } from "./rangerTalentTree.js";
+import { createWarriorTalentState } from "./warriorTalentTree.js";
 
 export function initializeRuntimeBaseState(game, { classType, classSpec, config }) {
   game.debugBossOverride = "auto";
@@ -60,6 +62,10 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.floatingTexts = [];
   game.recentPlayerShots = [];
   game.skills = createSkillState();
+  game.rangerTalents = createRangerTalentState();
+  game.warriorTalents = createWarriorTalentState();
+  game.rangerRuntime = createRangerRuntimeState();
+  game.warriorRuntime = createWarriorRuntimeState();
   game.runStats = createRunStats();
   game.warriorMomentumTimer = 0;
   game.warriorRageActiveTimer = 0;
@@ -71,6 +77,8 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.shopOrder = ["moveSpeed", "attackSpeed", "damage", "defense"];
 
   game.player = createPlayerState(classType, classSpec, config.player.maxHealth);
+  game.player.warriorRuntime = game.warriorRuntime;
+  game.player.rangerRuntime = game.rangerRuntime;
   game.door = { x: 0, y: 0, open: false };
   game.pickup = { x: 0, y: 0, taken: false };
   game.portal = { x: 0, y: 0, active: false };

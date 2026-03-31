@@ -154,7 +154,12 @@ export function applyEnemyDamage(game, enemy, amount, damageType = "physical", o
   }
   enemy.hpBarTimer = game.config.enemy.hpBarDuration;
   if (effective >= 1 || (enemy.damageTextTimer || 0) <= 0) {
-    game.spawnFloatingText(enemy.x, enemy.y - enemy.size * 0.65, `-${Math.max(1, Math.round(effective))}`, "#e85c5c");
+    game.spawnFloatingText(
+      enemy.x,
+      enemy.y - enemy.size * 0.65,
+      `-${Math.max(1, Math.round(effective))}`,
+      typeof game.getDamageTextColor === "function" ? game.getDamageTextColor(damageType) : "#e85c5c"
+    );
     enemy.damageTextTimer = 0.14;
   }
   if (enemy?.type === "skeleton_warrior" && enemy.hp <= 0) {

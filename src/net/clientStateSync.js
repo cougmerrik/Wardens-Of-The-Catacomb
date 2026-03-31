@@ -404,6 +404,18 @@ export function applyMetaStateToGame(game, state) {
   if (state.portal && typeof state.portal === "object") game.portal = { ...state.portal };
   if (state.musicTrack && typeof state.musicTrack === "object") game.musicTrack = { ...state.musicTrack };
   if (!isActiveMultiplayer && state.skills && typeof state.skills === "object") game.skills = syncNamedObject(game.skills, state.skills);
+  if (!isActiveMultiplayer && state.rangerTalents && typeof state.rangerTalents === "object") {
+    game.rangerTalents = syncNamedObject(game.rangerTalents, state.rangerTalents);
+  }
+  if (!isActiveMultiplayer && state.warriorTalents && typeof state.warriorTalents === "object") {
+    game.warriorTalents = syncNamedObject(game.warriorTalents, state.warriorTalents);
+  }
+  if (!isActiveMultiplayer && state.rangerRuntime && typeof state.rangerRuntime === "object") {
+    game.rangerRuntime = syncNamedObject(game.rangerRuntime, state.rangerRuntime);
+  }
+  if (!isActiveMultiplayer && state.warriorRuntime && typeof state.warriorRuntime === "object") {
+    game.warriorRuntime = syncNamedObject(game.warriorRuntime, state.warriorRuntime);
+  }
   if (!isActiveMultiplayer && state.upgrades && typeof state.upgrades === "object") game.upgrades = syncNamedObject(game.upgrades, state.upgrades);
 }
 
@@ -591,6 +603,18 @@ export function applySnapshotToGame({
       game.necromancerBeam.progress = 0;
     }
     if (snapshotPlayer.skills && typeof snapshotPlayer.skills === "object") game.skills = syncNamedObject(game.skills, snapshotPlayer.skills);
+    if (snapshotPlayer.rangerTalents && typeof snapshotPlayer.rangerTalents === "object") {
+      game.rangerTalents = syncNamedObject(game.rangerTalents, snapshotPlayer.rangerTalents);
+    }
+    if (snapshotPlayer.warriorTalents && typeof snapshotPlayer.warriorTalents === "object") {
+      game.warriorTalents = syncNamedObject(game.warriorTalents, snapshotPlayer.warriorTalents);
+    }
+    if (snapshotPlayer.rangerRuntime && typeof snapshotPlayer.rangerRuntime === "object") {
+      game.rangerRuntime = syncNamedObject(game.rangerRuntime, snapshotPlayer.rangerRuntime);
+    }
+    if (snapshotPlayer.warriorRuntime && typeof snapshotPlayer.warriorRuntime === "object") {
+      game.warriorRuntime = syncNamedObject(game.warriorRuntime, snapshotPlayer.warriorRuntime);
+    }
     if (snapshotPlayer.upgrades && typeof snapshotPlayer.upgrades === "object") game.upgrades = syncNamedObject(game.upgrades, snapshotPlayer.upgrades);
     if (typeof snapshotPlayer.classType === "string" && game.config?.classes?.[snapshotPlayer.classType]) {
       game.classType = snapshotPlayer.classType;

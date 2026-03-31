@@ -12,6 +12,13 @@ function shallowPlayerState(simPlayer) {
     experience: simPlayer.experience,
     expToNextLevel: simPlayer.expToNextLevel,
     skillPoints: simPlayer.skillPoints,
+    levelWeaponDamageBonus: simPlayer.levelWeaponDamageBonus,
+    skills: simPlayer.skills,
+    rangerTalents: simPlayer.rangerTalents,
+    warriorTalents: simPlayer.warriorTalents,
+    rangerRuntime: simPlayer.rangerRuntime,
+    warriorRuntime: simPlayer.warriorRuntime,
+    upgrades: simPlayer.upgrades,
     dirX: simPlayer.dirX,
     dirY: simPlayer.dirY,
     facing: simPlayer.facing,
@@ -55,7 +62,11 @@ function shallowActivePlayerState(player) {
         }
       : null,
     skills: player.skills,
+    rangerTalents: player.rangerTalents,
+    warriorTalents: player.warriorTalents,
     upgrades: player.upgrades,
+    rangerRuntime: player.rangerRuntime,
+    warriorRuntime: player.warriorRuntime,
     dirX: player.dirX,
     dirY: player.dirY,
     facing: player.facing,
@@ -281,6 +292,10 @@ export function serializeMetaState(source) {
     portal: sim.portal ? { ...sim.portal } : null,
     musicTrack,
     skills: sim.skills,
+    rangerTalents: sim.rangerTalents,
+    warriorTalents: sim.warriorTalents,
+    rangerRuntime: sim.rangerRuntime,
+    warriorRuntime: sim.warriorRuntime,
     upgrades: sim.upgrades
   };
 }

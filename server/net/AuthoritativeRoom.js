@@ -1,9 +1,13 @@
 import { GameSim } from "../../src/sim/GameSim.js";
 import {
   createNecromancerBeamState,
+  createRangerRuntimeState,
+  createWarriorRuntimeState,
   createSkillState,
   createUpgradeState
 } from "../../src/game/runtimeBaseStateFactories.js";
+import { cloneRangerTalentState, createRangerTalentState } from "../../src/game/rangerTalentTree.js";
+import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/game/warriorTalentTree.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -27,6 +31,20 @@ function cloneUpgradeState(source = null) {
     if (Number.isFinite(raw.level)) upgrade.level = Math.max(0, Math.min(upgrade.maxLevel, Math.floor(raw.level)));
   }
   return next;
+}
+
+function cloneRangerRuntimeState(source = null) {
+  return {
+    ...createRangerRuntimeState(),
+    ...(source && typeof source === "object" ? source : {})
+  };
+}
+
+function cloneWarriorRuntimeState(source = null) {
+  return {
+    ...createWarriorRuntimeState(),
+    ...(source && typeof source === "object" ? source : {})
+  };
 }
 
 function cloneNecromancerBeamState(source = null) {
@@ -210,7 +228,11 @@ export class AuthoritativeRoom {
       fireArrowCooldown: 0,
       deathBoltCooldown: 0,
       skills: cloneSkillState(),
+      rangerTalents: createRangerTalentState(),
+      warriorTalents: createWarriorTalentState(),
       upgrades: cloneUpgradeState(),
+      rangerRuntime: cloneRangerRuntimeState(),
+      warriorRuntime: cloneWarriorRuntimeState(),
       warriorMomentumTimer: 0,
       warriorRageActiveTimer: 0,
       warriorRageCooldownTimer: 0,
@@ -333,7 +355,11 @@ export class AuthoritativeRoom {
     this.sim.skillPoints = Number.isFinite(state.skillPoints) ? state.skillPoints : this.sim.skillPoints;
     this.sim.levelWeaponDamageBonus = Number.isFinite(state.levelWeaponDamageBonus) ? state.levelWeaponDamageBonus : this.sim.levelWeaponDamageBonus;
     this.sim.skills = cloneSkillState(state.skills);
+    this.sim.rangerTalents = cloneRangerTalentState(state.rangerTalents);
+    this.sim.warriorTalents = cloneWarriorTalentState(state.warriorTalents);
     this.sim.upgrades = cloneUpgradeState(state.upgrades);
+    this.sim.rangerRuntime = cloneRangerRuntimeState(state.rangerRuntime);
+    this.sim.warriorRuntime = cloneWarriorRuntimeState(state.warriorRuntime);
     this.sim.warriorMomentumTimer = Number.isFinite(state.warriorMomentumTimer) ? state.warriorMomentumTimer : 0;
     this.sim.warriorRageActiveTimer = Number.isFinite(state.warriorRageActiveTimer) ? state.warriorRageActiveTimer : 0;
     this.sim.warriorRageCooldownTimer = Number.isFinite(state.warriorRageCooldownTimer) ? state.warriorRageCooldownTimer : 0;
@@ -359,7 +385,11 @@ export class AuthoritativeRoom {
     state.fireArrowCooldown = this.sim.player.fireArrowCooldown;
     state.deathBoltCooldown = this.sim.player.deathBoltCooldown;
     state.skills = cloneSkillState(this.sim.skills);
+    state.rangerTalents = cloneRangerTalentState(this.sim.rangerTalents);
+    state.warriorTalents = cloneWarriorTalentState(this.sim.warriorTalents);
     state.upgrades = cloneUpgradeState(this.sim.upgrades);
+    state.rangerRuntime = cloneRangerRuntimeState(this.sim.rangerRuntime);
+    state.warriorRuntime = cloneWarriorRuntimeState(this.sim.warriorRuntime);
     state.score = this.sim.score;
     state.gold = this.sim.gold;
     state.experience = this.sim.experience;
@@ -405,7 +435,11 @@ export class AuthoritativeRoom {
     context.skillPoints = Number.isFinite(state.skillPoints) ? state.skillPoints : 0;
     context.levelWeaponDamageBonus = Number.isFinite(state.levelWeaponDamageBonus) ? state.levelWeaponDamageBonus : 0;
     context.skills = cloneSkillState(state.skills);
+    context.rangerTalents = cloneRangerTalentState(state.rangerTalents);
+    context.warriorTalents = cloneWarriorTalentState(state.warriorTalents);
     context.upgrades = cloneUpgradeState(state.upgrades);
+    context.rangerRuntime = cloneRangerRuntimeState(state.rangerRuntime);
+    context.warriorRuntime = cloneWarriorRuntimeState(state.warriorRuntime);
     context.warriorMomentumTimer = Number.isFinite(state.warriorMomentumTimer) ? state.warriorMomentumTimer : 0;
     context.warriorRageActiveTimer = Number.isFinite(state.warriorRageActiveTimer) ? state.warriorRageActiveTimer : 0;
     context.warriorRageCooldownTimer = Number.isFinite(state.warriorRageCooldownTimer) ? state.warriorRageCooldownTimer : 0;
@@ -430,7 +464,11 @@ export class AuthoritativeRoom {
       ? context.levelWeaponDamageBonus
       : state.levelWeaponDamageBonus;
     state.skills = cloneSkillState(context.skills);
+    state.rangerTalents = cloneRangerTalentState(context.rangerTalents);
+    state.warriorTalents = cloneWarriorTalentState(context.warriorTalents);
     state.upgrades = cloneUpgradeState(context.upgrades);
+    state.rangerRuntime = cloneRangerRuntimeState(context.rangerRuntime);
+    state.warriorRuntime = cloneWarriorRuntimeState(context.warriorRuntime);
     state.warriorMomentumTimer = Number.isFinite(context.warriorMomentumTimer) ? context.warriorMomentumTimer : 0;
     state.warriorRageActiveTimer = Number.isFinite(context.warriorRageActiveTimer) ? context.warriorRageActiveTimer : 0;
     state.warriorRageCooldownTimer = Number.isFinite(context.warriorRageCooldownTimer) ? context.warriorRageCooldownTimer : 0;

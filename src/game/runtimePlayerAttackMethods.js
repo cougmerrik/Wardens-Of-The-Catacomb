@@ -1,4 +1,26 @@
 import { vecLength } from "../utils.js";
+import {
+  getRangerFireArrowProjectileSizeBonus,
+  getRangerArrowBonusAgainstEnemy,
+  getRangerCritChance,
+  getRangerCritMultiplier,
+  getRangerIgniteChance,
+  getRangerPinningShotLengthTiles,
+  hasFireMastery,
+  hasPinningShot,
+  hasTrickShot,
+  shouldSpreadWildfire
+} from "./rangerTalentTree.js";
+import {
+  getWarriorBattleFrenzyDamageBonus,
+  getWarriorExecutionerRageRangeBonus,
+  getWarriorHeavyHandCleaveArcBonus,
+  getWarriorHeavyHandDamageBonus,
+  hasWarriorButchersPath,
+  hasWarriorCleaveDiscipline,
+  isWarriorRaging,
+  isWarriorTalentGame
+} from "./warriorTalentTree.js";
 
 export const runtimePlayerAttackMethods = {
   fire(dx, dy) {
@@ -16,6 +38,8 @@ export const runtimePlayerAttackMethods = {
     const releaseTailOffset = 7;
     const damageMultipliers = this.getMultiarrowArrowDamageMultipliers();
     const baseDamage = this.rollPrimaryDamage();
+    const critChance = getRangerCritChance(this);
+    const critMultiplier = getRangerCritMultiplier();
     if (typeof this.recordClassSpecificStat === "function") this.recordClassSpecificStat("ranger", "shotsFired", count);
     if (typeof this.recordPlayerShotTelemetry === "function") {
       const liveAimX = Number.isFinite(this.input?.mouse?.worldX) ? this.input.mouse.worldX : null;
@@ -47,6 +71,9 @@ export const runtimePlayerAttackMethods = {
         size: 6,
         damage: baseDamage,
         damageMult: damageMultipliers[i] || damageMultipliers[damageMultipliers.length - 1] || 1,
+        critMultiplier: Math.random() < critChance ? critMultiplier : 1,
+        remainingRicochets: hasTrickShot(this) ? 2 : 0,
+        linebreakerHits: 0,
         hitTargets: new Set(),
         ownerId: this.player.id || null
       });
@@ -54,9 +81,19 @@ export const runtimePlayerAttackMethods = {
   },
 
   performMeleeAttack(dx, dy) {
-    const range = this.classSpec.meleeRange || 42;
+    let range = this.classSpec.meleeRange || 42;
     const hitPadding = Number.isFinite(this.classSpec.meleeHitPadding) ? Math.max(0, this.classSpec.meleeHitPadding) : 0;
-    const arcDeg = this.classSpec.meleeArcDeg || 95;
+    let arcDeg = this.classSpec.meleeArcDeg || 95;
+    const raging = isWarriorTalentGame(this) ? isWarriorRaging(this) : (this.warriorRageActiveTimer || 0) > 0;
+    if (isWarriorTalentGame(this)) {
+      range *= 1 + getWarriorExecutionerRageRangeBonus(this) * (raging ? 1 : 0);
+      arcDeg *= 1 + getWarriorHeavyHandCleaveArcBonus(this);
+      this.warriorRuntime = this.warriorRuntime && typeof this.warriorRuntime === "object"
+        ? this.warriorRuntime
+        : (this.player?.warriorRuntime && typeof this.player.warriorRuntime === "object" ? this.player.warriorRuntime : {});
+      if (this.player) this.player.warriorRuntime = this.warriorRuntime;
+      if ((this.warriorRuntime.rageArcTimer || 0) > 0) arcDeg = 360;
+    }
     const arc = (arcDeg * Math.PI) / 180;
     let angle = Math.atan2(dy, dx);
     const halfArc = arc * 0.5;
@@ -82,6 +119,12 @@ export const runtimePlayerAttackMethods = {
     }
     if (snapTarget) angle = Math.atan2(snapTarget.y - this.player.y, snapTarget.x - this.player.x);
     let executeProc = false;
+    const guaranteedCrit = !!(this.warriorRuntime?.rageCritReady || this.warriorRuntime?.butcherCritReady);
+    const critMultiplier = guaranteedCrit ? (raging && hasWarriorCleaveDiscipline(this) ? 2.2 : 2) : 1;
+    if (isWarriorTalentGame(this)) {
+      this.warriorRuntime.rageCritReady = false;
+      this.warriorRuntime.butcherCritReady = false;
+    }
     this.meleeSwings.push({
       x: this.player.x,
       y: this.player.y,
@@ -93,6 +136,8 @@ export const runtimePlayerAttackMethods = {
       maxLife: this.config.effects.meleeSwingLife,
       ownerId: this.player.id || null
     });
+    let enemiesHit = 0;
+    let firstEnemyHit = false;
     for (const enemy of this.enemies) {
       const ex = enemy.x - this.player.x;
       const ey = enemy.y - this.player.y;
@@ -104,7 +149,15 @@ export const runtimePlayerAttackMethods = {
       while (diff < -Math.PI) diff += Math.PI * 2;
       if (Math.abs(diff) <= halfArc) {
         const hpBefore = Number.isFinite(enemy.hp) ? enemy.hp : 0;
-        this.applyEnemyDamage(enemy, this.rollPrimaryDamage(), "melee", this.player.id || null);
+        let damage = this.rollPrimaryDamage();
+        if (isWarriorTalentGame(this)) {
+          damage *= 1 + getWarriorHeavyHandDamageBonus(this, enemy);
+          if ((this.warriorMomentumTimer || 0) > 0) damage *= 1 + getWarriorBattleFrenzyDamageBonus(this);
+          damage *= critMultiplier;
+        }
+        this.applyEnemyDamage(enemy, damage, "melee", this.player.id || null);
+        enemiesHit += 1;
+        firstEnemyHit = true;
         const threshold = this.getWarriorExecuteThreshold();
         const chance = this.getWarriorExecuteChance();
         const hpRatio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;
@@ -112,13 +165,21 @@ export const runtimePlayerAttackMethods = {
           enemy.hp = 0;
           enemy.pendingExecuteKill = true;
           executeProc = true;
+          if (isWarriorTalentGame(this) && hasWarriorButchersPath(this)) this.warriorRuntime.butcherCritReady = true;
         }
-        if (hpBefore > 0 && enemy.hp <= 0 && this.warriorRageActiveTimer > 0 && (!this.isEnemyFriendlyToPlayer || !this.isEnemyFriendlyToPlayer(enemy))) {
-          const victoryRushHeal = this.getWarriorRageVictoryRushHeal();
-          if (victoryRushHeal > 0) {
-            this.warriorRageVictoryRushPool = Math.min(this.getWarriorRageVictoryRushPoolCap(), this.warriorRageVictoryRushPool + victoryRushHeal);
-            this.warriorRageVictoryRushTimer += this.getWarriorRageVictoryRushHotDuration();
-            this.spawnFloatingText(this.player.x, this.player.y - 32, "Victory Rush", "#ffb3b3", 0.8, 13);
+        if (isWarriorTalentGame(this) && hpBefore > 0 && enemy.hp <= 0 && raging && (!this.isEnemyFriendlyToPlayer || !this.isEnemyFriendlyToPlayer(enemy))) {
+          if ((this.warriorTalents?.battleFrenzy?.points || 0) > 0) {
+            const duration = this.getWarriorMomentumDuration();
+            this.warriorMomentumTimer = Math.max(this.warriorMomentumTimer || 0, duration) + 0.1;
+            const victoryRushHeal = this.getWarriorRageVictoryRushHeal();
+            if (victoryRushHeal > 0) {
+              this.warriorRageVictoryRushPool = Math.min(this.getWarriorRageVictoryRushPoolCap(), (this.warriorRageVictoryRushPool || 0) + victoryRushHeal);
+              this.warriorRageVictoryRushTimer = this.getWarriorRageVictoryRushHotDuration();
+              this.spawnFloatingText(this.player.x, this.player.y - 32, "Victory Rush", "#ffb3b3", 0.8, 13);
+            }
+          }
+          if ((this.warriorTalents?.rageMastery?.points || 0) > 0) {
+            this.warriorRageActiveTimer = Math.min(this.getWarriorRageDuration(), (this.warriorRageActiveTimer || 0) + 0.1);
           }
         }
       }
@@ -152,23 +213,32 @@ export const runtimePlayerAttackMethods = {
       return;
     }
     if (!this.isFireArrowUnlocked() || this.player.fireArrowCooldown > 0) return;
-    this.player.fireArrowCooldown = this.config.fireArrow.cooldown;
+    this.player.fireArrowCooldown = this.getRangerFireArrowCooldown();
     if (typeof this.recordClassSpecificStat === "function") this.recordClassSpecificStat("ranger", "shotsFired", 1);
     const origin = this.getBowMuzzleOrigin(dx, dy);
     const releaseTailOffset = 8;
+    const speed = this.config.fireArrow.speed;
+    const life = this.config.fireArrow.life;
+    const maxTravelDistance = speed * life;
+    const clickedX = Number.isFinite(this.input?.mouse?.worldX) ? this.input.mouse.worldX : (origin.x + origin.dirX * maxTravelDistance);
+    const clickedY = Number.isFinite(this.input?.mouse?.worldY) ? this.input.mouse.worldY : (origin.y + origin.dirY * maxTravelDistance);
+    const detonateDistance = Math.min(maxTravelDistance, vecLength(clickedX - origin.x, clickedY - origin.y) || maxTravelDistance);
     this.fireArrows.push({
       x: origin.x + origin.dirX * releaseTailOffset,
       y: origin.y + origin.dirY * releaseTailOffset,
-      vx: origin.dirX * this.config.fireArrow.speed,
-      vy: origin.dirY * this.config.fireArrow.speed,
+      vx: origin.dirX * speed,
+      vy: origin.dirY * speed,
       angle: Math.atan2(origin.dirY, origin.dirX),
-      life: this.config.fireArrow.life,
-      size: 8,
+      life,
+      size: 8 + getRangerFireArrowProjectileSizeBonus(this),
       ownerId: this.player.id || null,
       impactDamage: this.getFireArrowImpactDamage(),
       blastRadius: this.getFireArrowBlastRadius(),
-      lingerDuration: this.config.fireArrow.lingerDuration,
-      lingerDps: this.getFireArrowLingerDps()
+      lingerDuration: this.config.fireArrow.lingerDuration * this.getRangerFireArrowDurationMultiplier(),
+      lingerDps: this.getFireArrowLingerDps(),
+      pinningShot: hasPinningShot(this),
+      detonateX: hasFireMastery(this) ? origin.x + origin.dirX * detonateDistance : null,
+      detonateY: hasFireMastery(this) ? origin.y + origin.dirY * detonateDistance : null
     });
   },
 
@@ -179,11 +249,69 @@ export const runtimePlayerAttackMethods = {
     const lingerDuration = Number.isFinite(sourceState.lingerDuration) ? sourceState.lingerDuration : this.config.fireArrow.lingerDuration;
     const lingerDps = Number.isFinite(sourceState.lingerDps) ? sourceState.lingerDps : this.getFireArrowLingerDps();
     const ownerId = typeof sourceState.ownerId === "string" && sourceState.ownerId ? sourceState.ownerId : (this.player.id || null);
+    if (sourceState.pinningShot) {
+      const tile = this.config.map?.tile || 32;
+      const angle = Number.isFinite(sourceState.angle) ? sourceState.angle : 0;
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+      const lineLength = tile * getRangerPinningShotLengthTiles(this);
+      const zoneRadius = Math.max(10, tile * 0.42);
+      const segmentSpacing = tile;
+      for (const enemy of this.enemies) {
+        if (this.isEnemyFriendlyToPlayer(enemy)) continue;
+        const relX = (enemy.x || 0) - x;
+        const relY = (enemy.y || 0) - y;
+        const along = relX * dirX + relY * dirY;
+        const lateral = Math.abs(relX * -dirY + relY * dirX);
+        if (along < 0 || along > lineLength) continue;
+        if (lateral > zoneRadius + (enemy.size || 20) * 0.4) continue;
+        enemy.pinningSlowTimer = Math.max(enemy.pinningSlowTimer || 0, 1.75);
+        enemy.pinningSlowPct = Math.max(enemy.pinningSlowPct || 0, 0.25);
+        this.applyEnemyDamage(enemy, impactDamage, "fire", ownerId);
+      }
+      for (let dist = 0; dist <= lineLength; dist += segmentSpacing) {
+        this.fireZones.push({
+          x: x + dirX * dist,
+          y: y + dirY * dist,
+          radius: zoneRadius,
+          life: lingerDuration,
+          zoneType: "pinningFire",
+          ownerId,
+          dps: lingerDps
+        });
+      }
+      return;
+    }
     for (const enemy of this.enemies) {
       if (this.isEnemyFriendlyToPlayer(enemy)) continue;
       if (vecLength(x - enemy.x, y - enemy.y) <= blastRadius + enemy.size * 0.3) this.applyEnemyDamage(enemy, impactDamage, "fire", ownerId);
     }
     this.fireZones.push({ x, y, radius: blastRadius * 0.9, life: lingerDuration, zoneType: "fire", ownerId, dps: lingerDps });
+  },
+
+  applyRangerOnHitEffects(enemy, x, y) {
+    if (!(this.isArcherClass && this.isArcherClass()) || !enemy) return;
+    if (Math.random() < getRangerIgniteChance(this)) {
+      enemy.burningTimer = Math.max(enemy.burningTimer || 0, 2.2);
+      enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, this.getFireArrowLingerDps() * 0.35));
+    }
+    if (shouldSpreadWildfire(this) && (enemy.burningTimer || 0) > 0) {
+      for (const other of this.enemies || []) {
+        if (!other || other === enemy || this.isEnemyFriendlyToPlayer(other)) continue;
+        if (vecLength((other.x || 0) - enemy.x, (other.y || 0) - enemy.y) > (this.config.map?.tile || 32) * 1.35) continue;
+        if (Math.random() >= 0.25) continue;
+        other.burningTimer = Math.max(other.burningTimer || 0, 1.4);
+        other.burningDps = Math.max(other.burningDps || 0, Math.max(1, this.getFireArrowLingerDps() * 0.25));
+      }
+    }
+  },
+
+  getRangerArrowDamageAgainst(enemy, projectile) {
+    const projectileDamage = Number.isFinite(projectile?.damage) ? projectile.damage : this.rollPrimaryDamage();
+    const damageMult = Number.isFinite(projectile?.damageMult) ? projectile.damageMult : 1;
+    const critMult = Number.isFinite(projectile?.critMultiplier) ? projectile.critMultiplier : 1;
+    const linebreakerMult = 1 + this.getRangerLinebreakerDamageBonus(projectile?.linebreakerHits || 0);
+    return projectileDamage * damageMult * critMult * linebreakerMult * getRangerArrowBonusAgainstEnemy(this, enemy);
   },
 
   fireDeathBolt(dx, dy) {

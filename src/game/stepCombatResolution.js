@@ -75,6 +75,17 @@ export function resolveCombatAndDrops({
     a.x += a.vx * dt;
     a.y += a.vy * dt;
     a.life -= dt;
+    if (Number.isFinite(a.detonateX) && Number.isFinite(a.detonateY)) {
+      const remaining = vecLength((a.detonateX || 0) - a.x, (a.detonateY || 0) - a.y);
+      const stepDistance = vecLength(a.x - prevX, a.y - prevY);
+      if (remaining <= Math.max(a.size || 8, stepDistance)) {
+        a.x = a.detonateX;
+        a.y = a.detonateY;
+        game.triggerFireExplosion(a.x, a.y, a);
+        a.life = 0;
+        continue;
+      }
+    }
     for (const br of activeBreakables) {
       if ((br.hp || 0) <= 0) continue;
       const half = (br.size || 20) * 0.5 + (a.size || 8) * 0.5;
@@ -119,14 +130,23 @@ export function resolveCombatAndDrops({
         }
       }
       if (b.life <= 0) continue;
+      let reflected = false;
       for (const player of getLivingPlayers()) {
         if (vecLength(b.x - player.x, b.y - player.y) >= ((player.size || game.player.size) + b.size) * 0.5) continue;
+        if (typeof game.getWarriorMissileProtectorForPlayerEntity === "function" && typeof game.tryReflectMissileForPlayerEntity === "function") {
+          const protector = game.getWarriorMissileProtectorForPlayerEntity(player);
+          if (protector && game.tryReflectMissileForPlayerEntity(protector, b, protector)) {
+            reflected = true;
+            break;
+          }
+        }
         const rawDamage = Number.isFinite(b.damage) ? b.damage : game.config.enemy.necromancerProjectileDamage || 16;
         const scaledEnemyDamage = rawDamage * game.getEnemyDamageScale();
         damagePlayer(player, scaledEnemyDamage, b.damageType || "necrotic");
         b.life = 0;
         break;
       }
+      if (reflected) continue;
       continue;
     }
     for (const br of activeBreakables) {
@@ -148,10 +168,13 @@ export function resolveCombatAndDrops({
           b.hitTargets.add(enemy);
           continue;
         }
-        const dmgMult = Number.isFinite(b.damageMult) ? b.damageMult : 1;
-        const projectileDamage = Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage();
-        game.applyEnemyDamage(enemy, projectileDamage * Math.max(0.01, dmgMult), "arrow", b.ownerId || null);
+        const projectileDamage = typeof game.getRangerArrowDamageAgainst === "function"
+          ? game.getRangerArrowDamageAgainst(enemy, b)
+          : (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1);
+        game.applyEnemyDamage(enemy, projectileDamage, "arrow", b.ownerId || null);
+        if (typeof game.applyRangerOnHitEffects === "function") game.applyRangerOnHitEffects(enemy, b.x, b.y);
         b.hitTargets.add(enemy);
+        b.linebreakerHits = (Number.isFinite(b.linebreakerHits) ? b.linebreakerHits : 0) + 1;
         if (Math.random() >= game.getPiercingChance()) b.life = 0;
         break;
       }
@@ -254,7 +277,7 @@ export function resolveCombatAndDrops({
       }
       continue;
     }
-    if (zone.zoneType && zone.zoneType !== "fire") continue;
+    if (zone.zoneType && zone.zoneType !== "fire" && zone.zoneType !== "pinningFire") continue;
     for (const br of activeBreakables) {
       if (vecLength(zone.x - br.x, zone.y - br.y) < zone.radius + br.size * 0.32) br.hp = 0;
     }
@@ -270,9 +293,17 @@ export function resolveCombatAndDrops({
       }
       if (vecLength(zone.x - enemy.x, zone.y - enemy.y) < zone.radius + enemy.size * 0.35) {
         const lingerDps = Number.isFinite(zone.dps) ? zone.dps : game.getFireArrowLingerDps();
+        enemy.burningTimer = Math.max(enemy.burningTimer || 0, 0.25);
+        enemy.burningDps = Math.max(enemy.burningDps || 0, lingerDps);
         game.applyEnemyDamage(enemy, lingerDps * dt, "fire", zone.ownerId || null);
       }
     }
+  }
+
+  for (const enemy of activeEnemies) {
+    if (!enemy || (enemy.hp || 0) <= 0) continue;
+    if ((enemy.burningTimer || 0) <= 0 || !Number.isFinite(enemy.burningDps) || enemy.burningDps <= 0) continue;
+    game.applyEnemyDamage(enemy, enemy.burningDps * dt, "fire", enemy.lastDamageOwnerId || null);
   }
 
   for (const enemy of activeEnemies) {
