@@ -132,16 +132,18 @@ For the current target of:
 
 The recommended skill point progression is:
 
-- `Levels 2-17`: award `1 SP` per level
-- `Levels 18-30`: award `2 SP` per level
+- `Level 2`: award `2 SP`
+- `Levels 3-11`: award `1 SP` per level
+- `Levels 12-20`: award `1 SP` every `2` levels
 
 Math:
 
-- Levels `2-17` = `16` levels = `16 SP`
-- Levels `18-30` = `13` levels = `26 SP`
-- total = `42 SP`
+- Level `2` = `2 SP`
+- Levels `3-11` = `9 SP`
+- Levels `12, 14, 16, 18, 20` = `5 SP`
+- total by `Level 20` = `16 SP`
 
-This gives a clean progression breakpoint and ensures the full class tree can be completed by the level cap without requiring post-cap progression.
+This front-loads the early tree enough for Row 4 access at the start of floor 5, then slows progression so later points feel more deliberate.
 
 ## Ranger
 
@@ -217,10 +219,10 @@ The ranger should have one shared right-click active. The cleanest candidate rem
 | Row | Sharpshooter | Skirmisher | Warden |
 |---|---|---|---|
 | 0 |  | `Fire Arrow` |  |
-| 1 | `Keen Sight` | `Fleetstep` | `Kindling` |
-| 2 | `Pinning Shot` | `Quick Draw` | `Fire Arrow` |
+| 1 | `Keen Sight` | `Multi-Shot Arrow` | `Kindling` |
+| 2 | `Pinning Shot` | `Fleetstep` | `Fire Mastery` |
 | 3 | `Linebreaker` | `Dance of Thorns` | `Volleycraft` |
-| 4 | `Cull the Pack` | `Foxstep` | `Wildfire Volley` |
+| 4 | `Cull the Pack` | `Foxstep` | `Wildfire` |
 
 ### Ranger Node Details
 
@@ -272,13 +274,15 @@ The ranger should have one shared right-click active. The cleanest candidate rem
 - Rank 2: `+3% projectile speed, +3% ranged damage, +4% crit chance`
 - Rank 3: `+3% projectile speed, +3% ranged damage, +4% crit chance`
 
-##### Fleetstep
+##### Multi-Shot Arrow
 - Type: passive
 - Ranks: `3`
-- Purpose: establish the ranger's movement identity and the Skirmisher lane's survival role
-- Rank 1: `+4% move speed, +2% max health, +5% dodge`
-- Rank 2: `+4% move speed, +2% max health, +5% dodge`
-- Rank 3: `+4% move speed, +2% max health, +5% dodge`
+- Purpose: core Skirmisher throughput node
+- Rank 1: `Multishot +1 Arrow, +25% chance to spot traps, +25% chance to spot hidden monsters`
+- Rank 2: `Multishot +1 Arrow, +25% chance to spot traps, +25% chance to spot hidden monsters`
+- Rank 3: `Multishot +1 Arrow, +25% chance to spot traps, +25% chance to spot hidden monsters`
+- Multiplayer rider option:
+  - Nearby allies spot any traps or hidden monsters you spot
 
 ##### Kindling
 - Type: passive
@@ -296,19 +300,16 @@ The ranger should have one shared right-click active. The cleanest candidate rem
 - Purpose: convert the ranger active toward a precise lane-control shot for Sharpshooter builds
 - Effects:
   - the ranger active fire arrow generates fire in a line instead of a circle, damaging and slowing all enemies that enter it by 25%
+  - arrows that pass through the fire line deal `+10%` damage
   - this is not a second permanent button; it is a lane modifier on the ranger active
 - Multiplayer Effect:
   - Allies do +10% damage to enemies slowed by fire arrow
 
-##### Multi-Shot Arrow
+##### Fleetstep
 - Type: passive
-- Ranks: `3`
-- Purpose: core Skirmisher throughput node
-- Rank 1: `Multishot +1 Arrow, +25% chance to spot traps, +25% chance to spot hidden monsters`
-- Rank 2: `Multishot +1 Arrow, +25% chance to spot traps, +25% chance to spot hidden monsters`
-- Rank 3: `Multishot +1 Arrow, +25% chance to spot traps, +25% chance to spot hidden monsters`
-- Multiplayer rider option:
-  - Nearby allies spot any traps or hidden monsters you spot
+- Ranks: `1`
+- Purpose: establish the ranger's movement identity and the Skirmisher lane's survival role
+- Rank 1: `+12% move speed, +6% max health, +15% dodge`
 
 ##### Fire Mastery
 - Type: modifier
@@ -343,9 +344,9 @@ The ranger should have one shared right-click active. The cleanest candidate rem
 - Type: passive
 - Ranks: `3`
 - Purpose: make the Warden lane's version of the ranger active feel like controlled crowd pressure
-- Rank 1: `Fire Arrow cooldown reduced by 2 seconds`
-- Rank 2: `Fire Arrow cooldown reduced by 2 seconds`
-- Rank 3: `Fire Arrow cooldown reduced by 2 seconds`
+- Rank 1: `Fire Arrow cooldown reduced by 1 second`
+- Rank 2: `Fire Arrow cooldown reduced by 1 second`
+- Rank 3: `Fire Arrow cooldown reduced by 1 second`
 
 #### Row 4
 
@@ -367,13 +368,13 @@ The ranger should have one shared right-click active. The cleanest candidate rem
   - optional multiplayer rider:
     - nearby allies damage is reduced by 25% while this effect is enabled
 
-##### Wildfire Volley
+##### Wildfire
 - Type: capstone
 - Ranks: `1`
 - Purpose: turn Warden into the premier wave-shaping lane
 - Effects:
   - `Fire Arrow` radius is doubled
-  - Burning enemies take 25% more arrow damage
+  - Burning enemies take 15% more arrow damage
   - Burning enemies have a 25% chance to set other nearby enemies on fire
 
 ### Ranger Crossover Patterns
@@ -411,10 +412,10 @@ The warrior should feel like:
 
 ### Lane Overview
 
+- `Crusader`
+  - consecrated ground, anti-undead pressure, stand-your-ground defense
 - `Executioner`
   - direct weapon damage, cleave, finishing pressure
-- `Vanguard`
-  - health, defense, anti-pressure, front-line durability
 - `Berserker`
   - speed, rage, sustain spikes, aggressive momentum
 
@@ -423,8 +424,8 @@ The warrior should feel like:
 The warrior should also use one shared right-click active. The strongest candidate remains `Rage`, reframed as a core combat activation:
 
 - baseline use: short offensive commitment window
+- `Crusader` investment makes it defensive, holy, and zone-controlling
 - `Executioner` investment makes it deadlier and more front-loaded
-- `Vanguard` investment makes it more defensive and stabilizing
 - `Berserker` investment makes it faster, longer, and more snowbally
 
 If a more direct strike ability is preferred instead, the same lane logic still applies:
@@ -435,20 +436,19 @@ If a more direct strike ability is preferred instead, the same lane logic still 
 
 ### Warrior Stat Ownership
 
+#### Crusader owns
+
+- defense
+- holy area control
+- anti-undead pressure
+- healing amplification inside consecrated ground
+
 #### Executioner owns
 
 - raw damage
 - cleave efficiency
 - execute thresholds
 - melee range feel
-
-#### Vanguard owns
-
-- max health
-- defense
-- damage reduction
-- regen
-- anti-burst stability
 
 #### Berserker owns
 
@@ -460,13 +460,13 @@ If a more direct strike ability is preferred instead, the same lane logic still 
 
 ### Warrior Tree
 
-| Row | Executioner | Vanguard | Berserker |
+| Row | Crusader | Executioner | Berserker |
 |---|---|---|---|
 | 0 |  | `Rage` |  |
-| 1 | `Heavy Hand` | `Iron Guard` | `Bloodheat` |
-| 2 | `Cleave Discipline` | `Guarded Advance` | `Rage` |
-| 3 | `Executioner’s Reach` | `Unbroken` | `Battle Frenzy` |
-| 4 | `Butcher’s Path` | `Stonewall` | `Red Tempest` |
+| 1 | `Sanctified Steel` | `Heavy Hand` | `Bloodheat` |
+| 2 | `Consecrated Rage` | `Cleave Discipline` | `Rage Mastery` |
+| 3 | `Purging Light` | `Executioner’s Reach` | `Battle Frenzy` |
+| 4 | `Judgment Wave` | `Butcher’s Path` | `Red Tempest` |
 
 ### Warrior Node Details
 
@@ -508,6 +508,14 @@ If a more direct strike ability is preferred instead, the same lane logic still 
 
 #### Row 1
 
+##### Sanctified Steel
+- Type: passive
+- Ranks: `3`
+- Purpose: establish Crusader as the holy stand-your-ground lane
+- Rank 1: `+4% defense`
+- Rank 2: `+4% defense, +8 max health`
+- Rank 3: `+4% defense, +8 max health, +6% damage against undead`
+
 ##### Heavy Hand
 - Type: passive
 - Ranks: `3`
@@ -516,23 +524,26 @@ If a more direct strike ability is preferred instead, the same lane logic still 
 - Rank 2: `+4% melee damage`, `+10% cleave arc`
 - Rank 3: `+4% damage against enemies above 70% health`
 
-##### Iron Guard
-- Type: passive
-- Ranks: `3`
-- Purpose: establish Vanguard as the main durability lane
-- Rank 1: `+8 max health`
-- Rank 2: `+8 max health, +4% defense`
-- Rank 3: `+8 max health, +0.25% passive regen`
-
 ##### Bloodheat
 - Type: passive
 - Ranks: `3`
 - Purpose: establish Berserker as the momentum lane
 - Rank 1: `+5% attack speed`
-- Rank 2: `+5% attack speed, +5% move speed while in combat`
-- Rank 3: `+5% attack speed, +5% life leech while rage is active`
+- Rank 2: `+5% attack speed, +5% move speed while Rage is active`
+- Rank 3: `+5% attack speed, +5% passive move speed`
 
 #### Row 2
+
+##### Consecrated Rage
+- Type: modifier
+- Ranks: `1`
+- Purpose: make Rage create a holy stand-your-ground zone instead of a pure stat steroid
+- While raging, create a consecrated area where Rage was activated
+- Consecrated area radius: `4 tiles` before Purging Light
+- Consecrated area deals holy damage over time
+- Consecrated area deals bonus damage to undead
+- Healing received within the consecrated area is increased
+- While standing in the consecrated area, the warrior gains `5%` damage reduction
 
 ##### Cleave Discipline
 - Type: modifier
@@ -540,30 +551,30 @@ If a more direct strike ability is preferred instead, the same lane logic still 
 - Purpose: make the warrior active feel like an Executioner tool instead of adding another button
 - The first attack after the rage skill is activated will deal critical damage.
 - Rage increases critical damage by 20%.
-
-
-##### Guarded Advance
-- Type: passive
-- Ranks: `3`
-- Purpose: make Vanguard the lane that thrives while pressing into contact
-- Rank 1: `+5% defense against melee attacks`
-- Rank 2: `+5% defense against melee attacks, deal +3 damage when struck in melee`
-- Rank 3: `+5% defense against melee attacks, deal +3 damage when struck in melee`
-- Active interaction:
-  - While raging, 10% chance to ignore damage on hit
-- Multiplayer rider option:
-  - While within 3 tiles of the warrior, take -3 damage from melee or arrow attacks
+- While raging, cleave width is `+10%`
 
 ##### Rage Mastery
 - Type: modifier anchor
 - Ranks: `1`
 - Enhances the warrior's Row 0 active in the Berserker direction
 - Rage increases attack speed by 25%
-- Rage increases movement speed by 15%
+- Rage increases movement speed by 10%
 - Includes a small passive rider:
   - `+15% rage duration` or slightly better baseline rage uptime
 
 #### Row 3
+
+##### Purging Light
+- Type: passive
+- Ranks: `3`
+- Purpose: deepen the consecrated-area identity without adding a second active
+- Rank 1: `+15% consecrated area radius`
+- Rank 2: `+15% consecrated area holy damage`
+- Rank 3: undead inside the consecrated area take `+20% damage`
+- Active interaction:
+  - Rage still grants Second Wind, healing yourself for 25% max health over 10 seconds
+- Multiplayer rider option:
+  - When Rage is triggered, nearby allies gain 10% of their maximum health over 10 seconds
 
 ##### Executioner's Reach
 - Type: passive
@@ -575,29 +586,27 @@ If a more direct strike ability is preferred instead, the same lane logic still 
 - Active interaction:
   - While raging, attack range is `+10% longer`.
 
-##### Unbroken
-- Type: passive
-- Ranks: `3`
-- Purpose: give Vanguard its true front-line identity
-- Rank 1: While below 50% health, gain 8% damage reduction.
-- Rank 2: While below 25% health, gain 8% damage reduction and +0.2% life leech.
-- Rank 3: You are always raging while under 10% health.
-- Active interaction:
-  - When you trigger rage, you gain `Second Wind`, healing yourself for 25% or your maximum health over 10 seconds.
-- Multiplayer rider option:
-  - When rage is triggered, nearby allies gain 10% of their maximum health over 10 seconds.
-
 ##### Battle Frenzy
 - Type: passive
 - Ranks: `3`
 - Purpose: reward kill-chain pressure and staying active in the wave
-- Rank 1: When you kill an enemy while raging, gain Battle Frenzy and gain `+10% move speed and +5% damage` for 3 seconds. Add 0.1 second to the buff for each enemy killed.
+- Rank 1: When you kill an enemy while raging, gain Battle Frenzy and gain `+10% move speed and +5% damage` for 3 seconds. This has a `10` second internal cooldown.
 - Rank 2: While under the effects of Battle Frenzy, you gain `+10% move speed and +5% damage`
 - Rank 3: While under the effects of Battle Frenzy, you gain `+10% move speed and +5% damage`
 - Active interaction:
   - rage windows extend or intensify when kills happen during the active
 
 #### Row 4
+
+##### Judgment Wave
+- Type: capstone
+- Ranks: `1`
+- Purpose: make Crusader the holy front-line lane that locks down undead-heavy space
+- Effects:
+  - Cleave attacks have a chance to release a holy wave in the swing arc
+  - The holy wave travels forward and damages enemies it passes through
+  - Undead struck by the holy wave have their defenses reduced, causing them to take more damage
+  - While raging, Crusader turns gold instead of red
 
 ##### Butcher's Path
 - Type: capstone
@@ -606,15 +615,7 @@ If a more direct strike ability is preferred instead, the same lane logic still 
 - Effects:
   - After executing an enemy, your next hit is a guaranteed critical
   - While raging, your execution chance is doubled.
-
-##### Stonewall
-- Type: capstone
-- Ranks: `1`
-- Purpose: make Vanguard the class's premiere hold-the-line lane
-- Effects:
-  - `+20 max health, +0.5% lifesteal`
-  - When you would be reduced to <= 0hp, your hp becomes 1 and you become immune to all damage for 5 seconds. 60 second cooldown.
-  - All allies gain +15% defense for 5 seconds while you are raging
+  - After executing an enemy, your next cleave gains `+20%` width and `+20%` damage
 
 ##### Red Tempest
 - Type: capstone
@@ -627,21 +628,23 @@ If a more direct strike ability is preferred instead, the same lane logic still 
   
 ### Warrior Crossover Patterns
 
-#### Executioner -> Vanguard
-- high-damage front-liner with better stability
-- ideal for players who want pressure without full glass-cannon risk
-
-#### Vanguard -> Berserker
-- durable bruiser that ramps as the fight drags on
-- likely the safest warrior progression shape
+#### Crusader -> Executioner
+- durable front-liner who adds better direct damage and execute pressure
+- ideal for players who want to hold space without becoming purely defensive
 
 #### Executioner -> Berserker
 - all-in aggression build
 - strongest offense, weakest passive durability
 
+#### Crusader -> Berserker
+- high-damage front-liner with better stability
+- holy bruiser that ramps while holding consecrated ground
+- likely the safest warrior progression shape with better multiplayer value
+
 ### Warrior Design Notes
 
-- Major health and defense should mostly live in `Vanguard`
+- Major health and defense should mostly live in `Crusader`
+- `Crusader` should survive by sanctifying space, not by pure brick-wall mitigation
 - `Executioner` should be horde-relevant through cleave and front-line deletion, not only boss damage
 - `Berserker` should feel fast and explosive, but not permanently tanky
 
@@ -660,20 +663,20 @@ The class should feel like:
 ### Lane Overview
 
 - `Reaper`
-  - direct spell damage, death bolt pressure, corpse explosions
+  - direct spell damage, death bolt pressure, self-buffing through undead presence and death
 - `Gravekeeper`
   - pet durability, healing, ally support, command stability
 - `Plaguebinder`
-  - curses, zones, spread effects, sustained attrition
+  - curses, zones, spread effects, sacrificial undead pressure
 
 ### Necromancer Core Active
 
 The necromancer's shared right-click active should remain `Death Bolt`.
 
 - baseline use: direct necrotic projectile with utility and setup value
-- `Reaper` investment makes it the direct damage and burst lane
+- `Reaper` investment makes it the direct damage and burst lane, with undead amplifying the necromancer instead of being buffed themselves
 - `Gravekeeper` investment makes it support pets, formation, and healing
-- `Plaguebinder` investment makes it spread afflictions, zones, and attrition
+- `Plaguebinder` investment makes it spread afflictions, zones, and turn undead into expendable plague vectors
 
 This is the clearest class for the shared-active model, because the existing kit already points this way.
 
@@ -685,6 +688,7 @@ This is the clearest class for the shared-active model, because the existing kit
 - death bolt scaling
 - explosion damage
 - projectile quality
+- self-buffs gained from nearby undead, undead kills, or undead deaths
 
 #### Gravekeeper owns
 
@@ -701,16 +705,20 @@ This is the clearest class for the shared-active model, because the existing kit
 - duration
 - cooldown reduction
 - spread and chain pressure
+- on-death undead effects
+- plague-vector pet behavior
 
 ### Necromancer Tree
 
 | Row | Reaper | Gravekeeper | Plaguebinder |
 |---|---|---|---|
 | 0 |  | `Death Bolt` |  |
-| 1 | `Black Candle` | `Cold Command` | `Rot Touched` |
-| 2 | `Death Bolt` | `Control Mastery` | `Hexcraft` |
-| 3 | `Exploding Death` | `Bone Ward` | `Lingering Hex` |
+| 1 | `Black Candle` | `Control Mastery` | `Hexcraft` |
+| 2 | `Death Mastery` | `Cold Command` | `Plaguecraft` |
+| 3 | `Exploding Death` | `Bone Ward` | `Rot Touched` |
 | 4 | `Harvester` | `Legion Master` | `Blightstorm` |
+
+- Necromancer baseline charm time starts at `1.5s` and smoothly drops by level until reaching `0.33s` at `Level 10`.
 
 ### Necromancer Node Details
 
@@ -719,9 +727,11 @@ This is the clearest class for the shared-active model, because the existing kit
 ##### Death Bolt
 - Type: core active
 - Ranks: `1`
+
 - The necromancer's first skill point grants the class right-click active
 - Baseline purpose:
   - a direct necrotic projectile that later lanes can push toward burst, support, or affliction play
+  - the necrotic beam can always deal direct damage, but at a lower base output than the ranger's arrows
 - Later lane nodes modify this active rather than adding more normal buttons
 
 ##### Move Speed Training
@@ -753,93 +763,100 @@ This is the clearest class for the shared-active model, because the existing kit
 ##### Black Candle
 - Type: passive
 - Ranks: `3`
-- Purpose: establish Reaper as the direct offense lane
-- Rank 1: `+6% Death Bolt damage`
-- Rank 2: `+5% explosion damage`
-- Rank 3: `+8% projectile speed` or better Death Bolt travel quality
+- Purpose: establish Reaper as the direct offense lane where pets feed the necromancer's power instead of being durable assets
+- Rank 1: `+5% Death Bolt damage, +5% explosion damage, +15% necrotic beam damage`
+- Rank 2: `+5% Death Bolt damage, +5% explosion damage, +15% necrotic beam damage`
+- Rank 3: `+5% Death Bolt damage, +5% explosion damage, +15% necrotic beam damage`
+- If the target is cursed, necrotic beam deals `+10%` damage
 
-##### Cold Command
+##### Control Mastery
 - Type: passive
 - Ranks: `3`
 - Purpose: establish Gravekeeper as the pet-command lane
-- Rank 1: `+8% controlled undead health`
-- Rank 2: `+6% controlled undead defense`
-- Rank 3: `+8% healing to controlled undead`
+- Rank 1: `+1 controlled undead, +15% necrotic beam healing`
+- Rank 2: `+1 controlled undead, +15% necrotic beam healing`
+- Rank 3: `+1 controlled undead, +15% necrotic beam healing`
 - Multiplayer rider option:
-  - nearby allies gain a small protection bonus while close to controlled undead
+  - attacks against allies in the same tile as undead harm the undead only
 
-##### Rot Touched
+##### Hexcraft
 - Type: passive
 - Ranks: `3`
-- Purpose: establish Plaguebinder as the attrition and zone lane
-- Rank 1: `+10% damage-over-time duration`
-- Rank 2: `+8% zone or effect radius`
-- Rank 3: `+8% damage against affected targets`
-- Multiplayer rider option:
-  - afflicted enemies take a small amount of bonus allied damage
+- Purpose: turn `Death Bolt` toward affliction setup and make undead function like disposable plague missiles
+- Rank 1:
+  - `Death Bolt` applies `Curse` on hit
+  - `Death Bolt` deals poison damage
+  - `Curse`: `-25% attack speed`, `-25% defense`, `+25% poison vulnerability`
+- Rank 2:
+    - `Curse` lasts `+1` second
+    - cursed enemies take `+20%` damage from controlled undead
+- Rank 3:
+    - `Death Bolt` curse radius increases
+    - cursed enemies also take stronger poison damage over time from `Rot`
 
 #### Row 2
 
-##### Death Bolt Mastery
+##### Death Mastery
 - Type: modifier anchor
-- Ranks: `1`
-- Enhances the necromancer's Row 0 active in the Reaper direction
+- Ranks: `3`
+- Increase deathbolt active damage by 10% per rank
+- Reduce cooldown by 1s per rank
 - Includes a small passive rider:
-  - `+10% Death Bolt impact damage`
+  - Increase necrotic beam pulse rate by `15%` per rank
+  - Death Bolt and necrotic beam kills grant `1` temporary hp, up to `20%` of the necromancer's max hp
 
-##### Control Mastery
+##### Cold Command
 - Type: modifier
 - Ranks: `3`
 - Formalizes the Gravekeeper lane's modification of `Death Bolt` and pet control
 - Rank 1:
-  - improved controlled-undead capacity/quality lever, depending on final implementation
-  - `Death Bolt` gains stronger healing or command interaction with nearby controlled undead
+  - `+15% controlled undead health, +10% defense, +10% damage, +10% attack speed`
+  - Kills from Death Bolt have a +10% chance to spawn a controlled ghost, if the necromancer has slots available.
 - Rank 2:
-  - `+8%` controlled-undead healing received
-  - stronger command/formation response after `Death Bolt`
+  - `+15% controlled undead health, +10% defense, +10% damage, +10% attack speed`
+  - Kills from Death Bolt have a +10% chance to spawn a controlled ghost, if the necromancer has slots available.
 - Rank 3:
-  - `+6%` controlled-undead defense while near the necromancer
-  - improved multiplayer support pulse for nearby allies around controlled undead
+  - `+15% controlled undead health, +10% defense, +10% damage, +10% attack speed`
+  - Kills from Death Bolt have a +10% chance to spawn a controlled ghost, if the necromancer has slots available.
 
-##### Hexcraft
-- Type: modifier
+##### Plaguecraft
+- Type: passive
 - Ranks: `3`
-- Purpose: turn `Death Bolt` toward affliction setup instead of adding another button
+- Purpose: make Plaguebinder strongest in drawn-out crowd fights where undead are expected to die profitably
 - Rank 1:
-  - `Death Bolt` applies or strengthens plague/curse-style effects
-  - `+12%` duration on persistent necrotic effects
+  - controlled undead attacks apply `Rot` to a single target
+  - `Rot`: poison damage over time and `-25% movement speed`
 - Rank 2:
-  - afflicted enemies take `+6%` damage from necromancer zones or pets
+  - when controlled undead die, all enemies within `1` tile gain `Rot`
 - Rank 3:
-  - `Death Bolt` gains better affliction spread or a larger affliction radius
+  - non-undead enemies suffering from either `Curse` or `Rot` have a `20%` chance to rise again as controlled skeletons on death, if the necromancer has control slots available
 
 #### Row 3
 
 ##### Exploding Death
 - Type: modifier
 - Ranks: `1`
-- Applies the current `Exploding Death` augment to the shared `Death Bolt` lane plan
-- Serves as the Reaper lane's crowd-pressure bridge by turning kills and ally deaths into burst zones
+- When undead die, they explode and deal 5 damage within a 2 tile radius
+- When a controlled undead dies, the necromancer gains Vigor of Life:
+    - +15% defense for 5 seconds (capped, non-stacking) and healing of 15% of their total hp over 5 seconds.
 
 ##### Bone Ward
 - Type: passive
-- Ranks: `3`
+- Ranks: `1`
 - Purpose: make Gravekeeper the safest and most reliable minion lane
-- Rank 1: controlled undead take `6%` less damage
-- Rank 2: revived or healed undead return with stronger baseline health
-- Rank 3: controlled undead near the necromancer gain an additional defense bonus
-- Active interaction:
-  - `Death Bolt` cast near allies grants stronger pet sustain or defensive reinforcement
+- Rank 1:
+  - controlled undead take `10%` less damage
+  - controlled undead within `2` tiles of the necromancer gain `+10%` damage
+  - controlled undead within `2` tiles of the necromancer have a `15%` chance to reflect projectiles
 
-##### Lingering Hex
+##### Rot Touched
 - Type: passive
-- Ranks: `3`
-- Purpose: make Plaguebinder strongest in drawn-out crowd fights
-- Rank 1: curses and plague effects last longer
-- Rank 2: afflicted enemies take bonus damage from undead or Death Bolt follow-up
-- Rank 3: spreading or overlapping effects gain extra radius or chain behavior
-- Active interaction:
-  - `Death Bolt` becomes better at seeding or extending afflictions
+- Ranks: `1`
+- Purpose: add a late-row battlefield-shaping upgrade to Death Bolt's lingering area
+- Rank 1:
+  - `Death Bolt` area duration `+20%`
+  - `Death Bolt` area radius `+10%`
+  - enemies that hit the necromancer take `5` poison damage
 
 #### Row 4
 
@@ -848,60 +865,59 @@ This is the clearest class for the shared-active model, because the existing kit
 - Ranks: `1`
 - Purpose: make Reaper the necromancer's direct kill-pressure lane
 - Effects:
-  - `Death Bolt` and corpse explosions scale harder off clustered enemies
-  - kills strengthen the next direct necrotic effect
+  - Gain a 1 tile necrotic aura around the necromancer.
+  - Enemies that die within the aura have a 40% chance to rise as controlled ghosts, if the necromancer has slots available.
+  - Reduce the cooldown on death bolt by 20%.
+  - For every kill, the necromancer's next death bolt damage increases by 5% (up to 50%)
   - direct spellcasting becomes a legitimate primary playstyle rather than just support for pets
-  - optional active-capstone version:
-    - `Death Bolt` becomes a heavier reaping cast with stronger cluster burst
-
+  
 ##### Legion Master
 - Type: capstone
 - Ranks: `1`
 - Purpose: make Gravekeeper the dominant ally-command lane
 - Effects:
-  - strong controlled-undead durability and healing support
-  - tighter formation or better bodyguard behavior around the necromancer
-  - charmed allies become far more reliable as a stable frontline
-  - optional active-capstone version:
-    - `Death Bolt` can issue a command pulse or formation reinforcement on cast
+  - Skeletal warriors can shoot arrows with a range of 5 tiles
+  - Ghosts life steal increases by 0.2%
+  - Kills from Death Bolt have a +50% chance to spawn a controlled ghost, if the necromancer has slots available.
 
 ##### Blightstorm
 - Type: capstone
 - Ranks: `1`
 - Purpose: make Plaguebinder the attrition king of crowd control
 - Effects:
-  - larger, longer, or more punishing plague zones
-  - afflicted enemies feed further spread or chain reactions
-  - crowd fights become progressively more favorable the longer enemies stay inside the necromancer's control area
-  - optional active-capstone version:
-    - `Death Bolt` seeds a wider plague bloom on impact
-
+  - `Death Bolt` fires `3` bolts in a wide cone
+  - the necromancer's necrotic beam applies `Curse`
+  - controlled undead spawn a mini plague burst when they die (`2` tile radius)
+  - `Curse` and `Rot` stack visually and mechanically:
+    - `Curse` uses purple fire
+    - `Rot` uses a green teardrop layered above it
+  
 ### Necromancer Crossover Patterns
 
 #### Reaper -> Gravekeeper
-- active caster build with enough stable minion support to stay safe
+- active caster build with enough stable minion support to stay safe while still centering the necromancer's own power
 - likely the most approachable offensive necromancer hybrid
 
 #### Gravekeeper -> Plaguebinder
-- stable commander build with stronger long-fight control
+- stable commander build with stronger long-fight control, where preserved undead later become useful plague carriers
 - likely the safest broad necromancer shape
 
 #### Reaper -> Plaguebinder
 - high-pressure caster-control build
-- strongest direct spell and zone output, less forgiving if minions collapse
+- strongest direct spell and zone output, with undead serving as spell fuel and sacrificial spread tools rather than a stable frontline
 
 ### Necromancer Design Notes
 
 - `Gravekeeper` should own most of the pet-defense and ally-healing budget
-- `Reaper` should give the necromancer a stronger direct play option without erasing the pet fantasy
-- `Plaguebinder` should make the class better at choking off space and grinding down crowds
+- `Reaper` should give the necromancer a stronger direct play option without erasing the pet fantasy, by making undead amplify the caster instead of becoming tougher
+- `Plaguebinder` should make the class better at choking off space and grinding down crowds by making undead disposable plague vectors rather than tanky lieutenants
 
 ## Cross-Class Design Principles
 
 ### 1. Every class needs one lane that carries most of its survivability budget
 
 - Ranger: `Skirmisher`
-- Warrior: `Vanguard`
+- Warrior: `Crusader`
 - Necromancer: `Gravekeeper`
 
 ### 2. Every lane must solve the class’s core game problem
@@ -924,7 +940,7 @@ Good crossover means:
 
 - a Sharpshooter can dip into Skirmisher and still feel like a Sharpshooter
 - a Necromancer Reaper can dip into Gravekeeper and still feel spell-forward
-- a Warrior Berserker can take some Vanguard stability without turning into a pure tank
+- a Warrior Berserker can take some Crusader stability without turning into a pure tank
 
 ### 5. Multiplayer support should be additive, not mandatory
 
