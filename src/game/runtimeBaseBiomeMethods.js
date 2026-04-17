@@ -144,8 +144,9 @@ export const runtimeBaseBiomeMethods = {
     return this.map[ty]?.[tx] || "#";
   },
 
-  getPlayerTerrainMoveMultiplier() {
-    const tile = this.getMapTileAtWorld(this.player.x, this.player.y);
+  getPlayerTerrainMoveMultiplier(entity = this.player) {
+    if (typeof this.hasPassiveConsumableForEntity === "function" && this.hasPassiveConsumableForEntity(entity, "elvenBoots")) return 1;
+    const tile = this.getMapTileAtWorld(entity?.x || 0, entity?.y || 0);
     if (this.biomeKey === "sewer" && tile === "~") return 0.8;
     return 1;
   }

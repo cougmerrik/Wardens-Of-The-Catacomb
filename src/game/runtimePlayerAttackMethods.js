@@ -191,7 +191,12 @@ export const runtimePlayerAttackMethods = {
           }
           damage *= critMultiplier;
         }
+        if (typeof this.getConsumableBonusDamage === "function") damage += this.getConsumableBonusDamage();
         this.applyEnemyDamage(enemy, damage, "melee", this.player.id || null);
+        if (typeof this.applyPrimaryAttackConsumableBenefits === "function") {
+          const dealt = Math.max(0, hpBefore - Math.max(0, enemy.hp || 0));
+          this.applyPrimaryAttackConsumableBenefits(this.player, dealt, hpBefore > 0 && (enemy.hp || 0) <= 0);
+        }
         if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null);
         enemiesHit += 1;
         firstEnemyHit = true;
@@ -345,7 +350,9 @@ export const runtimePlayerAttackMethods = {
     }
     for (const enemy of this.enemies) {
       if (this.isEnemyFriendlyToPlayer(enemy)) continue;
-      if (vecLength(x - enemy.x, y - enemy.y) <= blastRadius + enemy.size * 0.3) this.applyEnemyDamage(enemy, impactDamage, "fire", ownerId);
+      if (vecLength(x - enemy.x, y - enemy.y) <= blastRadius + enemy.size * 0.3) {
+        this.applyEnemyDamage(enemy, impactDamage, "fire", ownerId);
+      }
     }
     this.fireZones.push({ x, y, radius: blastRadius * 0.9, life: lingerDuration, zoneType: "fire", ownerId, dps: lingerDps });
   },
@@ -395,7 +402,9 @@ export const runtimePlayerAttackMethods = {
     const detonateY = origin.y + origin.dirY * travelDistance;
     this.player.health = Math.max(1, this.player.health - hpCost);
     this.markPlayerHealthBarVisible();
-    this.player.deathBoltCooldown = Math.max(0.5, (this.config.deathBolt?.cooldown || 10) - (isNecromancerTalentGame(this) ? getNecromancerDeathBoltCooldownReduction(this) : 0));
+    const baseDeathBoltCooldown = (this.config.deathBolt?.cooldown || 10) - (isNecromancerTalentGame(this) ? getNecromancerDeathBoltCooldownReduction(this) : 0);
+    const potionMult = (this.consumables?.effects?.potionOfSkill?.timer || 0) > 0 ? 0.5 : 1;
+    this.player.deathBoltCooldown = Math.max(0.5, baseDeathBoltCooldown * potionMult);
     const baseAngles = hasNecromancerBlightstorm(this) ? [-0.24, 0, 0.24] : [0];
     const forwardAngle = Math.atan2(origin.dirY, origin.dirX);
     for (const angleOffset of baseAngles) {

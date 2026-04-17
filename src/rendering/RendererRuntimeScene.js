@@ -185,6 +185,23 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       }
       this.drawEnemyHealthBar(enemy, enemy.x - cameraX, enemy.y - cameraY);
     }
+    for (const decoy of Array.isArray(game.mirageDecoys) ? game.mirageDecoys : []) {
+      if (!decoy || (decoy.life || 0) <= 0 || (decoy.hp || 0) <= 0) continue;
+      const dx = decoy.x - cameraX;
+      const dy = decoy.y - cameraY;
+      ctx.save();
+      ctx.globalAlpha = 0.62;
+      ctx.fillStyle = "rgba(140, 201, 255, 0.32)";
+      ctx.beginPath();
+      ctx.arc(dx, dy, (decoy.size || 20) * 0.58, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(210, 238, 255, 0.82)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(dx, dy, (decoy.size || 20) * 0.42, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     this.drawDrops(game, cameraX, cameraY);
     this.drawRemotePlayers(game, cameraX, cameraY);

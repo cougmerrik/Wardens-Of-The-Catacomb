@@ -3,6 +3,110 @@ export const PASSIVE_CONSUMABLE_SLOT_CAP = 3;
 export const ACTIVE_CONSUMABLE_COOLDOWN = 2;
 
 export const CONSUMABLE_DEFS = {
+  timeHook: {
+    key: "timeHook",
+    name: "Time Hook",
+    type: "Active",
+    rarity: "Legendary",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 4,
+    price: 450,
+    maxStack: 2,
+    maxInventory: 1,
+    effect: "Slow all enemies for 8s; bosses are slowed less"
+  },
+  mirage: {
+    key: "mirage",
+    name: "Mirage",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 3,
+    price: 220,
+    maxStack: 2,
+    maxInventory: 2,
+    effect: "Create a decoy with 20% of your max health that draws enemy aggro for 4s"
+  },
+  blinkDust: {
+    key: "blinkDust",
+    name: "Blink Dust",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 180,
+    maxStack: 2,
+    maxInventory: 2,
+    effect: "Teleport to a random nearby room within 20 tiles"
+  },
+  warBanner: {
+    key: "warBanner",
+    name: "War Banner",
+    type: "Active",
+    rarity: "Legendary",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 4,
+    price: 320,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Place a banner for 10s that heals allies and boosts attack speed"
+  },
+  bloodwine: {
+    key: "bloodwine",
+    name: "Bloodwine",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 190,
+    maxStack: 2,
+    maxInventory: 2,
+    effect: "For 8s, heal for 20% of primary attack damage dealt"
+  },
+  potionOfSkill: {
+    key: "potionOfSkill",
+    name: "Potion of Skill",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 3,
+    price: 220,
+    maxStack: 2,
+    maxInventory: 1,
+    effect: "Refresh your class special and reduce its cooldown by 50% for 10s"
+  },
+  blessedStones: {
+    key: "blessedStones",
+    name: "Blessed Stones",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 160,
+    maxStack: 2,
+    maxInventory: 1,
+    effect: "Multiplayer only. Heal the lowest-health ally within 5 tiles for 25% max health"
+  },
+  stonebloodBeads: {
+    key: "stonebloodBeads",
+    name: "Stoneblood Beads",
+    type: "Active",
+    rarity: "Common",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 140,
+    maxStack: 2,
+    maxInventory: 2,
+    effect: "Gain 4 charges for 12s; each charge reduces the next hit by 6 damage"
+  },
   regenerationPotion: {
     key: "regenerationPotion",
     name: "Regeneration Potion",
@@ -14,7 +118,7 @@ export const CONSUMABLE_DEFS = {
     price: 100,
     maxStack: 3,
     maxInventory: 2,
-    effect: "The player regenerates 20% of health over 10s"
+    effect: "The player regenerates 20% of health over 5s"
   },
   speedPotion: {
     key: "speedPotion",
@@ -40,7 +144,7 @@ export const CONSUMABLE_DEFS = {
     price: 50,
     maxStack: 3,
     maxInventory: 2,
-    effect: "For the next 5s, attacks deal +2 cold damage and enemies struck are slowed by 15% for 3s"
+    effect: "For the next 10s, attacks deal +2 cold damage and enemies struck are slowed by 15% for 3s"
   },
   fireOil: {
     key: "fireOil",
@@ -53,7 +157,7 @@ export const CONSUMABLE_DEFS = {
     price: 50,
     maxStack: 3,
     maxInventory: 2,
-    effect: "For the next 5s, attacks deal +2 fire damage and enemies struck burn for 2s"
+    effect: "For the next 10s, attacks deal +2 fire damage and enemies struck burn for 2s"
   },
   spikeGrowth: {
     key: "spikeGrowth",
@@ -66,7 +170,7 @@ export const CONSUMABLE_DEFS = {
     price: 50,
     maxStack: 3,
     maxInventory: 2,
-    effect: "For 5s after activation, enemies that attack the player take +3 retaliatory damage"
+    effect: "For 10s after activation, enemies that attack the player take +3 retaliatory damage"
   },
   shield: {
     key: "shield",
@@ -76,10 +180,62 @@ export const CONSUMABLE_DEFS = {
     triggerCondition: "N/A",
     cooldown: "Default",
     unlockFloor: 1,
-    price: 3,
+    price: 100,
     maxStack: 2,
     maxInventory: 2,
-    effect: "Gain 10 temporary HP"
+    effect: "Gain temporary HP equal to 10% of max health"
+  },
+  mirrorShard: {
+    key: "mirrorShard",
+    name: "Mirror Shard",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "When the player is hit by a projectile",
+    cooldown: "8s",
+    unlockFloor: 3,
+    price: 260,
+    maxStack: 2,
+    maxInventory: 1,
+    effect: "Reflect the projectile and reduce its damage by 50%"
+  },
+  soulBattery: {
+    key: "soulBattery",
+    name: "Soul Battery",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "On killing an enemy with a primary attack",
+    cooldown: "3s",
+    unlockFloor: 3,
+    price: 240,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Restore 1% max health and gain 1% temporary HP on primary-kill trigger"
+  },
+  frostWard: {
+    key: "frostWard",
+    name: "Frost Ward",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "After standing still for 5s, on the next hit",
+    cooldown: "Default",
+    unlockFloor: 3,
+    price: 220,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Arm a frost ward that prevents 80% of the next hit and chills nearby enemies"
+  },
+  thornMail: {
+    key: "thornMail",
+    name: "Thorn Mail",
+    type: "Passive",
+    rarity: "Common",
+    triggerCondition: "When a nearby enemy hits the player",
+    cooldown: "3s",
+    unlockFloor: 2,
+    price: 130,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Retaliate against the attacker and briefly slow it"
   },
   angelRing: {
     key: "angelRing",
@@ -106,6 +262,71 @@ export const CONSUMABLE_DEFS = {
     maxStack: 1,
     maxInventory: 1,
     effect: "Remove all consumables, fully heal the player, and immediately grant a level"
+  },
+  amnesiaTalisman: {
+    key: "amnesiaTalisman",
+    name: "Amnesia Talisman",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "On moving to the next floor",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 260,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Reset all spent skills and talents whenever you change floors"
+  },
+  elvenBoots: {
+    key: "elvenBoots",
+    name: "Elven Boots",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "Passive while owned",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 180,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Ignore movement slow from rough terrain like sewer water and skeletal bones"
+  },
+  povertyCharm: {
+    key: "povertyCharm",
+    name: "Poverty Charm",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "On gold pickup while owned",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 120,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Halve gold gain, boost healing potion pickups by 20%, and break above 500 gold"
+  },
+  mimicEgg: {
+    key: "mimicEgg",
+    name: "Mimic Egg",
+    type: "Active",
+    rarity: "Legendary",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 4,
+    price: 380,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Hatch a friendly mimic that consumes loose gold and persists across floors"
+  },
+  guardianBell: {
+    key: "guardianBell",
+    name: "Guardian Bell",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 3,
+    price: 220,
+    maxStack: 2,
+    maxInventory: 1,
+    effect: "Multiplayer only. Redirect 35% of a nearby ally's damage to yourself for 6s"
   }
 };
 
@@ -119,6 +340,11 @@ export function getConsumableCatalog() {
 
 export function createConsumableEffectState() {
   return {
+    bloodwine: { timer: 0 },
+    potionOfSkill: { timer: 0 },
+    stonebloodBeads: { timer: 0, charges: 0, maxCharges: 0 },
+    guardianBell: { timer: 0 },
+    frostWard: { stationaryTimer: 0, ready: 0 },
     regenerationPotion: { timer: 0, total: 0, healPool: 0 },
     speedPotion: { timer: 0 },
     frostOil: { timer: 0 },
@@ -223,4 +449,3 @@ export function getConsumablePriceForFloor(def, floor) {
   const scale = 1 + Math.max(0, floor - 1) * 0.15;
   return Math.max(1, Math.floor(base * scale));
 }
-

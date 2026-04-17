@@ -42,6 +42,7 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   const sourceFriendly = isFriendlyToPlayer(game, enemy);
   const tile = game.config?.map?.tile || 32;
   const livingPlayers = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
+  const mirageDecoys = typeof game.getMirageDecoys === "function" ? game.getMirageDecoys() : [];
   const controllingPlayer =
     sourceFriendly && typeof game?.getControllingPlayerEntityForEnemy === "function"
       ? game.getControllingPlayerEntityForEnemy(enemy)
@@ -55,6 +56,13 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   let best = null;
   let bestDist = Number.POSITIVE_INFINITY;
   if (!sourceFriendly) {
+    for (const decoy of mirageDecoys) {
+      if (!decoy) continue;
+      const dist = vecLength((decoy.x || 0) - enemy.x, (decoy.y || 0) - enemy.y);
+      if (dist > maxRange || dist >= bestDist) continue;
+      best = decoy;
+      bestDist = dist;
+    }
     for (const player of livingPlayers) {
       if (!player) continue;
       const dist = vecLength((player.x || 0) - enemy.x, (player.y || 0) - enemy.y);

@@ -118,6 +118,13 @@ export function spawnSkeleton(game, x, y, options) {
 export function applyEnemyDamage(game, enemy, amount, damageType = "physical", ownerId = null) {
   if (!Number.isFinite(amount) || amount <= 0) return;
   if (enemy?.invincible) return;
+  if (enemy?.type === "mirageDecoy" || enemy?.isMirageDecoy) {
+    enemy.hp = Math.max(0, (Number.isFinite(enemy.hp) ? enemy.hp : 0) - amount);
+    if (typeof game.spawnFloatingText === "function") {
+      game.spawnFloatingText(enemy.x, enemy.y - (enemy.size || 20) * 0.7, `-${Math.max(1, Math.round(amount))}`, "#a8d3ff", 0.6, 12);
+    }
+    return;
+  }
   if (enemy?.type === "skeleton_warrior" && enemy.collapsed) {
     if (damageType === "fire" || damageType === "melee") {
       enemy.reviveAtEnd = false;

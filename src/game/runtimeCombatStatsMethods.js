@@ -144,12 +144,11 @@ export const runtimeCombatStatsMethods = {
     const mult = this.getDamageMultiplier();
     const safeMult = Number.isFinite(mult) ? Math.max(0, mult) : 1;
     const flatBonus = Number.isFinite(this.levelWeaponDamageBonus) ? Math.max(0, this.levelWeaponDamageBonus) : 0;
-    const consumableBonus = typeof this.getConsumableBonusDamage === "function" ? this.getConsumableBonusDamage() : 0;
     const scaledMinBase = (minBase + rageBaseBonus) * safeMult;
     const scaledMaxBase = (maxBase + rageBaseBonus) * safeMult;
     return {
-      min: scaledMinBase + flatBonus + consumableBonus,
-      max: scaledMaxBase + flatBonus + consumableBonus
+      min: scaledMinBase + flatBonus,
+      max: scaledMaxBase + flatBonus
     };
   },
 
@@ -322,8 +321,9 @@ export const runtimeCombatStatsMethods = {
 
   getRangerFireArrowCooldown() {
     const base = Number.isFinite(this.config.fireArrow?.cooldown) ? this.config.fireArrow.cooldown : 2;
-    if (!(this.isArcherClass && this.isArcherClass())) return base;
-    return Math.max(0.2, base - getRangerVolleyCooldownReduction(this));
+    const adjustedBase = (this.consumables?.effects?.potionOfSkill?.timer || 0) > 0 ? base * 0.5 : base;
+    if (!(this.isArcherClass && this.isArcherClass())) return adjustedBase;
+    return Math.max(0.2, adjustedBase - getRangerVolleyCooldownReduction(this));
   },
 
   getRangerFireArrowDurationMultiplier() {
@@ -379,9 +379,10 @@ export const runtimeCombatStatsMethods = {
   },
 
   getWarriorRageCooldown(points = this.skills.warriorRage.points) {
+    const cooldownMult = (this.consumables?.effects?.potionOfSkill?.timer || 0) > 0 ? 0.5 : 1;
     if (isWarriorTalentGame(this)) {
       const c = this.config.warriorRage || {};
-      return Number.isFinite(c.cooldown) ? c.cooldown : 20;
+      return (Number.isFinite(c.cooldown) ? c.cooldown : 20) * cooldownMult;
     }
     const c = this.config.warriorRage || {};
     const base = Number.isFinite(c.cooldown) ? c.cooldown : 20;
@@ -391,7 +392,7 @@ export const runtimeCombatStatsMethods = {
     const denom = Math.log1p(1.25 * Math.max(1, maxPoints));
     const norm = denom > 0 ? Math.log1p(1.25 * p) / denom : 0;
     const reduction = Math.max(0, Math.min(1, maxReduction * norm));
-    return base * (1 - reduction);
+    return base * (1 - reduction) * cooldownMult;
   },
 
   getWarriorRageBaseDamageBonus(points = this.skills.warriorRage.points) {

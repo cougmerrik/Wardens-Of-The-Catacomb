@@ -7,14 +7,24 @@ import {
   getConsumablePriceForFloor,
   rollConsumableShopStock
 } from "../consumables.js";
-
-const DEFAULT_CONSUMABLE_EFFECTS = () => ({
-  regenerationPotion: { timer: 0, total: 0, healPool: 0 },
-  speedPotion: { timer: 0 },
-  frostOil: { timer: 0 },
-  fireOil: { timer: 0 },
-  spikeGrowth: { timer: 0 }
-});
+import {
+  consumeConsumableChargeForEntity,
+  ensureConsumableInventoryRecord,
+  getConsumableEffectsForEntity,
+  getConsumableSlotForEntity
+} from "./consumableSupport.js";
+import {
+  activateConsumableEffect,
+  applyPrimaryAttackConsumableBenefits,
+  canUseConsumableEffect,
+  getGuardianBellProtector,
+  tryMirrorShardReflect
+} from "./consumableItemEffects.js";
+export {
+  applyPrimaryAttackConsumableBenefits,
+  getGuardianBellProtector,
+  tryMirrorShardReflect
+} from "./consumableItemEffects.js";
 
 export function ensureShopStock(game) {
   if (!Array.isArray(game.shopStock) || game.shopStock.length <= 0) {
@@ -24,21 +34,7 @@ export function ensureShopStock(game) {
 }
 
 function ensureConsumableState(game) {
-  if (!game.consumables || typeof game.consumables !== "object") {
-    game.consumables = {
-      activeSlots: [],
-      passiveSlots: [],
-      sharedCooldown: 0,
-      message: "",
-      messageTimer: 0,
-      effects: DEFAULT_CONSUMABLE_EFFECTS()
-    };
-  }
-  if (!Array.isArray(game.consumables.activeSlots)) game.consumables.activeSlots = [];
-  if (!Array.isArray(game.consumables.passiveSlots)) game.consumables.passiveSlots = [];
-  if (!game.consumables.effects || typeof game.consumables.effects !== "object") {
-    game.consumables.effects = DEFAULT_CONSUMABLE_EFFECTS();
-  }
+  game.consumables = ensureConsumableInventoryRecord(game.consumables);
   return game.consumables;
 }
 
@@ -142,49 +138,46 @@ function showConsumableConsumedText(game, def) {
   game.spawnFloatingText(x, y, def.name, "#d7e4ff", 0.9, 14);
 }
 
-function getConsumableTempHp(game) {
-  return Math.max(0, Number.isFinite(game.player?.consumableRuntime?.tempHp) ? game.player.consumableRuntime.tempHp : 0);
-}
-
-function setConsumableTempHp(game, amount) {
-  if (!game.player.consumableRuntime || typeof game.player.consumableRuntime !== "object") {
-    game.player.consumableRuntime = { tempHp: 0 };
+function resetPointTree(tree) {
+  if (!tree || typeof tree !== "object") return 0;
+  let refunded = 0;
+  for (const node of Object.values(tree)) {
+    if (!node || !Number.isFinite(node.points) || node.points <= 0) continue;
+    refunded += node.points;
+    node.points = 0;
   }
-  game.player.consumableRuntime.tempHp = Math.max(0, Number.isFinite(amount) ? amount : 0);
+  return refunded;
 }
 
-function canUseConsumable(game, def) {
-  if (!def) return false;
-  if (def.key === "regenerationPotion") return (game.player?.health || 0) < (game.player?.maxHealth || 0);
-  return true;
-}
-
-function activateConsumableEffect(game, def) {
-  const effects = ensureConsumableState(game).effects;
-  switch (def.key) {
-    case "regenerationPotion":
-      effects.regenerationPotion.timer = 10;
-      effects.regenerationPotion.total = 10;
-      effects.regenerationPotion.healPool = Math.max(1, (game.player?.maxHealth || 1) * 0.2);
-      return true;
-    case "speedPotion":
-      effects.speedPotion.timer = 10;
-      return true;
-    case "frostOil":
-      effects.frostOil.timer = 5;
-      return true;
-    case "fireOil":
-      effects.fireOil.timer = 5;
-      return true;
-    case "spikeGrowth":
-      effects.spikeGrowth.timer = 5;
-      return true;
-    case "shield":
-      setConsumableTempHp(game, getConsumableTempHp(game) + 10);
-      return true;
-    default:
-      return false;
+function clearRefundedSkillState(game) {
+  game.warriorMomentumTimer = 0;
+  game.warriorRageActiveTimer = 0;
+  game.warriorRageCooldownTimer = 0;
+  game.warriorRageVictoryRushPool = 0;
+  game.warriorRageVictoryRushTimer = 0;
+  if (!game.necromancerBeam || typeof game.necromancerBeam !== "object") game.necromancerBeam = {};
+  game.necromancerBeam.active = false;
+  game.necromancerBeam.targetEnemy = null;
+  game.necromancerBeam.targetId = null;
+  game.necromancerBeam.targetX = 0;
+  game.necromancerBeam.targetY = 0;
+  game.necromancerBeam.progress = 0;
+  game.necromancerBeam.healTickTimer = 0;
+  if (game.player) {
+    game.player.fireArrowCooldown = 0;
+    game.player.deathBoltCooldown = 0;
   }
+}
+
+function resetAllSkillsAndTalents(game) {
+  let refunded = 0;
+  refunded += resetPointTree(game.skills);
+  refunded += resetPointTree(game.rangerTalents);
+  refunded += resetPointTree(game.warriorTalents);
+  refunded += resetPointTree(game.necromancerTalents);
+  game.skillPoints = Math.max(0, (Number.isFinite(game.skillPoints) ? game.skillPoints : 0) + refunded);
+  clearRefundedSkillState(game);
+  return refunded;
 }
 
 export function useConsumableSlot(game, slotIndex) {
@@ -198,11 +191,11 @@ export function useConsumableSlot(game, slotIndex) {
   }
   const def = getConsumableDefinition(slot.key);
   if (!def || def.type !== "Active") return false;
-  if (!canUseConsumable(game, def)) {
+  if (!canUseConsumableEffect(game, def)) {
     pushConsumableMessage(game, "Cannot use now");
     return false;
   }
-  const activated = activateConsumableEffect(game, def);
+  const activated = activateConsumableEffect(game, def, consumables.effects);
   if (!activated) return false;
   consumeSlotCharge(game, slot, "Active");
   showConsumableConsumedText(game, def);
@@ -224,6 +217,16 @@ export function tickConsumables(game, dt) {
     const effect = effects[key];
     if (!effect || typeof effect !== "object") continue;
     if (Number.isFinite(effect.timer)) effect.timer = Math.max(0, effect.timer - dt);
+  }
+  if ((effects.stonebloodBeads?.timer || 0) <= 0) effects.stonebloodBeads.charges = 0;
+  const moving = !!game.player?.moving;
+  if ((effects.frostWard?.ready || 0) > 0) {
+    effects.frostWard.stationaryTimer = 0;
+  } else if (moving) {
+    effects.frostWard.stationaryTimer = 0;
+  } else {
+    effects.frostWard.stationaryTimer = Math.min(5, (effects.frostWard.stationaryTimer || 0) + dt);
+    if ((effects.frostWard.stationaryTimer || 0) >= 5 && getConsumableSlot(game, "frostWard", "Passive")) effects.frostWard.ready = 1;
   }
   const regen = effects.regenerationPotion;
   if ((regen?.timer || 0) > 0 && (regen?.healPool || 0) > 0 && (game.player?.health || 0) > 0) {
@@ -259,6 +262,10 @@ export function getConsumableBonusDamage(game) {
   return bonus;
 }
 
+export function getEntityConsumableEffects(game, entity = null) {
+  return getConsumableEffectsForEntity(game, entity);
+}
+
 export function applyPassiveConsumableEvent(game, eventKey, payload = {}) {
   const consumables = ensureConsumableState(game);
   const slots = cloneConsumableSlots(consumables.passiveSlots);
@@ -286,6 +293,15 @@ export function applyPassiveConsumableEvent(game, eventKey, payload = {}) {
       pushConsumableMessage(game, "Monkey Paw triggered");
       changed = true;
       break;
+    }
+    if (eventKey === "floorAdvance" && def.key === "amnesiaTalisman") {
+      const refunded = resetAllSkillsAndTalents(game);
+      if (refunded > 0) {
+        if (typeof game.spawnFloatingText === "function" && game.player) {
+          game.spawnFloatingText(game.player.x, game.player.y - 26, "Amnesia", "#d9c4ff", 0.95, 16);
+        }
+        changed = true;
+      }
     }
   }
   return changed;

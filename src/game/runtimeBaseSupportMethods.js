@@ -19,8 +19,37 @@ import {
   isWarriorTalentGame
 } from "./warriorTalentTree.js";
 import { getNecromancerRotTouchedRetaliationDamage, getNecromancerSkillPointGainForLevel, getNecromancerVigorMoveSpeedBonusPct } from "./necromancerTalentTree.js";
+import {
+  absorbPlayerTempHpLayers,
+  applyGuardianBellRedirect,
+  applyFrostWardProtection,
+  applyStonebloodBeads,
+  awardGoldWithPovertyCharm,
+  getConsumableInventoryForEntity as getEntityConsumableInventory,
+  getConsumablePassiveSlotForEntity as getEntityConsumablePassiveSlot,
+  getMirageDecoys,
+  hasPassiveConsumableForEntity as entityHasPassiveConsumable,
+  tickSecondaryPlayerConsumables,
+  triggerThornMailRetaliation
+} from "./world/consumableSupport.js";
 
 export const runtimeBaseSupportMethods = {
+  getConsumableInventoryForEntity(entity = this.player) {
+    return getEntityConsumableInventory(this, entity);
+  },
+
+  getConsumablePassiveSlotForEntity(entity, key) {
+    return getEntityConsumablePassiveSlot(this, entity, key);
+  },
+
+  hasPassiveConsumableForEntity(entity, key) {
+    return entityHasPassiveConsumable(this, entity, key);
+  },
+
+  getMirageDecoys() {
+    return getMirageDecoys(this);
+  },
+
   getActivePlayerEntities() {
     if (Array.isArray(this.networkActivePlayers) && this.networkActivePlayers.length > 0) {
       return this.networkActivePlayers.filter((player) => !!player);
@@ -58,8 +87,17 @@ export const runtimeBaseSupportMethods = {
 
   getNearestPlayerEntity(x, y, maxRange = Infinity) {
     const players = this.getLivingPlayerEntities();
+    const decoys = this.getMirageDecoys();
     let best = players[0] || this.player;
     let bestDist = Number.POSITIVE_INFINITY;
+    for (const decoy of decoys) {
+      const dx = (decoy?.x || 0) - x;
+      const dy = (decoy?.y || 0) - y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxRange || dist >= bestDist) continue;
+      best = decoy;
+      bestDist = dist;
+    }
     for (const player of players) {
       const dx = (player?.x || 0) - x;
       const dy = (player?.y || 0) - y;
@@ -203,7 +241,10 @@ export const runtimeBaseSupportMethods = {
         ? getNecromancerVigorMoveSpeedBonusPct(this)
         : ((entity?.necromancerRuntime?.vigorTimer || 0) > 0 ? 0.25 : 0);
     }
-    return (classSpec.baseMoveSpeed + levelBonus) * (1 + moveBonus);
+    const effects = this.getConsumableInventoryForEntity(entity)?.effects || {};
+    if ((effects.speedPotion?.timer || 0) > 0) moveBonus += 0.2;
+    const terrainMult = typeof this.getPlayerTerrainMoveMultiplier === "function" ? this.getPlayerTerrainMoveMultiplier(entity) : 1;
+    return (classSpec.baseMoveSpeed + levelBonus) * (1 + moveBonus) * terrainMult;
   },
 
   getPlayerProgressField(entity, key, fallback = 0) {
@@ -232,8 +273,10 @@ export const runtimeBaseSupportMethods = {
       player.hpBarTimer = Math.max(0, (Number.isFinite(player.hpBarTimer) ? player.hpBarTimer : 0) - dt);
       player.animTime = (Number.isFinite(player.animTime) ? player.animTime : 0) + dt;
       player.alive = Number.isFinite(player.health) ? player.health > 0 : player.alive !== false;
+      player.moving = !!player.moving;
       player.consumableRuntime = player.consumableRuntime && typeof player.consumableRuntime === "object" ? player.consumableRuntime : { tempHp: 0 };
       player.consumableRuntime.tempHp = Math.max(0, Number.isFinite(player.consumableRuntime.tempHp) ? player.consumableRuntime.tempHp : 0);
+      if (player !== this.player) tickSecondaryPlayerConsumables(this, player, dt);
       player.rangerRuntime = player.rangerRuntime && typeof player.rangerRuntime === "object" ? player.rangerRuntime : {};
       player.rangerRuntime.foxstepCooldown = Math.max(0, (Number.isFinite(player.rangerRuntime.foxstepCooldown) ? player.rangerRuntime.foxstepCooldown : 0) - dt);
       player.rangerRuntime.foxstepActiveTimer = Math.max(0, (Number.isFinite(player.rangerRuntime.foxstepActiveTimer) ? player.rangerRuntime.foxstepActiveTimer : 0) - dt);
@@ -303,6 +346,7 @@ export const runtimeBaseSupportMethods = {
 
   getDamageTakenForPlayerEntity(entity, amount, damageType = "physical") {
     if (!Number.isFinite(amount) || amount <= 0) return 0;
+    amount = applyFrostWardProtection(this, entity, amount);
     const rangerDodgeChance = entity === this.player
       ? getRangerDodgeChance(this)
       : ((entity?.rangerTalents?.fleetstep?.points || 0) > 0 ? 0.15 : 0);
@@ -361,13 +405,7 @@ export const runtimeBaseSupportMethods = {
   },
 
   awardGoldToPlayerEntity(entity, amount, { spawnText = true } = {}) {
-    if (!Number.isFinite(amount) || amount <= 0 || !this.isLivingPlayerEntity(entity)) return;
-    const currentGold = this.getPlayerProgressField(entity, "gold", 0);
-    this.setPlayerProgressField(entity, "gold", currentGold + amount);
-    this.awardScoreToPlayerEntity(entity, amount);
-    if (this.isPrimaryPlayerEntity(entity) && typeof this.recordRunGoldEarned === "function") this.recordRunGoldEarned(amount);
-    else entity.goldEarned = (Number.isFinite(entity.goldEarned) ? entity.goldEarned : 0) + amount;
-    if (spawnText) this.spawnFloatingText(entity.x, entity.y - 30, `+${amount}g`, "#f2d76b", 0.75, 14);
+    awardGoldWithPovertyCharm(this, entity, amount, { spawnText });
   },
 
   gainExperienceForPlayerEntity(entity, amount) {
@@ -537,36 +575,14 @@ export const runtimeBaseSupportMethods = {
 
   applyDamageToPlayerEntity(entity, amount, damageType = "physical", source = null) {
     if (!entity || amount <= 0) return;
+    amount = applyGuardianBellRedirect(this, entity, amount, damageType, source);
     entity.warriorRuntime = entity.warriorRuntime && typeof entity.warriorRuntime === "object" ? entity.warriorRuntime : {};
     entity.necromancerRuntime = entity.necromancerRuntime && typeof entity.necromancerRuntime === "object" ? entity.necromancerRuntime : {};
     entity.consumableRuntime = entity.consumableRuntime && typeof entity.consumableRuntime === "object" ? entity.consumableRuntime : { tempHp: 0 };
-    if ((entity.consumableRuntime.tempHp || 0) > 0) {
-      const absorbed = Math.min(entity.consumableRuntime.tempHp, amount);
-      entity.consumableRuntime.tempHp = Math.max(0, entity.consumableRuntime.tempHp - absorbed);
-      amount = Math.max(0, amount - absorbed);
-      if (amount <= 0) {
-        this.spawnFloatingText(entity.x, entity.y - 18, "Blocked", "#d9d1ff", 0.65, 13);
-        return;
-      }
-    }
-    if ((entity.warriorRuntime.tempHp || 0) > 0) {
-      const absorbed = Math.min(entity.warriorRuntime.tempHp, amount);
-      entity.warriorRuntime.tempHp = Math.max(0, entity.warriorRuntime.tempHp - absorbed);
-      amount = Math.max(0, amount - absorbed);
-      if (amount <= 0) {
-        this.spawnFloatingText(entity.x, entity.y - 18, "Blocked", "#d9d1ff", 0.65, 13);
-        return;
-      }
-    }
-    if ((entity.necromancerRuntime.tempHp || 0) > 0) {
-      const absorbed = Math.min(entity.necromancerRuntime.tempHp, amount);
-      entity.necromancerRuntime.tempHp = Math.max(0, entity.necromancerRuntime.tempHp - absorbed);
-      amount = Math.max(0, amount - absorbed);
-      if (amount <= 0) {
-        this.spawnFloatingText(entity.x, entity.y - 18, "Blocked", "#d9d1ff", 0.65, 13);
-        return;
-      }
-    }
+    amount = applyStonebloodBeads(this, entity, amount);
+    if (amount <= 0) return;
+    amount = absorbPlayerTempHpLayers(this, entity, amount);
+    if (amount <= 0) return;
     const healthBeforeDamage = Number.isFinite(entity.health) ? entity.health : 0;
     if (this.isPrimaryPlayerEntity(entity) && amount >= healthBeforeDamage && typeof this.applyPassiveConsumableEvent === "function") {
       const passivePayload = { amount, damageType, source, preventDeath: false };
@@ -587,6 +603,7 @@ export const runtimeBaseSupportMethods = {
     entity.health = Math.max(0, (Number.isFinite(entity.health) ? entity.health : 0) - amount);
     entity.alive = entity.health > 0;
     this.markPlayerEntityHealthBarVisible(entity);
+    triggerThornMailRetaliation(this, entity, amount);
     const entityHasFoxstep = entity === this.player ? hasFoxstep(this) : (entity?.rangerTalents?.foxstep?.points || 0) > 0;
     if (entity.classType === "archer" && entityHasFoxstep) {
       entity.rangerRuntime = entity.rangerRuntime && typeof entity.rangerRuntime === "object" ? entity.rangerRuntime : {};

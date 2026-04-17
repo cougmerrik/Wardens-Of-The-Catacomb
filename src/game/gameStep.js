@@ -14,6 +14,13 @@ import {
 } from "./necromancerTalentTree.js";
 
 export function stepGame(game, dt, controls = {}) {
+  if (Array.isArray(game.mirageDecoys)) {
+    for (const decoy of game.mirageDecoys) {
+      if (!decoy) continue;
+      decoy.life = Math.max(0, (Number.isFinite(decoy.life) ? decoy.life : 0) - dt);
+    }
+    game.mirageDecoys = game.mirageDecoys.filter((decoy) => !!decoy && (decoy.life || 0) > 0 && (decoy.hp || 0) > 0);
+  }
   const segmentRectHit = (x0, y0, x1, y1, left, top, right, bottom) => {
     // Liang-Barsky clipping against AABB.
     const dx = x1 - x0;
@@ -369,9 +376,15 @@ export function stepGame(game, dt, controls = {}) {
           beam.healTickTimer = (beam.healTickTimer || 0) + dt;
           while (beam.healTickTimer >= beamDamagePeriod) {
             beam.healTickTimer -= beamDamagePeriod;
-            const damage = game.getDeathBoltBaseDamage() * 0.27 * getNecromancerBeamDamageMultiplier(game) * (1 + getNecromancerBlackCandleCursedBeamBonus(game, bestTarget)) * getNecromancerVigorBeamDamageMultiplier(game);
+            const consumableBonusDamage = typeof game.getConsumableBonusDamage === "function" ? game.getConsumableBonusDamage() : 0;
+            const damage = game.getDeathBoltBaseDamage() * 0.27 * getNecromancerBeamDamageMultiplier(game) * (1 + getNecromancerBlackCandleCursedBeamBonus(game, bestTarget)) * getNecromancerVigorBeamDamageMultiplier(game) + consumableBonusDamage;
             const hpBefore = Number.isFinite(bestTarget.hp) ? bestTarget.hp : 0;
             game.applyEnemyDamage(bestTarget, damage, "necrotic", game.player.id || null);
+            if (typeof game.applyConsumableOnHitEffects === "function") game.applyConsumableOnHitEffects(bestTarget, game.player.id || null);
+            if (typeof game.applyPrimaryAttackConsumableBenefits === "function") {
+              const dealt = Math.max(0, hpBefore - Math.max(0, bestTarget.hp || 0));
+              game.applyPrimaryAttackConsumableBenefits(game.player, dealt, hpBefore > 0 && (bestTarget.hp || 0) <= 0);
+            }
             if (hasNecromancerBlightstorm(game)) {
               bestTarget.curseTimer = Math.max(bestTarget.curseTimer || 0, getNecromancerCurseDuration(game));
             }

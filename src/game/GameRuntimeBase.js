@@ -185,8 +185,12 @@ export class GameRuntimeBase {
   advanceToNextFloor() {
     if (typeof this.recordRunFloorCleared === "function") this.recordRunFloorCleared();
     if (typeof this.applyPassiveConsumableEvent === "function") this.applyPassiveConsumableEvent("floorAdvance");
+    this.mirageDecoys = [];
     const controlledUndead = (this.enemies || [])
       .filter((enemy) => enemy?.isControlledUndead && (enemy.hp || 0) > 0 && !(enemy.type === "skeleton_warrior" && enemy.collapsed))
+      .map((enemy) => ({ ...enemy }));
+    const summonedCompanions = (this.enemies || [])
+      .filter((enemy) => enemy?.isSummonedCompanion && (enemy.hp || 0) > 0)
       .map((enemy) => ({ ...enemy }));
     const persisted = {
       gold: this.gold,
@@ -223,6 +227,26 @@ export class GameRuntimeBase {
         enemy.reviveAtEnd = false;
       });
       this.enemies.push(...controlledUndead);
+    }
+    if (summonedCompanions.length > 0) {
+      const tile = this.config.map.tile;
+      summonedCompanions.forEach((enemy, index) => {
+        const angle = (index / Math.max(1, summonedCompanions.length)) * Math.PI * 2;
+        const spawn = this.findNearestSafePoint(
+          this.player.x + Math.cos(angle) * tile * 1.8,
+          this.player.y + Math.sin(angle) * tile * 1.8,
+          10
+        );
+        enemy.x = spawn.x;
+        enemy.y = spawn.y;
+        enemy.homeX = spawn.x;
+        enemy.homeY = spawn.y;
+        enemy.lastX = enemy.x;
+        enemy.lastY = enemy.y;
+        enemy.dormant = false;
+        enemy.revealed = true;
+      });
+      this.enemies.push(...summonedCompanions);
     }
     if (typeof this.onFloorChanged === "function") this.onFloorChanged(this.floor, this);
   }
@@ -323,7 +347,7 @@ export class GameRuntimeBase {
   }
 
   isEnemyFriendlyToPlayer(enemy) {
-    return this.isControlledUndead(enemy);
+    return this.isControlledUndead(enemy) || !!enemy?.isSummonedCompanion;
   }
 
   isEnemyHostileToPlayer(enemy) {

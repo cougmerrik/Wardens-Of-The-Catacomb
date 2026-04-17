@@ -20,28 +20,36 @@ import {
 } from "../consumables.js";
 import {
   applyConsumableOnHitEffects,
+  applyPrimaryAttackConsumableBenefits,
   applyPassiveConsumableEvent,
   buyShopItem,
+  getEntityConsumableEffects,
+  getGuardianBellProtector,
   getConsumableBonusDamage,
   getConsumableOwnedCount,
   getShopFailureReason,
   pushConsumableMessage,
   refillShopForFloor,
   tickConsumables,
+  tryMirrorShardReflect,
   useConsumableSlot,
   ensureShopStock
 } from "./consumablesEconomy.js";
 
 export {
   applyConsumableOnHitEffects,
+  applyPrimaryAttackConsumableBenefits,
   applyPassiveConsumableEvent,
   buyShopItem,
+  getEntityConsumableEffects,
+  getGuardianBellProtector,
   getConsumableBonusDamage,
   getConsumableOwnedCount,
   getShopFailureReason,
   pushConsumableMessage,
   refillShopForFloor,
   tickConsumables,
+  tryMirrorShardReflect,
   useConsumableSlot
 } from "./consumablesEconomy.js";
 
@@ -94,9 +102,18 @@ export function getGoldDropAmountMultiplier(game) {
 
 export function getAttackSpeedMultiplier(game) {
   const base = 1 + game.upgrades.attackSpeed.level * 0.06;
-  if (isRangerTalentGame(game)) return base * (1 + getRangerDanceAttackSpeedBonus(game));
-  if (isWarriorTalentGame(game)) return base * (1 + getWarriorBloodheatAttackSpeedBonus(game));
-  return base;
+  let result = base;
+  if (isRangerTalentGame(game)) result *= 1 + getRangerDanceAttackSpeedBonus(game);
+  if (isWarriorTalentGame(game)) result *= 1 + getWarriorBloodheatAttackSpeedBonus(game);
+  const player = game.player;
+  for (const zone of game.fireZones || []) {
+    if (!zone || zone.zoneType !== "warBanner" || (zone.life || 0) <= 0) continue;
+    const radius = Number.isFinite(zone.radius) ? zone.radius : 0;
+    if (!player || Math.hypot((zone.x || 0) - (player.x || 0), (zone.y || 0) - (player.y || 0)) > radius + (player.size || 20) * 0.45) continue;
+    result *= 1.2;
+    break;
+  }
+  return result;
 }
 
 export function getDamageMultiplier(game) {

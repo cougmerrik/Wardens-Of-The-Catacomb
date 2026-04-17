@@ -104,6 +104,7 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.shopOrder = [];
   game.consumables = createConsumableInventoryState();
   game.shopStock = rollConsumableShopStock(game.floor, 5);
+  game.mirageDecoys = [];
 
   game.player = createPlayerState(classType, classSpec, config.player.maxHealth);
   game.player.rangerTalents = game.rangerTalents;

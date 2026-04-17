@@ -53,7 +53,11 @@ import {
   tickConsumables,
   useConsumableSlot,
   applyConsumableOnHitEffects,
+  applyPrimaryAttackConsumableBenefits,
   getConsumableBonusDamage,
+  getEntityConsumableEffects,
+  getGuardianBellProtector,
+  tryMirrorShardReflect,
   applyPassiveConsumableEvent,
   refundAllSkills,
   toggleShop,
@@ -261,8 +265,24 @@ export class GameRuntimeWorld extends GameRuntimeBase {
     return applyConsumableOnHitEffects(this, enemy, ownerId);
   }
 
+  applyPrimaryAttackConsumableBenefits(ownerEntity, damageDealt, killedEnemy = false) {
+    return applyPrimaryAttackConsumableBenefits(this, ownerEntity, damageDealt, killedEnemy);
+  }
+
   getConsumableBonusDamage() {
     return getConsumableBonusDamage(this);
+  }
+
+  getEntityConsumableEffects(entity = null) {
+    return getEntityConsumableEffects(this, entity);
+  }
+
+  getGuardianBellProtector(protectedEntity) {
+    return getGuardianBellProtector(this, protectedEntity);
+  }
+
+  tryMirrorShardReflect(entity, projectile) {
+    return tryMirrorShardReflect(this, entity, projectile);
   }
 
   applyPassiveConsumableEvent(eventKey, payload = {}) {

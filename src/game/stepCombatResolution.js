@@ -2,6 +2,7 @@ import { vecLength } from "../utils.js";
 import { finalizeProjectilesAndTransientState, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
 import { getNecromancerPlaguecraftRiseChance, getNecromancerRotDps, getNecromancerRotDuration, hasNecromancerHarvester, hasNecromancerPlaguecraftRot, isNecromancerTalentGame } from "./necromancerTalentTree.js";
 import { spawnGhost, spawnSkeleton } from "./enemySpawnFactories.js";
+import { resolveConsumableDrivenDropPickup, tickWarBannerZone } from "./stepConsumableResolutionHelpers.js";
 
 export function resolveCombatAndDrops({
   game,
@@ -144,8 +145,20 @@ export function resolveCombatAndDrops({
       }
       if (b.life <= 0) continue;
       let reflected = false;
+      for (const decoy of typeof game.getMirageDecoys === "function" ? game.getMirageDecoys() : []) {
+        if (vecLength(b.x - decoy.x, b.y - decoy.y) >= ((decoy.size || 20) + b.size) * 0.5) continue;
+        decoy.hp = Math.max(0, (decoy.hp || 0) - (Number.isFinite(b.damage) ? b.damage : game.config.enemy.necromancerProjectileDamage || 16));
+        b.life = 0;
+        reflected = true;
+        break;
+      }
+      if (reflected) continue;
       for (const player of getLivingPlayers()) {
         if (vecLength(b.x - player.x, b.y - player.y) >= ((player.size || game.player.size) + b.size) * 0.5) continue;
+        if (typeof game.tryMirrorShardReflect === "function" && game.tryMirrorShardReflect(player, b)) {
+          reflected = true;
+          break;
+        }
         if (typeof game.getWarriorMissileProtectorForPlayerEntity === "function" && typeof game.tryReflectMissileForPlayerEntity === "function") {
           const protector = game.getWarriorMissileProtectorForPlayerEntity(player);
           if (protector && game.tryReflectMissileForPlayerEntity(protector, b, protector)) {
@@ -181,11 +194,20 @@ export function resolveCombatAndDrops({
           b.hitTargets.add(enemy);
           continue;
         }
+        const isPrimaryArrow =
+          b.faction === "player" &&
+          !b.projectileType &&
+          (Number.isFinite(b.damageMult) || Number.isFinite(b.critMultiplier));
         const projectileDamage = typeof game.getRangerArrowDamageAgainst === "function"
           ? game.getRangerArrowDamageAgainst(enemy, b)
           : (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1);
+        const primaryOilBonus = isPrimaryArrow && typeof game.getConsumableBonusDamage === "function"
+          ? game.getConsumableBonusDamage()
+          : 0;
         const damageType = b.projectileType === "holyWave" ? "holy" : "arrow";
-        game.applyEnemyDamage(enemy, projectileDamage, damageType, b.ownerId || null);
+        const hpBefore = Number.isFinite(enemy.hp) ? Math.max(0, enemy.hp) : 0;
+        game.applyEnemyDamage(enemy, projectileDamage + primaryOilBonus, damageType, b.ownerId || null);
+        const dealt = Math.max(0, hpBefore - Math.max(0, enemy.hp || 0));
         if (
           b.projectileType === "holyWave" &&
           typeof game.isUndeadEnemy === "function" &&
@@ -196,8 +218,18 @@ export function resolveCombatAndDrops({
           enemy.crusaderDefenseShredPct = Math.max(enemy.crusaderDefenseShredPct || 0, b.undeadDefenseShredPct);
           enemy.crusaderDefenseShredTimer = Math.max(enemy.crusaderDefenseShredTimer || 0, 4);
         }
-        if (typeof game.applyConsumableOnHitEffects === "function") game.applyConsumableOnHitEffects(enemy, b.ownerId || null);
-        if (b.projectileType !== "holyWave" && typeof game.applyRangerOnHitEffects === "function") game.applyRangerOnHitEffects(enemy, b.x, b.y);
+        if (isPrimaryArrow && typeof game.applyConsumableOnHitEffects === "function") {
+          game.applyConsumableOnHitEffects(enemy, b.ownerId || null);
+        }
+        if (
+          isPrimaryArrow &&
+          typeof game.applyPrimaryAttackConsumableBenefits === "function" &&
+          typeof game.getPlayerEntityById === "function"
+        ) {
+          const owner = game.getPlayerEntityById(b.ownerId) || game.player;
+          game.applyPrimaryAttackConsumableBenefits(owner, dealt, hpBefore > 0 && (enemy.hp || 0) <= 0);
+        }
+        if (isPrimaryArrow && typeof game.applyRangerOnHitEffects === "function") game.applyRangerOnHitEffects(enemy, b.x, b.y);
         b.hitTargets.add(enemy);
         b.linebreakerHits = (Number.isFinite(b.linebreakerHits) ? b.linebreakerHits : 0) + 1;
         if (b.projectileType === "holyWave") {
@@ -328,6 +360,10 @@ export function resolveCombatAndDrops({
         }
         zone.tickTimer += tickInterval;
       }
+      continue;
+    }
+    if (zone.zoneType === "warBanner") {
+      tickWarBannerZone(game, zone, dt, getLivingPlayers, playerEnemyRadius, healPlayer);
       continue;
     }
     if (zone.zoneType && zone.zoneType !== "fire" && zone.zoneType !== "pinningFire") continue;
@@ -581,17 +617,7 @@ export function resolveCombatAndDrops({
 
   for (const drop of game.drops) {
     if (drop.life <= 0) continue;
-    for (const player of getLivingPlayers()) {
-      if (vecLength(player.x - drop.x, player.y - drop.y) >= game.getPickupRadius()) continue;
-      if (drop.type === "health") {
-        healPlayer(player, drop.amount);
-      } else if (game.isGoldDrop(drop)) {
-        const amount = Math.max(1, Math.floor(drop.amount * game.getGoldFindMultiplier()));
-        if (typeof game.awardGoldToPlayerEntity === "function") game.awardGoldToPlayerEntity(player, amount);
-      }
-      drop.life = 0;
-      break;
-    }
+    resolveConsumableDrivenDropPickup(game, drop, getLivingPlayers, healPlayer);
   }
   game.drops = game.drops.filter((drop) => drop.life > 0);
 
@@ -599,6 +625,7 @@ export function resolveCombatAndDrops({
   if (boneSlowPct > 0) {
     const affectsEntity = (entity) => {
       if (!entity || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)) return;
+      if (typeof game.hasPassiveConsumableForEntity === "function" && game.hasPassiveConsumableForEntity(entity, "elvenBoots")) return;
       for (const enemy of game.enemies) {
         if (enemy.type !== "skeleton_warrior" || !enemy.collapsed || enemy.collapseTimer <= 0) continue;
         const slowRadius = (enemy.size || 20) * 0.6;

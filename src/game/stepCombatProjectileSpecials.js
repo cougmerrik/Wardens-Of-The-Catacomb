@@ -12,6 +12,7 @@ export function resolveSpecialProjectileCollision({
 }) {
   if (!projectile || projectile.life <= 0) return false;
   const tryReflect = (player) => {
+    if (typeof game.tryMirrorShardReflect === "function" && game.tryMirrorShardReflect(player, projectile)) return true;
     if (typeof game.getWarriorMissileProtectorForPlayerEntity !== "function") return false;
     const protector = game.getWarriorMissileProtectorForPlayerEntity(player);
     if (!protector || typeof game.tryReflectMissileForPlayerEntity !== "function") return false;

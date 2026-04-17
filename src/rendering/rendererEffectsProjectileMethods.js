@@ -509,6 +509,34 @@ export const rendererEffectsProjectileMethods = {
       ctx.stroke();
       return;
     }
+    if (zone.zoneType === "warBanner") {
+      const radius = Number.isFinite(zone.radius) ? Math.max(0, zone.radius) : 0;
+      if (radius <= 0) return;
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 10;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const outer = ctx.createRadialGradient(x, y, 2, x, y, radius);
+      outer.addColorStop(0, `rgba(214, 234, 157, ${0.2 * lifeFrac + 0.08})`);
+      outer.addColorStop(0.55, `rgba(112, 170, 77, ${0.18 * lifeFrac + 0.08})`);
+      outer.addColorStop(1, `rgba(34, 64, 21, ${0.06 * lifeFrac})`);
+      ctx.fillStyle = outer;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(232, 246, 180, ${0.45 * lifeFrac + 0.18})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 0.96, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(241, 235, 181, ${0.7 * lifeFrac + 0.18})`;
+      ctx.fillRect(x - 2, y - radius * 0.6, 4, radius * 0.9);
+      ctx.beginPath();
+      ctx.moveTo(x + 2, y - radius * 0.58);
+      ctx.lineTo(x + radius * 0.34, y - radius * 0.45);
+      ctx.lineTo(x + 2, y - radius * 0.26);
+      ctx.closePath();
+      ctx.fill();
+      return;
+    }
     const lifeFrac = Math.max(0, Math.min(1, zone.life / this.config.fireArrow.lingerDuration));
     const radius = Number.isFinite(zone.radius) ? Math.max(0, zone.radius) : 0;
     if (radius <= 0) return;
