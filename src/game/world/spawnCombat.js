@@ -125,7 +125,17 @@ export function spawnSkeleton(game, x, y, options) {
   return spawnSkeletonEntity(game, x, y, options);
 }
 
-export function applyEnemyDamage(game, enemy, amount, damageType = "physical", ownerId = null) {
+function brightenHexColor(color, amount = 0.18) {
+  if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) return color;
+  const n = Number.parseInt(color.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const lift = (v) => Math.max(0, Math.min(255, Math.round(v + (255 - v) * amount)));
+  return `#${((1 << 24) + (lift(r) << 16) + (lift(g) << 8) + lift(b)).toString(16).slice(1)}`;
+}
+
+export function applyEnemyDamage(game, enemy, amount, damageType = "physical", ownerId = null, options = {}) {
   if (!Number.isFinite(amount) || amount <= 0) return;
   if (enemy?.invincible) return;
   if (enemy?.type === "skeleton_warrior" && enemy.collapsed) {
@@ -226,11 +236,13 @@ export function applyEnemyDamage(game, enemy, amount, damageType = "physical", o
   }
   enemy.hpBarTimer = game.config.enemy.hpBarDuration;
   if (effective >= 1 || (enemy.damageTextTimer || 0) <= 0) {
+    const critical = !!options.critical;
+    const baseColor = typeof game.getDamageTextColor === "function" ? game.getDamageTextColor(damageType) : "#e85c5c";
     game.spawnFloatingText(
       enemy.x,
       enemy.y - enemy.size * 0.65,
-      `-${Math.max(1, Math.round(effective))}`,
-      typeof game.getDamageTextColor === "function" ? game.getDamageTextColor(damageType) : "#e85c5c"
+      `-${Math.max(1, Math.round(effective))}${critical ? "!" : ""}`,
+      critical ? brightenHexColor(baseColor, 0.22) : baseColor
     );
     enemy.damageTextTimer = 0.14;
   }

@@ -74,31 +74,45 @@ const RANGER_TALENT_DEFS = [
     ]
   },
   {
-    key: "quickChange",
-    label: "Quick Change",
+    key: "opportunist",
+    label: "Opportunist",
     tier: 2,
     group: "swap",
     maxRanks: 1,
-    icon: "QC",
+    icon: "OP",
     color: "#7cd5ff",
     description: [
-      "Pick Quick Change as your mode-swap style.",
-      "Q swaps between ranged and melee mode with reduced cooldown.",
-      "Combo is preserved when swapping."
+      "Pick Opportunist as your combat rhythm.",
+      "Swapping grants a 2 second destination-mode stat window.",
+      "First attack after swapping deals moderate bonus damage."
     ]
   },
   {
-    key: "followThrough",
-    label: "Follow-Through",
+    key: "ambush",
+    label: "Ambush",
     tier: 2,
     group: "swap",
     maxRanks: 1,
-    icon: "FT",
+    icon: "AM",
     color: "#ffba6d",
     description: [
-      "Pick Follow-Through as your mode-swap style.",
-      "The first attack after swapping gains a destination-mode bonus.",
-      "Swapping to melee improves combo gain; swapping to ranged improves impact."
+      "Pick Ambush as your combat rhythm.",
+      "Swapping grants a short damage window and high first-hit burst.",
+      "The burst improves after idling or hitting a new target."
+    ]
+  },
+  {
+    key: "predator",
+    label: "Predator",
+    tier: 2,
+    group: "swap",
+    maxRanks: 1,
+    icon: "PD",
+    color: "#d0f09d",
+    description: [
+      "Pick Predator as your combat rhythm.",
+      "Melee attacks generate additional combo.",
+      "Ranged attacks spend combo to pierce, and swap attacks scale with combo."
     ]
   },
   {
@@ -111,8 +125,8 @@ const RANGER_TALENT_DEFS = [
     color: "#cbb5ff",
     description: [
       "Pick Footwork as your mode-swap style.",
-      "Briefly reduces incoming damage after swapping.",
-      "The protection is stronger when swapping into melee."
+      "Swapping grants temporary block chance and block power.",
+      "Your first attack after swapping grants brief damage reduction."
     ]
   },
   {
@@ -256,16 +270,16 @@ const RANGER_TALENT_DEFS = [
     ]
   },
   {
-    key: "phaseStep",
-    label: "Phase Step",
+    key: "relentless",
+    label: "Relentless",
     tier: 5,
     group: "general",
     maxRanks: 1,
-    icon: "PS",
-    color: "#8fd9ff",
+    icon: "RL",
+    color: "#ffe27c",
     description: [
-      "Swapping modes grants brief true invulnerability.",
-      "Your next attack after the swap deals bonus damage."
+      "Combo decay starts later and decays more slowly.",
+      "Melee hits generate extra combo."
     ]
   },
   {
@@ -283,16 +297,16 @@ const RANGER_TALENT_DEFS = [
     ]
   },
   {
-    key: "fieldDressing",
-    label: "Field Dressing",
+    key: "forager",
+    label: "Forager",
     tier: 5,
     group: "general",
     maxRanks: 1,
-    icon: "FD",
+    icon: "FG",
     color: "#b7e38a",
     description: [
       "Pickups grant regeneration over time.",
-      "If a wolf is present, it receives reduced healing."
+      "Mushrooms can spawn in the dungeon and heal when picked up."
     ]
   },
   {
@@ -322,16 +336,16 @@ const RANGER_TALENT_DEFS = [
     ]
   },
   {
-    key: "packTactics",
-    label: "Pack Tactics",
+    key: "smokeBomb",
+    label: "Smoke Bomb",
     tier: 5,
     group: "general",
     maxRanks: 1,
-    icon: "PT",
-    color: "#d0f09d",
+    icon: "SB",
+    color: "#9ea7ad",
     description: [
-      "Deal bonus damage near an allied combatant, marked engagement, or recent target.",
-      "Wolf can share and help activate the bonus."
+      "Swapping drops a smoke cloud that prevents enemy targeting.",
+      "Attacks inside smoke generate extra combo."
     ]
   },
   {
@@ -395,8 +409,8 @@ const RANGER_TALENT_DEFS = [
     icon: "AP",
     color: "#fff0bd",
     description: [
-      "Reaching 30 combo triggers a timed peak-state buff.",
-      "The internal cooldown is three times the buff duration."
+      "Each combo tier grants broad damage, speed, and defense bonuses.",
+      "At high combo, the wolf gains a pouncing bite."
     ]
   }
 ];
@@ -414,19 +428,19 @@ export const RANGER_WEAPON_STATS = {
     label: "Throwing Knives",
     swapCooldown: 0.5,
     ranged: { range: 260, cooldown: 0.3, damageMult: 0.88, projectileSpeed: 390, comboGain: 1, size: 5, life: 0.78 },
-    melee: { range: 40, arcDeg: 95, cooldown: 0.28, damageMult: 0.82, comboGain: 2, knockback: 0, defensePct: 0.08 }
+    melee: { range: 40, arcDeg: 95, cooldown: 0.28, damageMult: 1.07, comboGain: 2, knockback: 0, defensePct: 0.08 }
   },
   twinDaggers: {
     label: "Twin Daggers",
     swapCooldown: 0.65,
     ranged: { range: 180, cooldown: 0.26, damageMult: 0.68, projectileSpeed: 360, comboGain: 1, size: 5, life: 0.58 },
-    melee: { range: 34, arcDeg: 115, cooldown: 0.2, damageMult: 0.72, comboGain: 2, knockback: 0, defensePct: 0.12 }
+    melee: { range: 34, arcDeg: 115, cooldown: 0.2, damageMult: 0.94, comboGain: 2, knockback: 0, defensePct: 0.12 }
   },
   rapierPistol: {
     label: "Rapier & Pistol",
     swapCooldown: 0.8,
-    ranged: { range: 220, cooldown: 0.7, damageMult: 1.08, projectileSpeed: 520, comboGain: 1, size: 5, life: 0.48, knockback: 70 },
-    melee: { range: 52, arcDeg: 60, cooldown: 0.38, damageMult: 1.45, comboGain: 2, knockback: 0, defensePct: 0.1 }
+    ranged: { range: 420, cooldown: 0.7, damageMult: 1.08, projectileSpeed: 560, comboGain: 1, size: 5, life: 0.75, knockback: 70 },
+    melee: { range: 52, arcDeg: 60, cooldown: 0.38, damageMult: 1.89, comboGain: 2, knockback: 0, defensePct: 0.1 }
   }
 };
 
@@ -669,7 +683,9 @@ export function getRangerComboTier(game) {
 
 export function getRangerComboAttackSpeedBonus(game) {
   const tier = getRangerComboTier(game);
-  return tier === 3 ? 0.18 : tier === 2 ? 0.11 : tier === 1 ? 0.05 : 0;
+  let bonus = tier === 3 ? 0.18 : tier === 2 ? 0.11 : tier === 1 ? 0.05 : 0;
+  if (hasRangerTalent(game, "apexPredator")) bonus += tier === 3 ? 0.08 : tier === 2 ? 0.05 : tier === 1 ? 0.03 : 0;
+  return bonus;
 }
 
 export function getRangerComboDamageBonus(game) {
@@ -687,13 +703,31 @@ export function getRangerCritMultiplier() {
 
 export function getRangerProjectileSpeedBonus(game) {
   const weapon = getRangerSelectedWeapon(game);
-  return weapon === "longbow" ? 0.08 : weapon === "rapierPistol" ? 0.15 : 0;
+  let bonus = weapon === "longbow" ? 0.08 : weapon === "rapierPistol" ? 0.15 : 0;
+  if (getRangerSelectedSwapStyle(game) === "opportunist" && getRangerCurrentWeaponMode(game) === "ranged" && (game?.rangerRuntime?.swapBuffTimer || 0) > 0) bonus += 0.2;
+  return bonus;
+}
+
+export function getRangerSwapAttackSpeedBonus(game) {
+  return getRangerSelectedSwapStyle(game) === "opportunist" &&
+    getRangerCurrentWeaponMode(game) === "melee" &&
+    (game?.rangerRuntime?.swapBuffTimer || 0) > 0
+    ? 0.15
+    : 0;
+}
+
+export function getRangerSwapRangeBonus(game) {
+  return getRangerSelectedSwapStyle(game) === "opportunist" && (game?.rangerRuntime?.swapBuffTimer || 0) > 0 ? 0.2 : 0;
 }
 
 export function getRangerDamageBonus(game) {
   let total = getRangerComboDamageBonus(game);
   if (hasRangerTalent(game, "skirmisher") && game?.player?.moving) total += 0.08;
-  if (hasRangerTalent(game, "apexPredator") && (game?.rangerRuntime?.apexPredatorTimer || 0) > 0) total += 0.15;
+  if (getRangerSelectedPath(game) === "beastMasterPath" && game?.rangerRuntime?.wolfId && (game?.enemies || []).some((enemy) => enemy?.id === game.rangerRuntime.wolfId && (enemy.hp || 0) > 0)) total += 0.08;
+  if (hasRangerTalent(game, "apexPredator")) {
+    const tier = getRangerComboTier(game);
+    total += tier === 3 ? 0.15 : tier === 2 ? 0.1 : tier === 1 ? 0.05 : 0;
+  }
   return total;
 }
 
@@ -701,7 +735,10 @@ export function getRangerMoveSpeedBonus(game) {
   let total = 0;
   if ((game?.rangerRuntime?.dodgeTimer || 0) > 0) total += 0.35;
   if ((game?.rangerRuntime?.predatorsFeastTimer || 0) > 0) total += 0.1;
-  if ((game?.rangerRuntime?.apexPredatorTimer || 0) > 0) total += 0.12;
+  if (hasRangerTalent(game, "apexPredator")) {
+    const tier = getRangerComboTier(game);
+    total += tier === 3 ? 0.12 : tier === 2 ? 0.08 : tier === 1 ? 0.04 : 0;
+  }
   return total;
 }
 
@@ -735,7 +772,7 @@ export function getRangerDamageTakenReductionPct(game) {
   if (path === "roguePath") reduction += mode === "melee" ? 0.06 : 0.03;
   else if (path === "assassinPath") reduction += mode === "melee" ? 0.08 : 0.03;
   else if (path === "beastMasterPath") reduction += 0.06;
-  if (hasRangerTalent(game, "packTactics")) reduction += 0.03;
+  if (hasRangerTalent(game, "apexPredator")) reduction += getRangerComboTier(game) * 0.02;
   return Math.max(0, Math.min(0.35, reduction));
 }
 
@@ -769,6 +806,13 @@ export function hasTrickShot(game) {
   return hasRangerTalent(game, "trickShots") || hasRangerTalent(game, "stormcaller");
 }
 
+export function getRangerRicochetCount(game) {
+  let count = 0;
+  if (hasRangerTalent(game, "trickShots")) count += 2;
+  if (hasRangerTalent(game, "stormcaller")) count += 2;
+  return count;
+}
+
 export function hasFoxstep() {
   return false;
 }
@@ -796,7 +840,10 @@ export function getRangerFireArrowDamageBonus(game) {
 }
 
 export function getRangerStationaryPierceBonus(game) {
-  return hasRangerTalent(game, "stormcaller") || hasRangerTalent(game, "trickShots") ? 0.25 : 0;
+  let bonus = 0;
+  if (hasRangerTalent(game, "trickShots")) bonus += 0.25;
+  if (hasRangerTalent(game, "stormcaller")) bonus += 0.25;
+  return Math.min(0.5, bonus);
 }
 
 export function getRangerLinebreakerDamagePerHit(game) {

@@ -16,6 +16,7 @@ import {
   getRangerMultishotBonus,
   getRangerProjectileSpeedBonus,
   getRangerStationaryPierceBonus,
+  getRangerSwapAttackSpeedBonus,
   getRangerTalentPoints,
   getRangerCurrentWeaponModeStats,
   getRangerVolleyCooldownReduction,
@@ -152,7 +153,7 @@ export const runtimeCombatStatsMethods = {
     if (this.isArcherClass && this.isArcherClass()) {
       const modeStats = getRangerCurrentWeaponModeStats(this);
       if (modeStats && Number.isFinite(modeStats.cooldown)) {
-        const attackMultiplier = this.getAttackSpeedMultiplier() * (1 + getRangerComboAttackSpeedBonus(this));
+        const attackMultiplier = this.getAttackSpeedMultiplier() * (1 + getRangerComboAttackSpeedBonus(this) + getRangerSwapAttackSpeedBonus(this));
         return Math.max(this.classSpec.minAttackCooldown || 0.08, modeStats.cooldown / Math.max(0.1, attackMultiplier));
       }
     }

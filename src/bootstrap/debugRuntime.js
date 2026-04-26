@@ -66,6 +66,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           size: game.player?.size || 0,
           health: game.player?.health || 0,
           classType: game.player?.classType || game.classType || "",
+          level: Number.isFinite(game.level) ? game.level : (game.player?.level || 1),
           dirX: game.player?.dirX || 0,
           dirY: game.player?.dirY || 0,
           fireCooldown: game.player?.fireCooldown || 0,

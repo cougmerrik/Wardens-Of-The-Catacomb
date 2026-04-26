@@ -84,8 +84,8 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
   const contentTop = menuY + 48;
   const contentBottom = menuY + menuH - 84;
   const visibleH = contentBottom - contentTop;
-  const rowH = 116;
-  const contentHeight = 6 * rowH + 44;
+  const getTierHeight = (tier) => (tier === 5 ? 184 : 116);
+  const contentHeight = [1, 2, 3, 4, 5, 6].reduce((sum, tier) => sum + getTierHeight(tier), 44);
   const scrollMax = Math.max(0, contentHeight - visibleH);
   const scroll = Math.max(0, Math.min(scrollMax, game.uiScroll?.skillTree || 0));
   game.uiScroll.skillTree = scroll;
@@ -113,10 +113,12 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
   const mouseY = game.input?.mouse?.screenY;
   let hovered = null;
 
+  let tierCursorY = menuY + 62;
   for (let tier = 1; tier <= 6; tier++) {
-    const tierY = sy(menuY + 62 + (tier - 1) * rowH);
+    const tierH = getTierHeight(tier);
+    const tierY = sy(tierCursorY);
     const tierDefs = defs.filter((def) => def.tier === tier);
-    const tierRect = { x: menuX + 18, y: tierY, w: menuW - 36, h: rowH - 10 };
+    const tierRect = { x: menuX + 18, y: tierY, w: menuW - 36, h: tierH - 10 };
     const accessible = isRangerTierAccessible(game, tier);
     const group = tierDefs[0]?.group || "";
     const selectedCount = getRangerSelectedInGroup(game, group).length;
@@ -139,8 +141,8 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
     }
 
     const cols = tier === 5 ? 4 : Math.min(5, tierDefs.length);
-    const cardW = Math.max(92, Math.min(136, (tierRect.w - 34) / cols - 8));
-    const cardH = tier === 5 ? 48 : 52;
+    const cardW = Math.max(86, Math.min(tier === 5 ? 136 : 112, (tierRect.w - 34) / cols - 8));
+    const cardH = tier === 5 ? 54 : 48;
     tierDefs.forEach((def, index) => {
       const col = index % cols;
       const row = Math.floor(index / cols);
@@ -157,6 +159,7 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
         hovered = getRangerTooltip(game, { key: def.key, kind: "node", locked: locked || !accessible });
       }
     });
+    tierCursorY += tierH;
   }
 
   ctx.restore();

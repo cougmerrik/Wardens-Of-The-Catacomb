@@ -172,6 +172,8 @@ function resetPointTree(tree) {
 }
 
 function clearRefundedSkillState(game) {
+  game.enemies = (game.enemies || []).filter((enemy) => !(enemy && enemy.type === "wolf" && enemy.ownerId === game.player?.id));
+  game.drops = (game.drops || []).filter((drop) => !(drop && drop.type === "mushroom"));
   game.rangerRuntime = createRangerRuntimeState();
   if (game.player) game.player.rangerRuntime = game.rangerRuntime;
   game.warriorMomentumTimer = 0;

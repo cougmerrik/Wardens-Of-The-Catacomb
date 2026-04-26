@@ -1,6 +1,20 @@
+import { getRangerSelectedPath, getRangerSelectedWeapon } from "../game/rangerTalentTree.js";
 import { getWarriorDoctrine, getWarriorWeaponForm, hasWarriorEldritchInvestment, isWarriorRaging } from "../game/warriorTalentTree.js";
 
 export const rendererEffectsPlayerMethods = {
+  getRangerPathPresentation(entityOrGame) {
+    const path = getRangerSelectedPath(entityOrGame);
+    if (path === "roguePath") return { tint: "#8e9297", alpha: 0.58, filter: "saturate(0.75) brightness(0.95)" };
+    if (path === "assassinPath") return { tint: "#101116", alpha: 0.62, filter: "brightness(0.72) contrast(1.15)" };
+    if (path === "beastMasterPath") return { tint: "#c7a16a", alpha: 0.48, filter: "sepia(0.22) saturate(1.08)" };
+    if (path === "rangerPath") return { tint: "#4fae5f", alpha: 0.48, filter: "saturate(1.1) brightness(1.02)" };
+    return { tint: null, alpha: 0, filter: "none" };
+  },
+
+  getRangerWeaponPresentation(entityOrGame) {
+    return getRangerSelectedWeapon(entityOrGame) || "longbow";
+  },
+
   getWarriorDoctrinePresentation(entityOrGame) {
     const doctrine = getWarriorDoctrine(entityOrGame);
     if (doctrine === "eldritch") return { tint: "#9d7bff", alpha: 0.72, filter: "brightness(1.08) saturate(1.2)" };
@@ -44,6 +58,7 @@ export const rendererEffectsPlayerMethods = {
     const shadowVeilActive = (player?.rangerRuntime?.shadowVeilTimer || 0) > 0;
     const warriorRaging = isWarriorRaging(player);
     const doctrineVisual = this.getWarriorDoctrinePresentation(player);
+    const rangerVisual = player?.classType === "archer" ? this.getRangerPathPresentation(player) : null;
     this.drawPlayerSpriteFrame(
       frameX,
       frameY,
@@ -51,9 +66,9 @@ export const rendererEffectsPlayerMethods = {
       drawX,
       drawY,
       renderSize,
-      warriorRaging ? doctrineVisual.tint : null,
-      warriorRaging ? doctrineVisual.alpha : 0,
-      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (warriorRaging ? doctrineVisual.filter : "none")
+      warriorRaging ? doctrineVisual.tint : rangerVisual?.tint || null,
+      warriorRaging ? doctrineVisual.alpha : rangerVisual?.alpha || 0,
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (warriorRaging ? doctrineVisual.filter : rangerVisual?.filter || "none")
     );
     return { movingVisual, walkPhase: movingVisual ? player._renderAnimPhase * 0.1 : 0 };
   },
@@ -73,7 +88,7 @@ export const rendererEffectsPlayerMethods = {
       if ((player?.warriorRageActiveTimer || 0) > 0) this.ctx.restore();
       return;
     }
-    this.drawPlayerAimingRig(player, screenX, screenY, walkPhase, 0);
+    this.drawPlayerAimingRig(player, screenX, screenY, walkPhase, 0, this.getRangerWeaponPresentation(player));
   },
 
   drawRemotePlayerHandle(player, screenX, screenY) {
@@ -135,11 +150,15 @@ export const rendererEffectsPlayerMethods = {
     const drawX = playerScreenX - renderSize / 2;
     const drawY = playerScreenY - renderSize * 0.56;
     const shadowVeilActive = (game.rangerRuntime?.shadowVeilTimer || 0) > 0;
+    const archerPathVisual = game.isArcherClass && game.isArcherClass() ? this.getRangerPathPresentation(game) : null;
     let tintColor = null;
     let tintAlpha = 0;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
       tintColor = "#a6a8ad";
       tintAlpha = 0.5;
+    } else if (archerPathVisual) {
+      tintColor = archerPathVisual.tint;
+      tintAlpha = archerPathVisual.alpha;
     } else if (!game.classSpec?.usesRanged) {
       const doctrineVisual = this.getWarriorDoctrinePresentation(game);
       if (isWarriorRaging(game)) {
@@ -159,22 +178,24 @@ export const rendererEffectsPlayerMethods = {
       renderSize,
       tintColor,
       tintAlpha,
-      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (!game.classSpec?.usesRanged && isWarriorRaging(game) ? this.getWarriorDoctrinePresentation(game).filter : "none")
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (!game.classSpec?.usesRanged && isWarriorRaging(game) ? this.getWarriorDoctrinePresentation(game).filter : archerPathVisual?.filter || "none")
     );
     const baseCd = game.getPlayerFireCooldown ? game.getPlayerFireCooldown() : this.config.player.baseFireCooldown;
     const firePulse = baseCd > 0 ? Math.max(0, Math.min(1, p.fireCooldown / baseCd)) : 0;
     const walkPhase = movingVisual ? p._renderAnimPhase * 0.1 : 0;
-    if (shadowVeilActive || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.save();
+    const hasArcherPathFilter = !!archerPathVisual?.filter && archerPathVisual.filter !== "none";
+    if (shadowVeilActive || hasArcherPathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.save();
     if (shadowVeilActive) this.ctx.filter = "saturate(45%) brightness(0.9) opacity(0.68)";
+    else if (hasArcherPathFilter) this.ctx.filter = archerPathVisual.filter;
     else if (!game.classSpec?.usesRanged && isWarriorRaging(game)) this.ctx.filter = this.getWarriorDoctrinePresentation(game).filter;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
       this.drawPlayerNecromancerRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
     } else if (game.classSpec && !game.classSpec.usesRanged) {
       this.drawPlayerFighterRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
     } else {
-      this.drawPlayerAimingRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
+      this.drawPlayerAimingRig(p, playerScreenX, playerScreenY, walkPhase, firePulse, this.getRangerWeaponPresentation(game));
     }
-    if (shadowVeilActive || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.restore();
+    if (shadowVeilActive || hasArcherPathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.restore();
   },
 
   drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor = null, tintAlpha = 0, filter = "none") {
@@ -574,6 +595,14 @@ export const rendererEffectsPlayerMethods = {
       };
     }
     if (this._minimapCache?.canvas) ctx.drawImage(this._minimapCache.canvas, miniX, miniY, drawW, drawH);
+
+    for (const drop of game.drops || []) {
+      if (!drop || drop.life <= 0 || (drop.type !== "health" && drop.type !== "mushroom")) continue;
+      ctx.fillStyle = drop.type === "health" ? "#ff3f3f" : "#ff6a52";
+      ctx.beginPath();
+      ctx.arc(miniX + (drop.x / this.config.map.tile) * scale, miniY + (drop.y / this.config.map.tile) * scale, Math.max(1.6, scale * 0.95), 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     for (const player of Array.isArray(game.remotePlayers) ? game.remotePlayers : []) {
       if (!player || player.alive === false) continue;

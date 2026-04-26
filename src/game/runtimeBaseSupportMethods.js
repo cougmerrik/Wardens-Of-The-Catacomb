@@ -264,21 +264,28 @@ export const runtimeBaseSupportMethods = {
       rr.swapCooldownTimer = Math.max(0, (Number.isFinite(rr.swapCooldownTimer) ? rr.swapCooldownTimer : 0) - dt);
       rr.classSkillCooldownTimer = Math.max(0, (Number.isFinite(rr.classSkillCooldownTimer) ? rr.classSkillCooldownTimer : 0) - dt);
       rr.dodgeTimer = Math.max(0, (Number.isFinite(rr.dodgeTimer) ? rr.dodgeTimer : 0) - dt);
+      rr.swapBuffTimer = Math.max(0, (Number.isFinite(rr.swapBuffTimer) ? rr.swapBuffTimer : 0) - dt);
+      if (rr.swapBuffTimer <= 0) rr.pendingSwapBonus = null;
       rr.shadowVeilTimer = Math.max(0, (Number.isFinite(rr.shadowVeilTimer) ? rr.shadowVeilTimer : 0) - dt);
-      rr.phaseStepTimer = Math.max(0, (Number.isFinite(rr.phaseStepTimer) ? rr.phaseStepTimer : 0) - dt);
       rr.footworkTimer = Math.max(0, (Number.isFinite(rr.footworkTimer) ? rr.footworkTimer : 0) - dt);
-      rr.fieldDressingRegenTimer = Math.max(0, (Number.isFinite(rr.fieldDressingRegenTimer) ? rr.fieldDressingRegenTimer : 0) - dt);
+      rr.footworkGuardTimer = Math.max(0, (Number.isFinite(rr.footworkGuardTimer) ? rr.footworkGuardTimer : 0) - dt);
+      rr.foragerRegenTimer = Math.max(0, (Number.isFinite(rr.foragerRegenTimer) ? rr.foragerRegenTimer : 0) - dt);
       rr.predatorsFeastTimer = Math.max(0, (Number.isFinite(rr.predatorsFeastTimer) ? rr.predatorsFeastTimer : 0) - dt);
       rr.predatorsFeastCooldownTimer = Math.max(0, (Number.isFinite(rr.predatorsFeastCooldownTimer) ? rr.predatorsFeastCooldownTimer : 0) - dt);
       rr.venomCooldownTimer = Math.max(0, (Number.isFinite(rr.venomCooldownTimer) ? rr.venomCooldownTimer : 0) - dt);
+      rr.smokeBombCooldownTimer = Math.max(0, (Number.isFinite(rr.smokeBombCooldownTimer) ? rr.smokeBombCooldownTimer : 0) - dt);
+      rr.mushroomSpawnTimer = Math.max(0, (Number.isFinite(rr.mushroomSpawnTimer) ? rr.mushroomSpawnTimer : 0) - dt);
+      if (this.isPrimaryPlayerEntity(player) && this.rangerTalents?.forager?.points > 0) this.ensureForagerMushrooms(dt);
       rr.comboSurgeCooldownTimer = Math.max(0, (Number.isFinite(rr.comboSurgeCooldownTimer) ? rr.comboSurgeCooldownTimer : 0) - dt);
-      rr.apexPredatorTimer = Math.max(0, (Number.isFinite(rr.apexPredatorTimer) ? rr.apexPredatorTimer : 0) - dt);
-      rr.apexPredatorCooldownTimer = Math.max(0, (Number.isFinite(rr.apexPredatorCooldownTimer) ? rr.apexPredatorCooldownTimer : 0) - dt);
+      rr.livingShadowCooldownTimer = Math.max(0, (Number.isFinite(rr.livingShadowCooldownTimer) ? rr.livingShadowCooldownTimer : 0) - dt);
       rr.combo = Math.max(0, Math.min(30, Number.isFinite(rr.combo) ? Math.floor(rr.combo) : 0));
       if (rr.combo > 0) {
         rr.comboDecayDelayTimer = Math.max(0, (Number.isFinite(rr.comboDecayDelayTimer) ? rr.comboDecayDelayTimer : 0) - dt);
         if (rr.comboDecayDelayTimer <= 0) {
-          const getDecayInterval = (combo) => combo >= 20 ? 0.65 : combo >= 10 ? 0.45 : combo >= 5 ? 0.3 : 0.2;
+          const relentless = this.rangerTalents?.relentless?.points > 0;
+          const getDecayInterval = (combo) => relentless
+            ? (combo >= 20 ? 0.68 : combo >= 10 ? 0.48 : combo >= 5 ? 0.34 : 0.22)
+            : (combo >= 20 ? 0.46 : combo >= 10 ? 0.32 : combo >= 5 ? 0.22 : 0.15);
           rr.comboDecayTickTimer = (Number.isFinite(rr.comboDecayTickTimer) ? rr.comboDecayTickTimer : getDecayInterval(rr.combo)) - dt;
           while (rr.combo > 0 && rr.comboDecayTickTimer <= 0) {
             rr.combo -= 1;
@@ -290,8 +297,9 @@ export const runtimeBaseSupportMethods = {
         rr.comboDecayTickTimer = 0;
         rr.quarryTargetId = null;
         rr.quarryStacks = 0;
+        rr.apexPredatorAnnounceTier = 0;
       }
-      if ((rr.fieldDressingRegenTimer || 0) > 0 && player.alive) {
+      if ((rr.foragerRegenTimer || 0) > 0 && player.alive) {
         const healAmount = (player.maxHealth || 1) * 0.012 * dt;
         if (this.isPrimaryPlayerEntity(player)) this.applyPlayerHealing(healAmount, { suppressText: true });
         else player.health = Math.min(player.maxHealth || player.health || 0, (player.health || 0) + healAmount);
@@ -396,8 +404,14 @@ export const runtimeBaseSupportMethods = {
     if (!Number.isFinite(amount) || amount <= 0) return 0;
     const rangerDodgeChance = entity === this.player ? getRangerDodgeChance(this) : 0;
     if (entity?.classType === "archer" && Math.random() < rangerDodgeChance) return 0;
-    if (entity?.classType === "archer" && (entity?.rangerRuntime?.phaseStepTimer || 0) > 0) return 0;
-    if (entity?.classType === "archer" && (entity?.rangerRuntime?.footworkTimer || 0) > 0) amount *= 0.75;
+    if (entity?.classType === "archer") {
+      const blockableDamage = source && (damageType === "physical" || damageType === "poison" || damageType === "unholy" || damageType === "melee");
+      if (blockableDamage && (entity?.rangerRuntime?.footworkTimer || 0) > 0 && Math.random() < 0.45) {
+        amount *= 0.4;
+        if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(entity.x, entity.y - 30, "Block", "#cbb5ff", 0.45, 12);
+      }
+      if ((entity?.rangerRuntime?.footworkGuardTimer || 0) > 0) amount *= 0.8;
+    }
     if (entity?.classType === "archer") {
       const rangerSource = entity === this.player ? this : entity;
       amount *= 1 - getRangerDamageTakenReductionPct(rangerSource);
@@ -628,6 +642,20 @@ export const runtimeBaseSupportMethods = {
     const healed = entity.health - before;
     if (this.isPrimaryPlayerEntity(entity) && typeof this.recordRunHealingReceived === "function") this.recordRunHealingReceived(healed);
     this.markPlayerEntityHealthBarVisible(entity);
+    if (entity?.classType === "archer" && healed > 0 && !options.skipWolfShare) {
+      const wolfId = entity?.rangerRuntime?.wolfId || (this.isPrimaryPlayerEntity(entity) ? this.rangerRuntime?.wolfId : null);
+      const wolf = wolfId ? (this.enemies || []).find((enemy) => enemy && enemy.id === wolfId && enemy.type === "wolf" && (enemy.hp || 0) > 0) : null;
+      if (wolf) {
+        const beforeWolf = Number.isFinite(wolf.hp) ? wolf.hp : 0;
+        wolf.hp = Math.min(Number.isFinite(wolf.maxHp) ? wolf.maxHp : beforeWolf, beforeWolf + healed);
+        if (wolf.hp > beforeWolf) {
+          wolf.hpBarTimer = this.config.enemy.hpBarDuration;
+          if (!options.suppressText) {
+            this.spawnFloatingText(wolf.x, wolf.y - wolf.size * 0.75, `+${Math.max(1, Math.round(wolf.hp - beforeWolf))}`, typeof this.getHealingTextColor === "function" ? this.getHealingTextColor() : "#79e59a", 0.8, 13);
+          }
+        }
+      }
+    }
     if (!options.suppressText) {
       this.spawnFloatingText(
         entity.x,

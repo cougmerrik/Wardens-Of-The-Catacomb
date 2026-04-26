@@ -1,5 +1,30 @@
 import { vecLength } from "../utils.js";
 
+function spawnStormcallerRicochetSplits(game, bullet) {
+  if (!game || !Array.isArray(game.bullets) || !bullet?.stormcallerSplitOnRicochet || bullet.stormcallerSplitUsed) return;
+  const speed = Math.max(160, Math.hypot(bullet.vx || 0, bullet.vy || 0));
+  const baseAngle = Math.atan2(bullet.vy || 0, bullet.vx || 1);
+  const splitLife = Math.max(0.12, Math.min(Number.isFinite(bullet.life) ? bullet.life : 0.5, 0.55));
+  for (const offset of [-0.36, 0.36]) {
+    const angle = baseAngle + offset;
+    game.bullets.push({
+      ...bullet,
+      x: bullet.x,
+      y: bullet.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      angle,
+      life: splitLife,
+      damageMult: (Number.isFinite(bullet.damageMult) ? bullet.damageMult : 1) * 0.55,
+      remainingRicochets: Math.max(0, Math.min(1, Number.isFinite(bullet.remainingRicochets) ? bullet.remainingRicochets : 0)),
+      stormcallerSplitOnRicochet: false,
+      stormcallerSplitUsed: true,
+      hitTargets: new Set()
+    });
+  }
+  bullet.stormcallerSplitUsed = true;
+}
+
 function spawnFleshBallBloodPool(game, x, y, ownerId = null) {
   if (!game || !Array.isArray(game.fireZones)) return;
   game.fireZones.push({
@@ -242,6 +267,7 @@ export function finalizeProjectilesAndTransientState(game) {
       bullet.remainingRicochets -= 1;
       bullet.x = probeX;
       bullet.y = probeY;
+      spawnStormcallerRicochetSplits(game, bullet);
     }
   }
   game.bullets = game.bullets.filter((bullet) => !game.isWallAt(bullet.x, bullet.y, false) && bullet.life > 0);

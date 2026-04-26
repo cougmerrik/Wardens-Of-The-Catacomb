@@ -15,7 +15,7 @@ const ROOM_ID = "validate-network-refund";
 const GAME_URL = `http://127.0.0.1:${HTTP_PORT}`;
 const REFUND_CLASS_KEY = "warrior";
 const REFUND_EXPECTED_CLASS_TYPE = "fighter";
-const REFUND_SPEND_KEY = "rageActive";
+const REFUND_SPEND_KEY = "broadswing";
 
 const children = [];
 
@@ -218,7 +218,8 @@ async function main() {
             actionKind: parsed?.action?.kind || "",
             actionKey: parsed?.action?.key || "",
             goldDelta: parsed?.action?.goldDelta || 0,
-            skillPointDelta: parsed?.action?.skillPointDelta || 0
+            skillPointDelta: parsed?.action?.skillPointDelta || 0,
+            levelDelta: parsed?.action?.levelDelta || 0
           });
           if (log.length > 512) log.splice(0, log.length - 512);
         } catch {}
@@ -244,9 +245,10 @@ async function main() {
 
     await runDebug(page, "grantSkillPoints", { amount: 2 });
     await runDebug(page, "grantGold", { amount: 400 });
+    await runDebug(page, "grantLevels", { amount: 1 });
     await page.waitForFunction(() => {
       const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.skillPoints >= 2 && state.ui?.gold >= 400;
+      return !!state && state.ui?.skillPoints >= 2 && state.ui?.gold >= 400 && (state.player?.level || 1) >= 2;
     }, null, { timeout: 5000 });
 
     lastState = await getDebugState(page);

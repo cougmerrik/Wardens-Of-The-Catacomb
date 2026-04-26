@@ -54,11 +54,19 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
     : Infinity;
   let best = null;
   let bestDist = Number.POSITIVE_INFINITY;
+  let suppressedPlayerSeen = false;
+  const fallbackAnchor = { x: enemy.x, y: enemy.y, anchorOnly: true, noVisibleTarget: true };
   if (!sourceFriendly) {
     for (const player of livingPlayers) {
       if (!player) continue;
-      if ((player.rangerRuntime?.shadowVeilTimer || 0) > 0) continue;
       const dist = vecLength((player.x || 0) - enemy.x, (player.y || 0) - enemy.y);
+      const suppressed =
+        (player.rangerRuntime?.shadowVeilTimer || 0) > 0 ||
+        (typeof game?.isPointInRangerSmokeBomb === "function" && game.isPointInRangerSmokeBomb(player.x, player.y));
+      if (suppressed) {
+        if (dist <= maxRange) suppressedPlayerSeen = true;
+        continue;
+      }
       if (dist > maxRange || dist >= bestDist) continue;
       best = player;
       bestDist = dist;
@@ -89,7 +97,7 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
       anchorOnly: true
     };
   }
-  return livingPlayers[0] || game.player;
+  return sourceFriendly ? (livingPlayers[0] || game.player) : (suppressedPlayerSeen ? fallbackAnchor : (livingPlayers[0] || game.player));
 }
 
 export function moveEnemyTowardPoint(game, enemy, target, dt, speedScale, minDistance = 0) {

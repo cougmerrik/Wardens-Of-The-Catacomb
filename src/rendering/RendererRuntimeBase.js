@@ -102,7 +102,7 @@ export class RendererRuntimeBase {
 
   }
 
-  drawPlayerAimingRig(player, screenX, screenY, walkPhase = 0, firePulse = 0) {
+  drawPlayerAimingRig(player, screenX, screenY, walkPhase = 0, firePulse = 0, weaponStyle = "longbow") {
     const ctx = this.ctx;
     const aimAngle = Math.atan2(player.dirY || 0, player.dirX || 1);
     const ax = Math.cos(aimAngle);
@@ -118,6 +118,7 @@ export class RendererRuntimeBase {
     const rearShoulderY = chestY - py * shoulderSpread;
     const frontShoulderX = chestX + px * shoulderSpread;
     const frontShoulderY = chestY + py * shoulderSpread;
+    const style = ["rapierPistol", "twinDaggers", "throwingKnives"].includes(weaponStyle) ? weaponStyle : "longbow";
 
     // Recoil pulse after a shot: draw hand snaps back and string oscillates briefly.
     const recoil = Math.max(0, Math.min(1, firePulse));
@@ -152,6 +153,63 @@ export class RendererRuntimeBase {
       ctx.lineTo(hx, hy);
       ctx.stroke();
     };
+
+    if (style !== "longbow") {
+      const mainHandX = chestX + ax * (13 - recoil * 3) + px * 1.5;
+      const mainHandY = chestY + ay * (13 - recoil * 3) + py * 1.5;
+      const offHandX = chestX + ax * 7 - px * 5;
+      const offHandY = chestY + ay * 7 - py * 5;
+      drawArm(rearShoulderX, rearShoulderY, offHandX, offHandY, "#2d5132", "#e4c39c", -1);
+      drawArm(frontShoulderX, frontShoulderY, mainHandX, mainHandY, "#355f3b", "#e4c39c", 1);
+
+      ctx.lineCap = "round";
+      if (style === "rapierPistol") {
+        ctx.strokeStyle = "#333842";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(mainHandX - ax * 1.5, mainHandY - ay * 1.5);
+        ctx.lineTo(mainHandX + ax * 9, mainHandY + ay * 9);
+        ctx.stroke();
+        ctx.strokeStyle = "#6d4a2c";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(mainHandX - px * 1.3, mainHandY - py * 1.3);
+        ctx.lineTo(mainHandX - ax * 2 - px * 4, mainHandY - ay * 2 - py * 4);
+        ctx.stroke();
+        ctx.strokeStyle = "#d9dde2";
+        ctx.lineWidth = 1.7;
+        ctx.beginPath();
+        ctx.moveTo(offHandX - ax * 2, offHandY - ay * 2);
+        ctx.lineTo(offHandX + ax * 13, offHandY + ay * 13);
+        ctx.stroke();
+      } else {
+        const bladeColor = style === "twinDaggers" ? "#e4e8ef" : "#d5dde8";
+        const hiltColor = style === "twinDaggers" ? "#58422b" : "#2d3340";
+        const drawKnife = (hx, hy, side) => {
+          ctx.strokeStyle = hiltColor;
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(hx - px * side * 2.8, hy - py * side * 2.8);
+          ctx.lineTo(hx + px * side * 2.8, hy + py * side * 2.8);
+          ctx.stroke();
+          ctx.strokeStyle = bladeColor;
+          ctx.lineWidth = style === "twinDaggers" ? 2.3 : 1.8;
+          ctx.beginPath();
+          ctx.moveTo(hx, hy);
+          ctx.lineTo(hx + ax * (style === "twinDaggers" ? 11 : 8), hy + ay * (style === "twinDaggers" ? 11 : 8));
+          ctx.stroke();
+        };
+        drawKnife(mainHandX, mainHandY, 1);
+        drawKnife(offHandX, offHandY, -1);
+      }
+
+      ctx.fillStyle = "#e4c39c";
+      ctx.beginPath();
+      ctx.arc(rearShoulderX, rearShoulderY, 1.2, 0, Math.PI * 2);
+      ctx.arc(frontShoulderX, frontShoulderY, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
 
     // Rear arm draws string (behind bow).
     drawArm(rearShoulderX, rearShoulderY, drawHandX, drawHandY, "#2d5132", "#e4c39c", -1);

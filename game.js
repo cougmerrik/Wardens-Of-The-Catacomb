@@ -1081,6 +1081,19 @@ if (typeof window !== "undefined") {
       if (torch.lit) torch.snuffCooldown = 0;
       return { ok: true, id: torch.id || null, lit: torch.lit };
     }
+    if (action === "grantLevels") {
+      const amount = Number.isFinite(payload.amount) ? Math.max(0, Math.floor(payload.amount)) : 0;
+      if (game.networkEnabled && netClient && typeof netClient.sendAction === "function") {
+        netClient.sendAction({ kind: "debugGrantProgress", levelDelta: amount });
+        return { ok: true, sent: true, levelDelta: amount };
+      }
+      game.level = Math.max(1, (Number.isFinite(game.level) ? game.level : 1) + amount);
+      if (game.player) game.player.level = game.level;
+      return {
+        ok: true,
+        level: game.level
+      };
+    }
     return { ok: false, error: `unknown action: ${action}` };
   }
 
@@ -1139,7 +1152,7 @@ if (typeof window !== "undefined") {
           maxHealth: game.player?.maxHealth || 0,
           hpBarTimer: game.player?.hpBarTimer || 0,
           hpBarVisible: typeof game.showPlayerHealthBar === "function" ? !!game.showPlayerHealthBar() : false,
-          level: game.player?.level || 1,
+          level: Number.isFinite(game.level) ? game.level : (game.player?.level || 1),
           xp: Number.isFinite(game.experience) ? game.experience : (game.player?.xp || 0),
           score: game.score || 0,
           gold: game.gold || 0,

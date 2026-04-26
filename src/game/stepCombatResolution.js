@@ -109,6 +109,7 @@ export function resolveCombatAndDrops({
 
   for (const b of game.bullets) {
     if (b.life <= 0) continue;
+    if (b.visualOnly) continue;
     if (!b.faction || b.faction !== "enemy") {
       for (const zone of game.fireZones || []) {
         if (!zone || zone.life <= 0 || zone.zoneType !== "pinningFire") continue;
@@ -189,7 +190,7 @@ export function resolveCombatAndDrops({
           ? game.getRangerArrowDamageAgainst(enemy, b)
           : (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1);
         const damageType = typeof b.damageType === "string" && b.damageType ? b.damageType : (b.projectileType === "holyWave" ? "holy" : "arrow");
-        game.applyEnemyDamage(enemy, projectileDamage, damageType, b.ownerId || null);
+        game.applyEnemyDamage(enemy, projectileDamage, damageType, b.ownerId || null, { critical: (b.critMultiplier || 1) > 1 });
         if (b.projectileType === "holyWave") {
           if ((b.shockKnockback || 0) > 0) {
             const angle = Number.isFinite(b.angle) ? b.angle : Math.atan2((b.vy || 0), (b.vx || 1));
@@ -232,6 +233,8 @@ export function resolveCombatAndDrops({
         b.linebreakerHits = (Number.isFinite(b.linebreakerHits) ? b.linebreakerHits : 0) + 1;
         if (b.projectileType === "holyWave") {
           // Holy waves travel through enemies once per target.
+        } else if (b.predatorPierce) {
+          b.predatorPierce = false;
         } else if (Math.random() >= game.getPiercingChance()) {
           b.life = 0;
         }
@@ -470,6 +473,7 @@ export function resolveCombatAndDrops({
     if ((enemy.crusaderDefenseShredTimer || 0) <= 0) enemy.crusaderDefenseShredPct = 0;
     enemy.slowTimer = Math.max(0, (Number.isFinite(enemy.slowTimer) ? enemy.slowTimer : 0) - dt);
     if ((enemy.slowTimer || 0) <= 0) enemy.slowPct = 0;
+    enemy.poisonSlowTimer = Math.max(0, (Number.isFinite(enemy.poisonSlowTimer) ? enemy.poisonSlowTimer : 0) - dt);
     enemy.curseTimer = Math.max(0, (Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0) - dt);
     enemy.rotTimer = Math.max(0, (Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0) - dt);
     enemy.rangerMarkedTimer = Math.max(0, (Number.isFinite(enemy.rangerMarkedTimer) ? enemy.rangerMarkedTimer : 0) - dt);
@@ -718,7 +722,9 @@ export function resolveCombatAndDrops({
       else if (enemy.type === "minotaur") rewardScore = 320;
       else if (enemy.type === "skeleton") rewardScore = 12;
       if (typeof game.awardScoreToPlayerEntity === "function" && rewardScore > 0) game.awardScoreToPlayerEntity(rewardOwner, rewardScore);
-      if (enemy.type !== "golem" || !enemy.isFloorBoss || isFinalGolemBossDeath) {
+      const bossCleanupPhase = game.floorBoss && ["defeated", "portal", "completed"].includes(game.floorBoss.phase);
+      const suppressPostBossXp = bossCleanupPhase && !enemy.isFloorBoss && !isFinalGolemBossDeath;
+      if (!suppressPostBossXp && (enemy.type !== "golem" || !enemy.isFloorBoss || isFinalGolemBossDeath)) {
         if (typeof game.gainExperienceForPlayerEntity === "function") game.gainExperienceForPlayerEntity(rewardOwner, game.xpFromEnemy(enemy));
         else game.gainExperience(game.xpFromEnemy(enemy));
       }
@@ -769,8 +775,13 @@ export function resolveCombatAndDrops({
     if (drop.life <= 0) continue;
     for (const player of getLivingPlayers()) {
       if (vecLength(player.x - drop.x, player.y - drop.y) >= game.getPickupRadius()) continue;
-      if (drop.type === "health") {
+      if (drop.type === "health" || drop.type === "mushroom") {
         healPlayer(player, drop.amount);
+        if (player.classType === "archer" && game.rangerTalents?.forager?.points > 0) {
+          player.rangerRuntime = player.rangerRuntime && typeof player.rangerRuntime === "object" ? player.rangerRuntime : {};
+          player.rangerRuntime.foragerRegenTimer = Math.max(player.rangerRuntime.foragerRegenTimer || 0, 4);
+          if (drop.type === "mushroom") player.rangerRuntime.mushroomSpawnTimer = 30;
+        }
       } else if (game.isGoldDrop(drop)) {
         const amount = Math.max(1, Math.floor(drop.amount * game.getGoldFindMultiplier()));
         if (typeof game.awardGoldToPlayerEntity === "function") game.awardGoldToPlayerEntity(player, amount);

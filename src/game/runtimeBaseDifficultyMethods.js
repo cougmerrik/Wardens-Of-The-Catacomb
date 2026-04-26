@@ -293,6 +293,58 @@ export const runtimeBaseDifficultyMethods = {
     }
   },
 
+  placeMushrooms(countOverride = null) {
+    const tile = this.config.map.tile;
+    const count = Number.isFinite(countOverride) ? Math.max(0, Math.floor(countOverride)) : Math.max(2, Math.min(8, Math.floor(((this.map?.length || 0) * (this.map?.[0]?.length || 0)) / 360)));
+    let placed = 0;
+    let attempts = Math.max(80, count * 100);
+    while (placed < count && attempts-- > 0) {
+      const x = 2 + Math.floor(Math.random() * Math.max(1, (this.map?.[0]?.length || 4) - 4));
+      const y = 2 + Math.floor(Math.random() * Math.max(1, (this.map?.length || 4) - 4));
+      if (this.map?.[y]?.[x] !== ".") continue;
+      const wx = x * tile + tile / 2;
+      const wy = y * tile + tile / 2;
+      if (vecLength(wx - this.player.x, wy - this.player.y) < tile * 5) continue;
+      if (vecLength(wx - this.door.x, wy - this.door.y) < tile * 2.5) continue;
+      if ((this.drops || []).some((drop) => vecLength(wx - drop.x, wy - drop.y) < tile * 1.2)) continue;
+      this.drops.push({
+        type: "mushroom",
+        x: wx,
+        y: wy,
+        size: 12,
+        amount: Math.max(1, Math.round((this.player?.maxHealth || 30) * 0.25)),
+        life: this.config.drops.life * 4
+      });
+      placed += 1;
+    }
+    return placed;
+  },
+
+  ensureForagerMushrooms(dt = 0) {
+    if (!this.rangerRuntime) return;
+    if (this.rangerTalents?.forager?.points <= 0) {
+      this.rangerRuntime.foragerMushroomsInitialized = false;
+      return;
+    }
+    const active = (this.drops || []).filter((drop) => drop && drop.type === "mushroom" && drop.life > 0).length;
+    if (!this.rangerRuntime.foragerMushroomsInitialized) {
+      const spawned = this.placeMushrooms(Math.max(0, 3 - active));
+      if (spawned > 0 || active >= 3) {
+        this.rangerRuntime.foragerMushroomsInitialized = true;
+        this.rangerRuntime.mushroomSpawnTimer = 30;
+      }
+      return;
+    }
+    if (active >= 3) {
+      this.rangerRuntime.mushroomSpawnTimer = 30;
+      return;
+    }
+    if (!Number.isFinite(this.rangerRuntime.mushroomSpawnTimer) || this.rangerRuntime.mushroomSpawnTimer <= 0) {
+      const spawned = this.placeMushrooms(Math.min(1, 3 - active));
+      this.rangerRuntime.mushroomSpawnTimer = spawned > 0 ? 30 : Math.max(5, 30 - (Number.isFinite(dt) ? dt : 0));
+    }
+  },
+
   dropBreakableLoot(x, y) {
     const cfg = typeof this.getBreakablesConfig === "function" ? this.getBreakablesConfig() : this.config.breakables;
     if (!cfg) return;

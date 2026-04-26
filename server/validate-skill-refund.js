@@ -160,10 +160,12 @@ async function runRefundScenario(page, { classKey, spendKey, expectedClassType }
 
   await runDebug(page, "grantSkillPoints", { amount: 2 });
   await runDebug(page, "grantGold", { amount: 400 });
-  await page.waitForFunction(() => {
+  if (classKey === "warrior") await runDebug(page, "grantLevels", { amount: 1 });
+  const requiredLevel = classKey === "warrior" ? 2 : 1;
+  await page.waitForFunction((level) => {
     const state = window.__WOTC_DEBUG__?.getState?.();
-    return !!state && state.ui?.skillPoints >= 2 && state.ui?.gold >= 400;
-  }, null, { timeout: 5000 });
+    return !!state && state.ui?.skillPoints >= 2 && state.ui?.gold >= 400 && (state.player?.level || 1) >= level;
+  }, requiredLevel, { timeout: 5000 });
 
   let state = await getDebugState(page);
   await clickCanvasRect(page, state.ui.skillTreeButton);
@@ -230,7 +232,7 @@ async function main() {
   let lastState = null;
   const scenarios = [
     { classKey: "archer", expectedClassType: "archer", spendKey: "longbow" },
-    { classKey: "warrior", expectedClassType: "fighter", spendKey: "rageActive" }
+    { classKey: "warrior", expectedClassType: "fighter", spendKey: "broadswing" }
   ];
   const results = [];
   try {
