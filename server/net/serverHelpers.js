@@ -24,7 +24,8 @@ export function makeDefaultInput() {
     swapAttackQueued: false,
     firePrimaryQueued: false,
     firePrimaryHeld: false,
-    fireAltQueued: false
+    fireAltQueued: false,
+    modeSwapQueued: false
   };
 }
 
@@ -44,6 +45,7 @@ export function sanitizeInput(raw, previous) {
     next.firePrimaryQueued = !!raw.firePrimaryQueued || !!previous.firePrimaryQueued;
     next.firePrimaryHeld = !!raw.firePrimaryHeld;
     next.fireAltQueued = !!raw.fireAltQueued || !!previous.fireAltQueued;
+    next.modeSwapQueued = !!raw.modeSwapQueued || !!previous.modeSwapQueued;
   }
   return next;
 }

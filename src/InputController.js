@@ -296,6 +296,7 @@
   } = {}) {
     if (this.mouse.hasAim && typeof this.refreshAimWorldPosition === "function") this.refreshAimWorldPosition();
     const { moveX, moveY } = this.getMoveVector(gameplayBlocked);
+    const qQueued = !gameplayBlocked && consumeQueued ? this.consumeKeyQueued("q") : false;
     const touchAim = !gameplayBlocked ? this.getTouchStickVector(this.touch.aimStick) : null;
     if (touchAim) {
       const aimLen = Math.hypot(touchAim.dx, touchAim.dy) || 1;
@@ -314,10 +315,11 @@
         aimY: this.mouse.worldY,
         aimDirX,
         aimDirY,
-        swapAttackQueued: !gameplayBlocked && consumeQueued ? this.consumeKeyQueued("q") : false,
+        swapAttackQueued: qQueued,
         firePrimaryQueued: false,
         firePrimaryHeld: true,
-        fireAltQueued: !gameplayBlocked && consumeQueued ? this.consumeRightQueued() : false
+        fireAltQueued: !gameplayBlocked && consumeQueued ? this.consumeRightQueued() : false,
+        modeSwapQueued: qQueued
       };
     }
     if (this.touch.enabled) this.mouse.leftDown = false;
@@ -333,10 +335,11 @@
       aimY: this.mouse.worldY,
       aimDirX: hasAim ? rawAimX / rawAimLen : fallbackAimDirX,
       aimDirY: hasAim ? rawAimY / rawAimLen : fallbackAimDirY,
-      swapAttackQueued: !gameplayBlocked && consumeQueued ? this.consumeKeyQueued("q") : false,
+      swapAttackQueued: qQueued,
       firePrimaryQueued: !gameplayBlocked && consumeQueued ? this.consumeLeftQueued() : false,
       firePrimaryHeld: !gameplayBlocked && !!this.mouse.leftDown,
-      fireAltQueued: !gameplayBlocked && consumeQueued ? this.consumeRightQueued() : false
+      fireAltQueued: !gameplayBlocked && consumeQueued ? this.consumeRightQueued() : false,
+      modeSwapQueued: qQueued
     };
   }
 }

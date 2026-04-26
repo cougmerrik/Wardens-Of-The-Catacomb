@@ -2,11 +2,19 @@ import { vecLength } from "../utils.js";
 import {
   getRangerFireArrowProjectileSizeBonus,
   getRangerArrowBonusAgainstEnemy,
+  getRangerComboTier,
   getRangerCritChance,
   getRangerCritMultiplier,
+  getRangerCurrentWeaponMode,
+  getRangerCurrentWeaponModeStats,
+  getRangerSelectedPath,
+  getRangerSelectedSwapStyle,
+  getRangerSelectedWeapon,
+  getRangerWeaponStats,
   getRangerIgniteChance,
   getRangerPinningShotLengthTiles,
   hasFireMastery,
+  hasRangerTalent,
   hasPinningShot,
   hasTrickShot,
   shouldSpreadWildfire
@@ -386,6 +394,26 @@ export const runtimePlayerAttackMethods = {
     return this.getWarriorAttackProfile("secondary");
   },
 
+  switchRangerWeaponMode() {
+    if (!(this.isArcherClass && this.isArcherClass())) return false;
+    if (!getRangerSelectedSwapStyle(this)) return false;
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    if ((this.rangerRuntime.swapCooldownTimer || 0) > 0) return false;
+    const current = this.rangerRuntime.weaponMode === "melee" ? "melee" : "ranged";
+    const next = current === "melee" ? "ranged" : "melee";
+    this.rangerRuntime.weaponMode = next;
+    const weapon = getRangerWeaponStats(this);
+    const style = getRangerSelectedSwapStyle(this);
+    const cooldownMult = style === "quickChange" ? 0.7 : 1;
+    this.rangerRuntime.swapCooldownTimer = Math.max(0.15, (weapon.swapCooldown || 0.8) * cooldownMult);
+    if (style === "followThrough") this.rangerRuntime.pendingSwapBonus = { mode: next, damageMult: next === "ranged" ? 1.25 : 1.12, comboBonus: next === "melee" ? 1 : 0 };
+    if (style === "footwork") this.rangerRuntime.footworkTimer = next === "melee" ? 0.85 : 0.45;
+    if (hasRangerTalent(this, "shadowVeil") && next === "melee") this.rangerRuntime.shadowVeilTimer = 1.25;
+    if (hasRangerTalent(this, "phaseStep")) this.rangerRuntime.phaseStepTimer = 0.25;
+    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(this.player.x, this.player.y - 30, next === "melee" ? "Melee" : "Ranged", "#b7f4dc", 0.45, 12);
+    return true;
+  },
+
   fire(dx, dy) {
     if (this.isNecromancerClass()) return;
     if (this.player.fireCooldown > 0) return;
@@ -396,6 +424,10 @@ export const runtimePlayerAttackMethods = {
       return;
     }
     this.player.fireCooldown = this.getPlayerFireCooldown();
+    if (this.isArcherClass && this.isArcherClass() && getRangerCurrentWeaponMode(this) === "melee") {
+      this.performMeleeAttack(dx, dy);
+      return;
+    }
     if (!this.classSpec.usesRanged) {
       this.performMeleeAttack(dx, dy);
       return;
@@ -429,20 +461,28 @@ export const runtimePlayerAttackMethods = {
     }
     for (let i = 0; i < count; i++) {
       const a = volleyAngles[i];
-      const speed = this.getProjectileSpeed();
+      const modeStats = this.isArcherClass && this.isArcherClass() ? getRangerCurrentWeaponModeStats(this) : null;
+      const speed = modeStats?.projectileSpeed || this.getProjectileSpeed();
+      const projectileLife = modeStats?.life || 1.1;
+      const projectileSize = modeStats?.size || 6;
+      const damageMultBase = modeStats?.damageMult || 1;
+      const projectileType = this.isArcherClass && this.isArcherClass() ? `ranger_${getRangerSelectedWeapon(this) || "longbow"}` : null;
+      const knockback = modeStats?.knockback || 0;
       this.bullets.push({
         x: origin.x + Math.cos(a) * releaseTailOffset,
         y: origin.y + Math.sin(a) * releaseTailOffset,
         vx: Math.cos(a) * speed,
         vy: Math.sin(a) * speed,
         angle: a,
-        life: 1.1,
-        size: 6,
+        life: projectileLife,
+        size: projectileSize,
         damage: baseDamage,
-        damageMult: damageMultipliers[i] || damageMultipliers[damageMultipliers.length - 1] || 1,
+        damageMult: damageMultBase * (damageMultipliers[i] || damageMultipliers[damageMultipliers.length - 1] || 1),
         critMultiplier: Math.random() < critChance ? critMultiplier : 1,
         remainingRicochets: hasTrickShot(this) ? 2 : 0,
         linebreakerHits: 0,
+        projectileType,
+        knockback,
         hitTargets: new Set(),
         ownerId: this.player.id || null
       });
@@ -460,6 +500,12 @@ export const runtimePlayerAttackMethods = {
     let range = Number.isFinite(attackProfile?.range) ? attackProfile.range : (this.classSpec.meleeRange || 42);
     const hitPadding = Number.isFinite(this.classSpec.meleeHitPadding) ? Math.max(0, this.classSpec.meleeHitPadding) : 0;
     let arcDeg = Number.isFinite(attackProfile?.arcDeg) ? attackProfile.arcDeg : (this.classSpec.meleeArcDeg || 95);
+    let rangerMeleeStats = null;
+    if (this.isArcherClass && this.isArcherClass()) {
+      rangerMeleeStats = getRangerWeaponStats(this).melee;
+      range = rangerMeleeStats.range || range;
+      arcDeg = rangerMeleeStats.arcDeg || arcDeg;
+    }
     const raging = isWarriorTalentGame(this) ? isWarriorRaging(this) : (this.warriorRageActiveTimer || 0) > 0;
     if (isWarriorTalentGame(this)) {
       range *= 1 + getWarriorExecutionerRageRangeBonus(this) * (raging ? 1 : 0);
@@ -545,6 +591,15 @@ export const runtimePlayerAttackMethods = {
         const hpBefore = Number.isFinite(enemy.hp) ? enemy.hp : 0;
         const wasMarked = enemy === markedEnemyAtAttackStart;
         let damage = this.rollPrimaryDamage() * (Number.isFinite(attackProfile?.damageMult) ? attackProfile.damageMult : 1);
+        if (rangerMeleeStats) damage *= rangerMeleeStats.damageMult || 1;
+        if (rangerMeleeStats && this.rangerRuntime?.pendingSwapBonus?.mode === "melee") {
+          damage *= this.rangerRuntime.pendingSwapBonus.damageMult || 1;
+          this.addRangerCombo(this.rangerRuntime.pendingSwapBonus.comboBonus || 0);
+        }
+        if (rangerMeleeStats && this.rangerRuntime?.shadowVeilTimer > 0) {
+          damage *= 1.35;
+          this.rangerRuntime.shadowVeilTimer = 0;
+        }
         if (isWarriorTalentGame(this)) {
           damage *= 1 + getWarriorHeavyHandDamageBonus(this, enemy);
           damage *= 1 + getWarriorCrusaderUndeadDamageBonus(this, enemy);
@@ -612,6 +667,23 @@ export const runtimePlayerAttackMethods = {
         if ((attackProfile?.surgeDuration || 0) > 0 && getWarriorDoctrine(this) === "eldritch") {
           this.warriorRuntime.eldritchSurgeTimer = Math.max(this.warriorRuntime.eldritchSurgeTimer || 0, attackProfile.surgeDuration);
         }
+        if (rangerMeleeStats?.knockbackTiles > 0) {
+          const push = rangerMeleeStats.knockbackTiles * (this.config?.map?.tile || 32);
+          const len = vecLength(ex, ey) || 1;
+          if (typeof this.moveWithCollisionSubsteps === "function") {
+            this.moveWithCollisionSubsteps(enemy, (ex / len) * push, (ey / len) * push);
+          } else {
+            enemy.x += (ex / len) * push;
+            enemy.y += (ey / len) * push;
+          }
+          enemy.slowTimer = Math.max(enemy.slowTimer || 0, 0.25);
+        } else if (rangerMeleeStats?.knockback > 0) {
+          const push = rangerMeleeStats.knockback;
+          const len = vecLength(ex, ey) || 1;
+          if (typeof this.moveWithCollisionSubsteps === "function") this.moveWithCollisionSubsteps(enemy, (ex / len) * push, (ey / len) * push);
+        }
+        if (this.isArcherClass && this.isArcherClass()) this.addRangerCombo(rangerMeleeStats?.comboGain || 1);
+        if (this.isArcherClass && this.isArcherClass()) this.applyRangerTalentOnHitEffects(enemy, "melee");
         if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null);
         enemiesHit += 1;
         hitAnyEnemy = true;
@@ -749,8 +821,16 @@ export const runtimePlayerAttackMethods = {
       this.activateWarriorRage();
       return;
     }
+    if (this.isArcherClass && this.isArcherClass()) {
+      const path = getRangerSelectedPath(this);
+      if (path === "roguePath") return this.activateRangerShadowstep(dx, dy);
+      if (path === "assassinPath") return this.activateRangerExecute(dx, dy);
+      if (path === "beastMasterPath") return this.activateRangerNaturesAlly();
+      if (path !== "rangerPath") return this.activateRangerDodge();
+    }
     if (!this.isFireArrowUnlocked() || this.player.fireArrowCooldown > 0) return;
     this.player.fireArrowCooldown = this.getRangerFireArrowCooldown();
+    if (this.rangerRuntime) this.rangerRuntime.classSkillCooldownTimer = this.player.fireArrowCooldown;
     if (typeof this.recordClassSpecificStat === "function") this.recordClassSpecificStat("ranger", "shotsFired", 1);
     const origin = this.getBowMuzzleOrigin(dx, dy);
     const releaseTailOffset = 8;
@@ -777,6 +857,108 @@ export const runtimePlayerAttackMethods = {
       detonateX: hasFireMastery(this) ? origin.x + origin.dirX * detonateDistance : null,
       detonateY: hasFireMastery(this) ? origin.y + origin.dirY * detonateDistance : null
     });
+  },
+
+  activateRangerDodge() {
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    if ((this.rangerRuntime.classSkillCooldownTimer || 0) > 0) return false;
+    this.rangerRuntime.dodgeTimer = 1.25;
+    this.rangerRuntime.classSkillCooldownTimer = 6;
+    this.player.speed = this.getPlayerMoveSpeedFor(this.player);
+    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(this.player.x, this.player.y - 30, "Dodge", "#b7f4dc", 0.6, 13);
+    return true;
+  },
+
+  activateRangerShadowstep(dx, dy) {
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    if ((this.rangerRuntime.classSkillCooldownTimer || 0) > 0) return false;
+    const len = vecLength(dx, dy) || 1;
+    const distance = 140;
+    this.moveWithCollisionSubsteps(this.player, (dx / len) * distance, (dy / len) * distance);
+    this.rangerRuntime.shadowVeilTimer = Math.max(this.rangerRuntime.shadowVeilTimer || 0, 1.5);
+    this.rangerRuntime.pendingSwapBonus = { mode: getRangerCurrentWeaponMode(this), damageMult: 1.5, comboBonus: 0 };
+    this.rangerRuntime.classSkillCooldownTimer = 8;
+    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(this.player.x, this.player.y - 30, "Shadowstep", "#c7a5ff", 0.6, 13);
+    return true;
+  },
+
+  activateRangerExecute(dx, dy) {
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    if ((this.rangerRuntime.classSkillCooldownTimer || 0) > 0) return false;
+    const len = vecLength(dx, dy) || 1;
+    const ax = dx / len;
+    const ay = dy / len;
+    const mode = getRangerCurrentWeaponMode(this);
+    const range = mode === "melee" ? 70 : 260;
+    let target = null;
+    let best = Number.POSITIVE_INFINITY;
+    for (const enemy of this.enemies || []) {
+      if (!enemy || (enemy.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(enemy)) continue;
+      const ex = (enemy.x || 0) - this.player.x;
+      const ey = (enemy.y || 0) - this.player.y;
+      const dist = vecLength(ex, ey);
+      if (dist > range + (enemy.size || 20) * 0.5) continue;
+      const line = Math.abs(ex * -ay + ey * ax);
+      if (line > (mode === "melee" ? 34 : 22) + (enemy.size || 20) * 0.35) continue;
+      const score = line * 12 + dist;
+      if (score < best) {
+        best = score;
+        target = enemy;
+      }
+    }
+    if (!target) return false;
+    const hpRatio = target.maxHp > 0 ? (target.hp || 0) / target.maxHp : 1;
+    const damage = this.rollPrimaryDamage() * (hpRatio <= 0.35 ? 3.2 : 1.45);
+    target.rangerMarkedBy = this.player.id || null;
+    target.rangerMarkedTimer = Math.max(target.rangerMarkedTimer || 0, 4);
+    if (typeof this.applyWarriorMark === "function") this.applyWarriorMark(target, 4);
+    this.applyEnemyDamage(target, damage, "physical", this.player.id || null);
+    this.addRangerCombo(mode === "melee" ? 2 : 1);
+    this.rangerRuntime.classSkillCooldownTimer = 7;
+    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(target.x, target.y - 30, "Execute", "#ffc0b3", 0.65, 13);
+    return true;
+  },
+
+  activateRangerNaturesAlly() {
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    if ((this.rangerRuntime.classSkillCooldownTimer || 0) > 0) return false;
+    const existing = (this.enemies || []).find((enemy) => enemy && enemy.id === this.rangerRuntime.wolfId && (enemy.hp || 0) > 0);
+    if (existing) {
+      existing.hp = Math.min(existing.maxHp || existing.hp || 1, (existing.hp || 0) + (existing.maxHp || 1) * 0.35);
+      existing.hpBarTimer = Math.max(existing.hpBarTimer || 0, 1.2);
+      if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(existing.x, existing.y - 28, "Nature's Ally", "#d0f09d", 0.7, 13);
+    } else {
+      const id = `wolf_${this.player.id || "p"}_${Math.floor((this.time || 0) * 1000)}_${Math.floor(Math.random() * 10000)}`;
+      const wolf = {
+        id,
+        type: "wolf",
+        tacticKey: "skeleton_warrior",
+        x: this.player.x + (this.player.dirX || 1) * 28,
+        y: this.player.y + (this.player.dirY || 0) * 28,
+        size: 22,
+        speed: 132,
+        hp: 55 + this.level * 5,
+        maxHp: 55 + this.level * 5,
+        baseMaxHp: 55 + this.level * 5,
+        damageMin: 4 + this.level * 0.35,
+        damageMax: 7 + this.level * 0.45,
+        baseDamageMin: 4 + this.level * 0.35,
+        baseDamageMax: 7 + this.level * 0.45,
+        contactAttackCooldown: 0,
+        isControlledUndead: true,
+        controllerPlayerId: this.player.id || null,
+        controlledAttackSpeedBonusPct: 0.15,
+        controlledDamageBonusPct: 0,
+        hpBarTimer: 1.2
+      };
+      this.enemies.push(wolf);
+      this.rangerRuntime.wolfId = id;
+      if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(wolf.x, wolf.y - 28, "Wolf", "#d0f09d", 0.7, 13);
+    }
+    this.rangerRuntime.dodgeTimer = Math.max(this.rangerRuntime.dodgeTimer || 0, 2);
+    this.rangerRuntime.classSkillCooldownTimer = 10;
+    this.player.speed = this.getPlayerMoveSpeedFor(this.player);
+    return true;
   },
 
   triggerFireExplosion(x, y, source = null) {
@@ -826,8 +1008,76 @@ export const runtimePlayerAttackMethods = {
     this.fireZones.push({ x, y, radius: blastRadius * 0.9, life: lingerDuration, zoneType: "fire", ownerId, dps: lingerDps });
   },
 
+  addRangerCombo(amount = 1) {
+    if (!(this.isArcherClass && this.isArcherClass())) return;
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    if (this.player) this.player.rangerRuntime = this.rangerRuntime;
+    const gain = Math.floor(Number.isFinite(amount) ? amount : 1);
+    if (gain <= 0) return;
+    this.rangerRuntime.combo = Math.min(30, Math.max(0, Math.floor(this.rangerRuntime.combo || 0)) + gain);
+    this.rangerRuntime.comboDecayDelayTimer = 2;
+    this.rangerRuntime.comboDecayTickTimer = this.rangerRuntime.combo >= 20 ? 0.65 : this.rangerRuntime.combo >= 10 ? 0.45 : this.rangerRuntime.combo >= 5 ? 0.3 : 0.2;
+    if (hasRangerTalent(this, "apexPredator") && this.rangerRuntime.combo >= 30 && (this.rangerRuntime.apexPredatorCooldownTimer || 0) <= 0) {
+      this.rangerRuntime.apexPredatorTimer = 5;
+      this.rangerRuntime.apexPredatorCooldownTimer = 15;
+      if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(this.player.x, this.player.y - 34, "Apex Predator", "#fff0bd", 0.8, 14);
+    }
+  },
+
+  applyRangerTalentOnHitEffects(enemy, mode = "ranged") {
+    if (!(this.isArcherClass && this.isArcherClass()) || !enemy) return;
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    const ownerId = this.player?.id || null;
+    if (hasRangerTalent(this, "venomCoating") && (this.rangerRuntime.venomCooldownTimer || 0) <= 0) {
+      enemy.slowTimer = Math.max(enemy.slowTimer || 0, 2);
+      enemy.slowPct = Math.max(enemy.slowPct || 0, 0.25);
+      this.rangerRuntime.venomCooldownTimer = 1;
+    }
+    if (hasRangerTalent(this, "quarry")) {
+      if (this.rangerRuntime.quarryTargetId === enemy.id) this.rangerRuntime.quarryStacks = Math.min(3, (this.rangerRuntime.quarryStacks || 0) + 1);
+      else {
+        this.rangerRuntime.quarryTargetId = enemy.id || null;
+        this.rangerRuntime.quarryStacks = 1;
+      }
+      if ((this.rangerRuntime.quarryStacks || 0) >= 2) {
+        enemy.rangerMarkedBy = ownerId;
+        enemy.rangerMarkedTimer = Math.max(enemy.rangerMarkedTimer || 0, 4);
+        if (typeof this.applyWarriorMark === "function") this.applyWarriorMark(enemy, 4);
+      }
+    }
+    if (hasRangerTalent(this, "bleed")) {
+      enemy.bleedTimer = Math.max(enemy.bleedTimer || 0, 3);
+      enemy.bleedDps = Math.max(enemy.bleedDps || 0, this.getPrimaryDamage() * (mode === "melee" ? 0.5 : 0.25));
+    }
+    if (hasRangerTalent(this, "comboSurge") && (this.rangerRuntime.comboSurgeCooldownTimer || 0) <= 0 && (this.rangerRuntime.combo || 0) >= 10) {
+      const tier = getRangerComboTier(this);
+      const tile = this.config?.map?.tile || 32;
+      this.fireZones.push({
+        x: enemy.x,
+        y: enemy.y,
+        radius: tile * (tier >= 3 ? 1.6 : 1.0),
+        life: 0.18,
+        totalLife: 0.18,
+        zoneType: "rangerSurge",
+        ownerId,
+        damageType: "physical"
+      });
+      for (const other of this.enemies || []) {
+        if (!other || (other.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(other)) continue;
+        if (vecLength((other.x || 0) - enemy.x, (other.y || 0) - enemy.y) > tile * (tier >= 3 ? 1.6 : 1.0) + (other.size || 20) * 0.35) continue;
+        this.applyEnemyDamage(other, this.getPrimaryDamage() * (tier >= 3 ? 0.85 : 0.45), "physical", ownerId);
+      }
+      this.rangerRuntime.comboSurgeCooldownTimer = tier >= 3 ? 1.5 : 2.2;
+    }
+    if (this.rangerRuntime.pendingSwapBonus) {
+      this.rangerRuntime.pendingSwapBonus = null;
+    }
+  },
+
   applyRangerOnHitEffects(enemy, x, y) {
     if (!(this.isArcherClass && this.isArcherClass()) || !enemy) return;
+    this.addRangerCombo(getRangerCurrentWeaponModeStats(this)?.comboGain || 1);
+    this.applyRangerTalentOnHitEffects(enemy, "ranged");
     if (Math.random() < getRangerIgniteChance(this)) {
       enemy.burningTimer = Math.max(enemy.burningTimer || 0, 2.2);
       enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, this.getFireArrowLingerDps() * 0.35));
@@ -849,7 +1099,9 @@ export const runtimePlayerAttackMethods = {
     const critMult = Number.isFinite(projectile?.critMultiplier) ? projectile.critMultiplier : 1;
     const linebreakerMult = 1 + this.getRangerLinebreakerDamageBonus(projectile?.linebreakerHits || 0);
     const pinningLineMult = projectile?.passedPinningFire ? 1.1 : 1;
-    return projectileDamage * damageMult * critMult * linebreakerMult * pinningLineMult * getRangerArrowBonusAgainstEnemy(this, enemy);
+    let swapMult = 1;
+    if (this.rangerRuntime?.pendingSwapBonus?.mode === "ranged") swapMult *= this.rangerRuntime.pendingSwapBonus.damageMult || 1;
+    return projectileDamage * damageMult * critMult * linebreakerMult * pinningLineMult * swapMult * getRangerArrowBonusAgainstEnemy(this, enemy);
   },
 
   fireDeathBolt(dx, dy) {

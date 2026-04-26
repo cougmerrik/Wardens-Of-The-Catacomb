@@ -239,12 +239,15 @@ function buildCharacterColumns(game) {
 
   let classKit = null;
   if (game.isArcherClass && game.isArcherClass()) {
+    const runtime = game.rangerRuntime || {};
+    const mode = runtime.weaponMode === "melee" ? "Melee" : "Ranged";
+    const combo = Math.max(0, Math.floor(runtime.combo || 0));
+    const abilityState = getHudAbilityState(game);
     classKit = createSection("Ranger Kit", [
-      ["Fire Arrow", game.isFireArrowUnlocked() ? "Unlocked" : "Locked"],
-      ["Fire Cooldown", game.player.fireArrowCooldown > 0 ? `${game.player.fireArrowCooldown.toFixed(1)}s` : "Ready"],
-      ["Fire AoE Radius", game.isFireArrowUnlocked() ? game.getFireArrowBlastRadius().toFixed(1) : "-"],
-      ["Pierce Chance", `${(game.getPiercingChance() * 100).toFixed(1)}%`],
-      ["Multiarrow", `${game.getMultiarrowCount()} (${game.getMultiarrowSpreadDeg().toFixed(1)}deg)`],
+      ["Mode", mode],
+      ["Combo", `${combo}/30`],
+      ["Q Swap", runtime.swapCooldownTimer > 0 ? `${runtime.swapCooldownTimer.toFixed(1)}s` : "Ready"],
+      [abilityState.title, abilityState.cooldownRemaining > 0 ? `${abilityState.cooldownRemaining.toFixed(1)}s` : "Ready"],
       ["Tree SP", `${game.skillPoints} available`]
     ]);
   } else if (game.isWarriorClass && game.isWarriorClass()) {

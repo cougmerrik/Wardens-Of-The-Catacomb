@@ -762,6 +762,7 @@ export class AuthoritativeRoom {
         input.firePrimaryQueued = false;
         input.firePrimaryHeld = false;
         input.fireAltQueued = false;
+        input.modeSwapQueued = false;
         continue;
       }
       const mx = Number.isFinite(input.moveX) ? input.moveX : 0;
@@ -793,6 +794,7 @@ export class AuthoritativeRoom {
       input.swapAttackQueued = false;
       input.firePrimaryQueued = false;
       input.fireAltQueued = false;
+      input.modeSwapQueued = false;
     }
   }
 
@@ -802,6 +804,13 @@ export class AuthoritativeRoom {
       this.performActionForActivePlayer(client.id, (context) => {
         if (typeof context.toggleWarriorAttackMode !== "function") return false;
         return context.toggleWarriorAttackMode();
+      });
+    }
+    if (state.classType === "archer" && input.modeSwapQueued) {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.switchRangerWeaponMode !== "function") return false;
+        context.switchRangerWeaponMode();
+        return true;
       });
     }
     const wantsPrimary = !!input.firePrimaryQueued || (!!input.firePrimaryHeld && !!input.hasAim);
@@ -1163,6 +1172,7 @@ export class AuthoritativeRoom {
       controllerClient.input.swapAttackQueued = false;
       controllerClient.input.firePrimaryQueued = false;
       controllerClient.input.fireAltQueued = false;
+      controllerClient.input.modeSwapQueued = false;
     }
     this.options.pushTelemetrySample(this.telemetry.tickDurationsMs, this.options.monotonicNowMs() - t0);
   }

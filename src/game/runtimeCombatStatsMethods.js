@@ -4,6 +4,7 @@ import {
   getRangerCritChance,
   getRangerCritMultiplier,
   getRangerDamageBonus,
+  getRangerComboAttackSpeedBonus,
   getRangerDanceAttackSpeedBonus,
   getRangerDanceDefenseBonus,
   getRangerFireArrowDurationMultiplier,
@@ -11,12 +12,12 @@ import {
   getRangerFireArrowImpactMultiplier,
   getRangerFireRadiusBonus,
   getRangerLinebreakerDamagePerHit,
-  getRangerMaxHealthBonusPct,
   getRangerMoveSpeedBonus,
   getRangerMultishotBonus,
   getRangerProjectileSpeedBonus,
   getRangerStationaryPierceBonus,
   getRangerTalentPoints,
+  getRangerCurrentWeaponModeStats,
   getRangerVolleyCooldownReduction,
   hasFireMastery,
   hasPinningShot,
@@ -148,6 +149,13 @@ export const runtimeCombatStatsMethods = {
   },
 
   getPlayerFireCooldown() {
+    if (this.isArcherClass && this.isArcherClass()) {
+      const modeStats = getRangerCurrentWeaponModeStats(this);
+      if (modeStats && Number.isFinite(modeStats.cooldown)) {
+        const attackMultiplier = this.getAttackSpeedMultiplier() * (1 + getRangerComboAttackSpeedBonus(this));
+        return Math.max(this.classSpec.minAttackCooldown || 0.08, modeStats.cooldown / Math.max(0.1, attackMultiplier));
+      }
+    }
     const levelAttackBonusPct = Number.isFinite(this.classSpec.levelAttackSpeedPct)
       ? Math.max(0, this.classSpec.levelAttackSpeedPct) * Math.max(0, this.level - 1)
       : 0;
@@ -353,7 +361,7 @@ export const runtimeCombatStatsMethods = {
 
   isFireArrowUnlocked() {
     if (this.isArcherClass && this.isArcherClass()) {
-      return getRangerTalentPoints(this, "fireArrowActive") > 0;
+      return getRangerTalentPoints(this, "rangerPath") > 0;
     }
     return this.skills.fireArrow.points > 0;
   },
@@ -725,16 +733,10 @@ export const runtimeCombatStatsMethods = {
       }
       if (!canSpendRangerNode(this, skillKey) && !canSpendRangerUtility(this, skillKey)) return false;
       if (spendRangerNode(this, skillKey)) {
-        if (skillKey === "fleetstep") {
-          const hpGain = Math.max(1, this.player.maxHealth * 0.06);
-          this.player.maxHealth += hpGain;
-          this.player.health = Math.min(this.player.maxHealth, this.player.health + hpGain);
-          this.markPlayerHealthBarVisible();
-        }
-        if (skillKey === "fireArrowActive") {
+        if (skillKey === "rangerPath") {
           this.spawnFloatingText(this.player.x, this.player.y - 26, "Fire Arrow Unlocked!", "#f6b36a", 1.0, 15);
         } else {
-          this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent improved", "#9fd9ff", 0.85, 14);
+          this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent selected", "#9fd9ff", 0.85, 14);
         }
         return true;
       }

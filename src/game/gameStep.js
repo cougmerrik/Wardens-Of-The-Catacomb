@@ -156,16 +156,6 @@ export function stepGame(game, dt, controls = {}) {
     game.moveWithCollisionSubsteps(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
   }
   game.player.moving = !!(mx || my);
-  if (game.isArcherClass && game.isArcherClass()) {
-    if (game.player.moving) {
-      game.rangerDanceMoveTimer = (Number.isFinite(game.rangerDanceMoveTimer) ? game.rangerDanceMoveTimer : 0) + dt;
-      if (game.rangerDanceMoveTimer >= 6 && (game.rangerTalents?.danceOfThorns?.points || 0) > 0) {
-        game.rangerDanceOfThornsTimer = Math.max(game.rangerDanceOfThornsTimer || 0, 0.3);
-      }
-    } else {
-      game.rangerDanceMoveTimer = 0;
-    }
-  }
   if (primaryPlayerAlive) game.revealAroundPlayer();
   if (typeof game.updateLightingInteractions === "function") game.updateLightingInteractions(dt);
 
@@ -415,6 +405,7 @@ export function stepGame(game, dt, controls = {}) {
     if (controls.swapAttackQueued && typeof game.toggleWarriorAttackMode === "function") {
       game.toggleWarriorAttackMode();
     }
+    if (controls.modeSwapQueued && typeof game.switchRangerWeaponMode === "function") game.switchRangerWeaponMode();
     if (controls.firePrimaryQueued) game.fire(game.player.dirX, game.player.dirY);
     if (!controls.firePrimaryQueued && controls.firePrimaryHeld && controls.hasAim) {
       game.fire(game.player.dirX, game.player.dirY);

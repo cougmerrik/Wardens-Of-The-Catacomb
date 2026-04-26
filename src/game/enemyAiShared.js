@@ -57,6 +57,7 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   if (!sourceFriendly) {
     for (const player of livingPlayers) {
       if (!player) continue;
+      if ((player.rangerRuntime?.shadowVeilTimer || 0) > 0) continue;
       const dist = vecLength((player.x || 0) - enemy.x, (player.y || 0) - enemy.y);
       if (dist > maxRange || dist >= bestDist) continue;
       best = player;

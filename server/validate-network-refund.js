@@ -13,6 +13,9 @@ const HTTP_PORT = 8199;
 const WS_PORT = 8200;
 const ROOM_ID = "validate-network-refund";
 const GAME_URL = `http://127.0.0.1:${HTTP_PORT}`;
+const REFUND_CLASS_KEY = "warrior";
+const REFUND_EXPECTED_CLASS_TYPE = "fighter";
+const REFUND_SPEND_KEY = "rageActive";
 
 const children = [];
 
@@ -230,14 +233,14 @@ async function main() {
       wsUrl: `ws://127.0.0.1:${WS_PORT}`,
       roomId: ROOM_ID,
       playerName: "RefundValidator",
-      classType: "archer"
+      classType: REFUND_CLASS_KEY
     });
     await setReady(page);
 
-    await page.waitForFunction(() => {
+    await page.waitForFunction((classType) => {
       const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.networkReady === true && state.networkRole === "Active" && !!state.ui?.skillTreeButton;
-    }, null, { timeout: 15000 });
+      return !!state && state.networkReady === true && state.networkRole === "Active" && state.player?.classType === classType && !!state.ui?.skillTreeButton;
+    }, REFUND_EXPECTED_CLASS_TYPE, { timeout: 15000 });
 
     await runDebug(page, "grantSkillPoints", { amount: 2 });
     await runDebug(page, "grantGold", { amount: 400 });
@@ -248,19 +251,23 @@ async function main() {
 
     lastState = await getDebugState(page);
     await clickCanvasRect(page, lastState.ui.skillTreeButton);
-    await page.waitForFunction(() => {
+    await page.waitForFunction((key) => {
       const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.skillTreeOpen === true && !!state.ui?.refundButton && Array.isArray(state.ui?.skillTreeNodes) && state.ui.skillTreeNodes.some((node) => node?.key === "fireArrowActive");
-    }, null, { timeout: 5000 });
+      return !!state &&
+        state.ui?.skillTreeOpen === true &&
+        !!state.ui?.refundButton &&
+        Array.isArray(state.ui?.skillTreeNodes) &&
+        state.ui.skillTreeNodes.some((node) => node?.key === key);
+    }, REFUND_SPEND_KEY, { timeout: 5000 });
 
     let skillState = await getDebugState(page);
-    const fireArrowNode = findSkillTreeNode(skillState, "fireArrowActive");
-    assert(fireArrowNode, "fireArrowActive node not available in skill tree");
-    await clickCanvasRect(page, fireArrowNode);
-    await page.waitForFunction(() => {
+    const spendNode = findSkillTreeNode(skillState, REFUND_SPEND_KEY);
+    assert(spendNode, `${REFUND_SPEND_KEY} node not available in ${REFUND_CLASS_KEY} skill tree`);
+    await clickCanvasRect(page, spendNode);
+    await page.waitForFunction((key) => {
       const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.talentLevels?.fireArrowActive === 1 && state.ui?.spentSkillPoints === 1;
-    }, null, { timeout: 5000 });
+      return !!state && state.ui?.talentLevels?.[key] === 1 && state.ui?.spentSkillPoints === 1;
+    }, REFUND_SPEND_KEY, { timeout: 5000 });
 
     skillState = await getDebugState(page);
     const skillPointsBeforeRefund = skillState.ui.skillPoints;
@@ -269,10 +276,10 @@ async function main() {
     assert(refundCost > 0, `expected positive refund cost, got ${refundCost}`);
 
     await clickCanvasRect(page, skillState.ui.refundButton);
-    await page.waitForFunction(() => {
+    await page.waitForFunction((key) => {
       const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.refundCount === 1 && state.ui?.spentSkillPoints === 0 && state.ui?.talentLevels?.fireArrowActive === 0;
-    }, null, { timeout: 5000 });
+      return !!state && state.ui?.refundCount === 1 && state.ui?.spentSkillPoints === 0 && state.ui?.talentLevels?.[key] === 0;
+    }, REFUND_SPEND_KEY, { timeout: 5000 });
 
     lastState = await getDebugState(page);
     const actionLog = await getActionLog(page);
@@ -280,7 +287,7 @@ async function main() {
     assert(lastState.ui.gold === goldBeforeRefund - refundCost, `refund sync gold mismatch: before=${goldBeforeRefund}, cost=${refundCost}, after=${lastState.ui.gold}`);
     assert(actionLog.some((entry) => entry.type === "action" && entry.actionKind === "debugGrantProgress" && entry.skillPointDelta === 2), "missing debugGrantProgress skill point action");
     assert(actionLog.some((entry) => entry.type === "action" && entry.actionKind === "debugGrantProgress" && entry.goldDelta === 400), "missing debugGrantProgress gold action");
-    assert(actionLog.some((entry) => entry.type === "action" && entry.actionKind === "spendSkill" && entry.actionKey === "fireArrowActive"), "missing spendSkill fireArrowActive action");
+    assert(actionLog.some((entry) => entry.type === "action" && entry.actionKind === "spendSkill" && entry.actionKey === REFUND_SPEND_KEY), `missing spendSkill ${REFUND_SPEND_KEY} action`);
     assert(actionLog.some((entry) => entry.type === "action" && entry.actionKind === "refundSkills"), "missing refundSkills action");
 
     mkdirSync(artifactsDir, { recursive: true });
@@ -290,6 +297,8 @@ async function main() {
       JSON.stringify(
         {
           refundCost,
+          classKey: REFUND_CLASS_KEY,
+          spendKey: REFUND_SPEND_KEY,
           finalUi: lastState.ui,
           actionLog: actionLog.slice(-20)
         },
@@ -299,6 +308,8 @@ async function main() {
     );
     console.log(JSON.stringify({
       refundCost,
+      classKey: REFUND_CLASS_KEY,
+      spendKey: REFUND_SPEND_KEY,
       goldAfterRefund: lastState.ui.gold,
       skillPointsAfterRefund: lastState.ui.skillPoints,
       refundCount: lastState.ui.refundCount,

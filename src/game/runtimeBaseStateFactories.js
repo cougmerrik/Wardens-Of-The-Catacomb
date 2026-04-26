@@ -14,12 +14,27 @@ export function createSkillState() {
 
 export function createRangerRuntimeState() {
   return {
-    danceActiveTimer: 0,
-    danceMoveTimer: 0,
-    foxstepCooldown: 0,
-    foxstepActiveTimer: 0,
-    foxstepHealPool: 0,
-    foxstepHealTickTimer: 0
+    weaponMode: "ranged",
+    swapCooldownTimer: 0,
+    combo: 0,
+    comboDecayDelayTimer: 0,
+    comboDecayTickTimer: 0,
+    classSkillCooldownTimer: 0,
+    dodgeTimer: 0,
+    pendingSwapBonus: null,
+    shadowVeilTimer: 0,
+    phaseStepTimer: 0,
+    footworkTimer: 0,
+    fieldDressingRegenTimer: 0,
+    predatorsFeastTimer: 0,
+    predatorsFeastCooldownTimer: 0,
+    venomCooldownTimer: 0,
+    comboSurgeCooldownTimer: 0,
+    quarryTargetId: null,
+    quarryStacks: 0,
+    apexPredatorTimer: 0,
+    apexPredatorCooldownTimer: 0,
+    wolfId: null
   };
 }
 

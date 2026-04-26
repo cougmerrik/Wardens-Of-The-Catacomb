@@ -127,6 +127,34 @@ export function drawHud(renderer, game, layout) {
     ctx.textAlign = "left";
   }
 
+  if (game.isArcherClass && game.isArcherClass()) {
+    const runtime = game.rangerRuntime || {};
+    const combo = Math.max(0, Math.min(30, Math.floor(Number.isFinite(runtime.combo) ? runtime.combo : 0)));
+    const tier = combo >= 20 ? 3 : combo >= 10 ? 2 : combo >= 5 ? 1 : 0;
+    const tierColor = tier === 3 ? "#6ff6ff" : tier === 2 ? "#ffd76d" : tier === 1 ? "#7ee189" : "#8a96a3";
+    const mode = runtime.weaponMode === "melee" ? "Melee" : "Ranged";
+    const qCooldown = Math.max(0, runtime.swapCooldownTimer || 0);
+    const boxW = 210;
+    const boxH = 34;
+    const boxX = Math.max(570, layout.playW - boxW - 14);
+    const boxY = 31;
+    ctx.fillStyle = "rgba(9, 19, 20, 0.94)";
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    ctx.strokeStyle = tierColor;
+    ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+    ctx.fillStyle = "#dff8ef";
+    ctx.font = "bold 12px Trebuchet MS";
+    ctx.fillText(`${mode}  Q ${qCooldown > 0 ? qCooldown.toFixed(1) : "Ready"}`, boxX + 10, boxY + 14);
+    ctx.fillStyle = tierColor;
+    ctx.font = "bold 15px Trebuchet MS";
+    ctx.fillText(`Combo ${combo}`, boxX + 10, boxY + 29);
+    const barW = 82;
+    ctx.fillStyle = "rgba(38, 48, 55, 0.9)";
+    ctx.fillRect(boxX + boxW - barW - 10, boxY + 21, barW, 7);
+    ctx.fillStyle = tierColor;
+    ctx.fillRect(boxX + boxW - barW - 10, boxY + 21, Math.floor(barW * (combo / 30)), 7);
+  }
+
   drawPauseOwnerBanner(ctx, game, layout);
   drawMultiplayerNotifications(ctx, game, layout);
 }

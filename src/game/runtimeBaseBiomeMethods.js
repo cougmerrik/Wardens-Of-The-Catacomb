@@ -1,6 +1,5 @@
 import { DEFAULT_BIOME_KEY, getBiomeDefinition, getBiomeKey, mergeBiomeSection } from "../biomes.js";
-import { createNecromancerBeamState } from "./runtimeBaseStateFactories.js";
-import { createWarriorRuntimeState } from "./runtimeBaseStateFactories.js";
+import { createNecromancerBeamState, createRangerRuntimeState, createWarriorRuntimeState } from "./runtimeBaseStateFactories.js";
 
 export const runtimeBaseBiomeMethods = {
   resolveFloorBiomeKey(floor = this.floor) {
@@ -121,6 +120,8 @@ export const runtimeBaseBiomeMethods = {
     this.warriorRageVictoryRushTimer = 0;
     this.warriorRuntime = createWarriorRuntimeState();
     if (this.player) this.player.warriorRuntime = this.warriorRuntime;
+    this.rangerRuntime = createRangerRuntimeState();
+    if (this.player) this.player.rangerRuntime = this.rangerRuntime;
     this.necromancerBeam = createNecromancerBeamState();
     this.navDistance = Array.from({ length: this.map.length }, () => Array(this.map[0].length).fill(-1));
     this.navPlayerTile = { x: -1, y: -1 };

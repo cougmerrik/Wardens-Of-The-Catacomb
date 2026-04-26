@@ -6,6 +6,7 @@ import {
   getRangerMoveSpeedBonus,
   isRangerTalentGame
 } from "../rangerTalentTree.js";
+import { createRangerRuntimeState } from "../runtimeBaseStateFactories.js";
 import {
   canSpendWarriorUtility,
   getWarriorBloodheatAttackSpeedBonus,
@@ -171,6 +172,8 @@ function resetPointTree(tree) {
 }
 
 function clearRefundedSkillState(game) {
+  game.rangerRuntime = createRangerRuntimeState();
+  if (game.player) game.player.rangerRuntime = game.rangerRuntime;
   game.warriorMomentumTimer = 0;
   game.warriorRageActiveTimer = 0;
   game.warriorRageCooldownTimer = 0;

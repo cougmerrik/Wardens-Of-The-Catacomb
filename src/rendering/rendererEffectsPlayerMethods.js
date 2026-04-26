@@ -1,4 +1,4 @@
-import { getWarriorDoctrine, getWarriorWeaponForm, hasWarriorCrusaderInvestment, hasWarriorEldritchInvestment, isWarriorRaging } from "../game/warriorTalentTree.js";
+import { getWarriorDoctrine, getWarriorWeaponForm, hasWarriorEldritchInvestment, isWarriorRaging } from "../game/warriorTalentTree.js";
 
 export const rendererEffectsPlayerMethods = {
   getWarriorDoctrinePresentation(entityOrGame) {
@@ -41,7 +41,7 @@ export const rendererEffectsPlayerMethods = {
     const frameY = (Number.isFinite(player.facing) ? player.facing : 0) * frameSize;
     const drawX = screenX - renderSize / 2;
     const drawY = screenY - renderSize * 0.56;
-    const foxstepActive = (player?.rangerRuntime?.foxstepActiveTimer || 0) > 0;
+    const shadowVeilActive = (player?.rangerRuntime?.shadowVeilTimer || 0) > 0;
     const warriorRaging = isWarriorRaging(player);
     const doctrineVisual = this.getWarriorDoctrinePresentation(player);
     this.drawPlayerSpriteFrame(
@@ -53,7 +53,7 @@ export const rendererEffectsPlayerMethods = {
       renderSize,
       warriorRaging ? doctrineVisual.tint : null,
       warriorRaging ? doctrineVisual.alpha : 0,
-      foxstepActive ? "saturate(50%) brightness(0.95)" : (warriorRaging ? doctrineVisual.filter : "none")
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (warriorRaging ? doctrineVisual.filter : "none")
     );
     return { movingVisual, walkPhase: movingVisual ? player._renderAnimPhase * 0.1 : 0 };
   },
@@ -134,7 +134,7 @@ export const rendererEffectsPlayerMethods = {
     const frameY = p.facing * frameSize;
     const drawX = playerScreenX - renderSize / 2;
     const drawY = playerScreenY - renderSize * 0.56;
-    const foxstepActive = (game.rangerRuntime?.foxstepActiveTimer || 0) > 0;
+    const shadowVeilActive = (game.rangerRuntime?.shadowVeilTimer || 0) > 0;
     let tintColor = null;
     let tintAlpha = 0;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
@@ -159,13 +159,13 @@ export const rendererEffectsPlayerMethods = {
       renderSize,
       tintColor,
       tintAlpha,
-      foxstepActive ? "saturate(50%) brightness(0.95)" : (!game.classSpec?.usesRanged && isWarriorRaging(game) ? this.getWarriorDoctrinePresentation(game).filter : "none")
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (!game.classSpec?.usesRanged && isWarriorRaging(game) ? this.getWarriorDoctrinePresentation(game).filter : "none")
     );
     const baseCd = game.getPlayerFireCooldown ? game.getPlayerFireCooldown() : this.config.player.baseFireCooldown;
     const firePulse = baseCd > 0 ? Math.max(0, Math.min(1, p.fireCooldown / baseCd)) : 0;
     const walkPhase = movingVisual ? p._renderAnimPhase * 0.1 : 0;
-    if (foxstepActive || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.save();
-    if (foxstepActive) this.ctx.filter = "saturate(50%) brightness(0.95)";
+    if (shadowVeilActive || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.save();
+    if (shadowVeilActive) this.ctx.filter = "saturate(45%) brightness(0.9) opacity(0.68)";
     else if (!game.classSpec?.usesRanged && isWarriorRaging(game)) this.ctx.filter = this.getWarriorDoctrinePresentation(game).filter;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
       this.drawPlayerNecromancerRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
@@ -174,7 +174,7 @@ export const rendererEffectsPlayerMethods = {
     } else {
       this.drawPlayerAimingRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
     }
-    if (foxstepActive || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.restore();
+    if (shadowVeilActive || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.restore();
   },
 
   drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor = null, tintAlpha = 0, filter = "none") {

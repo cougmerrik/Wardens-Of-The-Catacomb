@@ -33,7 +33,8 @@ function makeInput(stepIndex, loaded) {
     aimY: 320 + Math.sin(t * 1.9) * 120,
     firePrimaryQueued: loaded ? stepIndex % 10 === 0 : false,
     firePrimaryHeld: loaded ? stepIndex % 2 === 0 : false,
-    fireAltQueued: false
+    fireAltQueued: false,
+    modeSwapQueued: false
   };
 }
 

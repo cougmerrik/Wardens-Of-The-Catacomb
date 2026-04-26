@@ -437,7 +437,7 @@ export function createNetworkSessionController({
       const nowMs = performance.now();
       const inputDt = netLastInputProcessAt > 0 ? Math.min(0.05, Math.max(0.001, (nowMs - netLastInputProcessAt) / 1000)) : NET_INPUT_DT;
       netLastInputProcessAt = nowMs;
-      if (nowMs - netLastInputSendAt < NET_MIN_SEND_MS && !input.firePrimaryQueued && !input.fireAltQueued && !input.swapAttackQueued) return;
+      if (nowMs - netLastInputSendAt < NET_MIN_SEND_MS && !input.firePrimaryQueued && !input.fireAltQueued && !input.swapAttackQueued && !input.modeSwapQueued) return;
       if (!shouldSendNetworkInput(input, nowMs, netLastSentInput, netLastInputSendAt, NET_FORCE_SEND_IDLE_MS)) return;
       netLastInputSendAt = nowMs;
       netLastSentInput = {
@@ -450,13 +450,15 @@ export function createNetworkSessionController({
         aimDirY: input.aimDirY,
         swapAttackQueued: input.swapAttackQueued,
         firePrimaryQueued: input.firePrimaryQueued,
-        fireAltQueued: input.fireAltQueued
+        fireAltQueued: input.fireAltQueued,
+        modeSwapQueued: input.modeSwapQueued
       };
       if (!isNetworkController()) {
         input.swapAttackQueued = false;
         input.firePrimaryQueued = false;
         input.firePrimaryHeld = false;
         input.fireAltQueued = false;
+        input.modeSwapQueued = false;
       } else {
         netNextHeldPrimaryPredictAtMs = predictProjectileSpawn(
           game,

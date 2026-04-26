@@ -8,8 +8,7 @@ import {
   maybeSpawnDrop as maybeSpawnDropEntity,
   xpFromEnemy as xpFromEnemyEntity
 } from "./enemySystems.js";
-import { getRangerTalentPoints } from "./rangerTalentTree.js";
-
+import { getRangerMaxHealthBonusPct } from "./rangerTalentTree.js";
 export const runtimePlayerCombatMethods = {
   xpFromEnemy(enemy) {
     return xpFromEnemyEntity(this, enemy);
@@ -23,9 +22,7 @@ export const runtimePlayerCombatMethods = {
       this.level += 1;
       this.skillPoints += this.getSkillPointGainForLevel(this.level, this.classType);
       const hpGain = Number.isFinite(this.classSpec.levelHpGain) ? this.classSpec.levelHpGain : 10;
-      const adjustedHpGain = this.classType === "archer"
-        ? hpGain * (1 + (getRangerTalentPoints(this, "fleetstep") > 0 ? 0.06 : 0))
-        : hpGain;
+      const adjustedHpGain = this.classType === "archer" ? hpGain * (1 + getRangerMaxHealthBonusPct(this)) : hpGain;
       this.player.maxHealth += adjustedHpGain;
       this.player.health = Math.min(this.player.maxHealth, this.player.health + adjustedHpGain);
       this.markPlayerHealthBarVisible();
