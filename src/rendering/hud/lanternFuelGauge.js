@@ -1,0 +1,34 @@
+export function drawLanternFuelGauge(renderer, game, layout, xpBarY, consumableBounds = null) {
+  const ctx = renderer.ctx;
+  const cfg = game?.config?.lighting || {};
+  const maxFuel = Number.isFinite(cfg.lanternMaxFuel) ? Math.max(0.001, cfg.lanternMaxFuel) : 1;
+  const fuel = Math.max(0, Math.min(maxFuel, Number.isFinite(game?.player?.lanternFuel) ? game.player.lanternFuel : 0));
+  const ratio = fuel / maxFuel;
+  const w = layout.isAndroid ? Math.min(154, Math.max(116, layout.playW * 0.26)) : 168;
+  const h = 34;
+  const fallbackX = layout.isAndroid ? Math.floor((layout.playW - w) * 0.5) : 216;
+  const x = Math.min(layout.playW - w - 10, Math.max(10, Number.isFinite(consumableBounds?.right) ? consumableBounds.right + 12 : fallbackX));
+  const y = xpBarY - h - 8;
+  ctx.fillStyle = "rgba(8, 12, 18, 0.94)";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(242, 210, 120, 0.58)";
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  ctx.fillStyle = "#f4d789";
+  ctx.font = "bold 10px Trebuchet MS";
+  ctx.fillText("LANTERN", x + 8, y + 12);
+  const barX = x + 8;
+  const barY = y + 18;
+  const barW = w - 16;
+  const barH = 8;
+  ctx.fillStyle = "#1b2130";
+  ctx.fillRect(barX, barY, barW, barH);
+  ctx.fillStyle = ratio > 0.66 ? "#ffd978" : ratio > 0.33 ? "#e6a95a" : "#c96555";
+  ctx.fillRect(barX, barY, Math.floor(barW * ratio), barH);
+  ctx.strokeStyle = "rgba(255, 236, 174, 0.35)";
+  ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
+  ctx.fillStyle = "#d7e4ff";
+  ctx.font = "10px Trebuchet MS";
+  ctx.textAlign = "right";
+  ctx.fillText(`${Math.round(ratio * 100)}%`, x + w - 8, y + 12);
+  ctx.textAlign = "left";
+}

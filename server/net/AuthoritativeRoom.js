@@ -108,6 +108,7 @@ export class AuthoritativeRoom {
     this.deltaCache = {
       enemies: new Map(),
       drops: new Map(),
+      lightSources: new Map(),
       breakables: new Map(),
       wallTraps: new Map(),
       bullets: new Map(),
@@ -123,6 +124,7 @@ export class AuthoritativeRoom {
       fireZone: 1,
       meleeSwing: 1,
       armorStand: 1,
+      lightSource: 1,
       breakable: 1,
       wallTrap: 1
     };
@@ -134,6 +136,7 @@ export class AuthoritativeRoom {
       fireZone: new WeakMap(),
       meleeSwing: new WeakMap(),
       armorStand: new WeakMap(),
+      lightSource: new WeakMap(),
       breakable: new WeakMap(),
       wallTrap: new WeakMap()
     };
@@ -955,6 +958,7 @@ export class AuthoritativeRoom {
     this.deltaCache = {
       enemies: new Map(),
       drops: new Map(),
+      lightSources: new Map(),
       breakables: new Map(),
       wallTraps: new Map(),
       bullets: new Map(),
@@ -970,6 +974,7 @@ export class AuthoritativeRoom {
       fireZone: 1,
       meleeSwing: 1,
       armorStand: 1,
+      lightSource: 1,
       breakable: 1,
       wallTrap: 1
     };
@@ -981,6 +986,7 @@ export class AuthoritativeRoom {
       fireZone: new WeakMap(),
       meleeSwing: new WeakMap(),
       armorStand: new WeakMap(),
+      lightSource: new WeakMap(),
       breakable: new WeakMap(),
       wallTrap: new WeakMap()
     };
@@ -1212,6 +1218,16 @@ export class AuthoritativeRoom {
         animated: !!stand.animated,
         activated: !!stand.activated,
         variant: typeof stand.variant === "string" ? stand.variant : null
+      })),
+      lightSources: (this.sim.lightSources || []).map((light) => ({
+        id: this.options.getStableId(this, "lightSource", "ls", light),
+        type: typeof light?.type === "string" ? light.type : "light",
+        x: light.x,
+        y: light.y,
+        size: light.size,
+        lit: light.lit !== false,
+        lightRadius: light.lightRadius,
+        snuffCooldown: Number.isFinite(light.snuffCooldown) ? light.snuffCooldown : 0
       }))
     };
     if (toClient) {
@@ -1237,6 +1253,16 @@ export class AuthoritativeRoom {
         size: stand.size,
         animated: !!stand.animated,
         activated: !!stand.activated
+      })),
+      lightSources: (this.sim.lightSources || []).map((light) => ({
+        id: this.options.getStableId(this, "lightSource", "ls", light),
+        type: typeof light?.type === "string" ? light.type : "light",
+        x: light.x,
+        y: light.y,
+        size: light.size,
+        lit: light.lit !== false,
+        lightRadius: light.lightRadius,
+        snuffCooldown: Number.isFinite(light.snuffCooldown) ? light.snuffCooldown : 0
       }))
     };
     if (toClient) {
@@ -1325,6 +1351,7 @@ export class AuthoritativeRoom {
     const delta = { keyframe };
     const enemyDelta = this.options.buildDeltaCollection(this.deltaCache.enemies, fullState.enemies, keyframe);
     const dropDelta = this.options.buildDeltaCollection(this.deltaCache.drops, fullState.drops, keyframe);
+    const lightSourceDelta = this.options.buildDeltaCollection(this.deltaCache.lightSources, fullState.lightSources, keyframe);
     const breakableDelta = this.options.buildDeltaCollection(this.deltaCache.breakables, fullState.breakables, keyframe);
     const wallTrapDelta = this.options.buildDeltaCollection(this.deltaCache.wallTraps, fullState.wallTraps, keyframe);
     const bulletDelta = this.options.buildDeltaCollection(this.deltaCache.bullets, fullState.bullets, keyframe);
@@ -1333,6 +1360,7 @@ export class AuthoritativeRoom {
     const meleeSwingDelta = this.options.buildDeltaCollection(this.deltaCache.meleeSwings, fullState.meleeSwings, keyframe);
     if (keyframe || enemyDelta) delta.enemies = enemyDelta || {};
     if (keyframe || dropDelta) delta.drops = dropDelta || {};
+    if (keyframe || lightSourceDelta) delta.lightSources = lightSourceDelta || {};
     if (keyframe || breakableDelta) delta.breakables = breakableDelta || {};
     if (keyframe || wallTrapDelta) delta.wallTraps = wallTrapDelta || {};
     if (keyframe || bulletDelta) delta.bullets = bulletDelta || {};

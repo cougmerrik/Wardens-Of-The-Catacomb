@@ -34,6 +34,13 @@ import {
   randomEnemySpawnPoint
 } from "./world/spawnCombat.js";
 import {
+  getActiveLightSources,
+  getEnemyLightRadius,
+  getPlayerLightRadius,
+  placeTorches,
+  updateLightingInteractions
+} from "./world/lighting.js";
+import {
   getEnemySpawnInterval,
   getMoveSpeedMultiplier,
   getGoldFindMultiplier,
@@ -121,6 +128,26 @@ export class GameRuntimeWorld extends GameRuntimeBase {
 
   placeArmorStands() {
     placeArmorStands(this);
+  }
+
+  placeTorches() {
+    return placeTorches(this);
+  }
+
+  getPlayerLightRadius(player = this.player) {
+    return getPlayerLightRadius(this, player);
+  }
+
+  getEnemyLightRadius(enemy) {
+    return getEnemyLightRadius(this, enemy);
+  }
+
+  getActiveLightSources() {
+    return getActiveLightSources(this);
+  }
+
+  updateLightingInteractions(dt) {
+    updateLightingInteractions(this, dt);
   }
 
   spawnGhost(x, y) {

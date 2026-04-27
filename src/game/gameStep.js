@@ -167,6 +167,7 @@ export function stepGame(game, dt, controls = {}) {
     }
   }
   if (primaryPlayerAlive) game.revealAroundPlayer();
+  if (typeof game.updateLightingInteractions === "function") game.updateLightingInteractions(dt);
 
   const trapCfg = typeof game.getWallTrapConfig === "function" ? game.getWallTrapConfig() : game.config?.traps?.wall || {};
   const moveLen = vecLength(mx, my) || 1;

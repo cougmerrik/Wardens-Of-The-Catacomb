@@ -30,6 +30,7 @@ export function initializeNetworkGameState(game, predictedProjectiles) {
   game.fireZones = [];
   game.meleeSwings = [];
   game.armorStands = [];
+  game.lightSources = [];
   game.explored = [];
   game.navDistance = [];
   game.navPlayerTile = { x: -1, y: -1 };

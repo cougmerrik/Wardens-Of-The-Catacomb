@@ -290,6 +290,7 @@ export function createNetworkSessionController({
       game.networkHasChunks = false;
       game.networkChunkSync = true;
       game.armorStands = syncByIdLerp(game.armorStands, msg.armorStands, 1);
+      game.lightSources = syncByIdLerp(game.lightSources, msg.lightSources, 1);
       updateNetworkStatusRuntime(networkStatus, getCurrentGame(), "Loading nearby map chunks...");
     });
     netClient.on("state.mapChunk", (msg) => {
@@ -318,6 +319,7 @@ export function createNetworkSessionController({
       game.networkHasChunks = true;
       game.networkChunkSync = false;
       game.armorStands = syncByIdLerp(game.armorStands, msg.armorStands, 1);
+      game.lightSources = syncByIdLerp(game.lightSources, msg.lightSources, 1);
       handleMapReady();
     });
     netClient.on("state.meta", (msg) => {

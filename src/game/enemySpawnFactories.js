@@ -87,6 +87,7 @@ export function spawnMummy(game, x, y) {
     damageMax: game.config.enemy.mummyDamageMax,
     baseDamageMin: game.config.enemy.mummyDamageMin,
     baseDamageMax: game.config.enemy.mummyDamageMax,
+    snuffsTorches: true,
     contactAttackCooldown: 0,
     auraPulseTimer: 0
   };

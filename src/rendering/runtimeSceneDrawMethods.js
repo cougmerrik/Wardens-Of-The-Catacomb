@@ -1,8 +1,9 @@
 import { runtimeSceneEnemyDrawMethods } from "./runtimeSceneEnemyDrawMethods.js";
+import { runtimeSceneLightingMethods } from "./runtimeSceneLightingMethods.js";
 import { runtimeSceneObjectDrawMethods } from "./runtimeSceneObjectDrawMethods.js";
 import { drawAndroidTouchControls, getAndroidTouchRegions } from "./hud/androidLayout.js";
 import { drawConsumablesBar } from "./hud/consumablesBar.js";
-
+import { drawLanternFuelGauge } from "./hud/lanternFuelGauge.js";
 function hexToRgba(color, alpha) {
   if (typeof color !== "string") return `rgba(199, 202, 209, ${alpha})`;
   const hex = color.trim();
@@ -70,7 +71,6 @@ export const runtimeSceneDrawMethods = {
     ctx.strokeStyle = "rgba(126, 139, 171, 0.48)";
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-
     const pad = 10;
     const barX = x + pad;
     const barY = y + 8;
@@ -91,7 +91,8 @@ export const runtimeSceneDrawMethods = {
     ctx.fillStyle = "#d7e4ff";
     ctx.font = "12px Trebuchet MS";
     ctx.fillText(`XP ${game.experience}/${game.expToNextLevel} (${Math.round(ratio * 100)}%)`, barX, y + 22);
-    drawConsumablesBar(this, game, layout, y);
+    const consumableBounds = drawConsumablesBar(this, game, layout, y);
+    drawLanternFuelGauge(this, game, layout, y, consumableBounds);
     if (layout.isAndroid) {
       const regions = getAndroidTouchRegions(layout, y);
       layout.touchMoveRegion = game.uiRects.touchMoveRegion = regions.move;
@@ -241,6 +242,7 @@ export const runtimeSceneDrawMethods = {
   },
 
   ...runtimeSceneEnemyDrawMethods,
+  ...runtimeSceneLightingMethods,
   ...runtimeSceneObjectDrawMethods,
 
   drawPrisoner(enemy, screenX, screenY) {
@@ -494,5 +496,4 @@ export const runtimeSceneDrawMethods = {
     ctx.fillStyle = ratio > 0.5 ? "#7cd88f" : ratio > 0.25 ? "#e1bf63" : "#de6a6a";
     ctx.fillRect(x, y, width * ratio, height);
   },
-
 };

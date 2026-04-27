@@ -14,6 +14,7 @@ function shallowPlayerState(simPlayer) {
     skillPoints: simPlayer.skillPoints,
     refundCount: simPlayer.refundCount,
     levelWeaponDamageBonus: simPlayer.levelWeaponDamageBonus,
+    lanternFuel: simPlayer.lanternFuel,
     skills: simPlayer.skills,
     rangerTalents: simPlayer.rangerTalents,
     warriorTalents: simPlayer.warriorTalents,
@@ -50,6 +51,7 @@ function shallowActivePlayerState(player) {
     skillPoints: player.skillPoints,
     refundCount: player.refundCount,
     levelWeaponDamageBonus: player.levelWeaponDamageBonus,
+    lanternFuel: player.lanternFuel,
     fireCooldown: player.fireCooldown,
     fireArrowCooldown: player.fireArrowCooldown,
     deathBoltCooldown: player.deathBoltCooldown,
@@ -103,6 +105,10 @@ function resolveControlledEnemyColor(room, enemy) {
 
 export function getStableId(room, domain, prefix, obj) {
   if (!obj || typeof obj !== "object") return `${prefix}_0`;
+  if (!room.idMaps || typeof room.idMaps !== "object") room.idMaps = {};
+  if (!room.idCounters || typeof room.idCounters !== "object") room.idCounters = {};
+  if (!room.idMaps[domain]) room.idMaps[domain] = new WeakMap();
+  if (!Number.isFinite(room.idCounters[domain])) room.idCounters[domain] = 1;
   const map = room.idMaps[domain];
   if (map.has(obj)) return map.get(obj);
   const id = `${prefix}_${room.idCounters[domain]++}`;
@@ -210,6 +216,19 @@ function serializeWallTrap(room, trap) {
     dirY: trap.dirY,
     spotted: !!trap.spotted,
     cooldown: trap.cooldown || 0
+  };
+}
+
+export function serializeLightSource(room, light) {
+  return {
+    id: getStableId(room, "lightSource", "ls", light),
+    type: typeof light?.type === "string" ? light.type : "light",
+    x: light.x,
+    y: light.y,
+    size: light.size,
+    lit: light.lit !== false,
+    lightRadius: light.lightRadius,
+    snuffCooldown: Number.isFinite(light.snuffCooldown) ? light.snuffCooldown : 0
   };
 }
 
@@ -349,6 +368,7 @@ export function serializeState(room) {
     portal: sim.portal ? { ...sim.portal } : null,
     enemies: activeEnemies.map((e) => serializeEnemy(room, e)),
     drops: activeDrops.map((d) => serializeDrop(room, d)),
+    lightSources: (sim.lightSources || []).map((light) => serializeLightSource(room, light)),
     breakables: activeBreakables.map((b) => serializeBreakable(room, b)),
     wallTraps: activeWallTraps.map((t) => serializeWallTrap(room, t)),
     bullets: activeBullets.map((b) => serializeBullet(room, b, "bullet", "b")),

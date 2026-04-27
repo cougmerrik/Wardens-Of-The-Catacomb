@@ -190,23 +190,30 @@ async function main() {
       const baselineProjectileCount = Array.isArray(before.combat?.ownedProjectiles)
         ? before.combat.ownedProjectiles.filter((entry) => entry?.source === "authoritative").length
         : 0;
-      const clickStartedAt = performance.now();
       await page.keyboard.down("d");
       await delay(260);
+      const clickStartedAt = await page.evaluate(() => performance.now());
       await page.mouse.click(aimPoint.x, aimPoint.y, { button: "left" });
       await delay(70);
       await page.keyboard.up("d");
 
-      const shotReadyHandle = await page.waitForFunction((countBefore) => {
+      const shotReadyHandle = await page.waitForFunction((args) => {
         const state = window.__WOTC_DEBUG__?.getState?.();
-        if (!!state && (state.combat?.recentPlayerShots?.length || 0) > countBefore) {
+        const shots = Array.isArray(state?.combat?.recentPlayerShots) ? state.combat.recentPlayerShots : [];
+        const hasFreshPredicted = shots.some((entry) =>
+          entry &&
+          (entry.source === "primary" || entry.source === "predictedPrimary") &&
+          Number.isFinite(entry.atMs) &&
+          entry.atMs >= args.startedAtMs
+        );
+        if (!!state && ((state.combat?.recentPlayerShots?.length || 0) > args.countBefore || hasFreshPredicted)) {
           return {
             state,
             atMs: performance.now()
           };
         }
         return null;
-      }, beforeCount, { timeout: 2000 });
+      }, { countBefore: beforeCount, startedAtMs: clickStartedAt }, { timeout: 2000 });
       const shotReady = await shotReadyHandle.jsonValue();
       const afterShot = shotReady?.state || null;
       assert(afterShot, "debug state unavailable after archer shot");
@@ -214,7 +221,9 @@ async function main() {
       const deltaCount = shots.length - beforeCount;
       assert(deltaCount >= 1 && deltaCount <= 2, `single click produced ${deltaCount} shot telemetry entries`);
       const newShots = shots.slice(beforeCount);
-      const shot = newShots.find((entry) => entry && (entry.source === "primary" || entry.source === "predictedPrimary")) || newShots[0];
+      const freshShots = shots.filter((entry) => entry && Number.isFinite(entry.atMs) && entry.atMs >= clickStartedAt);
+      const candidateShots = freshShots.length > 0 ? freshShots : newShots;
+      const shot = candidateShots.find((entry) => entry && (entry.source === "primary" || entry.source === "predictedPrimary")) || candidateShots[0];
       assert(shot && (shot.source === "primary" || shot.source === "predictedPrimary"), `unexpected shot source: ${JSON.stringify(shot)}`);
       assert(Array.isArray(shot.volleyAngles) && shot.volleyAngles.length === shot.multishotCount, `bad volley telemetry: ${JSON.stringify(shot)}`);
       const aimX = Number.isFinite(shot.aimX) ? shot.aimX : afterShot.aim?.x;

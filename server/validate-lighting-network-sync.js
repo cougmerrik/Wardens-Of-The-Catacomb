@@ -1,0 +1,106 @@
+import { Game } from "../src/Game.js";
+import { applyMapStateToGame, applySnapshotToGame } from "../src/net/clientStateSync.js";
+import { buildDeltaCollection, buildJoinKeyframeState } from "./net/deltaProtocol.js";
+import { serializeState } from "./net/stateSerialization.js";
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function makeRoom(sim) {
+  return {
+    sim,
+    idCounters: {
+      enemy: 1,
+      drop: 1,
+      bullet: 1,
+      fireArrow: 1,
+      fireZone: 1,
+      meleeSwing: 1,
+      armorStand: 1,
+      lightSource: 1,
+      breakable: 1,
+      wallTrap: 1
+    },
+    idMaps: {
+      enemy: new WeakMap(),
+      drop: new WeakMap(),
+      bullet: new WeakMap(),
+      fireArrow: new WeakMap(),
+      fireZone: new WeakMap(),
+      meleeSwing: new WeakMap(),
+      armorStand: new WeakMap(),
+      lightSource: new WeakMap(),
+      breakable: new WeakMap(),
+      wallTrap: new WeakMap()
+    },
+    getActivePlayerStates() {
+      return [];
+    },
+    syncPrimaryActivePlayerFromSim() {
+      return sim.player;
+    }
+  };
+}
+
+function main() {
+  const serverGame = new Game(null, { headless: true });
+  assert(serverGame.lightSources.length > 0, "server game should have placed torches");
+  const room = makeRoom(serverGame);
+  serverGame.player.lanternFuel = 0.42;
+  const fullState = serializeState(room);
+  assert(fullState.player.lanternFuel === 0.42, "serialized primary player should include lantern fuel");
+  assert(Array.isArray(fullState.lightSources), "serialized state should include lightSources");
+  assert(fullState.lightSources.length === serverGame.lightSources.length, "serialized state should include all torches");
+  assert(fullState.lightSources.every((light) => typeof light.id === "string" && light.type === "torch"), "serialized torches should include stable ids and type");
+
+  const joinState = buildJoinKeyframeState(fullState);
+  assert(Array.isArray(joinState.delta.lightSources.spawn), "join keyframe should include light source spawns");
+  assert(joinState.delta.lightSources.spawn.length === fullState.lightSources.length, "join keyframe should include all light sources");
+
+  const clientGame = new Game(null, { headless: true });
+  applyMapStateToGame(clientGame, {
+    mapSignature: fullState.mapSignature,
+    floor: serverGame.floor,
+    mapWidth: serverGame.mapWidth,
+    mapHeight: serverGame.mapHeight,
+    map: serverGame.map,
+    lightSources: fullState.lightSources
+  });
+  assert(clientGame.lightSources.length === fullState.lightSources.length, "map bootstrap should sync light source placement");
+  assert(clientGame.lightSources.every((light) => light.lit === true), "map bootstrap should preserve lit state");
+
+  const deltaCache = new Map();
+  const keyframeDelta = buildDeltaCollection(deltaCache, fullState.lightSources, true);
+  assert(Array.isArray(keyframeDelta.spawn), "delta keyframe should spawn light sources");
+
+  serverGame.lightSources[0].lit = false;
+  serverGame.lightSources[0].snuffCooldown = 0.75;
+  const updatedState = serializeState(room);
+  const updateDelta = buildDeltaCollection(deltaCache, updatedState.lightSources, false);
+  assert(updateDelta && Array.isArray(updateDelta.update), "changed torch state should produce delta update");
+  assert(updateDelta.update.some((patch) => patch.id === fullState.lightSources[0].id && patch.lit === false), "delta update should include lit=false patch");
+
+  applySnapshotToGame({
+    game: clientGame,
+    state: {
+      mapSignature: updatedState.mapSignature,
+      time: updatedState.time,
+      player: updatedState.player,
+      players: [],
+      delta: {
+        keyframe: false,
+        lightSources: updateDelta
+      }
+    },
+    controller: false
+  });
+  const syncedTorch = clientGame.lightSources.find((light) => light.id === fullState.lightSources[0].id);
+  assert(syncedTorch && syncedTorch.lit === false, "snapshot delta should sync lit=false to client");
+  assert(syncedTorch.snuffCooldown === 0.75, "snapshot delta should sync snuff cooldown to client");
+  assert(clientGame.player.lanternFuel === 0.42, "snapshot should sync lantern fuel to client player");
+
+  console.log("Lighting network sync validation passed.");
+}
+
+main();
