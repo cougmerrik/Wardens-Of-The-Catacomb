@@ -275,7 +275,7 @@ export const runtimeBaseSupportMethods = {
       rr.venomCooldownTimer = Math.max(0, (Number.isFinite(rr.venomCooldownTimer) ? rr.venomCooldownTimer : 0) - dt);
       rr.smokeBombCooldownTimer = Math.max(0, (Number.isFinite(rr.smokeBombCooldownTimer) ? rr.smokeBombCooldownTimer : 0) - dt);
       rr.mushroomSpawnTimer = Math.max(0, (Number.isFinite(rr.mushroomSpawnTimer) ? rr.mushroomSpawnTimer : 0) - dt);
-      if (this.isPrimaryPlayerEntity(player) && this.rangerTalents?.forager?.points > 0) this.ensureForagerMushrooms(dt);
+      if (this.isPrimaryPlayerEntity(player)) this.ensureForagerMushrooms(dt);
       rr.comboSurgeCooldownTimer = Math.max(0, (Number.isFinite(rr.comboSurgeCooldownTimer) ? rr.comboSurgeCooldownTimer : 0) - dt);
       rr.livingShadowCooldownTimer = Math.max(0, (Number.isFinite(rr.livingShadowCooldownTimer) ? rr.livingShadowCooldownTimer : 0) - dt);
       rr.combo = Math.max(0, Math.min(30, Number.isFinite(rr.combo) ? Math.floor(rr.combo) : 0));

@@ -363,6 +363,11 @@ export function handleUiClicks(game) {
         game.useConsumableSlot(hitConsumable.index);
         continue;
       }
+      if (pointInRect(game, click.x, click.y, game.uiRects.hudSwapButton)) {
+        clearPinnedUiTooltip(game);
+        game.input.queueKey?.("q");
+        continue;
+      }
       if (pointInRect(game, click.x, click.y, game.uiRects.hudAbilityWidget)) {
         if (isAndroidTouchUi(game)) {
           pinUiTooltip(game, {

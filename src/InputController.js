@@ -150,6 +150,8 @@
       "statsCharacterTab",
       "shopClose",
       "skillTreeClose",
+      "skillRefundButton",
+      "hudSwapButton",
       "gameOverLeaderboardButton",
       "gameOverMenuButton",
       "gameOverStatsButton",
@@ -266,6 +268,11 @@
     const queued = this.keyQueued.has(lower);
     this.keyQueued.delete(lower);
     return queued;
+  }
+
+  queueKey(key) {
+    if (typeof key !== "string" || !key) return;
+    this.keyQueued.add(key.toLowerCase());
   }
 
   getMoveVector(gameplayBlocked = false) {

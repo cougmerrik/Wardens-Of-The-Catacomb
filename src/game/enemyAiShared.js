@@ -60,9 +60,8 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
     for (const player of livingPlayers) {
       if (!player) continue;
       const dist = vecLength((player.x || 0) - enemy.x, (player.y || 0) - enemy.y);
-      const suppressed =
-        (player.rangerRuntime?.shadowVeilTimer || 0) > 0 ||
-        (typeof game?.isPointInRangerSmokeBomb === "function" && game.isPointInRangerSmokeBomb(player.x, player.y));
+      const smokeSuppressed = !enemy.isBoss && !enemy.isFloorBoss && typeof game?.isPointInRangerSmokeBomb === "function" && game.isPointInRangerSmokeBomb(player.x, player.y);
+      const suppressed = (player.rangerRuntime?.shadowVeilTimer || 0) > 0 || smokeSuppressed;
       if (suppressed) {
         if (dist <= maxRange) suppressedPlayerSeen = true;
         continue;

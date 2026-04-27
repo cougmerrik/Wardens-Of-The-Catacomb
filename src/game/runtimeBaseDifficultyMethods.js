@@ -324,6 +324,8 @@ export const runtimeBaseDifficultyMethods = {
     if (!this.rangerRuntime) return;
     if (this.rangerTalents?.forager?.points <= 0) {
       this.rangerRuntime.foragerMushroomsInitialized = false;
+      this.rangerRuntime.mushroomSpawnTimer = 0;
+      this.drops = (this.drops || []).filter((drop) => !(drop && drop.type === "mushroom"));
       return;
     }
     const active = (this.drops || []).filter((drop) => drop && drop.type === "mushroom" && drop.life > 0).length;

@@ -731,10 +731,15 @@ export const runtimePlayerAttackMethods = {
         const threshold = this.getWarriorExecuteThreshold();
         const chance = this.getWarriorExecuteChance();
         const hpRatio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;
-        if (!enemy.isBoss && chance > 0 && enemy.hp > 0 && hpRatio > 0 && hpRatio <= threshold && Math.random() < chance) {
-          enemy.hp = 0;
-          enemy.pendingExecuteKill = true;
-          executeProc = true;
+        if (chance > 0 && enemy.hp > 0 && hpRatio > 0 && hpRatio <= threshold && Math.random() < chance) {
+          const bossTarget = !!(enemy.isBoss || enemy.isFloorBoss);
+          if (bossTarget) {
+            this.applyEnemyDamage(enemy, this.rollPrimaryDamage() * 1.5, "melee", this.player.id || null, { critical: true });
+          } else {
+            enemy.hp = 0;
+            enemy.pendingExecuteKill = true;
+            executeProc = true;
+          }
           if (isWarriorTalentGame(this) && hasWarriorButchersPath(this)) {
             this.warriorRuntime.butcherCritReady = true;
             this.warriorRuntime.butcherEmpowerReady = true;
@@ -981,11 +986,14 @@ export const runtimePlayerAttackMethods = {
     target.rangerMarkedBy = this.player.id || null;
     target.rangerMarkedTimer = Math.max(target.rangerMarkedTimer || 0, 4);
     if (typeof this.applyWarriorMark === "function") this.applyWarriorMark(target, 4);
-    const lethalDamage = Math.max(9999, (target.hp || 1) * 20, (target.maxHp || 1) * 20);
-    this.applyEnemyDamage(target, lethalDamage, "physical", this.player.id || null, { critical: true });
+    const isBossTarget = !!(target.isBoss || target.isFloorBoss);
+    const executeDamage = isBossTarget
+      ? this.rollPrimaryDamage() * getRangerCritMultiplier()
+      : Math.max(9999, (target.hp || 1) * 20, (target.maxHp || 1) * 20);
+    this.applyEnemyDamage(target, executeDamage, "physical", this.player.id || null, { critical: true });
     this.addRangerCombo(2);
     this.rangerRuntime.classSkillCooldownTimer = 7;
-    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(target.x, target.y - 30, "Execute", "#ffc0b3", 0.65, 13);
+    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(target.x, target.y - 30, isBossTarget ? "Execute Crit" : "Execute", "#ffc0b3", 0.65, 13);
     return true;
   },
 
@@ -1041,7 +1049,7 @@ export const runtimePlayerAttackMethods = {
         baseDamageMax: 7 + this.level * 0.45,
         contactAttackCooldown: 0,
         isControlledUndead: true,
-        controllerPlayerId: this.player.id || null,
+        controllerPlayerId: this.player.id || "player",
         controlledAttackSpeedBonusPct: 0.15,
         controlledDamageBonusPct: 0,
         hpBarTimer: 1.2
@@ -1214,6 +1222,10 @@ export const runtimePlayerAttackMethods = {
         const newTarget = enemy?.id && enemy.id !== this.rangerRuntime.lastAttackTargetId;
         if (idle || newTarget) swapMult *= 1.25;
       }
+    }
+    if (getRangerSelectedSwapStyle(this) === "ambush" && !this.rangerRuntime?.pendingSwapBonus) {
+      const idle = (this.time || 0) - (Number.isFinite(this.rangerRuntime?.lastAttackAt) ? this.rangerRuntime.lastAttackAt : -Infinity) >= 2;
+      if (idle) swapMult *= 1.35;
     }
     return projectileDamage * damageMult * critMult * linebreakerMult * pinningLineMult * swapMult * getRangerArrowBonusAgainstEnemy(this, enemy);
   },

@@ -81,6 +81,44 @@ function drawAbilityCooldownWidget(renderer, game, x, y, size) {
   if (game.isAndroidLayout && game.uiPinnedTooltip?.source === "abilityWidget") drawPinnedAbilityTooltip(renderer, rect, state);
 }
 
+function drawAndroidSwapWidget(renderer, game, abilityRect) {
+  if (!game?.isAndroidLayout || !abilityRect) return;
+  const canSwap = !!(game.isArcherClass?.() || game.isWarriorClass?.());
+  if (!canSwap) {
+    game.uiRects.hudSwapButton = null;
+    return;
+  }
+  const ctx = renderer.ctx;
+  const w = abilityRect.w;
+  const h = 44;
+  const gap = 12;
+  const rect = {
+    x: abilityRect.x,
+    y: Math.max(8, abilityRect.y - h - gap),
+    w,
+    h
+  };
+  const cooldown = game.isArcherClass?.()
+    ? Math.max(0, game.rangerRuntime?.swapCooldownTimer || 0)
+    : Math.max(0, game.warriorRuntime?.attackSwapCooldownTimer || 0);
+  const ready = cooldown <= 0;
+  game.uiRects.hudSwapButton = rect;
+  ctx.save();
+  ctx.fillStyle = ready ? "rgba(24, 58, 48, 0.88)" : "rgba(54, 55, 66, 0.86)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = ready ? "rgba(139, 231, 190, 0.72)" : "rgba(218, 228, 246, 0.22)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  ctx.fillStyle = ready ? "#dcfff0" : "#c8ced8";
+  ctx.font = "bold 13px Trebuchet MS";
+  ctx.textAlign = "center";
+  ctx.fillText(ready ? "Swap" : `${cooldown.toFixed(1)}s`, rect.x + rect.w * 0.5, rect.y + 18);
+  ctx.font = "bold 10px Trebuchet MS";
+  ctx.fillText("Q", rect.x + rect.w * 0.5, rect.y + 33);
+  ctx.textAlign = "left";
+  ctx.restore();
+}
+
 function drawHudButton(ctx, rect, label, active, activeFill) {
   ctx.fillStyle = active ? activeFill : "rgba(95, 126, 189, 0.92)";
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -395,13 +433,11 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   ctx.fillText("Pace", panelX + 10, paceRowY);
   ctx.fillStyle = outpace.color;
   ctx.fillText(outpace.label, panelX + 42, paceRowY);
-  drawAbilityCooldownWidget(
-    renderer,
-    game,
-    layout.isAndroid ? 18 : panelX + panelW - 64,
-    layout.isAndroid ? renderer.canvas.height - layout.xpBarH - 132 : (isNecromancer ? panelY + 58 : panelY + 44),
-    layout.isAndroid ? 68 : 42
-  );
+  const abilityX = layout.isAndroid ? 18 : panelX + panelW - 64;
+  const abilityY = layout.isAndroid ? renderer.canvas.height - layout.xpBarH - 132 : (isNecromancer ? panelY + 58 : panelY + 44);
+  const abilitySize = layout.isAndroid ? 68 : 42;
+  drawAbilityCooldownWidget(renderer, game, abilityX, abilityY, abilitySize);
+  drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget);
 
   if (!layout.isAndroid) {
     const buttonW = Math.floor((panelW - 20) / 3), buttonH = 28, buttonX = panelX + 10, buttonGap = 5;

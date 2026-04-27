@@ -202,6 +202,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     game.uiRects.gameOverLeaderboardButton = null;
     game.uiRects.gameOverMenuButton = null;
     game.uiRects.hudAbilityWidget = null;
+    game.uiRects.hudSwapButton = null;
     game.uiRects.consumableSlots = [];
     game.uiRects.touchMoveRegion = null;
     game.uiRects.touchAimRegion = null;

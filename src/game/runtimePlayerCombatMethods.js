@@ -183,9 +183,13 @@ export const runtimePlayerCombatMethods = {
         const threshold = this.getWarriorExecuteThreshold();
         const chance = this.getWarriorExecuteChance();
         const hpRatio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;
-        if (!enemy.isBoss && chance > 0 && enemy.hp > 0 && hpRatio > 0 && hpRatio <= threshold && Math.random() < chance) {
-          enemy.hp = 0;
-          executeProc = true;
+        if (chance > 0 && enemy.hp > 0 && hpRatio > 0 && hpRatio <= threshold && Math.random() < chance) {
+          if (enemy.isBoss || enemy.isFloorBoss) {
+            this.applyEnemyDamage(enemy, this.rollPrimaryDamage() * 1.5, "melee", this.player.id || null, { critical: true });
+          } else {
+            enemy.hp = 0;
+            executeProc = true;
+          }
         }
       }
     }

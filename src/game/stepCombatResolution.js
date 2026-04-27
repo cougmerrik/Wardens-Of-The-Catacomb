@@ -555,7 +555,7 @@ export function resolveCombatAndDrops({
         friendly.contactAttackCooldown = 0.55 / Math.max(0.4, 1 + (friendly.controlledAttackSpeedBonusPct || 0));
       }
       if ((hostile.contactAttackCooldown || 0) <= 0) {
-        game.applyEnemyDamage(friendly, game.rollEnemyContactDamage(hostile) * game.getEnemyDamageScale(), "physical");
+        game.applyEnemyDamage(friendly, game.rollEnemyContactDamage(hostile) * game.getEnemyDamageScale(), "physical", null, { allowFriendlyPetDamage: true });
         hostile.contactAttackCooldown = 0.55;
       }
     }
@@ -679,21 +679,25 @@ export function resolveCombatAndDrops({
           if (rewardOwner === game.player && typeof game.applyPlayerHealing === "function") game.applyPlayerHealing(heal);
           else rewardOwner.health = Math.min(rewardOwner.maxHealth || rewardOwner.health || 0, (rewardOwner.health || 0) + heal);
           runtime.predatorsFeastTimer = 2;
-          runtime.predatorsFeastCooldownTimer = 2;
+          runtime.predatorsFeastCooldownTimer = 5;
         }
-        if (hasRangerTalent(talentSource, "deathChain")) {
+        if (hasRangerTalent(talentSource, "deathChain") && !enemy.killedByDeathChain) {
           const tile = game.config?.map?.tile || 32;
-          let chainTarget = null;
-          let bestDist = Number.POSITIVE_INFINITY;
+          const chainTargets = [];
           for (const other of activeEnemies) {
             if (!other || other === enemy || (other.hp || 0) <= 0) continue;
             if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(other)) continue;
             const dist = vecLength((other.x || 0) - (enemy.x || 0), (other.y || 0) - (enemy.y || 0));
-            if (dist > tile * 3 || dist >= bestDist) continue;
-            bestDist = dist;
-            chainTarget = other;
+            if (dist > tile * 3) continue;
+            chainTargets.push({ enemy: other, dist });
           }
-          if (chainTarget) game.applyEnemyDamage(chainTarget, (typeof game.rollPrimaryDamage === "function" ? game.rollPrimaryDamage() : 8) * (enemy.rangerMarkedBy ? 1.1 : 0.7), "physical", rewardOwner.id || null);
+          chainTargets.sort((a, b) => a.dist - b.dist);
+          for (const entry of chainTargets.slice(0, 2)) {
+            const chainDamage = (typeof game.rollPrimaryDamage === "function" ? game.rollPrimaryDamage() : 8) * (enemy.rangerMarkedBy ? 1.1 : 0.7);
+            game.applyEnemyDamage(entry.enemy, chainDamage, "physical", rewardOwner.id || null);
+            if ((entry.enemy.hp || 0) <= 0) entry.enemy.killedByDeathChain = true;
+            if (typeof game.spawnFloatingText === "function") game.spawnFloatingText(entry.enemy.x, entry.enemy.y - entry.enemy.size, "Death Chain", "#d8b3ff", 0.75, 13);
+          }
         }
       }
       if (enemy.isFloorBoss && typeof game.recordRunBossKill === "function" && (enemy.type !== "golem" || isFinalGolemBossDeath)) {

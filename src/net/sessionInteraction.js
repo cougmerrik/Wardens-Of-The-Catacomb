@@ -265,6 +265,12 @@ export function handleNetworkUiActions(game, netClient, isController) {
       else if (canSendRoomAction) netClient.sendAction({ kind: "setStatsView", view: "character" });
       continue;
     }
+    if (playerAlive && hit(click.x, click.y, game.uiRects.hudSwapButton)) {
+      clearPinnedUiTooltip();
+      recordAction(click, "hudSwapButton", "modeSwap");
+      game.input?.queueKey?.("q");
+      continue;
+    }
     const itemRects = game.uiRects.shopItems || [];
     for (const item of itemRects) {
       if (!playerAlive) break;

@@ -1,11 +1,13 @@
 const WARRIOR_TIER_LEVELS = {
   1: 2,
   2: 3,
-  3: 4,
-  4: 6,
-  5: 8,
-  6: 10
+  3: 5,
+  4: 7,
+  5: 9,
+  6: 12
 };
+
+const OPEN_PROGRESSION_SP_LEVELS = new Set([2, 3, 5, 7, 9, 10, 12]);
 
 const WARRIOR_TIER_PICK_LIMITS = {
   1: 1,
@@ -942,8 +944,6 @@ export function hasWarriorEldritchInvestment(game) {
 export function getWarriorSkillPointGainForLevel(level, classType) {
   if (classType !== "fighter") return 1;
   const safeLevel = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
-  if (safeLevel < 2) return 0;
-  if (safeLevel === 2) return 2;
-  if (safeLevel <= 11) return 1;
-  return safeLevel % 2 === 0 ? 1 : 0;
+  if (OPEN_PROGRESSION_SP_LEVELS.has(safeLevel)) return 1;
+  return safeLevel > 12 && safeLevel % 2 === 0 ? 1 : 0;
 }

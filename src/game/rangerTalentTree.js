@@ -7,6 +7,17 @@ const RANGER_GROUP_LIMITS = {
   capstone: 1
 };
 
+const RANGER_TIER_LEVELS = {
+  1: 2,
+  2: 3,
+  3: 5,
+  4: 7,
+  5: 9,
+  6: 12
+};
+
+const OPEN_PROGRESSION_SP_LEVELS = new Set([2, 3, 5, 7, 9, 10, 12]);
+
 const RANGER_TIER_LABELS = {
   1: "Weapon Style",
   2: "Mode Swap",
@@ -560,6 +571,8 @@ export function getRangerGroupLimit(group) {
 }
 
 export function isRangerTierAccessible(game, tier) {
+  const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
+  if (level < (RANGER_TIER_LEVELS[tier] || 99)) return false;
   if (tier <= 1) return true;
   if (tier === 2) return !!getRangerSelectedWeapon(game);
   if (tier === 3) return !!getRangerSelectedSwapStyle(game);
@@ -570,7 +583,8 @@ export function isRangerTierAccessible(game, tier) {
 }
 
 export function getRangerRowRequirement(row) {
-  return row <= 0 ? 0 : row;
+  const tier = Math.max(1, Math.min(6, Math.floor(row) + 1));
+  return RANGER_TIER_LEVELS[tier] || 99;
 }
 
 export function isRangerRowAccessible(game, row) {
@@ -583,7 +597,9 @@ export function getRangerLaneSpent(game, lane) {
 
 export function getRangerUnlockRequirementText(game, def) {
   if (!def) return "";
-  if (def.tier === 1) return "Available immediately.";
+  const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
+  if (level < (RANGER_TIER_LEVELS[def.tier] || 99)) return `Requires level ${RANGER_TIER_LEVELS[def.tier]}.`;
+  if (def.tier === 1) return "Available now.";
   if (def.tier === 2) return getRangerSelectedWeapon(game) ? "Available now." : "Requires a weapon style.";
   if (def.tier === 3) return getRangerSelectedSwapStyle(game) ? "Available now." : "Requires a mode-swap style.";
   if (def.tier === 4) return getRangerSelectedModifier(game) ? "Available now." : "Requires an attack modifier.";
@@ -898,8 +914,6 @@ export function getRangerArrowBonusAgainstEnemy(game, enemy) {
 export function getRangerSkillPointGainForLevel(level, classType) {
   if (classType !== "archer") return 1;
   const safeLevel = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
-  if (safeLevel < 2) return 0;
-  if (safeLevel === 2) return 2;
-  if (safeLevel <= 11) return 1;
-  return safeLevel % 2 === 0 ? 1 : 0;
+  if (OPEN_PROGRESSION_SP_LEVELS.has(safeLevel)) return 1;
+  return safeLevel > 12 && safeLevel % 2 === 0 ? 1 : 0;
 }

@@ -138,6 +138,10 @@ function brightenHexColor(color, amount = 0.18) {
 export function applyEnemyDamage(game, enemy, amount, damageType = "physical", ownerId = null, options = {}) {
   if (!Number.isFinite(amount) || amount <= 0) return;
   if (enemy?.invincible) return;
+  if (enemy?.type === "wolf" && game.isEnemyFriendlyToPlayer?.(enemy) && !options.allowFriendlyPetDamage) {
+    const owner = typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(ownerId) : null;
+    if (owner || !ownerId) return;
+  }
   if (enemy?.type === "skeleton_warrior" && enemy.collapsed) {
     if (damageType === "fire" || damageType === "melee") {
       enemy.reviveAtEnd = false;
