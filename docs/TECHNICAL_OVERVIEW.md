@@ -46,7 +46,10 @@ This document summarizes the current high-level architecture and validation work
 - Player entities carry `lanternFuel` in the `0..1` range. Network serialization includes that fuel value so the HUD gauge and player light radius stay aligned across clients.
 - Lighting interaction updates are throttled and use squared-distance checks to avoid adding avoidable per-frame cost on larger floors.
 - The renderer draws torches through `runtimeSceneObjectDrawMethods.js` and applies the darkness/light overlay through `runtimeSceneLightingMethods.js`.
-- The lighting overlay is rendered after terrain/world objects and before enemies, drops, floating text, vignette, and HUD layers so gameplay-critical entities remain fully readable.
+- The lighting overlay is rendered after terrain/world objects and before enemies, drops, floating text, vignette, and HUD layers.
+- Enemies and drops draw after the global overlay and receive a tight sprite-sized darkness overlay capped by `enemyMaxDarknessAlpha`, which can meet the 99% global darkness maximum while using `enemyLightFalloffDecay` so sprites visibly brighten before reaching the center of a light source.
+- Ranger Fire Arrow projectiles, `fire`/`pinningFire` zones, and burning enemies are included in active light source collection with config-driven bright-light radii and source-specific falloff metadata.
+- Floating text stays fully readable after the darkness overlay.
 - The overlay keeps unlit areas visible through ambient alpha and radial gradient falloff rather than hard visibility cutoffs.
 - Debug lighting state is exposed for browser validation through the existing dev/debug runtime surface.
 
@@ -169,7 +172,7 @@ This document summarizes the current high-level architecture and validation work
 - `validate:lighting-interaction`
   - verifies player relight, enemy snuffing, cooldown behavior, and relight-after-snuff
 - `validate:lighting-enemies`
-  - verifies enemies and bosses render fully illuminated while default ghosts do not create world light
+  - verifies enemies and bosses remain readable while default ghosts do not create world light
 - `validate:lighting-network`
   - verifies light-source serialization, network map state, and delta sync behavior
 - `validate:lighting-browser`

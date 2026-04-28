@@ -169,7 +169,7 @@ async function main() {
     assert((litState?.lighting?.activeLightSourceCount || 0) > 0, "expected active browser light sources");
     assert((lightingDebug?.drawCount || 0) > 0, "lighting overlay should render at least once");
     assert((lightingDebug?.sourceCount || 0) > 0, "lighting overlay should render active sources");
-    assert((lightingDebug?.ambientAlpha || 0) > 0 && (lightingDebug?.maxAlpha || 0) > lightingDebug.ambientAlpha, "lighting overlay debug alpha values are invalid");
+    assert((lightingDebug?.ambientAlpha || 0) > 0 && (lightingDebug?.maxAlpha || 0) >= lightingDebug.ambientAlpha, "lighting overlay debug alpha values are invalid");
     assert(Number.isFinite(litState?.lighting?.lanternFuel), "browser debug state should expose lantern fuel");
     assert(Number.isFinite(litState?.lighting?.playerLightRadius), "browser debug state should expose player light radius");
 

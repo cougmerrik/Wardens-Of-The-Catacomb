@@ -182,6 +182,12 @@ git push
 11. Include a short PR description with purpose, major changes, validation, and known risks.
 12. After review, address feedback, re-run validation as needed, and push the follow-up commits.
 
+## Automated PR Review
+- `.github/workflows/codex-pr-review.yml` runs Codex review on non-draft pull requests when they are opened, synchronized, reopened, or marked ready for review.
+- The workflow checks out the pull request merge ref, runs `openai/codex-action@v1` in a read-only sandbox, and posts the final review message as a pull request comment.
+- The repository must define the GitHub Actions secret `OPENAI_API_KEY`; keep the key only in GitHub secrets, not in tracked files or local documentation.
+- Use `gh secret list` to confirm the secret exists and `gh run list --workflow "Codex PR Review"` to inspect recent workflow runs.
+
 ## Example Prompt Sequence
 1. `Read TASK_BOARD.md, inspect the current gameplay difficulty, class stats, and XP progression systems, then summarize the main tuning levers and update TASK_BOARD.md with a short implementation plan.`
 2. `Using TASK_BOARD.md as the source of truth, tune the class baseline stats and per-level growth in src/config.js. Keep the first pass conservative, explain the tradeoffs, and update TASK_BOARD.md with the changes made.`

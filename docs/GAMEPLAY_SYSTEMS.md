@@ -113,7 +113,10 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Players relight unlit torches by touching them.
 - Snuffer enemies can extinguish lit torches by touching them; mummies currently opt into this behavior.
 - Snuffed torches use a short cooldown to avoid immediate relight/snuff flicker, then can be relit by the player.
-- Enemies, bosses, drops, and floating text render after the darkness overlay so they remain fully readable outside the light radius.
+- Enemy and boss sprites render after the global darkness overlay, then receive a tight darkness pass that can reach the 99% global darkness maximum and brightens with a gentler sprite-specific falloff as they approach active light.
+- Drops render after the global darkness overlay, then receive the same tight capped darkness pass as enemies so pickups brighten near active light and can fade to the 99% global darkness maximum at range.
+- Floating text renders after the darkness overlay so it remains fully readable outside the light radius.
+- Ranger Fire Arrow projectiles, lingering fire/pinning-fire zones, and ignited enemies emit bright temporary light with a wider bright center and slower falloff than normal dungeon lights.
 - Lighting is visual-only for now:
   - it does not alter collision
   - it does not change map exploration

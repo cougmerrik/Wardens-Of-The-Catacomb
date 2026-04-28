@@ -120,7 +120,7 @@ function drawMultiplayerResultsOverlay(ctx, game, canvas) {
 }
 
 export class RendererRuntimeScene extends RendererRuntimeBase {
-  drawSceneEnemy(game, enemy, cameraX, cameraY) {
+  drawSceneEnemy(game, enemy, cameraX, cameraY, options = {}) {
     const ctx = this.ctx;
     const screenX = enemy.x - cameraX;
     const screenY = enemy.y - cameraY;
@@ -143,6 +143,14 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     } else {
       this.drawGhost(enemy, screenX, screenY, enemy.size);
     }
+    if (options.drawOverlays === false) return;
+    this.drawSceneEnemyOverlays(game, enemy, cameraX, cameraY);
+  }
+
+  drawSceneEnemyOverlays(game, enemy, cameraX, cameraY) {
+    const ctx = this.ctx;
+    const screenX = enemy.x - cameraX;
+    const screenY = enemy.y - cameraY;
     drawArcaneMarkSigil(ctx, enemy, screenX, screenY, game.time);
     this.drawEnemyHealthBar(enemy, screenX, screenY);
   }
@@ -236,6 +244,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     this.drawDrops(game, cameraX, cameraY);
     this.drawFloatingTexts(game, cameraX, cameraY);
     for (const enemy of game.enemies) {
+      if (this.drawEnemyDarkenedLayer(game, enemy, cameraX, cameraY, layout)) continue;
       this.drawSceneEnemy(game, enemy, cameraX, cameraY);
     }
     this.drawVignette(game, cameraX, cameraY);
