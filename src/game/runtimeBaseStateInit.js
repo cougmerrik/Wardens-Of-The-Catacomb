@@ -75,6 +75,7 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.drops = [];
   game.enemies = [];
   game.armorStands = [];
+  game.lightSources = [];
   game.breakables = [];
   game.wallTraps = [];
   game.enemySpawnTimer = config.enemy.spawnIntervalStart;

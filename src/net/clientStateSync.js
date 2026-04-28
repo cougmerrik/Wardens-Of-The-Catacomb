@@ -61,6 +61,7 @@ export function applyMapStateToGame(game, payload) {
     }
   }
   if (typeof game.ensurePlayerSafePosition === "function") game.ensurePlayerSafePosition(12);
+  game.lightSources = syncByIdLerp(game.lightSources, payload.lightSources, 1);
   return typeof payload.mapSignature === "string" ? payload.mapSignature : `${game.biomeKey}:${game.floor}:${game.mapWidth}x${game.mapHeight}`;
 }
 
@@ -80,6 +81,7 @@ export function applyMapMetaToGame(game, payload) {
   game.explored = Array.from({ length: mapHeight }, () => Array(mapWidth).fill(false));
   game.navDistance = Array.from({ length: mapHeight }, () => Array(mapWidth).fill(-1));
   game.navPlayerTile = { x: -1, y: -1 };
+  game.lightSources = syncByIdLerp(game.lightSources, payload.lightSources, 1);
   return typeof payload.mapSignature === "string" ? payload.mapSignature : `${game.biomeKey}:${game.floor}:${game.mapWidth}x${game.mapHeight}`;
 }
 
@@ -384,6 +386,7 @@ export function applySnapshotToGame({
     if (Number.isFinite(snapshotPlayer.skillPoints)) game.skillPoints = snapshotPlayer.skillPoints;
     if (Number.isFinite(snapshotPlayer.refundCount)) game.refundCount = snapshotPlayer.refundCount;
     if (Number.isFinite(snapshotPlayer.levelWeaponDamageBonus)) game.levelWeaponDamageBonus = snapshotPlayer.levelWeaponDamageBonus;
+    if (Number.isFinite(snapshotPlayer.lanternFuel)) game.player.lanternFuel = snapshotPlayer.lanternFuel;
     if (Number.isFinite(snapshotPlayer.warriorMomentumTimer)) game.warriorMomentumTimer = snapshotPlayer.warriorMomentumTimer;
     if (Number.isFinite(snapshotPlayer.warriorRageActiveTimer)) game.warriorRageActiveTimer = snapshotPlayer.warriorRageActiveTimer;
     if (Number.isFinite(snapshotPlayer.warriorRageCooldownTimer)) game.warriorRageCooldownTimer = snapshotPlayer.warriorRageCooldownTimer;
@@ -457,6 +460,7 @@ export function applySnapshotToGame({
     const keyframe = !!state.delta.keyframe;
     game.enemies = applyDeltaCollection(game.enemies, state.delta.enemies, { keyframe, positionAlpha: snapAlpha });
     game.drops = applyDeltaCollection(game.drops, state.delta.drops, { keyframe, positionAlpha: snapAlpha });
+    game.lightSources = applyDeltaCollection(game.lightSources, state.delta.lightSources, { keyframe, positionAlpha: 1 });
     game.breakables = applyDeltaCollection(game.breakables, state.delta.breakables, { keyframe, positionAlpha: 1 });
     game.wallTraps = applyDeltaCollection(game.wallTraps, state.delta.wallTraps, { keyframe, positionAlpha: 1 });
     game.bullets = applyDeltaCollection(game.bullets, state.delta.bullets, {
@@ -476,6 +480,7 @@ export function applySnapshotToGame({
     game.armorStands = syncByIdLerp(game.armorStands, state.armorStands, 1);
     game.enemies = syncByIdLerp(game.enemies, state.enemies, snapAlpha);
     game.drops = syncByIdLerp(game.drops, state.drops, snapAlpha);
+    game.lightSources = syncByIdLerp(game.lightSources, state.lightSources, 1);
     game.breakables = syncByIdLerp(game.breakables, state.breakables, 1);
     game.wallTraps = syncByIdLerp(game.wallTraps, state.wallTraps, 1);
     game.bullets = syncByIdLerp(game.bullets, (state.bullets || []).map((p) => reconcileProjectileSpawn(p, "bullet")), 1);

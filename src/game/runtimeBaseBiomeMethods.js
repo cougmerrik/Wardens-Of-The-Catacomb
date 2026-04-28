@@ -109,6 +109,7 @@ export const runtimeBaseBiomeMethods = {
     this.drops = [];
     this.enemies = [];
     this.armorStands = [];
+    this.lightSources = [];
     this.breakables = [];
     this.wallTraps = [];
     this.enemySpawnTimer = this.config.enemy.spawnIntervalStart;
@@ -132,6 +133,7 @@ export const runtimeBaseBiomeMethods = {
     this.placeArmorStands();
     this.placeWallTraps();
     this.placeBreakables();
+    if (typeof this.placeTorches === "function") this.placeTorches();
     this.ensurePlayerSafePosition(12);
   },
 

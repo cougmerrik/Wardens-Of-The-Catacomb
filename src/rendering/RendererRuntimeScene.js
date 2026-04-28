@@ -120,6 +120,33 @@ function drawMultiplayerResultsOverlay(ctx, game, canvas) {
 }
 
 export class RendererRuntimeScene extends RendererRuntimeBase {
+  drawSceneEnemy(game, enemy, cameraX, cameraY) {
+    const ctx = this.ctx;
+    const screenX = enemy.x - cameraX;
+    const screenY = enemy.y - cameraY;
+    if (enemy.type === "goblin") this.drawTreasureGoblin(enemy, screenX, screenY);
+    else if (enemy.type === "armor") this.drawAnimatedArmor(game, enemy, screenX, screenY);
+    else if (enemy.type === "mummy") this.drawMummy(enemy, screenX, screenY);
+    else if (enemy.type === "prisoner") this.drawPrisoner(enemy, screenX, screenY);
+    else if (enemy.type === "rat_archer") this.drawRatArcher(enemy, screenX, screenY);
+    else if (enemy.type === "skeleton_warrior") this.drawSkeletonWarrior(enemy, screenX, screenY);
+    else if (enemy.type === "sonya") this.drawSonyaBoss(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "necromancer") this.drawNecromancer(enemy, screenX, screenY);
+    else if (enemy.type === "leprechaun") this.drawLeprechaunBoss(enemy, screenX, screenY);
+    else if (enemy.type === "minotaur") this.drawMinotaur(enemy, screenX, screenY);
+    else if (enemy.type === "golem") this.drawGolemBoss(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "shardling") this.drawShardling(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "skeleton") this.drawSkeleton(enemy, screenX, screenY);
+    else if (enemy.type === "mimic") {
+      if (enemy.dormant) this.drawBreakable(game, { type: "box", size: enemy.size }, screenX, screenY);
+      else this.drawMimic(enemy, screenX, screenY);
+    } else {
+      this.drawGhost(enemy, screenX, screenY, enemy.size);
+    }
+    drawArcaneMarkSigil(ctx, enemy, screenX, screenY, game.time);
+    this.drawEnemyHealthBar(enemy, screenX, screenY);
+  }
+
   draw(game) {
     const ctx = this.ctx;
     const camera = game.getCamera();
@@ -191,42 +218,26 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       if (stand.animated && stand.activated) continue;
       this.drawArmorStand(game, stand, stand.x - cameraX, stand.y - cameraY);
     }
+    for (const light of game.lightSources || []) {
+      if (light?.type !== "torch") continue;
+      this.drawTorch(game, light, light.x - cameraX, light.y - cameraY);
+    }
     for (const trap of game.wallTraps || []) {
       if (!trap.spotted) continue;
       this.drawWallTrap(trap, trap.x - cameraX, trap.y - cameraY, biomePalette);
     }
     for (const br of game.breakables || []) this.drawBreakable(game, br, br.x - cameraX, br.y - cameraY);
 
-    for (const enemy of game.enemies) {
-      if (enemy.type === "goblin") this.drawTreasureGoblin(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "armor") this.drawAnimatedArmor(game, enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "mummy") this.drawMummy(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "prisoner") this.drawPrisoner(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "rat_archer") this.drawRatArcher(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "skeleton_warrior") this.drawSkeletonWarrior(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "sonya") this.drawSonyaBoss(enemy, enemy.x - cameraX, enemy.y - cameraY, game.time);
-      else if (enemy.type === "necromancer") this.drawNecromancer(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "leprechaun") this.drawLeprechaunBoss(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "minotaur") this.drawMinotaur(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "golem") this.drawGolemBoss(enemy, enemy.x - cameraX, enemy.y - cameraY, game.time);
-      else if (enemy.type === "shardling") this.drawShardling(enemy, enemy.x - cameraX, enemy.y - cameraY, game.time);
-      else if (enemy.type === "skeleton") this.drawSkeleton(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      else if (enemy.type === "mimic") {
-        if (enemy.dormant) this.drawBreakable(game, { type: "box", size: enemy.size }, enemy.x - cameraX, enemy.y - cameraY);
-        else this.drawMimic(enemy, enemy.x - cameraX, enemy.y - cameraY);
-      } else {
-        this.drawGhost(enemy, enemy.x - cameraX, enemy.y - cameraY, enemy.size);
-      }
-      drawArcaneMarkSigil(ctx, enemy, enemy.x - cameraX, enemy.y - cameraY, game.time);
-      this.drawEnemyHealthBar(enemy, enemy.x - cameraX, enemy.y - cameraY);
-    }
-
-    this.drawDrops(game, cameraX, cameraY);
     this.drawRemotePlayers(game, cameraX, cameraY);
     this.drawPlayer(game, cameraX, cameraY);
     this.drawProjectiles(game, cameraX, cameraY);
     this.drawPlayerHealthBar(game, cameraX, cameraY);
+    this.drawLightingOverlay(game, cameraX, cameraY, layout);
+    this.drawDrops(game, cameraX, cameraY);
     this.drawFloatingTexts(game, cameraX, cameraY);
+    for (const enemy of game.enemies) {
+      this.drawSceneEnemy(game, enemy, cameraX, cameraY);
+    }
     this.drawVignette(game, cameraX, cameraY);
     ctx.restore();
 

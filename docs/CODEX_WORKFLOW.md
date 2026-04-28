@@ -53,6 +53,16 @@ npm run validate:gameplay
 npm run perf:test
 ```
 
+### Resumable Validation Triage
+Use focused runner options while debugging a failed validation gate, then finish with one clean full closeout run before staging.
+
+```bash
+node server/run-validation-suite.js closeout --list
+node server/run-validation-suite.js closeout --only validate:network-combat-hit
+node server/run-validation-suite.js closeout --from validate:network-combat-hit
+node server/run-validation-suite.js closeout --from validate:network-combat-hit --until validate:network-two-client-damage
+```
+
 ### Example Targeted Iteration Loop
 ```bash
 git status -u

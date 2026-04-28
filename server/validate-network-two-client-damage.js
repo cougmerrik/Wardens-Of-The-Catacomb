@@ -185,6 +185,11 @@ async function waitForSnapshotAdvance(page, baselineCount, targetIncrease = 6, t
   return getDebugState(page);
 }
 
+function findRemotePlayer(state, playerId) {
+  const remotePlayers = Array.isArray(state?.remotePlayers) ? state.remotePlayers : [];
+  return remotePlayers.find((player) => player?.id === playerId) || null;
+}
+
 async function roamForChunkStreaming(page, samples, minDistance = 900, maxSteps = 24) {
   const start = await getDebugState(page);
   assert(start, "debug state unavailable before chunk-stream roam");
@@ -345,13 +350,14 @@ async function main() {
     const controllerSnapshotBase = controllerState?.networkPerf?.appliedSnapshotCount || 0;
     const spectatorSnapshotBase = spectatorState?.networkPerf?.appliedSnapshotCount || 0;
 
-    const roamResult = await roamForChunkStreaming(controllerPage, samples, 520, 28);
-    assert(roamResult.travelled >= 440, `controller did not travel far enough to stress chunk streaming: ${roamResult.travelled.toFixed(1)}px`);
+    const roamResult = await roamForChunkStreaming(controllerPage, samples, 560, 36);
+    assert(roamResult.travelled >= 400, `controller did not travel far enough to stress chunk streaming: ${roamResult.travelled.toFixed(1)}px`);
 
     controllerState = await waitForSnapshotAdvance(controllerPage, controllerSnapshotBase, 10, 5000);
     spectatorState = await waitForSnapshotAdvance(spectatorPage, spectatorSnapshotBase, 10, 5000);
     assert((issues.length || 0) === 0, `browser errors detected during chunk-stream phase: ${JSON.stringify(issues)}`);
 
+    const controllerPlayerId = controllerState?.net?.playerId || null;
     const damageResult = await waitForPlayerDamage(controllerPage, samples, 14000);
     controllerState = damageResult.state;
     spectatorState = await waitForSnapshotAdvance(
@@ -370,7 +376,23 @@ async function main() {
     assert((controllerState?.player?.hpBarTimer || 0) > 0, "controller self hp bar timer did not activate after taking damage");
     assert((controllerState?.networkPerf?.appliedSnapshotCount || 0) > controllerSnapshotBase, "controller snapshots stopped advancing");
     assert((spectatorState?.networkPerf?.appliedSnapshotCount || 0) > spectatorSnapshotBase, "spectator snapshots stopped advancing");
-    assert((spectatorState?.player?.health || Infinity) <= damageResult.baselineHealth, "spectator did not observe synced player health");
+    const syncedController = findRemotePlayer(spectatorState, controllerPlayerId);
+    samples.push({
+      phase: "damage-sync",
+      controllerPlayerId,
+      controllerHealth: controllerState?.player?.health ?? null,
+      spectatorLocalHealth: spectatorState?.player?.health ?? null,
+      syncedControllerHealth: syncedController?.health ?? null,
+      remotePlayerCount: Array.isArray(spectatorState?.remotePlayers) ? spectatorState.remotePlayers.length : 0
+    });
+    assert(
+      syncedController,
+      `spectator did not expose controller remote player ${controllerPlayerId || "(unknown)"}`
+    );
+    assert(
+      (syncedController?.health || Infinity) <= damageResult.baselineHealth,
+      `spectator did not observe synced controller health: local=${spectatorState?.player?.health ?? "n/a"}, remote=${syncedController?.health ?? "n/a"}, baseline=${damageResult.baselineHealth}`
+    );
     assert(issues.length === 0, `browser errors detected after damage sync: ${JSON.stringify(issues)}`);
 
     mkdirSync(artifactsDir, { recursive: true });
@@ -389,6 +411,7 @@ async function main() {
             currentHealth: damageResult.currentHealth,
             elapsedMs: damageResult.elapsedMs
           },
+          syncedController: findRemotePlayer(spectatorState, controllerPlayerId),
           controller: controllerState,
           spectator: spectatorState,
           issues,

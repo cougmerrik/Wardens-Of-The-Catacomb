@@ -54,6 +54,13 @@ If your machine uses different locations, set `JAVA_HOME` and `ANDROID_SDK_ROOT`
 - `npm run validate:core`: syntax, LOC, and core validation grouping
 - `npm run validate:gameplay`: boss, tactics, minotaur, solo XP attribution, and gameplay regression grouping
 - `npm run validate:network`: browser-driven network join, combat, hit-confirmation, two-client damage, archer, audio, pause-flow, and UI grouping
+- `npm run validate:lighting-state`: lighting config, base state, and helper validation
+- `npm run validate:lighting-placement`: torch placement validation
+- `npm run validate:lighting-render`: torch drawing and darkness overlay validation
+- `npm run validate:lighting-interaction`: relight/snuff interaction validation
+- `npm run validate:lighting-enemies`: enemy/boss lighting-overlay validation
+- `npm run validate:lighting-network`: network light-source sync validation
+- `npm run validate:lighting-browser`: browser lighting overlay validation
 - `npm run validate:solo-xp`: solo kill reward / XP attribution regression coverage
 - `npm run validate:network-pause`: pause-owner overlay isolation regression coverage
 - `npm run validate:dev-start`: verify higher-floor dev starts load and spawn correctly
@@ -69,6 +76,9 @@ If your machine uses different locations, set `JAVA_HOME` and `ANDROID_SDK_ROOT`
 - Floor biomes currently cycle as `catacomb`, `catacomb`, `catacomb`, `sewer`, then repeat
 - Default `catacomb` preserves the original stone crypt layout, arrow traps, and wooden breakables
 - `sewer` adds long flooded halls, two-entrance offshoot rooms, darker stonework, sludge water, grate/pool floor dressing, hidden gelatinous cubes, boosted rat archers, and poison traps that leave lingering acid
+- Dynamic lighting keeps dungeon areas dark but readable, with gradual light falloff from players, lit torches, and remote players
+- The player lantern starts at 50% fuel, decays over time, and scales player light radius linearly from global darkness at 0% to full radius at 100%
+- Lit torches are generated as persistent floor objects; players collect lit torches for lantern fuel, can relight snuffed torches by touching them, and mummies can extinguish lit torches on contact
 - Playable classes: Archer, Fighter, and Necromancer
 - Class-specific passive level scaling, damage-type resistances, floor-based enemy caps, and progression-driven reward tuning
 - Enemy tactics framework with bespoke ghost, goblin, rat-archer, skeleton, mummy, necromancer, and minotaur behaviors
@@ -83,7 +93,7 @@ If your machine uses different locations, set `JAVA_HOME` and `ANDROID_SDK_ROOT`
 - Multiplayer death flow where dead players spectate living teammates, runs only end when all connected players are dead, and completed network runs return to the room lobby instead of kicking players back to setup
 - Multiplayer final-results overlay with team roster, per-player level/outcome, kills, and damage dealt; multiplayer leaderboard submission is intentionally disabled for now
 - Persistent server-backed leaderboard storage in `data/leaderboard.json` for the global top 25 local solo runs, plus per-session local leaderboard tracking in the browser
-- Browser-driven regression coverage for solo XP, local skill refunds, network join, combat, hit confirmation, refund sync, audio, archer projectile behavior, UI interaction, dev-start flow, and browser perf
+- Browser-driven regression coverage for solo XP, local skill refunds, network join, combat, hit confirmation, refund sync, audio, archer projectile behavior, UI interaction, lighting, dev-start flow, and browser perf
 
 ## Documentation
 - [docs/GAMEPLAY_SYSTEMS.md](docs/GAMEPLAY_SYSTEMS.md): classes, progression, drops, enemies, and difficulty systems

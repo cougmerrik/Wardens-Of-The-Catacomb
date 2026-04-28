@@ -91,6 +91,35 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - flooded hall tiles slow player movement by `20%`
   - room pools are visual decals only, though some pool tiles hide disguised cube enemies
 
+## Dynamic Lighting
+- Dungeon floors render with ambient darkness by default, but unlit areas are never fully black. Figures and nearby shapes remain faintly readable outside direct light.
+- Light falloff is gradual:
+  - bright near the source
+  - dim through the middle radius
+  - very dark past the outer falloff
+- Current light sources are:
+  - the local player
+  - lit dungeon torches
+  - remote players in multiplayer sessions
+- Player light radius is driven by lantern fuel:
+  - fuel starts at `50%`
+  - `0%` fuel emits no player light and matches global darkness
+  - radius scales linearly with fuel percentage
+  - full-fuel radius is configured through `playerFuelRadiusTiles`
+  - level and item radius modifiers reuse the same helper path and scale with fuel
+- Lantern fuel slowly decays over time, is bounded between `0%` and `100%`, and is shown in a right-panel HUD gauge above the XP bar.
+- Torches are persistent floor objects placed on walkable tiles near walls while avoiding spawn, key, door, portal, and invalid map positions.
+- Players collect lit torches by touching them, removing the torch from the floor and restoring `20%` lantern fuel.
+- Players relight unlit torches by touching them.
+- Snuffer enemies can extinguish lit torches by touching them; mummies currently opt into this behavior.
+- Snuffed torches use a short cooldown to avoid immediate relight/snuff flicker, then can be relit by the player.
+- Enemies, bosses, drops, and floating text render after the darkness overlay so they remain fully readable outside the light radius.
+- Lighting is visual-only for now:
+  - it does not alter collision
+  - it does not change map exploration
+  - it does not hide enemies or items outside the light radius
+  - it does not currently drive enemy AI decisions
+
 ## Drops and Economy
 - Gold drops scale with player level and floor level.
 - Health drops use a computed drop-rate helper instead of a flat static chance.
@@ -226,6 +255,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 ## Network Combat Feedback
 - Network mode synthesizes enemy damage floating text client-side from authoritative enemy HP changes instead of replicating full floating-text state.
 - Local-player health in multiplayer is driven from authoritative snapshot health plus replicated player HP-bar visibility timers.
+- Torch state is synchronized through map meta/state, snapshots, and deltas so relit or snuffed torches stay aligned between network clients.
 - Browser/network validation now covers:
   - join safety
   - multiplayer combat input

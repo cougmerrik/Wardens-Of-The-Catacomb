@@ -76,6 +76,25 @@ export const CONFIG = {
     defaultBiomeKey: "catacomb",
     biomeCycle: ["catacomb", "catacomb", "catacomb", "sewer"]
   },
+  lighting: {
+    enabled: true,
+    ambientDarknessAlpha: 0.72,
+    maxDarknessAlpha: 0.91,
+    brightRadiusRatio: 0.24,
+    dimRadiusRatio: 0.74,
+    playerBaseRadiusTiles: 0,
+    playerFuelRadiusTiles: 9.75,
+    playerRadiusPerLevelTiles: 0.08,
+    lanternInitialFuel: 0.5,
+    lanternMaxFuel: 1.0,
+    lanternFuelPerTorch: 0.2,
+    lanternFuelDecayPerSecond: 0.012,
+    torchRadiusTiles: 2.25,
+    touchDistanceTiles: 0.75,
+    torchSnuffCooldown: 1.0,
+    maxTorches: 80,
+    torchCountFactor: 180
+  },
   player: {
     maxHealth: 100,
     hpBarDuration: 1.25,

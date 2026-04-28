@@ -80,6 +80,7 @@ export function buildJoinKeyframeState(fullState) {
       keyframe: true,
       enemies: toKeyframeCollection(fullState.enemies),
       drops: toKeyframeCollection(fullState.drops),
+      lightSources: toKeyframeCollection(fullState.lightSources),
       breakables: toKeyframeCollection(fullState.breakables),
       wallTraps: toKeyframeCollection(fullState.wallTraps),
       bullets: toKeyframeCollection(fullState.bullets),

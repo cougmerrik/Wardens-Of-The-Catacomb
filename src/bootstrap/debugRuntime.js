@@ -37,6 +37,9 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
             .sort((a, b) => a.distToPlayer - b.distToPlayer)
             .slice(0, 12)
         : [];
+      const lightSources = Array.isArray(game.lightSources) ? game.lightSources : [];
+      const activeLightSources = typeof game.getActiveLightSources === "function" ? game.getActiveLightSources() : [];
+      const torchLightSources = lightSources.filter((source) => source && source.type === "torch");
       return {
         networkReady: !!game.networkReady,
         networkHasMap: !!game.networkHasMap,
@@ -52,7 +55,9 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           dirX: game.player?.dirX || 0,
           dirY: game.player?.dirY || 0,
           fireCooldown: game.player?.fireCooldown || 0,
-          fireArrowCooldown: game.player?.fireArrowCooldown || 0
+          fireArrowCooldown: game.player?.fireArrowCooldown || 0,
+          lanternFuel: Number.isFinite(game.player?.lanternFuel) ? game.player.lanternFuel : null,
+          lightRadius: typeof game.getPlayerLightRadius === "function" ? game.getPlayerLightRadius(game.player) : null
         },
         aim: {
           x: Number.isFinite(game.input?.mouse?.worldX) ? game.input.mouse.worldX : null,
@@ -67,6 +72,37 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
         },
         walkable,
         hostiles,
+        lighting: {
+          enabled: game.config?.lighting?.enabled !== false,
+          ambientDarknessAlpha: Number.isFinite(game.config?.lighting?.ambientDarknessAlpha) ? game.config.lighting.ambientDarknessAlpha : null,
+          maxDarknessAlpha: Number.isFinite(game.config?.lighting?.maxDarknessAlpha) ? game.config.lighting.maxDarknessAlpha : null,
+          lanternFuel: Number.isFinite(game.player?.lanternFuel) ? game.player.lanternFuel : null,
+          playerLightRadius: typeof game.getPlayerLightRadius === "function" ? game.getPlayerLightRadius(game.player) : null,
+          lightSourceCount: lightSources.length,
+          torchCount: torchLightSources.length,
+          litTorchCount: torchLightSources.filter((source) => source.lit !== false).length,
+          unlitTorchCount: torchLightSources.filter((source) => source.lit === false).length,
+          activeLightSourceCount: Array.isArray(activeLightSources) ? activeLightSources.length : 0,
+          torches: torchLightSources.slice(0, 12).map((source) => ({
+            id: source.id || null,
+            x: source.x,
+            y: source.y,
+            screenX: (source.x || 0) - camera.x,
+            screenY: (source.y || 0) - camera.y,
+            distToPlayer: Math.hypot((source.x || 0) - playerX, (source.y || 0) - playerY),
+            lit: source.lit !== false,
+            lightRadius: source.lightRadius || 0
+          })),
+          firstTorch: torchLightSources.length > 0
+            ? {
+                id: torchLightSources[0].id || null,
+                x: torchLightSources[0].x,
+                y: torchLightSources[0].y,
+                lit: torchLightSources[0].lit !== false,
+                lightRadius: torchLightSources[0].lightRadius || 0
+              }
+            : null
+        },
         combat: {
           meleeSwingCount: Array.isArray(game.meleeSwings) ? game.meleeSwings.length : 0,
           bulletCount: Array.isArray(game.bullets) ? game.bullets.length : 0,
@@ -215,6 +251,21 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
         documentHasFocus: typeof document.hasFocus === "function" ? document.hasFocus() : null,
         documentVisibilityState: typeof document.visibilityState === "string" ? document.visibilityState : ""
       };
+    },
+    run(command, data = {}) {
+      const game = typeof getCurrentGame === "function" ? getCurrentGame() : null;
+      if (!game) return { ok: false, error: "gameUnavailable" };
+      if (command === "setFirstTorchLit") {
+        const torchId = typeof data?.id === "string" ? data.id : null;
+        const torch = Array.isArray(game.lightSources)
+          ? game.lightSources.find((source) => source && source.type === "torch" && (!torchId || source.id === torchId))
+          : null;
+        if (!torch) return { ok: false, error: "torchUnavailable" };
+        torch.lit = data?.lit !== false;
+        if (torch.lit) torch.snuffCooldown = 0;
+        return { ok: true, id: torch.id || null, lit: torch.lit };
+      }
+      return { ok: false, error: "unknownCommand" };
     }
   };
 }

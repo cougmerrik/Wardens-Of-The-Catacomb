@@ -1,4 +1,59 @@
 export const runtimeSceneObjectDrawMethods = {
+  drawTorch(game, torch, screenX, screenY) {
+    const ctx = this.ctx;
+    const size = Number.isFinite(torch?.size) ? Math.max(10, torch.size) : 16;
+    const half = size * 0.5;
+    const lit = torch?.lit !== false;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.34)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY + half * 0.62, half * 0.58, half * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#4a3423";
+    ctx.fillRect(screenX - 2, screenY - half * 0.1, 4, half * 0.95);
+    ctx.fillStyle = "#7b5735";
+    ctx.fillRect(screenX - 3, screenY - half * 0.44, 6, half * 0.38);
+    ctx.fillStyle = "#2d2420";
+    ctx.fillRect(screenX - 4, screenY - half * 0.5, 8, 3);
+
+    if (!lit) {
+      ctx.fillStyle = "#202531";
+      ctx.beginPath();
+      ctx.ellipse(screenX, screenY - half * 0.58, 4, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(121, 132, 152, 0.45)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(screenX - 3, screenY - half * 0.64);
+      ctx.lineTo(screenX + 3, screenY - half * 0.52);
+      ctx.stroke();
+      return;
+    }
+
+    const glow = ctx.createRadialGradient(screenX, screenY - half * 0.72, 1, screenX, screenY - half * 0.72, half * 1.18);
+    glow.addColorStop(0, "rgba(255, 218, 118, 0.72)");
+    glow.addColorStop(0.5, "rgba(255, 143, 60, 0.28)");
+    glow.addColorStop(1, "rgba(255, 108, 38, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(screenX, screenY - half * 0.72, half * 1.18, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ff9a38";
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY - half * 1.25);
+    ctx.quadraticCurveTo(screenX + 5, screenY - half * 0.8, screenX + 1, screenY - half * 0.48);
+    ctx.quadraticCurveTo(screenX - 6, screenY - half * 0.76, screenX, screenY - half * 1.25);
+    ctx.fill();
+    ctx.fillStyle = "#ffe58f";
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY - half * 1.04);
+    ctx.quadraticCurveTo(screenX + 2.5, screenY - half * 0.76, screenX, screenY - half * 0.56);
+    ctx.quadraticCurveTo(screenX - 2.8, screenY - half * 0.77, screenX, screenY - half * 1.04);
+    ctx.fill();
+  },
+
   drawArmorStand(game, stand, screenX, screenY) {
     const ctx = this.ctx;
     if (stand?.variant === "sewer_pool") {

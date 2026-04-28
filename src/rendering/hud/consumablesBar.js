@@ -72,4 +72,12 @@ export function drawConsumablesBar(renderer, game, layout, xpBarY) {
       Math.max(0, Math.min(1, (slot.cooldownRemaining || 0) / 5))
     );
   }
+  return {
+    x: activeStartX,
+    y: barBaseY,
+    w: totalWidth,
+    h: slotSize,
+    right: activeStartX + totalWidth,
+    bottom: barBaseY + slotSize
+  };
 }
