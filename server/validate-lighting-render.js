@@ -239,6 +239,57 @@ function main() {
   assert(pickupLayerCtx.globalCompositeOperation === "source-over", "drop layer should restore source-over compositing");
   assert(pickupOverlayCalls.some((call) => call[0] === "drawImage"), "drop sprite layer should composite back to the scene");
 
+  const throwingEnemyLayerCtx = createStubContext();
+  const throwingPickupLayerCtx = createStubContext();
+  const throwingHost = {
+    ctx: overlayCtx,
+    canvas: { width: 320, height: 240 },
+    getLightingCutoutAtPoint: runtimeSceneLightingMethods.getLightingCutoutAtPoint,
+    getLightingDarknessAlphaAtPoint: runtimeSceneLightingMethods.getLightingDarknessAlphaAtPoint,
+    getEnemyDarknessAlphaAtPoint: runtimeSceneLightingMethods.getEnemyDarknessAlphaAtPoint,
+    getEnemyLightingCanvas() {
+      return {
+        width: 320,
+        height: 240,
+        getContext() {
+          return throwingEnemyLayerCtx;
+        }
+      };
+    },
+    getPickupLightingCanvas() {
+      return {
+        width: 320,
+        height: 240,
+        getContext() {
+          return throwingPickupLayerCtx;
+        }
+      };
+    },
+    drawSceneEnemy() {
+      throw new Error("forced enemy draw failure");
+    },
+    drawSceneDrop() {
+      throw new Error("forced drop draw failure");
+    }
+  };
+  let enemyThrowRestored = false;
+  try {
+    runtimeSceneLightingMethods.drawEnemyDarkenedLayer.call(throwingHost, lightingGame, { x: 260, y: 120, size: 32, hp: 10 }, 0, 0, { playW: 300, topHudH: 24, xpBarH: 28 });
+  } catch (error) {
+    enemyThrowRestored = error.message === "forced enemy draw failure" && throwingHost.ctx === overlayCtx;
+  }
+  assert(enemyThrowRestored, "enemy layer should restore renderer context when sprite drawing throws");
+  assert(throwingEnemyLayerCtx.calls.at(-1)?.[0] === "restore", "enemy layer should restore offscreen context when sprite drawing throws");
+
+  let pickupThrowRestored = false;
+  try {
+    runtimeSceneLightingMethods.drawPickupDarkenedLayer.call(throwingHost, lightingGame, { x: 260, y: 120, size: 12, life: 10, type: "gold" }, 0, 0);
+  } catch (error) {
+    pickupThrowRestored = error.message === "forced drop draw failure" && throwingHost.ctx === overlayCtx;
+  }
+  assert(pickupThrowRestored, "drop layer should restore renderer context when sprite drawing throws");
+  assert(throwingPickupLayerCtx.calls.at(-1)?.[0] === "restore", "drop layer should restore offscreen context when sprite drawing throws");
+
   const sceneSource = readFileSync(resolve("src", "rendering", "RendererRuntimeScene.js"), "utf8");
   const overlayIndex = sceneSource.indexOf("this.drawLightingOverlay(game, cameraX, cameraY, layout);");
   const dropsIndex = sceneSource.indexOf("this.drawDrops(game, cameraX, cameraY);");

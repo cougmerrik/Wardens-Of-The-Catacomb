@@ -99,16 +99,22 @@ export const runtimeSceneLightingMethods = {
     if (!layerCanvas || !layerCtx || typeof this.drawSceneEnemy !== "function") return false;
 
     layerCtx.save();
-    layerCtx.clearRect(0, 0, layerCanvas.width, layerCanvas.height);
-    const previousCtx = this.ctx;
-    this.ctx = layerCtx;
-    this.drawSceneEnemy(game, enemy, cameraX, cameraY, { drawOverlays: false });
-    this.ctx = previousCtx;
-    layerCtx.globalCompositeOperation = "source-atop";
-    layerCtx.fillStyle = `rgba(2, 4, 9, ${darknessAlpha.toFixed(3)})`;
-    layerCtx.fillRect(0, 0, layerCanvas.width, layerCanvas.height);
-    layerCtx.globalCompositeOperation = "source-over";
-    layerCtx.restore();
+    try {
+      layerCtx.clearRect(0, 0, layerCanvas.width, layerCanvas.height);
+      const previousCtx = this.ctx;
+      try {
+        this.ctx = layerCtx;
+        this.drawSceneEnemy(game, enemy, cameraX, cameraY, { drawOverlays: false });
+      } finally {
+        this.ctx = previousCtx;
+      }
+      layerCtx.globalCompositeOperation = "source-atop";
+      layerCtx.fillStyle = `rgba(2, 4, 9, ${darknessAlpha.toFixed(3)})`;
+      layerCtx.fillRect(0, 0, layerCanvas.width, layerCanvas.height);
+      layerCtx.globalCompositeOperation = "source-over";
+    } finally {
+      layerCtx.restore();
+    }
 
     ctx.drawImage(layerCanvas, 0, 0);
     this.drawSceneEnemyOverlays(game, enemy, cameraX, cameraY);
@@ -128,16 +134,22 @@ export const runtimeSceneLightingMethods = {
     if (!layerCanvas || !layerCtx || typeof this.drawSceneDrop !== "function") return false;
 
     layerCtx.save();
-    layerCtx.clearRect(0, 0, layerCanvas.width, layerCanvas.height);
-    const previousCtx = this.ctx;
-    this.ctx = layerCtx;
-    this.drawSceneDrop(game, drop, cameraX, cameraY);
-    this.ctx = previousCtx;
-    layerCtx.globalCompositeOperation = "source-atop";
-    layerCtx.fillStyle = `rgba(2, 4, 9, ${darknessAlpha.toFixed(3)})`;
-    layerCtx.fillRect(0, 0, layerCanvas.width, layerCanvas.height);
-    layerCtx.globalCompositeOperation = "source-over";
-    layerCtx.restore();
+    try {
+      layerCtx.clearRect(0, 0, layerCanvas.width, layerCanvas.height);
+      const previousCtx = this.ctx;
+      try {
+        this.ctx = layerCtx;
+        this.drawSceneDrop(game, drop, cameraX, cameraY);
+      } finally {
+        this.ctx = previousCtx;
+      }
+      layerCtx.globalCompositeOperation = "source-atop";
+      layerCtx.fillStyle = `rgba(2, 4, 9, ${darknessAlpha.toFixed(3)})`;
+      layerCtx.fillRect(0, 0, layerCanvas.width, layerCanvas.height);
+      layerCtx.globalCompositeOperation = "source-over";
+    } finally {
+      layerCtx.restore();
+    }
 
     ctx.drawImage(layerCanvas, 0, 0);
     return true;
