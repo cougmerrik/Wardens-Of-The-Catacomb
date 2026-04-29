@@ -48,8 +48,23 @@ function main() {
   assert(serverGame.lightSources.length > 0, "server game should have placed torches");
   const room = makeRoom(serverGame);
   serverGame.player.lanternFuel = 0.42;
+  const burningEnemy = {
+    type: "goblin",
+    x: serverGame.player.x + 64,
+    y: serverGame.player.y,
+    size: 24,
+    hp: 8,
+    maxHp: 8,
+    burningTimer: 1.25,
+    burningDps: 3,
+    burningLightRadius: 96
+  };
+  serverGame.enemies = [burningEnemy];
   const fullState = serializeState(room);
   assert(fullState.player.lanternFuel === 0.42, "serialized primary player should include lantern fuel");
+  assert(fullState.enemies.length === 1, "serialized state should include the nearby burning enemy");
+  assert(fullState.enemies[0].burningTimer === 1.25, "serialized enemy should include burning timer");
+  assert(fullState.enemies[0].burningLightRadius === 96, "serialized enemy should include burning light radius");
   assert(Array.isArray(fullState.lightSources), "serialized state should include lightSources");
   assert(fullState.lightSources.length === serverGame.lightSources.length, "serialized state should include all torches");
   assert(fullState.lightSources.every((light) => typeof light.id === "string" && light.type === "torch"), "serialized torches should include stable ids and type");
@@ -69,6 +84,31 @@ function main() {
   });
   assert(clientGame.lightSources.length === fullState.lightSources.length, "map bootstrap should sync light source placement");
   assert(clientGame.lightSources.every((light) => light.lit === true), "map bootstrap should preserve lit state");
+  applySnapshotToGame({
+    game: clientGame,
+    state: {
+      mapSignature: fullState.mapSignature,
+      time: fullState.time,
+      player: fullState.player,
+      players: [],
+      enemies: fullState.enemies,
+      drops: [],
+      lightSources: fullState.lightSources,
+      breakables: [],
+      wallTraps: [],
+      bullets: [],
+      fireArrows: [],
+      fireZones: [],
+      meleeSwings: []
+    },
+    controller: false
+  });
+  assert(clientGame.enemies[0]?.burningTimer === 1.25, "snapshot should sync burning timer to client enemy");
+  assert(clientGame.enemies[0]?.burningLightRadius === 96, "snapshot should sync burning light radius to client enemy");
+  assert(
+    clientGame.getActiveLightSources().some((source) => source.sourceType === "burningEnemy" && source.radius === 96),
+    "client active lights should include synced burning enemy light"
+  );
 
   const deltaCache = new Map();
   const keyframeDelta = buildDeltaCollection(deltaCache, fullState.lightSources, true);

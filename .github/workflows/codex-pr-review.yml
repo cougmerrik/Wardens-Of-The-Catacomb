@@ -1,8 +1,17 @@
 name: Codex PR Review
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: number
+      base_ref:
+        description: Base branch for the pull request
+        required: false
+        default: main
+        type: string
 
 permissions:
   contents: read
@@ -11,41 +20,54 @@ permissions:
 
 jobs:
   codex-review:
-    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Check out PR merge
         uses: actions/checkout@v5
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          ref: refs/pull/${{ inputs.pr_number }}/merge
           fetch-depth: 0
 
       - name: Fetch PR refs
         env:
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ inputs.base_ref }}
+          PR_NUMBER: ${{ inputs.pr_number }}
         run: |
-          git fetch --no-tags origin "$PR_BASE_REF" "+refs/pull/$PR_NUMBER/head"
+          git fetch --no-tags origin "$PR_BASE_REF" "+refs/pull/$PR_NUMBER/head:refs/remotes/pull/$PR_NUMBER/head"
+
+      - name: Build focused review prompt
+        env:
+          PR_BASE_REF: ${{ inputs.base_ref }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          {
+            echo "# Codex PR Review"
+            echo
+            echo "Review only PR #$PR_NUMBER."
+            echo
+            echo "Do not perform a whole-repository review. Inspect only files changed by this PR and nearby code needed to validate those changes."
+            echo "Focus on correctness, regressions, missing validation, security, and maintainability."
+            echo "Return findings only. If there are no material findings, write: No findings."
+            echo "Keep output concise and reference files/lines when possible."
+            echo
+            echo "Changed files:"
+            git diff --name-only "origin/$PR_BASE_REF...refs/remotes/pull/$PR_NUMBER/head" | sed 's/^/- /'
+            echo
+            echo "Diff stat:"
+            git diff --stat "origin/$PR_BASE_REF...refs/remotes/pull/$PR_NUMBER/head"
+          } > .codex-pr-review-prompt.md
 
       - name: Run Codex review
         id: codex
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: gpt-5.4-mini
+          effort: low
           sandbox: read-only
           safety-strategy: drop-sudo
           working-directory: ${{ github.workspace }}
-          prompt: |
-            Review only the changes introduced by PR #${{ github.event.pull_request.number }}.
-
-            Focus on correctness, regressions, missing validation, security, and maintainability.
-            Be concise and specific. Reference files and lines when possible.
-
-            Pull request title:
-            ${{ github.event.pull_request.title }}
-
-            Pull request body:
-            ${{ github.event.pull_request.body }}
+          prompt-file: .codex-pr-review-prompt.md
 
       - name: Post Codex review
         if: steps.codex.outputs.final-message != ''
@@ -58,6 +80,6 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
+              issue_number: Number("${{ inputs.pr_number }}"),
               body: process.env.CODEX_FINAL_MESSAGE,
             });
