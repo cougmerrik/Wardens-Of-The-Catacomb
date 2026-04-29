@@ -300,6 +300,7 @@ function main() {
   assert(overlayIndex >= 0 && floatingTextIndex > overlayIndex, "floating text should render after lighting overlay so it stays readable");
   assert(overlayIndex >= 0 && enemyLayerIndex > overlayIndex, "enemies should render through a darkened sprite layer after global lighting overlay");
   assert(fallbackEnemyIndex > enemyLayerIndex, "enemies should fall back to direct drawing only when the darkened layer is unavailable");
+  assert(floatingTextIndex > fallbackEnemyIndex, "floating combat text should render after enemies so actors cannot paint over it");
   assert(!sceneSource.slice(0, overlayIndex).includes("this.drawSceneEnemy(game, enemy, cameraX, cameraY);"), "enemies should not render before lighting overlay");
 
   const drawSource = readFileSync(resolve("src", "rendering", "runtimeSceneDrawMethods.js"), "utf8");
