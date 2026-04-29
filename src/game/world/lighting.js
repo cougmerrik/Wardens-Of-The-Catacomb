@@ -57,6 +57,45 @@ function addLanternFuel(game, player, amount) {
   return player.lanternFuel - before;
 }
 
+function getRangerFireArrowLightRadius(game, arrow) {
+  const cfg = getLightingConfig(game);
+  if (!arrow || (arrow.life ?? 0) <= 0) return 0;
+  if (Number.isFinite(arrow.lightRadius)) return Math.max(0, arrow.lightRadius);
+  const tile = getTileSize(game);
+  const radiusTiles = Number.isFinite(cfg.fireArrowProjectileRadiusTiles) ? cfg.fireArrowProjectileRadiusTiles : 2.25;
+  return Math.max(0, radiusTiles * tile);
+}
+
+function getRangerFireZoneLightRadius(game, zone) {
+  const cfg = getLightingConfig(game);
+  if (!zone || (zone.life ?? 0) <= 0) return 0;
+  if (zone.zoneType !== "fire" && zone.zoneType !== "pinningFire") return 0;
+  if (Number.isFinite(zone.lightRadius)) return Math.max(0, zone.lightRadius);
+  const tile = getTileSize(game);
+  const multiplier = Number.isFinite(cfg.fireZoneRadiusMultiplier) ? Math.max(0, cfg.fireZoneRadiusMultiplier) : 1.35;
+  const minRadiusTiles = Number.isFinite(cfg.fireZoneMinRadiusTiles) ? Math.max(0, cfg.fireZoneMinRadiusTiles) : 1.5;
+  const baseRadius = Number.isFinite(zone.radius) ? Math.max(0, zone.radius) * multiplier : 0;
+  return Math.max(baseRadius, minRadiusTiles * tile);
+}
+
+function getBurningEnemyLightRadius(game, enemy) {
+  const cfg = getLightingConfig(game);
+  if (!enemy || (enemy.hp ?? 0) <= 0 || (enemy.burningTimer || 0) <= 0) return 0;
+  if (Number.isFinite(enemy.burningLightRadius)) return Math.max(0, enemy.burningLightRadius);
+  const tile = getTileSize(game);
+  const radiusTiles = Number.isFinite(cfg.burningEnemyRadiusTiles) ? cfg.burningEnemyRadiusTiles : 3.25;
+  return Math.max(0, radiusTiles * tile);
+}
+
+function getFireLightOptions(game) {
+  const cfg = getLightingConfig(game);
+  return {
+    lightDecay: Number.isFinite(cfg.fireLightFalloffDecay) ? Math.max(0.5, cfg.fireLightFalloffDecay) : 1.45,
+    brightRadiusRatio: Number.isFinite(cfg.fireLightBrightRadiusRatio) ? Math.max(0.05, Math.min(0.95, cfg.fireLightBrightRadiusRatio)) : 0.42,
+    dimRadiusRatio: Number.isFinite(cfg.fireLightDimRadiusRatio) ? Math.max(0.05, Math.min(1, cfg.fireLightDimRadiusRatio)) : 0.94
+  };
+}
+
 function decayLanternFuel(game, players, dt) {
   const cfg = getLightingConfig(game);
   const decay = Number.isFinite(cfg.lanternFuelDecayPerSecond) ? Math.max(0, cfg.lanternFuelDecayPerSecond) : 0;
@@ -148,7 +187,7 @@ export function getActiveLightSources(game) {
   const cfg = getLightingConfig(game);
   if (cfg.enabled === false || !game) return [];
   const sources = [];
-  const addSource = (source, sourceType, radius) => {
+  const addSource = (source, sourceType, radius, options = null) => {
     if (!source || !Number.isFinite(source.x) || !Number.isFinite(source.y) || !Number.isFinite(radius) || radius <= 0) return;
     sources.push({
       id: source.id || null,
@@ -156,7 +195,8 @@ export function getActiveLightSources(game) {
       x: source.x,
       y: source.y,
       radius,
-      entityType: source.type || null
+      entityType: source.type || source.zoneType || null,
+      ...(options && typeof options === "object" ? options : {})
     });
   };
 
@@ -171,8 +211,17 @@ export function getActiveLightSources(game) {
     addSource(light, light.type || "light", radius);
   }
 
+  for (const arrow of Array.isArray(game.fireArrows) ? game.fireArrows : []) {
+    addSource(arrow, "rangerFireArrow", getRangerFireArrowLightRadius(game, arrow), getFireLightOptions(game));
+  }
+
+  for (const zone of Array.isArray(game.fireZones) ? game.fireZones : []) {
+    addSource(zone, "rangerFireZone", getRangerFireZoneLightRadius(game, zone), getFireLightOptions(game));
+  }
+
   for (const enemy of Array.isArray(game.enemies) ? game.enemies : []) {
     addSource(enemy, "enemy", getEnemyLightRadius(game, enemy));
+    addSource(enemy, "burningEnemy", getBurningEnemyLightRadius(game, enemy), getFireLightOptions(game));
   }
 
   return sources;

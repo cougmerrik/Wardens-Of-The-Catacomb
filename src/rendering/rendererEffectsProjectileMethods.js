@@ -884,20 +884,25 @@ export const rendererEffectsProjectileMethods = {
   },
 
   drawDrops(game, cameraX, cameraY) {
-    const ctx = this.ctx;
     for (const drop of game.drops) {
-      const x = drop.x - cameraX;
-      const y = drop.y - cameraY;
-      if (drop.type === "health") {
-        ctx.drawImage(this.potionSprite, x - 10, y - 13, 20, 24);
-      } else if (drop.type === "gold") {
-        ctx.fillStyle = "#e1bc54";
-        ctx.beginPath();
-        ctx.arc(x, y, drop.size / 2, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (drop.type === "gold_bag") {
-        ctx.drawImage(this.goldBagSprite, x - 12, y - 12, 24, 24);
-      }
+      if (this.drawPickupDarkenedLayer(game, drop, cameraX, cameraY)) continue;
+      this.drawSceneDrop(game, drop, cameraX, cameraY);
+    }
+  },
+
+  drawSceneDrop(game, drop, cameraX, cameraY) {
+    const ctx = this.ctx;
+    const x = drop.x - cameraX;
+    const y = drop.y - cameraY;
+    if (drop.type === "health") {
+      ctx.drawImage(this.potionSprite, x - 10, y - 13, 20, 24);
+    } else if (drop.type === "gold") {
+      ctx.fillStyle = "#e1bc54";
+      ctx.beginPath();
+      ctx.arc(x, y, drop.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (drop.type === "gold_bag") {
+      ctx.drawImage(this.goldBagSprite, x - 12, y - 12, 24, 24);
     }
   }
 };

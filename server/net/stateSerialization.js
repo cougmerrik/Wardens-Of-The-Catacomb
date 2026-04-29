@@ -160,6 +160,9 @@ function serializeEnemy(room, e) {
   if (Number.isFinite(e.curseTimer) && e.curseTimer > 0) base.curseTimer = e.curseTimer;
   if (Number.isFinite(e.rotTimer) && e.rotTimer > 0) base.rotTimer = e.rotTimer;
   if (Number.isFinite(e.rotDps) && e.rotDps > 0) base.rotDps = e.rotDps;
+  if (Number.isFinite(e.burningTimer) && e.burningTimer > 0) base.burningTimer = e.burningTimer;
+  if (Number.isFinite(e.burningDps) && e.burningDps > 0) base.burningDps = e.burningDps;
+  if (Number.isFinite(e.burningLightRadius) && e.burningLightRadius > 0) base.burningLightRadius = e.burningLightRadius;
   const controlledColor = resolveControlledEnemyColor(room, e);
   if (controlledColor) base.controlledColor = controlledColor;
   switch (e.type) {
