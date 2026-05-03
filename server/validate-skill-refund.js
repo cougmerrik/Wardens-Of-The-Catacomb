@@ -160,8 +160,8 @@ async function runRefundScenario(page, { classKey, spendKey, expectedClassType }
 
   await runDebug(page, "grantSkillPoints", { amount: 2 });
   await runDebug(page, "grantGold", { amount: 400 });
-  if (classKey === "warrior") await runDebug(page, "grantLevels", { amount: 1 });
-  const requiredLevel = classKey === "warrior" ? 2 : 1;
+  await runDebug(page, "grantLevels", { amount: 1 });
+  const requiredLevel = 2;
   await page.waitForFunction((level) => {
     const state = window.__WOTC_DEBUG__?.getState?.();
     return !!state && state.ui?.skillPoints >= 2 && state.ui?.gold >= 400 && (state.player?.level || 1) >= level;
@@ -232,7 +232,8 @@ async function main() {
   let lastState = null;
   const scenarios = [
     { classKey: "archer", expectedClassType: "archer", spendKey: "longbow" },
-    { classKey: "warrior", expectedClassType: "fighter", spendKey: "broadswing" }
+    { classKey: "warrior", expectedClassType: "fighter", spendKey: "broadswing" },
+    { classKey: "necromancer", expectedClassType: "necromancer", spendKey: "fireBoltCantrip" }
   ];
   const results = [];
   try {

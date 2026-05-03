@@ -1,7 +1,5 @@
 import {
   canSpendRangerNode,
-  canSpendRangerUtility,
-  formatLaneLabel,
   getRangerAvailableSkillPoints,
   getRangerGroupLimit,
   getRangerSelectedInGroup,
@@ -10,10 +8,9 @@ import {
   getRangerTalentPoints,
   getRangerTierLabel,
   getRangerTooltip,
-  getRangerUtilityLevel,
   isRangerTierAccessible
 } from "../../game/rangerTalentTree.js";
-import { drawSkillRefundFooter } from "./skillTreeMenuSections.js";
+import { drawSkillRefundFooter, drawSkillTreeTitle, getSkillTierHeader } from "./skillTreeMenuSections.js";
 
 function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
@@ -94,9 +91,7 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
   game.uiRects.skillTreeNodes = [];
   const sy = (y) => y - scroll;
 
-  ctx.fillStyle = "#f3efe3";
-  ctx.font = "bold 20px Trebuchet MS";
-  ctx.fillText("Ranger Open Progression", menuX + 16, menuY + 30);
+  drawSkillTreeTitle(ctx, menuX, menuY);
   ctx.font = "13px Trebuchet MS";
   ctx.fillStyle = "#d2d9e8";
   ctx.textAlign = "right";
@@ -129,16 +124,7 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
     ctx.strokeRect(tierRect.x, tierRect.y, tierRect.w, tierRect.h);
     ctx.fillStyle = accessible ? "#e7fff6" : "#9198a4";
     ctx.font = "bold 14px Trebuchet MS";
-    ctx.fillText(`Tier ${tier}  ${getRangerTierLabel(tier)}  (${selectedCount}/${groupLimit})`, tierRect.x + 12, tierRect.y + 20);
-    ctx.font = "12px Trebuchet MS";
-    ctx.fillStyle = accessible ? "#b9dacc" : "#bda885";
-    if (!accessible) {
-      const lockedEntry = tierDefs[0];
-      const lockedTip = lockedEntry ? getRangerTooltip(game, { key: lockedEntry.key, kind: "node", locked: true }) : null;
-      ctx.fillText(lockedTip?.requirement || "Locked.", tierRect.x + 12, tierRect.y + 38);
-    } else {
-      ctx.fillText(formatLaneLabel(group), tierRect.x + 12, tierRect.y + 38);
-    }
+    ctx.fillText(getSkillTierHeader(tier, getRangerTierLabel(tier), selectedCount, groupLimit), tierRect.x + 12, tierRect.y + 20);
 
     const cols = tier === 5 ? 4 : Math.min(5, tierDefs.length);
     const cardW = Math.max(86, Math.min(tier === 5 ? 136 : 112, (tierRect.w - 34) / cols - 8));
@@ -146,7 +132,7 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
     tierDefs.forEach((def, index) => {
       const col = index % cols;
       const row = Math.floor(index / cols);
-      const rect = { x: tierRect.x + 14 + col * (cardW + 8), y: tierRect.y + 48 + row * (cardH + 6), w: cardW, h: cardH };
+      const rect = { x: tierRect.x + 14 + col * (cardW + 8), y: tierRect.y + 32 + row * (cardH + 6), w: cardW, h: cardH };
       const points = getRangerTalentPoints(game, def.key);
       const locked = !canSpendRangerNode(game, def.key) && points <= 0;
       drawIcon(ctx, { x: rect.x + 4, y: rect.y + 6, w: 28, h: 28 }, def.icon, def.color, locked || !accessible);

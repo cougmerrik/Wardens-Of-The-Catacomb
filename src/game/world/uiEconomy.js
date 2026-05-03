@@ -209,7 +209,6 @@ export function refundAllSkills(game) {
   game.skillPoints += spent;
   game.refundCount = Math.max(0, Number.isFinite(game.refundCount) ? Math.floor(game.refundCount) : 0) + 1;
   if (typeof game.recordRunGoldSpent === "function") game.recordRunGoldSpent(cost);
-  resetPointTree(game.skills);
   resetPointTree(game.rangerTalents);
   resetPointTree(game.warriorTalents);
   resetPointTree(game.necromancerTalents);
@@ -469,51 +468,6 @@ export function handleUiClicks(game) {
       break;
     }
     if (handledSkillNode) continue;
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillFireArrowNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("fireArrow");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillPiercingNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("piercingStrike");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillMultiarrowNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("multiarrow");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillWarriorMomentumNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("warriorMomentum");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillWarriorRageNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("warriorRage");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillWarriorExecuteNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("warriorExecute");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillUndeadMasteryNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("undeadMastery");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillDeathBoltNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("deathBolt");
-      continue;
-    }
-    if (pointInRect(game, click.x, click.y, game.uiRects.skillExplodingDeathNode)) {
-      clearPinnedUiTooltip(game);
-      game.spendSkillPoint("explodingDeath");
-      continue;
-    }
     const itemRects = game.uiRects.shopItems || [];
     for (const item of itemRects) {
       if (pointInRect(game, click.x, click.y, item.rect)) {

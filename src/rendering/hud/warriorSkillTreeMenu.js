@@ -8,7 +8,16 @@ import {
   getWarriorTooltip,
   isWarriorRowAccessible
 } from "../../game/warriorTalentTree.js";
-import { drawSkillRefundFooter } from "./skillTreeMenuSections.js";
+import { drawSkillRefundFooter, drawSkillTreeTitle, getSkillTierHeader } from "./skillTreeMenuSections.js";
+
+const WARRIOR_TIER_LABELS = {
+  1: "Weapon Form",
+  2: "Stance A Modifier",
+  3: "Stance B Modifier",
+  4: "Doctrine + Class Skill",
+  5: "Extras",
+  6: "Capstone"
+};
 
 function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
@@ -87,7 +96,7 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
     const nodes = tiers.get(tier) || [];
     const columns = getTierColumnCount(tier, nodes.length || 1);
     const rows = Math.max(1, Math.ceil(Math.max(1, nodes.length) / Math.max(1, columns)));
-    const height = 58 + rows * 48 + Math.max(0, rows - 1) * 8;
+    const height = 42 + rows * 48 + Math.max(0, rows - 1) * 8;
     tierLayouts.push({ tier, nodes, columns, rows, height });
     contentHeight += height + 10;
   }
@@ -99,9 +108,7 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
   game.uiRects.skillTreeNodes = [];
   const sy = (y) => y - scroll;
 
-  ctx.fillStyle = "#f3efe3";
-  ctx.font = "bold 20px Trebuchet MS";
-  ctx.fillText("Warrior Talent Tree", menuX + 16, menuY + 30);
+  drawSkillTreeTitle(ctx, menuX, menuY);
   ctx.font = "13px Trebuchet MS";
   ctx.fillStyle = "#d2d9e8";
   ctx.textAlign = "right";
@@ -133,18 +140,9 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
     ctx.strokeRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
     ctx.fillStyle = accessible ? "#f5eadc" : "#9a948b";
     ctx.font = "bold 14px Trebuchet MS";
-    const tierLabel =
-      tier === 1 ? "Tier 1  Weapon Form" :
-      tier === 2 ? "Tier 2  Stance A Modifier" :
-      tier === 3 ? "Tier 3  Stance B Modifier" :
-      tier === 4 ? "Tier 4  Doctrine + Class Skill" :
-      tier === 5 ? "Tier 5  Extras" :
-      "Tier 6  Capstone";
-    ctx.fillText(tierLabel, rowRect.x + 12, rowRect.y + 20);
-    ctx.font = "12px Trebuchet MS";
-    ctx.fillStyle = accessible ? "#cfd7e6" : "#c9a67b";
-    const gateText = `Unlocks at level ${tier === 1 ? 2 : tier === 2 ? 3 : tier === 3 ? 4 : tier === 4 ? 6 : tier === 5 ? 8 : 10}`;
-    ctx.fillText(gateText, rowRect.x + 12, rowRect.y + 36);
+    const selectedCount = nodes.reduce((sum, def) => sum + (getWarriorTalentPoints(game, def.key) > 0 ? 1 : 0), 0);
+    const tierLimit = tier === 5 ? 2 : 1;
+    ctx.fillText(getSkillTierHeader(tier, WARRIOR_TIER_LABELS[tier], selectedCount, tierLimit), rowRect.x + 12, rowRect.y + 20);
 
     const cardGap = 10;
     const cardH = 42;
@@ -154,7 +152,7 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
       const row = Math.floor(index / columns);
       const rect = {
         x: rowRect.x + 12 + col * (cardW + cardGap),
-        y: rowRect.y + 46 + row * (cardH + 8),
+        y: rowRect.y + 30 + row * (cardH + 8),
         w: cardW,
         h: cardH
       };

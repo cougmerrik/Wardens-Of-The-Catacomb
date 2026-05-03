@@ -42,7 +42,8 @@ export const runtimeSceneDrawMethods = {
     const row0 = Array.isArray(game.map) && game.map.length > 0 ? game.map[0] : null;
     const row0Len = typeof row0 === "string" ? row0.length : Array.isArray(row0) ? row0.length : 0;
     if (row0Len > 0) {
-      const minimapBottom = this.drawMinimap(game, layout);
+      const classStatusBottom = this.drawClassStatusPanel(game, layout);
+      const minimapBottom = this.drawMinimap(game, layout, classStatusBottom + this.sidebarPadding);
       const statsBottom = this.drawPlayerStatsPanel(game, layout, minimapBottom + this.sidebarPadding);
       this.drawGroupPanel(game, layout, statsBottom + this.sidebarPadding);
     }

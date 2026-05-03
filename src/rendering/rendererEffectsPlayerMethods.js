@@ -591,13 +591,14 @@ export const rendererEffectsPlayerMethods = {
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   },
 
-  drawMinimap(game, layout) {
+  drawMinimap(game, layout, panelY = null) {
     const mapW = game.map[0].length;
     const mapH = game.map.length;
     const miniW = layout.isAndroid ? 146 : layout.sidebarW - this.sidebarPadding * 2;
     const miniH = layout.isAndroid ? 126 : Math.min(this.config.minimap.height, 190);
     const miniX = layout.isAndroid ? layout.playW - miniW - 12 : layout.sidebarX + this.sidebarPadding;
-    const miniY = layout.topHudH + this.sidebarPadding;
+    const defaultY = layout.topHudH + this.sidebarPadding;
+    const miniY = Number.isFinite(panelY) ? Math.max(defaultY, Math.floor(panelY)) : defaultY;
     const scale = Math.min(miniW / mapW, miniH / mapH);
     const drawW = mapW * scale;
     const drawH = mapH * scale;

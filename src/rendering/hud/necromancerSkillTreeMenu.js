@@ -1,5 +1,7 @@
 import {
   canSpendNecromancerNode,
+  getMageGroupLimit,
+  getMageSelectedInGroup,
   getMageTierLabel,
   getNecromancerAvailableSkillPoints,
   getNecromancerSpentSkillPoints,
@@ -8,7 +10,7 @@ import {
   getNecromancerTooltip,
   isNecromancerRowAccessible
 } from "../../game/necromancerTalentTree.js";
-import { drawSkillRefundFooter } from "./skillTreeMenuSections.js";
+import { drawSkillRefundFooter, drawSkillTreeTitle, getSkillTierHeader } from "./skillTreeMenuSections.js";
 
 function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
@@ -74,9 +76,7 @@ export function drawNecromancerSkillTreeMenu(renderer, game, layout, frame) {
   game.uiRects.skillTreeNodes = [];
   const sy = (y) => y - scroll;
 
-  ctx.fillStyle = "#f3efe3";
-  ctx.font = "bold 20px Trebuchet MS";
-  ctx.fillText("Mage Progression", menuX + 16, menuY + 30);
+  drawSkillTreeTitle(ctx, menuX, menuY);
   ctx.font = "13px Trebuchet MS";
   ctx.fillStyle = "#d2d9e8";
   ctx.textAlign = "right";
@@ -107,10 +107,12 @@ export function drawNecromancerSkillTreeMenu(renderer, game, layout, frame) {
     ctx.strokeRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
     ctx.fillStyle = accessible ? "#f1ecff" : "#9198a4";
     ctx.font = "bold 14px Trebuchet MS";
-    const rule = tier === 5 ? "Pick 2" : "Pick 1";
-    ctx.fillText(`Tier ${tier}  ${getMageTierLabel(tier)}  ${rule}`, rowRect.x + 12, rowRect.y + 20);
-
     const nodes = defs.filter((def) => def.tier === tier);
+    const group = nodes[0]?.group || "";
+    const selectedCount = getMageSelectedInGroup(game, group).length;
+    const groupLimit = getMageGroupLimit(group);
+    ctx.fillText(getSkillTierHeader(tier, getMageTierLabel(tier), selectedCount, groupLimit), rowRect.x + 12, rowRect.y + 20);
+
     const columns = tier === 5 ? 4 : Math.min(4, nodes.length);
     const nodeW = Math.floor((rowRect.w - 28 - (columns - 1) * 8) / columns);
     nodes.forEach((def, index) => {
