@@ -82,11 +82,12 @@ function validateFireballExplodesOnEnemyImpact() {
     ownerId: game.player.id,
     damage: 12,
     blastRadius: tile * 2,
+    useSegmentHit: true,
     burnDuration: 3,
     hitTargets: new Set()
   });
   stepGame(game, 0.08, { processUi: false });
-  assert(game.bullets.every((bullet) => bullet.projectileType !== "mage_fireball"), "Fireball should be consumed on enemy impact");
+  assert(game.bullets.every((bullet) => bullet.projectileType !== "mage_fireball" || bullet.life <= 0), "Fireball should be consumed on enemy impact");
   assert(primary.hp < 40 && splash.hp < 40, "Fireball should explode and damage nearby enemies on enemy impact");
   assert(game.fireZones.some((zone) => zone.zoneType === "arcaneBurst"), "Fireball impact should create explosion feedback");
 }

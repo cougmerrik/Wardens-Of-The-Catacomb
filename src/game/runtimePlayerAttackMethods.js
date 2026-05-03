@@ -850,6 +850,7 @@ export const runtimePlayerAttackMethods = {
       damage: this.getPrimaryDamage() * 3.4 * power,
       critMultiplier: this.rollMageCritical(),
       blastRadius: (this.config?.map?.tile || 32) * 3 * Math.max(0.75, Math.min(1.35, power)) * (options.sizeMult || 1),
+      useSegmentHit: true,
       burnDuration: 3,
       knockback: options.knockback || 0,
       wildInfusion: options.infusion || "",
