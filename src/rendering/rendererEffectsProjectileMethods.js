@@ -114,6 +114,9 @@ export const rendererEffectsProjectileMethods = {
       const y = projectile.y - cameraY;
       const isTrapArrow = projectile.projectileType === "trapArrow";
       const isDeathBolt = projectile.projectileType === "deathBolt";
+      const isExecuteKnife = projectile.projectileType === "ranger_executeKnife";
+      const rangerType = typeof projectile.projectileType === "string" ? projectile.projectileType : "";
+      const rangerWeapon = rangerType.startsWith("ranger_") ? rangerType.slice("ranger_".length) : "";
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(x, y);
@@ -127,6 +130,51 @@ export const rendererEffectsProjectileMethods = {
         ctx.beginPath();
         ctx.arc(0, 0, 9, 0, Math.PI * 2);
         ctx.fill();
+      } else if (isExecuteKnife) {
+        ctx.strokeStyle = "rgba(255, 214, 214, 0.45)";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(-15, 0);
+        ctx.lineTo(-3, 0);
+        ctx.stroke();
+        ctx.fillStyle = "#fff2ee";
+        ctx.beginPath();
+        ctx.moveTo(9, 0);
+        ctx.lineTo(-2, -3.3);
+        ctx.lineTo(-5, 0);
+        ctx.lineTo(-2, 3.3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#5b2f2f";
+        ctx.fillRect(-8, -1.5, 5, 3);
+      } else if (rangerWeapon === "rapierPistol") {
+        ctx.fillStyle = "rgba(255, 236, 166, 0.35)";
+        ctx.fillRect(-11, -1.1, 12, 2.2);
+        ctx.fillStyle = "#fff0a8";
+        ctx.beginPath();
+        ctx.arc(2.5, 0, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#7d5a2e";
+        ctx.beginPath();
+        ctx.arc(-2.5, 0, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (rangerWeapon === "throwingKnives" || rangerWeapon === "twinDaggers") {
+        const bladeLength = rangerWeapon === "twinDaggers" ? 9 : 7;
+        ctx.strokeStyle = "#f0f4fb";
+        ctx.lineWidth = rangerWeapon === "twinDaggers" ? 2.4 : 2;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(-bladeLength * 0.55, -2.4);
+        ctx.lineTo(bladeLength * 0.55, 2.4);
+        ctx.moveTo(-bladeLength * 0.55, 2.4);
+        ctx.lineTo(bladeLength * 0.55, -2.4);
+        ctx.stroke();
+        ctx.strokeStyle = "#384052";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-2.2, 0);
+        ctx.lineTo(2.2, 0);
+        ctx.stroke();
       } else {
         ctx.fillStyle = isTrapArrow ? "#d66e57" : "#d9c27f";
         ctx.fillRect(-7, -1.3, 11, 2.6);
@@ -176,6 +224,10 @@ export const rendererEffectsProjectileMethods = {
         this.drawFleshBallProjectile(b, cameraX, cameraY, game.time);
         continue;
       }
+      if (typeof b.projectileType === "string" && b.projectileType.startsWith("mage_")) {
+        this.drawMageProjectile(b, cameraX, cameraY, game.time);
+        continue;
+      }
       drawArrowLikeProjectile(b, 1);
     }
     for (const arrow of game.fireArrows) {
@@ -197,7 +249,83 @@ export const rendererEffectsProjectileMethods = {
       ctx.restore();
     }
 
+    for (const soul of game.necromancerRuntime?.souls || []) this.drawLichSoul(soul, cameraX, cameraY, game.time);
     for (const zone of game.fireZones) this.drawFireZone(zone, cameraX, cameraY, game.time);
+  },
+
+  drawLichSoul(soul, cameraX, cameraY, time = 0) {
+    const ctx = this.ctx;
+    const x = (soul.x || 0) - cameraX;
+    const y = (soul.y || 0) - cameraY;
+    const pulse = 0.88 + Math.sin(time * 6 + (soul.x || 0) * 0.02) * 0.12;
+    ctx.save();
+    ctx.translate(x, y);
+    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, 10);
+    glow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+    glow.addColorStop(0.45, "rgba(207, 214, 226, 0.86)");
+    glow.addColorStop(1, "rgba(100, 110, 128, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, 8 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#e9edf4";
+    ctx.beginPath();
+    ctx.arc(0, 0, 3.2 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+
+  drawMageProjectile(projectile, cameraX, cameraY, time = 0) {
+    const ctx = this.ctx;
+    const x = projectile.x - cameraX;
+    const y = projectile.y - cameraY;
+    const type = projectile.projectileType || "";
+    const size = Number.isFinite(projectile.size) ? projectile.size : 8;
+    const pulse = 0.92 + Math.sin(time * 12 + (projectile.x || 0) * 0.02) * 0.08;
+    const palette = projectile.damageType === "fire"
+      ? ["rgba(255, 243, 178, 0.95)", "rgba(255, 138, 66, 0.86)", "rgba(132, 28, 20, 0)"]
+      : projectile.damageType === "cold"
+      ? ["rgba(226, 255, 255, 0.95)", "rgba(113, 205, 255, 0.84)", "rgba(30, 74, 124, 0)"]
+      : projectile.damageType === "lightning"
+      ? ["rgba(255, 252, 180, 0.95)", "rgba(170, 228, 255, 0.8)", "rgba(70, 72, 151, 0)"]
+      : ["rgba(241, 218, 255, 0.95)", "rgba(153, 118, 255, 0.82)", "rgba(54, 27, 104, 0)"];
+    ctx.save();
+    ctx.translate(x, y);
+    if (type === "mage_chromaticOrb") {
+      const radius = Math.max(8, size * 0.5);
+      const orb = ctx.createRadialGradient(0, 0, 1, 0, 0, radius);
+      orb.addColorStop(0, palette[0]);
+      orb.addColorStop(0.48, palette[1]);
+      orb.addColorStop(1, palette[2]);
+      ctx.fillStyle = orb;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.72, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    ctx.rotate(Number.isFinite(projectile.angle) ? projectile.angle : 0);
+    const radius = Math.max(4, size * 0.9);
+    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, radius);
+    glow.addColorStop(0, palette[0]);
+    glow.addColorStop(0.55, palette[1]);
+    glow.addColorStop(1, palette[2]);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = palette[0];
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.7, 0);
+    ctx.lineTo(radius * 0.7, 0);
+    ctx.stroke();
+    ctx.restore();
   },
 
   drawNecroticBolt(projectile, cameraX, cameraY, time = 0) {
@@ -404,7 +532,9 @@ export const rendererEffectsProjectileMethods = {
     const modifier = typeof swing.modifier === "string" ? swing.modifier : "";
     const doctrine = typeof swing.doctrine === "string" ? swing.doctrine : "";
     const palette =
-      doctrine === "paladin"
+      style === "greenFlameBlade"
+        ? { core: "rgba(102, 255, 132, 0.96)", edge: "#91ff9f", shadow: "rgba(12, 122, 44, 0)" }
+        : doctrine === "paladin"
         ? { core: "rgba(255, 236, 176, 0.96)", edge: "#ffe39f", shadow: "rgba(181, 128, 48, 0)" }
         : doctrine === "eldritch"
         ? { core: "rgba(166, 190, 255, 0.94)", edge: "#aac4ff", shadow: "rgba(78, 104, 196, 0)" }
@@ -532,7 +662,11 @@ export const rendererEffectsProjectileMethods = {
     } else {
       ctx.globalAlpha = 0.55 * alpha;
       const slashGrad = ctx.createRadialGradient(x, y, range * 0.15, x + dirX * range * 0.6, y + dirY * range * 0.6, range);
-      if (swing.executeProc) {
+      if (style === "greenFlameBlade") {
+        slashGrad.addColorStop(0, "rgba(190, 255, 170, 0.96)");
+        slashGrad.addColorStop(0.48, "rgba(68, 238, 96, 0.72)");
+        slashGrad.addColorStop(1, "rgba(14, 104, 38, 0)");
+      } else if (swing.executeProc) {
         slashGrad.addColorStop(0, "rgba(255, 106, 106, 0.96)");
         slashGrad.addColorStop(0.55, "rgba(221, 48, 48, 0.7)");
         slashGrad.addColorStop(1, "rgba(128, 12, 12, 0)");
@@ -553,6 +687,14 @@ export const rendererEffectsProjectileMethods = {
       ctx.beginPath();
       ctx.arc(x, y, range * 0.82, start, end);
       ctx.stroke();
+      if (style === "greenFlameBlade") {
+        ctx.globalAlpha = 0.95 * alpha;
+        ctx.strokeStyle = "#baffbf";
+        ctx.lineWidth = 1.7;
+        ctx.beginPath();
+        ctx.arc(x, y, range * 0.96, start + arc * 0.08, end - arc * 0.08);
+        ctx.stroke();
+      }
     }
 
     if (swing.executeProc && style !== "longspear") {
@@ -586,6 +728,103 @@ export const rendererEffectsProjectileMethods = {
     const x = zone.x - cameraX;
     const y = zone.y - cameraY;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (zone.zoneType === "cloudDaggers") {
+      const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 48;
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 4;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const pulse = 0.94 + Math.sin(time * 8 + zone.x * 0.01) * 0.05;
+      const haze = ctx.createRadialGradient(x, y, 2, x, y, radius * pulse);
+      haze.addColorStop(0, `rgba(228, 232, 242, ${0.16 + lifeFrac * 0.12})`);
+      haze.addColorStop(0.52, `rgba(86, 92, 112, ${0.16 + lifeFrac * 0.12})`);
+      haze.addColorStop(1, `rgba(16, 20, 30, ${0.04 + lifeFrac * 0.05})`);
+      ctx.fillStyle = haze;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.strokeStyle = `rgba(238, 242, 250, ${0.62 * lifeFrac + 0.18})`;
+      ctx.fillStyle = `rgba(170, 180, 204, ${0.45 * lifeFrac + 0.18})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 9; i++) {
+        const a = time * (2.5 + (i % 3) * 0.35) + (i / 9) * Math.PI * 2;
+        const r = radius * (0.18 + (i % 4) * 0.16);
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a * 1.07) * r * 0.72;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(a + Math.PI * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(0, -7);
+        ctx.lineTo(3, 2);
+        ctx.lineTo(0, 7);
+        ctx.lineTo(-3, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(0, -7);
+        ctx.lineTo(0, 8);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+      return;
+    }
+    if (zone.zoneType === "confusion") {
+      const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 48;
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 4;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const pulse = 0.95 + Math.sin(time * 5 + zone.y * 0.01) * 0.06;
+      const haze = ctx.createRadialGradient(x, y, 2, x, y, radius * pulse);
+      haze.addColorStop(0, `rgba(224, 156, 255, ${0.2 + lifeFrac * 0.14})`);
+      haze.addColorStop(0.48, `rgba(138, 58, 190, ${0.18 + lifeFrac * 0.16})`);
+      haze.addColorStop(1, `rgba(40, 10, 66, ${0.05 + lifeFrac * 0.08})`);
+      ctx.fillStyle = haze;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(231, 184, 255, ${0.35 * lifeFrac + 0.14})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const a = time * (1.1 + i * 0.12) + i * 1.25;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(a) * radius * 0.18, y + Math.sin(a) * radius * 0.12, radius * (0.22 + i * 0.05), a, a + Math.PI * 1.15);
+        ctx.stroke();
+      }
+      return;
+    }
+    if (zone.zoneType === "spiritGuardians") {
+      const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 64;
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 4;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const pulse = 0.96 + Math.sin(time * 6 + zone.x * 0.01) * 0.05;
+      const aura = ctx.createRadialGradient(x, y, 2, x, y, radius * pulse);
+      aura.addColorStop(0, `rgba(206, 255, 218, ${0.1 + lifeFrac * 0.08})`);
+      aura.addColorStop(0.5, `rgba(104, 222, 150, ${0.12 + lifeFrac * 0.1})`);
+      aura.addColorStop(1, `rgba(18, 74, 42, ${0.03 + lifeFrac * 0.05})`);
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      for (let i = 0; i < 5; i++) {
+        const a = time * (1.8 + i * 0.14) + (i / 5) * Math.PI * 2;
+        const r = radius * (0.32 + (i % 2) * 0.18);
+        const sx = x + Math.cos(a) * r;
+        const sy = y + Math.sin(a) * r * 0.82;
+        ctx.fillStyle = `rgba(220, 255, 226, ${0.52 * lifeFrac + 0.2})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy - 3, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(132, 238, 164, ${0.45 * lifeFrac + 0.16})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.quadraticCurveTo(sx - Math.cos(a) * 8, sy + 10, sx + Math.sin(a) * 5, sy + 16);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
     if (zone.zoneType === "ghostSiphon") {
       const tx = (Number.isFinite(zone.targetX) ? zone.targetX : zone.x) - cameraX;
       const ty = (Number.isFinite(zone.targetY) ? zone.targetY : zone.y) - cameraY;
@@ -610,6 +849,75 @@ export const rendererEffectsProjectileMethods = {
         ctx.arc(px, py, 3.5 - t, 0, Math.PI * 2);
         ctx.fill();
       }
+      return;
+    }
+    if (zone.zoneType === "rangerSurge") {
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 0.18;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const radius = Number.isFinite(zone.radius) ? Math.max(0, zone.radius) : 0;
+      ctx.save();
+      ctx.globalAlpha = lifeFrac;
+      ctx.strokeStyle = "rgba(154, 235, 214, 0.82)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * (1.08 - lifeFrac * 0.2), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(240, 255, 238, 0.55)";
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + time * 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(a) * radius * 0.25, y + Math.sin(a) * radius * 0.25);
+        ctx.lineTo(x + Math.cos(a) * radius, y + Math.sin(a) * radius);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+    if (zone.zoneType === "smokeBomb") {
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 2.75;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const radius = Number.isFinite(zone.radius) ? Math.max(0, zone.radius) : 0;
+      const pulse = 0.95 + Math.sin(time * 5 + zone.x * 0.01) * 0.04;
+      const outer = ctx.createRadialGradient(x, y, 2, x, y, radius * pulse);
+      outer.addColorStop(0, `rgba(186, 192, 190, ${0.24 * lifeFrac + 0.12})`);
+      outer.addColorStop(0.52, `rgba(84, 92, 96, ${0.28 * lifeFrac + 0.12})`);
+      outer.addColorStop(1, `rgba(28, 31, 34, ${0.08 * lifeFrac})`);
+      ctx.fillStyle = outer;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(220, 226, 222, ${0.16 * lifeFrac + 0.08})`;
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + time * (0.9 + i * 0.05);
+        const r = radius * (0.18 + (i % 3) * 0.16);
+        ctx.beginPath();
+        ctx.ellipse(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.72, 6.5, 3.2, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
+    if (zone.zoneType === "stormcallerFlash") {
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 0.18;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 18;
+      ctx.save();
+      ctx.globalAlpha = lifeFrac;
+      ctx.strokeStyle = "rgba(218, 236, 255, 0.94)";
+      ctx.lineWidth = 2.8;
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + time * 2.5;
+        const length = radius * (0.55 + (i % 2) * 0.28);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(a) * length, y + Math.sin(a) * length);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(245, 252, 255, 0.75)";
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
       return;
     }
     if (zone.zoneType === "acid") {
@@ -804,9 +1112,10 @@ export const rendererEffectsProjectileMethods = {
       const ty = (Number.isFinite(zone.targetY) ? zone.targetY : zone.y) - cameraY;
       const lifeFrac = Math.max(0, Math.min(1, zone.life / (zone.totalLife || 0.18)));
       const grad = ctx.createLinearGradient(x, y, tx, ty);
-      grad.addColorStop(0, `rgba(110, 92, 255, ${0.18 + lifeFrac * 0.22})`);
-      grad.addColorStop(0.55, `rgba(171, 159, 255, ${0.6 * lifeFrac})`);
-      grad.addColorStop(1, `rgba(228, 223, 255, ${0.18 + lifeFrac * 0.12})`);
+      const lightning = zone.damageType === "lightning";
+      grad.addColorStop(0, lightning ? `rgba(255, 231, 86, ${0.2 + lifeFrac * 0.25})` : `rgba(110, 92, 255, ${0.18 + lifeFrac * 0.22})`);
+      grad.addColorStop(0.55, lightning ? `rgba(255, 250, 173, ${0.65 * lifeFrac})` : `rgba(171, 159, 255, ${0.6 * lifeFrac})`);
+      grad.addColorStop(1, lightning ? `rgba(255, 255, 225, ${0.2 + lifeFrac * 0.14})` : `rgba(228, 223, 255, ${0.18 + lifeFrac * 0.12})`);
       ctx.strokeStyle = grad;
       ctx.lineWidth = 3.2;
       ctx.lineCap = "round";
@@ -896,6 +1205,16 @@ export const rendererEffectsProjectileMethods = {
     const y = drop.y - cameraY;
     if (drop.type === "health") {
       ctx.drawImage(this.potionSprite, x - 10, y - 13, 20, 24);
+    } else if (drop.type === "mushroom") {
+      ctx.fillStyle = "#d3e0c0";
+      ctx.fillRect(x - 2, y - 2, 4, 8);
+      ctx.fillStyle = "#c9554f";
+      ctx.beginPath();
+      ctx.ellipse(x, y - 4, 7, 5, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f4e8d2";
+      ctx.fillRect(x - 3, y - 6, 2, 2);
+      ctx.fillRect(x + 2, y - 7, 2, 2);
     } else if (drop.type === "gold") {
       ctx.fillStyle = "#e1bc54";
       ctx.beginPath();

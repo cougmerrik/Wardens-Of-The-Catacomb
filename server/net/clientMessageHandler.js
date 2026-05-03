@@ -126,18 +126,30 @@ export function handleActionMessage(room, clientId, action) {
   if (kind === "debugGrantProgress") {
     const goldDelta = Number.isFinite(action.goldDelta) ? Math.max(0, Math.floor(action.goldDelta)) : 0;
     const skillPointDelta = Number.isFinite(action.skillPointDelta) ? Math.max(0, Math.floor(action.skillPointDelta)) : 0;
-    if (goldDelta <= 0 && skillPointDelta <= 0) return;
+    const levelDelta = Number.isFinite(action.levelDelta) ? Math.max(0, Math.floor(action.levelDelta)) : 0;
+    if (goldDelta <= 0 && skillPointDelta <= 0 && levelDelta <= 0) return;
     if (isPauseOwner) {
       if (!playerAlive) return;
       sim.gold = Math.max(0, (Number.isFinite(sim.gold) ? sim.gold : 0) + goldDelta);
       sim.skillPoints = Math.max(0, (Number.isFinite(sim.skillPoints) ? sim.skillPoints : 0) + skillPointDelta);
+      sim.level = Math.max(1, (Number.isFinite(sim.level) ? sim.level : 1) + levelDelta);
+      if (sim.player) sim.player.level = sim.level;
       syncPauseOwnerActiveState();
+      return;
+    }
+    const activeState = room.activePlayers instanceof Map ? room.activePlayers.get(clientId) : null;
+    if (activeState) {
+      activeState.gold = Math.max(0, (Number.isFinite(activeState.gold) ? activeState.gold : 0) + goldDelta);
+      activeState.skillPoints = Math.max(0, (Number.isFinite(activeState.skillPoints) ? activeState.skillPoints : 0) + skillPointDelta);
+      activeState.level = Math.max(1, (Number.isFinite(activeState.level) ? activeState.level : 1) + levelDelta);
       return;
     }
     if (room.phase !== "active" || typeof room.performActionForActivePlayer !== "function") return;
     room.performActionForActivePlayer(clientId, (context) => {
       context.gold = Math.max(0, (Number.isFinite(context.gold) ? context.gold : 0) + goldDelta);
       context.skillPoints = Math.max(0, (Number.isFinite(context.skillPoints) ? context.skillPoints : 0) + skillPointDelta);
+      context.level = Math.max(1, (Number.isFinite(context.level) ? context.level : 1) + levelDelta);
+      if (context.player) context.player.level = context.level;
       return true;
     });
   }

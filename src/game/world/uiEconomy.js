@@ -6,13 +6,14 @@ import {
   getRangerMoveSpeedBonus,
   isRangerTalentGame
 } from "../rangerTalentTree.js";
+import { createNecromancerRuntimeState, createRangerRuntimeState } from "../runtimeBaseStateFactories.js";
 import {
   canSpendWarriorUtility,
   getWarriorBloodheatAttackSpeedBonus,
   getWarriorIronGuardDefenseBonusPct,
   isWarriorTalentGame
 } from "../warriorTalentTree.js";
-import { isNecromancerTalentGame } from "../necromancerTalentTree.js";
+import { hasMageArcanePresenceActive, hasMageTalent, isNecromancerTalentGame } from "../necromancerTalentTree.js";
 import {
   ACTIVE_CONSUMABLE_SLOT_CAP,
   getConsumableDefinition,
@@ -112,6 +113,9 @@ export function getDefenseFlatReduction(game) {
   const reduction = base + levelBonus + game.upgrades.defense.level * 1.5;
   if (isRangerTalentGame(game)) return reduction * (1 + getRangerDanceDefenseBonus(game));
   if (isWarriorTalentGame(game)) return reduction * (1 + getWarriorIronGuardDefenseBonusPct(game));
+  if (isNecromancerTalentGame(game)) {
+    return reduction + (hasMageArcanePresenceActive(game) ? 1 : 0) + (hasMageTalent(game, "battleCaster") ? 1 : 0);
+  }
   return reduction;
 }
 
@@ -171,6 +175,10 @@ function resetPointTree(tree) {
 }
 
 function clearRefundedSkillState(game) {
+  game.enemies = (game.enemies || []).filter((enemy) => !(enemy && enemy.type === "wolf" && enemy.ownerId === game.player?.id));
+  game.drops = (game.drops || []).filter((drop) => !(drop && drop.type === "mushroom"));
+  game.rangerRuntime = createRangerRuntimeState();
+  if (game.player) game.player.rangerRuntime = game.rangerRuntime;
   game.warriorMomentumTimer = 0;
   game.warriorRageActiveTimer = 0;
   game.warriorRageCooldownTimer = 0;
@@ -186,6 +194,9 @@ function clearRefundedSkillState(game) {
   game.necromancerBeam.targetY = 0;
   game.necromancerBeam.progress = 0;
   game.necromancerBeam.healTickTimer = 0;
+  game.necromancerRuntime = createNecromancerRuntimeState();
+  if (game.player) game.player.necromancerRuntime = game.necromancerRuntime;
+  game.enemies = (game.enemies || []).filter((enemy) => !(enemy && enemy.controllerPlayerId === game.player?.id && enemy.isControlledUndead));
 }
 
 export function refundAllSkills(game) {
@@ -356,6 +367,11 @@ export function handleUiClicks(game) {
       if (hitConsumable && typeof game.useConsumableSlot === "function") {
         clearPinnedUiTooltip(game);
         game.useConsumableSlot(hitConsumable.index);
+        continue;
+      }
+      if (pointInRect(game, click.x, click.y, game.uiRects.hudSwapButton)) {
+        clearPinnedUiTooltip(game);
+        game.input.queueKey?.("q");
         continue;
       }
       if (pointInRect(game, click.x, click.y, game.uiRects.hudAbilityWidget)) {

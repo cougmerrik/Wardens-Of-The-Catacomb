@@ -40,6 +40,20 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
       const lightSources = Array.isArray(game.lightSources) ? game.lightSources : [];
       const activeLightSources = typeof game.getActiveLightSources === "function" ? game.getActiveLightSources() : [];
       const torchLightSources = lightSources.filter((source) => source && source.type === "torch");
+      const pointLevels = (tree) => Object.fromEntries(
+        Object.entries(tree || {}).map(([key, node]) => [
+          key,
+          Number.isFinite(node?.points) ? Math.max(0, Math.floor(node.points)) : 0
+        ])
+      );
+      const skillLevels = pointLevels(game.skills);
+      const talentLevels = {
+        ...pointLevels(game.rangerTalents),
+        ...pointLevels(game.warriorTalents),
+        ...pointLevels(game.necromancerTalents)
+      };
+      const spentSkillPoints = typeof game.getSpentSkillPointCount === "function" ? game.getSpentSkillPointCount() : 0;
+      const refundCost = typeof game.getSkillRefundCost === "function" ? game.getSkillRefundCost(spentSkillPoints, game.refundCount) : 0;
       return {
         networkReady: !!game.networkReady,
         networkHasMap: !!game.networkHasMap,
@@ -52,6 +66,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           size: game.player?.size || 0,
           health: game.player?.health || 0,
           classType: game.player?.classType || game.classType || "",
+          level: Number.isFinite(game.level) ? game.level : (game.player?.level || 1),
           dirX: game.player?.dirX || 0,
           dirY: game.player?.dirY || 0,
           fireCooldown: game.player?.fireCooldown || 0,
@@ -193,6 +208,19 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           skillTreeButton: game.uiRects?.skillTreeButton || null,
           shopClose: game.uiRects?.shopClose || null,
           skillTreeClose: game.uiRects?.skillTreeClose || null,
+          refundButton: game.uiRects?.skillRefundButton || null,
+          refundCount: Math.max(0, Number.isFinite(game.refundCount) ? Math.floor(game.refundCount) : 0),
+          refundCost,
+          spentSkillPoints,
+          skillTreeNodes: Array.isArray(game.uiRects?.skillTreeNodes)
+            ? game.uiRects.skillTreeNodes.map((entry) => ({
+                key: entry?.key || "",
+                kind: entry?.kind || "node",
+                rect: entry?.rect || null
+              }))
+            : [],
+          skillLevels,
+          talentLevels,
           shopItems: Array.isArray(game.uiRects?.shopItems)
             ? game.uiRects.shopItems.slice(0, 4).map((entry) => ({
                 key: entry.key,

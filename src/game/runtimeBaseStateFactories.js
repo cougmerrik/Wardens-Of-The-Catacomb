@@ -14,12 +14,32 @@ export function createSkillState() {
 
 export function createRangerRuntimeState() {
   return {
-    danceActiveTimer: 0,
-    danceMoveTimer: 0,
-    foxstepCooldown: 0,
-    foxstepActiveTimer: 0,
-    foxstepHealPool: 0,
-    foxstepHealTickTimer: 0
+    weaponMode: "ranged",
+    swapCooldownTimer: 0,
+    combo: 0,
+    comboDecayDelayTimer: 0,
+    comboDecayTickTimer: 0,
+    classSkillCooldownTimer: 0,
+    dodgeTimer: 0,
+    pendingSwapBonus: null,
+    swapBuffTimer: 0,
+    lastAttackAt: -Infinity,
+    lastAttackTargetId: null,
+    shadowVeilTimer: 0,
+    footworkTimer: 0,
+    footworkGuardTimer: 0,
+    foragerRegenTimer: 0,
+    predatorsFeastTimer: 0,
+    predatorsFeastCooldownTimer: 0,
+    venomCooldownTimer: 0,
+    smokeBombCooldownTimer: 0,
+    mushroomSpawnTimer: 0,
+    foragerMushroomsInitialized: false,
+    comboSurgeCooldownTimer: 0,
+    quarryTargetId: null,
+    quarryStacks: 0,
+    livingShadowCooldownTimer: 0,
+    wolfId: null
   };
 }
 
@@ -58,11 +78,37 @@ export function createWarriorRuntimeState() {
 
 export function createNecromancerRuntimeState() {
   return {
+    activeMode: "cantrip",
+    mana: 7,
+    manaRegenPauseTimer: 0,
+    spellCastTimer: 0,
+    pendingSpell: null,
+    classSkillCooldownTimer: 0,
+    blinkInvulnTimer: 0,
+    invisibilityTimer: 0,
+    targetingBreakTimer: 0,
+    catalystTimer: 0,
+    arcaneClarityTimer: 0,
+    arcaneClarityChargeTimer: 0,
+    phaseBarrierCooldownTimer: 0,
+    arcaneFocusTimer: 0,
+    arcaneFocusTier: "",
+    chaosSurgeTimer: 0,
+    wildMagicCooldownTimer: 0,
+    influenceCooldownTimer: 0,
+    runes: 0,
+    runeTimer: 0,
+    battlemageGuardTimer: 0,
+    battlemageShockwaveCooldownTimer: 0,
+    battleCasterShieldTimer: 0,
+    souls: [],
+    soulSpawnCooldownTimer: 0,
     vigorTimer: 0,
     vigorBeamTimer: 0,
     vigorHealPool: 0,
     vigorTotalDuration: 0,
     harvesterBonusPct: 0,
+    mimicHealth: 0,
     tempHp: 0
   };
 }

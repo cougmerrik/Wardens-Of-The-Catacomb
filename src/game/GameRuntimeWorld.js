@@ -210,8 +210,8 @@ export class GameRuntimeWorld extends GameRuntimeBase {
     return spawnSkeleton(this, x, y, options);
   }
 
-  applyEnemyDamage(enemy, amount, damageType = "physical", ownerId = null) {
-    applyEnemyDamage(this, enemy, amount, damageType, ownerId);
+  applyEnemyDamage(enemy, amount, damageType = "physical", ownerId = null, options = {}) {
+    applyEnemyDamage(this, enemy, amount, damageType, ownerId, options);
   }
 
   getEnemySpawnInterval() {

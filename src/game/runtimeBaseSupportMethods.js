@@ -1,4 +1,4 @@
-import { getRangerDodgeChance, getRangerSkillPointGainForLevel, hasFoxstep } from "./rangerTalentTree.js";
+import { getRangerDamageTakenReductionPct, getRangerDodgeChance, getRangerMaxHealthBonusPct, getRangerMoveSpeedBonus, getRangerSkillPointGainForLevel } from "./rangerTalentTree.js";
 import {
   getWarriorBattleFrenzyMoveSpeedBonus,
   getWarriorBattleFrenzyDuration,
@@ -217,10 +217,18 @@ export const runtimeBaseSupportMethods = {
         else if (warCircle.doctrine === "paladin") moveBonus += 0.04;
       }
     }
+    if (entity?.classType === "archer") {
+      moveBonus += entity === this.player
+        ? getRangerMoveSpeedBonus(this)
+        : ((entity?.rangerRuntime?.dodgeTimer || 0) > 0 ? 0.35 : 0);
+    }
     if (entity?.classType === "necromancer") {
       moveBonus += entity === this.player
         ? getNecromancerVigorMoveSpeedBonusPct(this)
         : ((entity?.necromancerRuntime?.vigorTimer || 0) > 0 ? 0.25 : 0);
+      if ((entity?.necromancerRuntime?.wildSpeedRegenTimer || 0) > 0) moveBonus += 0.28;
+      if ((entity?.necromancerRuntime?.mimicTimer || 0) > 0) moveBonus -= 0.08;
+      if ((entity?.necromancerRuntime?.stoneskinTimer || 0) > 0) moveBonus -= 0.5;
     }
     return (classSpec.baseMoveSpeed + levelBonus) * (1 + moveBonus);
   },
@@ -254,19 +262,50 @@ export const runtimeBaseSupportMethods = {
       player.consumableRuntime = player.consumableRuntime && typeof player.consumableRuntime === "object" ? player.consumableRuntime : { tempHp: 0 };
       player.consumableRuntime.tempHp = Math.max(0, Number.isFinite(player.consumableRuntime.tempHp) ? player.consumableRuntime.tempHp : 0);
       player.rangerRuntime = player.rangerRuntime && typeof player.rangerRuntime === "object" ? player.rangerRuntime : {};
-      player.rangerRuntime.foxstepCooldown = Math.max(0, (Number.isFinite(player.rangerRuntime.foxstepCooldown) ? player.rangerRuntime.foxstepCooldown : 0) - dt);
-      player.rangerRuntime.foxstepActiveTimer = Math.max(0, (Number.isFinite(player.rangerRuntime.foxstepActiveTimer) ? player.rangerRuntime.foxstepActiveTimer : 0) - dt);
-      player.rangerRuntime.foxstepHealTickTimer = Math.max(0, (Number.isFinite(player.rangerRuntime.foxstepHealTickTimer) ? player.rangerRuntime.foxstepHealTickTimer : 0) - dt);
-      if ((player.rangerRuntime.foxstepActiveTimer || 0) > 0 && (player.rangerRuntime.foxstepHealPool || 0) > 0 && player.alive) {
-        while ((player.rangerRuntime.foxstepHealTickTimer || 0) <= 0 && (player.rangerRuntime.foxstepHealPool || 0) > 0) {
-          player.rangerRuntime.foxstepHealTickTimer += 0.25;
-          const healAmount = Math.min(player.rangerRuntime.foxstepHealPool, Math.max(1, (player.maxHealth || 1) * 0.0084));
-          player.rangerRuntime.foxstepHealPool = Math.max(0, player.rangerRuntime.foxstepHealPool - healAmount);
-          if (this.isPrimaryPlayerEntity(player)) this.applyPlayerHealing(healAmount, { suppressText: true });
-          else player.health = Math.min(player.maxHealth || player.health || 0, (player.health || 0) + healAmount);
+      const rr = player.rangerRuntime;
+      rr.weaponMode = rr.weaponMode === "melee" ? "melee" : "ranged";
+      rr.swapCooldownTimer = Math.max(0, (Number.isFinite(rr.swapCooldownTimer) ? rr.swapCooldownTimer : 0) - dt);
+      rr.classSkillCooldownTimer = Math.max(0, (Number.isFinite(rr.classSkillCooldownTimer) ? rr.classSkillCooldownTimer : 0) - dt);
+      rr.dodgeTimer = Math.max(0, (Number.isFinite(rr.dodgeTimer) ? rr.dodgeTimer : 0) - dt);
+      rr.swapBuffTimer = Math.max(0, (Number.isFinite(rr.swapBuffTimer) ? rr.swapBuffTimer : 0) - dt);
+      if (rr.swapBuffTimer <= 0) rr.pendingSwapBonus = null;
+      rr.shadowVeilTimer = Math.max(0, (Number.isFinite(rr.shadowVeilTimer) ? rr.shadowVeilTimer : 0) - dt);
+      rr.footworkTimer = Math.max(0, (Number.isFinite(rr.footworkTimer) ? rr.footworkTimer : 0) - dt);
+      rr.footworkGuardTimer = Math.max(0, (Number.isFinite(rr.footworkGuardTimer) ? rr.footworkGuardTimer : 0) - dt);
+      rr.foragerRegenTimer = Math.max(0, (Number.isFinite(rr.foragerRegenTimer) ? rr.foragerRegenTimer : 0) - dt);
+      rr.predatorsFeastTimer = Math.max(0, (Number.isFinite(rr.predatorsFeastTimer) ? rr.predatorsFeastTimer : 0) - dt);
+      rr.predatorsFeastCooldownTimer = Math.max(0, (Number.isFinite(rr.predatorsFeastCooldownTimer) ? rr.predatorsFeastCooldownTimer : 0) - dt);
+      rr.venomCooldownTimer = Math.max(0, (Number.isFinite(rr.venomCooldownTimer) ? rr.venomCooldownTimer : 0) - dt);
+      rr.smokeBombCooldownTimer = Math.max(0, (Number.isFinite(rr.smokeBombCooldownTimer) ? rr.smokeBombCooldownTimer : 0) - dt);
+      rr.mushroomSpawnTimer = Math.max(0, (Number.isFinite(rr.mushroomSpawnTimer) ? rr.mushroomSpawnTimer : 0) - dt);
+      if (this.isPrimaryPlayerEntity(player)) this.ensureForagerMushrooms(dt);
+      rr.comboSurgeCooldownTimer = Math.max(0, (Number.isFinite(rr.comboSurgeCooldownTimer) ? rr.comboSurgeCooldownTimer : 0) - dt);
+      rr.livingShadowCooldownTimer = Math.max(0, (Number.isFinite(rr.livingShadowCooldownTimer) ? rr.livingShadowCooldownTimer : 0) - dt);
+      rr.combo = Math.max(0, Math.min(30, Number.isFinite(rr.combo) ? Math.floor(rr.combo) : 0));
+      if (rr.combo > 0) {
+        rr.comboDecayDelayTimer = Math.max(0, (Number.isFinite(rr.comboDecayDelayTimer) ? rr.comboDecayDelayTimer : 0) - dt);
+        if (rr.comboDecayDelayTimer <= 0) {
+          const relentless = this.rangerTalents?.relentless?.points > 0;
+          const getDecayInterval = (combo) => relentless
+            ? (combo >= 20 ? 0.68 : combo >= 10 ? 0.48 : combo >= 5 ? 0.34 : 0.22)
+            : (combo >= 20 ? 0.46 : combo >= 10 ? 0.32 : combo >= 5 ? 0.22 : 0.15);
+          rr.comboDecayTickTimer = (Number.isFinite(rr.comboDecayTickTimer) ? rr.comboDecayTickTimer : getDecayInterval(rr.combo)) - dt;
+          while (rr.combo > 0 && rr.comboDecayTickTimer <= 0) {
+            rr.combo -= 1;
+            rr.comboDecayTickTimer += getDecayInterval(rr.combo);
+          }
         }
-      } else if ((player.rangerRuntime.foxstepActiveTimer || 0) <= 0) {
-        player.rangerRuntime.foxstepHealPool = 0;
+      } else {
+        rr.comboDecayDelayTimer = 0;
+        rr.comboDecayTickTimer = 0;
+        rr.quarryTargetId = null;
+        rr.quarryStacks = 0;
+        rr.apexPredatorAnnounceTier = 0;
+      }
+      if ((rr.foragerRegenTimer || 0) > 0 && player.alive) {
+        const healAmount = (player.maxHealth || 1) * 0.012 * dt;
+        if (this.isPrimaryPlayerEntity(player)) this.applyPlayerHealing(healAmount, { suppressText: true });
+        else player.health = Math.min(player.maxHealth || player.health || 0, (player.health || 0) + healAmount);
       }
       player.warriorRuntime = player.warriorRuntime && typeof player.warriorRuntime === "object" ? player.warriorRuntime : {};
       player.warriorRuntime.secondWindTimer = Math.max(0, (Number.isFinite(player.warriorRuntime.secondWindTimer) ? player.warriorRuntime.secondWindTimer : 0) - dt);
@@ -324,6 +363,71 @@ export const runtimeBaseSupportMethods = {
         player.warriorRuntime.secondWindPool = 0;
       }
       player.necromancerRuntime = player.necromancerRuntime && typeof player.necromancerRuntime === "object" ? player.necromancerRuntime : {};
+      const nr = player.necromancerRuntime;
+      nr.activeMode = nr.activeMode === "spell" ? "spell" : "cantrip";
+      const maxMana = this.isPrimaryPlayerEntity(player) && typeof this.getMageMaxMana === "function"
+        ? this.getMageMaxMana()
+        : (7 + ((player.necromancerTalents?.wizardPath?.points || 0) > 0 ? 3 : 0) + ((player.necromancerTalents?.deepReserves?.points || 0) > 0 ? 8 : 0) + ((nr.arcaneFocusTimer || 0) > 0 ? 3 : 0));
+      nr.mana = Math.max(0, Math.min(maxMana, Number.isFinite(nr.mana) ? nr.mana : maxMana));
+      nr.manaRegenPauseTimer = Math.max(0, (Number.isFinite(nr.manaRegenPauseTimer) ? nr.manaRegenPauseTimer : 0) - dt);
+      nr.spellCastTimer = Math.max(0, (Number.isFinite(nr.spellCastTimer) ? nr.spellCastTimer : 0) - dt);
+      nr.classSkillCooldownTimer = Math.max(0, (Number.isFinite(nr.classSkillCooldownTimer) ? nr.classSkillCooldownTimer : 0) - dt);
+      nr.blinkInvulnTimer = Math.max(0, (Number.isFinite(nr.blinkInvulnTimer) ? nr.blinkInvulnTimer : 0) - dt);
+      nr.invisibilityTimer = Math.max(0, (Number.isFinite(nr.invisibilityTimer) ? nr.invisibilityTimer : 0) - dt);
+      nr.targetingBreakTimer = Math.max(0, (Number.isFinite(nr.targetingBreakTimer) ? nr.targetingBreakTimer : 0) - dt);
+      nr.catalystTimer = Math.max(0, (Number.isFinite(nr.catalystTimer) ? nr.catalystTimer : 0) - dt);
+      nr.phaseBarrierCooldownTimer = Math.max(0, (Number.isFinite(nr.phaseBarrierCooldownTimer) ? nr.phaseBarrierCooldownTimer : 0) - dt);
+      nr.arcaneFocusTimer = Math.max(0, (Number.isFinite(nr.arcaneFocusTimer) ? nr.arcaneFocusTimer : 0) - dt);
+      if ((nr.arcaneFocusTimer || 0) <= 0) nr.arcaneFocusTier = "";
+      nr.chaosSurgeTimer = Math.max(0, (Number.isFinite(nr.chaosSurgeTimer) ? nr.chaosSurgeTimer : 0) - dt);
+      nr.wildMagicCooldownTimer = Math.max(0, (Number.isFinite(nr.wildMagicCooldownTimer) ? nr.wildMagicCooldownTimer : 0) - dt);
+      nr.blueTimer = Math.max(0, (Number.isFinite(nr.blueTimer) ? nr.blueTimer : 0) - dt);
+      nr.stoneskinTimer = Math.max(0, (Number.isFinite(nr.stoneskinTimer) ? nr.stoneskinTimer : 0) - dt);
+      nr.wildSpeedRegenTimer = Math.max(0, (Number.isFinite(nr.wildSpeedRegenTimer) ? nr.wildSpeedRegenTimer : 0) - dt);
+      nr.mimicTimer = Math.max(0, (Number.isFinite(nr.mimicTimer) ? nr.mimicTimer : 0) - dt);
+      nr.mimicTongueTimer = Math.max(0, (Number.isFinite(nr.mimicTongueTimer) ? nr.mimicTongueTimer : 0) - dt);
+      if ((nr.mimicTimer || 0) <= 0) nr.mimicHealth = 0;
+      nr.influenceCooldownTimer = Math.max(0, (Number.isFinite(nr.influenceCooldownTimer) ? nr.influenceCooldownTimer : 0) - dt);
+      nr.runeTimer = Math.max(0, (Number.isFinite(nr.runeTimer) ? nr.runeTimer : 0) - dt);
+      if ((nr.runeTimer || 0) <= 0) nr.runes = 0;
+      nr.battlemageGuardTimer = Math.max(0, (Number.isFinite(nr.battlemageGuardTimer) ? nr.battlemageGuardTimer : 0) - dt);
+      nr.battlemageShockwaveCooldownTimer = Math.max(0, (Number.isFinite(nr.battlemageShockwaveCooldownTimer) ? nr.battlemageShockwaveCooldownTimer : 0) - dt);
+      nr.soulSpawnCooldownTimer = Math.max(0, (Number.isFinite(nr.soulSpawnCooldownTimer) ? nr.soulSpawnCooldownTimer : 0) - dt);
+      nr.necroRaiseCooldownTimer = Math.max(0, (Number.isFinite(nr.necroRaiseCooldownTimer) ? nr.necroRaiseCooldownTimer : 0) - dt);
+      if ((player.necromancerTalents?.battleCaster?.points || 0) > 0 && (nr.battleCasterShieldTimer || 0) <= 0) {
+        nr.tempHp = Math.max(nr.tempHp || 0, (player.maxHealth || 1) * 0.08);
+        nr.battleCasterShieldTimer = 6;
+      }
+      nr.battleCasterShieldTimer = Math.max(0, (Number.isFinite(nr.battleCasterShieldTimer) ? nr.battleCasterShieldTimer : 0) - dt);
+      if (Array.isArray(nr.souls)) {
+        nr.souls = nr.souls.filter((soul) => soul && (soul.life = Math.max(0, (Number.isFinite(soul.life) ? soul.life : 8) - dt)) > 0);
+        for (const soul of nr.souls) {
+          const dx = (player.x || 0) - (soul.x || 0);
+          const dy = (player.y || 0) - (soul.y || 0);
+          const dist = Math.hypot(dx, dy) || 1;
+          if (dist <= (Number.isFinite(soul.collectRadius) ? soul.collectRadius : 22) && player.alive) {
+            const heal = (player.maxHealth || 1) * (Number.isFinite(soul.healPct) ? soul.healPct : 0.04);
+            if (this.isPrimaryPlayerEntity(player)) this.applyPlayerHealing(heal);
+            else player.health = Math.min(player.maxHealth || player.health || 0, (player.health || 0) + heal);
+            soul.life = 0;
+          }
+        }
+      } else nr.souls = [];
+      const moving = !!player.moving;
+      if (moving) {
+        nr.arcaneClarityChargeTimer = 0;
+        nr.arcaneClarityTimer = 0;
+      } else {
+        nr.arcaneClarityChargeTimer = Math.min(3, (Number.isFinite(nr.arcaneClarityChargeTimer) ? nr.arcaneClarityChargeTimer : 0) + dt);
+        if ((player.necromancerTalents?.arcaneClarity?.points || 0) > 0 && nr.arcaneClarityChargeTimer >= 3) nr.arcaneClarityTimer = 0.25;
+      }
+      if (nr.mana < maxMana) {
+        const regen = this.isPrimaryPlayerEntity(player) && typeof this.getMageManaRegen === "function"
+          ? this.getMageManaRegen()
+          : (1 * ((player.necromancerTalents?.deepReserves?.points || 0) > 0 ? 0.85 : 1) * ((nr.arcaneClarityTimer || 0) > 0 ? 1.25 : 1));
+        const regenScale = nr.manaRegenPauseTimer > 0 ? 0.34 : 1;
+        nr.mana = Math.min(maxMana, nr.mana + regen * regenScale * dt);
+      }
       player.necromancerRuntime.vigorTimer = Math.max(0, (Number.isFinite(player.necromancerRuntime.vigorTimer) ? player.necromancerRuntime.vigorTimer : 0) - dt);
       player.necromancerRuntime.vigorBeamTimer = Math.max(0, (Number.isFinite(player.necromancerRuntime.vigorBeamTimer) ? player.necromancerRuntime.vigorBeamTimer : 0) - dt);
       if ((player.necromancerRuntime.vigorTimer || 0) > 0 && (player.necromancerRuntime.vigorHealPool || 0) > 0 && player.alive) {
@@ -366,11 +470,20 @@ export const runtimeBaseSupportMethods = {
 
   getDamageTakenForPlayerEntity(entity, amount, damageType = "physical", source = null) {
     if (!Number.isFinite(amount) || amount <= 0) return 0;
-    const rangerDodgeChance = entity === this.player
-      ? getRangerDodgeChance(this)
-      : ((entity?.rangerTalents?.fleetstep?.points || 0) > 0 ? 0.15 : 0);
+    const rangerDodgeChance = entity === this.player ? getRangerDodgeChance(this) : 0;
     if (entity?.classType === "archer" && Math.random() < rangerDodgeChance) return 0;
-    if (entity?.classType === "archer" && (entity?.rangerRuntime?.foxstepActiveTimer || 0) > 0) return amount * 0.5;
+    if (entity?.classType === "archer") {
+      const blockableDamage = source && (damageType === "physical" || damageType === "poison" || damageType === "unholy" || damageType === "melee");
+      if (blockableDamage && (entity?.rangerRuntime?.footworkTimer || 0) > 0 && Math.random() < 0.45) {
+        amount *= 0.4;
+        if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(entity.x, entity.y - 30, "Block", "#cbb5ff", 0.45, 12);
+      }
+      if ((entity?.rangerRuntime?.footworkGuardTimer || 0) > 0) amount *= 0.8;
+    }
+    if (entity?.classType === "archer") {
+      const rangerSource = entity === this.player ? this : entity;
+      amount *= 1 - getRangerDamageTakenReductionPct(rangerSource);
+    }
     if (entity?.classType === "fighter") {
       const doctrine = getWarriorDoctrine(entity === this.player ? this : entity);
       if (this.isEnemyMarkedByPlayerEntity(source, entity) && doctrine === "gladiator") amount *= 0.88;
@@ -463,8 +576,8 @@ export const runtimeBaseSupportMethods = {
       entity.skillPoints += this.getSkillPointGainForLevel(entity.level, entity.classType);
       const hpGain = Number.isFinite(classSpec.levelHpGain) ? classSpec.levelHpGain : 10;
       let adjustedHpGain = hpGain;
-      if (entity.classType === "archer") adjustedHpGain = hpGain * (1 + ((entity?.rangerTalents?.fleetstep?.points || 0) > 0 ? 0.06 : 0));
-      else if (entity.classType === "fighter") adjustedHpGain = hpGain * (1 + getWarriorIronGuardMaxHealthBonusPct(entity));
+      if (entity.classType === "archer") adjustedHpGain = hpGain * (1 + getRangerMaxHealthBonusPct(entity));
+      if (entity.classType === "fighter") adjustedHpGain = hpGain * (1 + getWarriorIronGuardMaxHealthBonusPct(entity));
       entity.maxHealth = (Number.isFinite(entity.maxHealth) ? entity.maxHealth : 0) + adjustedHpGain;
       entity.health = Math.min(entity.maxHealth, (Number.isFinite(entity.health) ? entity.health : 0) + adjustedHpGain);
       const baseMin = Number.isFinite(classSpec.primaryDamageMin)
@@ -597,6 +710,20 @@ export const runtimeBaseSupportMethods = {
     const healed = entity.health - before;
     if (this.isPrimaryPlayerEntity(entity) && typeof this.recordRunHealingReceived === "function") this.recordRunHealingReceived(healed);
     this.markPlayerEntityHealthBarVisible(entity);
+    if (entity?.classType === "archer" && healed > 0 && !options.skipWolfShare) {
+      const wolfId = entity?.rangerRuntime?.wolfId || (this.isPrimaryPlayerEntity(entity) ? this.rangerRuntime?.wolfId : null);
+      const wolf = wolfId ? (this.enemies || []).find((enemy) => enemy && enemy.id === wolfId && enemy.type === "wolf" && (enemy.hp || 0) > 0) : null;
+      if (wolf) {
+        const beforeWolf = Number.isFinite(wolf.hp) ? wolf.hp : 0;
+        wolf.hp = Math.min(Number.isFinite(wolf.maxHp) ? wolf.maxHp : beforeWolf, beforeWolf + healed);
+        if (wolf.hp > beforeWolf) {
+          wolf.hpBarTimer = this.config.enemy.hpBarDuration;
+          if (!options.suppressText) {
+            this.spawnFloatingText(wolf.x, wolf.y - wolf.size * 0.75, `+${Math.max(1, Math.round(wolf.hp - beforeWolf))}`, typeof this.getHealingTextColor === "function" ? this.getHealingTextColor() : "#79e59a", 0.8, 13);
+          }
+        }
+      }
+    }
     if (!options.suppressText) {
       this.spawnFloatingText(
         entity.x,
@@ -628,6 +755,27 @@ export const runtimeBaseSupportMethods = {
       amount = Math.max(0, amount - absorbed);
       this.spawnFloatingText(entity.x, entity.y - 18, "Ward", "#bdb0ff", 0.65, 13);
       if ((entity.warriorRuntime.eldritchWardHp || 0) <= 0) entity.blockBonusTimer = 0;
+      if (amount <= 0) return;
+    }
+    if (entity.classType === "necromancer" && (entity.necromancerRuntime.phaseBarrierCooldownTimer || 0) <= 0) {
+      const hasPhaseBarrier = entity === this.player
+        ? (this.necromancerTalents?.phaseBarrier?.points || 0) > 0
+        : (entity.necromancerTalents?.phaseBarrier?.points || 0) > 0;
+      if (hasPhaseBarrier && (entity.necromancerRuntime.mana || 0) >= 1) {
+        entity.necromancerRuntime.mana = Math.max(0, (entity.necromancerRuntime.mana || 0) - 1);
+        entity.necromancerRuntime.phaseBarrierCooldownTimer = 1;
+        amount *= 0.5;
+        this.spawnFloatingText(entity.x, entity.y - 18, "Phase Barrier", "#9dd7ff", 0.65, 12);
+      }
+    }
+    if (entity.classType === "necromancer" && (entity.necromancerRuntime.mimicTimer || 0) > 0 && (entity.necromancerRuntime.mimicHealth || 0) > 0) {
+      const absorbed = Math.min(entity.necromancerRuntime.mimicHealth, amount);
+      entity.necromancerRuntime.mimicHealth = Math.max(0, entity.necromancerRuntime.mimicHealth - absorbed);
+      amount = Math.max(0, amount - absorbed);
+      if ((entity.necromancerRuntime.mimicHealth || 0) <= 0) {
+        entity.necromancerRuntime.mimicTimer = 0;
+        this.spawnFloatingText(entity.x, entity.y - 18, "Mimic Form Breaks", "#ff8ed9", 0.7, 12);
+      }
       if (amount <= 0) return;
     }
     if ((entity.consumableRuntime.tempHp || 0) > 0) {
@@ -677,19 +825,6 @@ export const runtimeBaseSupportMethods = {
     entity.health = Math.max(0, (Number.isFinite(entity.health) ? entity.health : 0) - amount);
     entity.alive = entity.health > 0;
     this.markPlayerEntityHealthBarVisible(entity);
-    const entityHasFoxstep = entity === this.player ? hasFoxstep(this) : (entity?.rangerTalents?.foxstep?.points || 0) > 0;
-    if (entity.classType === "archer" && entityHasFoxstep) {
-      entity.rangerRuntime = entity.rangerRuntime && typeof entity.rangerRuntime === "object" ? entity.rangerRuntime : {};
-      const runtime = entity.rangerRuntime;
-      const hpRatio = (Number.isFinite(entity.maxHealth) && entity.maxHealth > 0) ? entity.health / entity.maxHealth : 1;
-      if ((runtime.foxstepCooldown || 0) <= 0 && (runtime.foxstepActiveTimer || 0) <= 0 && hpRatio <= 0.5) {
-        runtime.foxstepCooldown = 90;
-        runtime.foxstepActiveTimer = 15;
-        runtime.foxstepHealPool = Math.max(1, entity.maxHealth * 0.5);
-        runtime.foxstepHealTickTimer = 0.25;
-        this.spawnFloatingText(entity.x, entity.y - 36, "Foxstep", "#d8ffe5", 1.0, 16);
-      }
-    }
     if (entity.classType === "fighter" && (damageType === "melee" || damageType === "physical")) {
       const counterChance = entity === this.player
         ? getWarriorGuardedAdvanceCounterChance(this)

@@ -388,7 +388,7 @@ export function drawSkillTreeMenu(renderer, game, layout) {
     ctx.strokeRect(menuX + 22, executeCard.y + executeCard.h + 12, menuW - 44, 86);
     ctx.fillStyle = "#b9c3d8";
     ctx.font = "13px Trebuchet MS";
-    ctx.fillText("Ranger skills (Fire Arrow, Piercing Strike, Multiarrow)", menuX + 36, executeCard.y + executeCard.h + 44);
+    ctx.fillText("Ranger open progression skills", menuX + 36, executeCard.y + executeCard.h + 44);
     ctx.fillText("are unavailable for Warrior.", menuX + 36, executeCard.y + executeCard.h + 64);
     ctx.restore();
     return;

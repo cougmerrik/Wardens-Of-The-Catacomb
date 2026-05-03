@@ -24,7 +24,7 @@ export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, 
     previous.hasAim &&
     (Math.abs((input.aimDirX || 0) - (previous.aimDirX || 0)) > 0.01 || Math.abs((input.aimDirY || 0) - (previous.aimDirY || 0)) > 0.01);
   const changedPrimaryHold = !!input.firePrimaryHeld !== !!previous.firePrimaryHeld;
-  const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued || !!input.swapAttackQueued;
+  const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued || !!input.swapAttackQueued || !!input.modeSwapQueued;
   const hasContinuousInput = !!input.firePrimaryHeld || !!input.moveX || !!input.moveY;
   if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || hasQueuedAction || hasContinuousInput) return true;
   return nowMs - lastInputSendAt >= forceSendIdleMs;
@@ -263,6 +263,12 @@ export function handleNetworkUiActions(game, netClient, isController) {
       recordAction(click, "statsCharacterTab", "setStatsView", "character");
       if (typeof game?.setStatsPanelView === "function" && canUseLocalPanels) game.setStatsPanelView("character");
       else if (canSendRoomAction) netClient.sendAction({ kind: "setStatsView", view: "character" });
+      continue;
+    }
+    if (playerAlive && hit(click.x, click.y, game.uiRects.hudSwapButton)) {
+      clearPinnedUiTooltip();
+      recordAction(click, "hudSwapButton", "modeSwap");
+      game.input?.queueKey?.("q");
       continue;
     }
     const itemRects = game.uiRects.shopItems || [];

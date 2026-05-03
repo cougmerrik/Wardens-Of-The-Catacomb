@@ -136,6 +136,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     else if (enemy.type === "minotaur") this.drawMinotaur(enemy, screenX, screenY);
     else if (enemy.type === "golem") this.drawGolemBoss(enemy, screenX, screenY, game.time);
     else if (enemy.type === "shardling") this.drawShardling(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "wolf") this.drawWolf(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "flaming_sphere") this.drawFlamingSphere(enemy, screenX, screenY, game.time);
     else if (enemy.type === "skeleton") this.drawSkeleton(enemy, screenX, screenY);
     else if (enemy.type === "mimic") {
       if (enemy.dormant) this.drawBreakable(game, { type: "box", size: enemy.size }, screenX, screenY);
@@ -152,6 +154,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     const screenX = enemy.x - cameraX;
     const screenY = enemy.y - cameraY;
     drawArcaneMarkSigil(ctx, enemy, screenX, screenY, game.time);
+    if ((enemy.poisonSlowTimer || 0) > 0) this.drawPoisonSlowIcon(enemy, screenX, screenY);
     this.drawEnemyHealthBar(enemy, screenX, screenY);
   }
 
@@ -200,6 +203,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     game.uiRects.gameOverLeaderboardButton = null;
     game.uiRects.gameOverMenuButton = null;
     game.uiRects.hudAbilityWidget = null;
+    game.uiRects.hudSwapButton = null;
     game.uiRects.consumableSlots = [];
     game.uiRects.touchMoveRegion = null;
     game.uiRects.touchAimRegion = null;
