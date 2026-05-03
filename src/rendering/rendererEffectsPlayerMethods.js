@@ -1,4 +1,5 @@
 import { getRangerSelectedPath, getRangerSelectedWeapon } from "../game/rangerTalentTree.js";
+import { getMageSelectedPath } from "../game/necromancerTalentTree.js";
 import { getWarriorDoctrine, getWarriorWeaponForm, hasWarriorEldritchInvestment, isWarriorRaging } from "../game/warriorTalentTree.js";
 
 export const rendererEffectsPlayerMethods = {
@@ -21,6 +22,15 @@ export const rendererEffectsPlayerMethods = {
     if (doctrine === "paladin") return { tint: "#f5cf6f", alpha: 0.78, filter: "brightness(1.08) saturate(1.15)" };
     if (doctrine === "gladiator") return { tint: "#d6b487", alpha: 0.62, filter: "brightness(1.06) saturate(1.08)" };
     return { tint: "#ff2a2a", alpha: 0.5, filter: "none" };
+  },
+
+  getMagePathPresentation(entityOrGame) {
+    const path = getMageSelectedPath(entityOrGame);
+    if (path === "wizardPath") return { tint: "#2f7dff", alpha: 0.52, filter: "saturate(1.12) brightness(1.04)", staff: "#f3f6ff", arm: "#6f93c9", orb: "#dfeaff" };
+    if (path === "enchanterPath") return { tint: "#3faf63", alpha: 0.5, filter: "saturate(1.1) brightness(1.02)", staff: "#d8b84f", arm: "#79a06f", orb: "#f2d872" };
+    if (path === "sorcererPath") return { tint: "#c83a30", alpha: 0.54, filter: "saturate(1.18) brightness(1.02)", staff: "#f3f6ff", arm: "#b56b62", orb: "#ffb1a8" };
+    if (path === "necromancerPath") return { tint: "#8d9299", alpha: 0.54, filter: "saturate(0.7) brightness(0.92)", staff: "#111317", arm: "#6f737b", orb: "#363a42" };
+    return { tint: "#a6a8ad", alpha: 0.42, filter: "none", staff: "#7a5130", arm: "#6f737b", orb: "#8b5a34" };
   },
 
   getPlayerTempHp(entity) {
@@ -51,6 +61,17 @@ export const rendererEffectsPlayerMethods = {
     if (movingVisual) player._renderAnimPhase += renderDt * this.config.player.animationSpeed;
     else player._renderAnimPhase = Math.max(0, player._renderAnimPhase - renderDt * this.config.player.animationSpeed * 1.8);
     const animFrame = movingVisual ? Math.floor(player._renderAnimPhase) % this.config.player.spriteFramesPerDir : 0;
+    const runtime = player?.necromancerRuntime || {};
+    if (player.classType === "necromancer" && (runtime.mimicTimer || 0) > 0 && typeof this.drawMimic === "function") {
+      const tile = this.config?.map?.tile || 32;
+      this.drawMimic({
+        size: Math.max(24, (player.size || 22) * 1.35),
+        tongueLength: (runtime.mimicTongueTimer || 0) > 0 ? tile * 1.5 : 0,
+        tongueDirX: runtime.mimicTongueDirX || player.dirX || 1,
+        tongueDirY: runtime.mimicTongueDirY || player.dirY || 0
+      }, screenX, screenY);
+      return { movingVisual, walkPhase: movingVisual ? player._renderAnimPhase * 0.1 : 0, skipRig: true };
+    }
     const frameX = animFrame * frameSize;
     const frameY = (Number.isFinite(player.facing) ? player.facing : 0) * frameSize;
     const drawX = screenX - renderSize / 2;
@@ -59,6 +80,7 @@ export const rendererEffectsPlayerMethods = {
     const warriorRaging = isWarriorRaging(player);
     const doctrineVisual = this.getWarriorDoctrinePresentation(player);
     const rangerVisual = player?.classType === "archer" ? this.getRangerPathPresentation(player) : null;
+    const mageVisual = player?.classType === "necromancer" ? this.getMagePathPresentation(player) : null;
     this.drawPlayerSpriteFrame(
       frameX,
       frameY,
@@ -66,9 +88,9 @@ export const rendererEffectsPlayerMethods = {
       drawX,
       drawY,
       renderSize,
-      warriorRaging ? doctrineVisual.tint : rangerVisual?.tint || null,
-      warriorRaging ? doctrineVisual.alpha : rangerVisual?.alpha || 0,
-      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (warriorRaging ? doctrineVisual.filter : rangerVisual?.filter || "none")
+      warriorRaging ? doctrineVisual.tint : rangerVisual?.tint || mageVisual?.tint || null,
+      warriorRaging ? doctrineVisual.alpha : rangerVisual?.alpha || mageVisual?.alpha || 0,
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (warriorRaging ? doctrineVisual.filter : rangerVisual?.filter || mageVisual?.filter || "none")
     );
     return { movingVisual, walkPhase: movingVisual ? player._renderAnimPhase * 0.1 : 0 };
   },
@@ -116,8 +138,8 @@ export const rendererEffectsPlayerMethods = {
       const screenX = player.x - cameraX;
       const screenY = player.y - cameraY;
       const classSpec = this.getReplicatedPlayerClassSpec(player);
-      const { walkPhase } = this.drawReplicatedPlayerSprite(player, screenX, screenY, renderSize, frameSize);
-      this.drawReplicatedPlayerRig(player, classSpec, screenX, screenY, walkPhase);
+      const { walkPhase, skipRig } = this.drawReplicatedPlayerSprite(player, screenX, screenY, renderSize, frameSize);
+      if (!skipRig) this.drawReplicatedPlayerRig(player, classSpec, screenX, screenY, walkPhase);
       this.drawRemotePlayerHandle(player, screenX, screenY);
     }
   },
@@ -144,6 +166,16 @@ export const rendererEffectsPlayerMethods = {
     p._renderAnimPhase = Number.isFinite(p._renderAnimPhase) ? p._renderAnimPhase : 0;
     if (movingVisual) p._renderAnimPhase += renderDt * this.config.player.animationSpeed;
     else p._renderAnimPhase = Math.max(0, p._renderAnimPhase - renderDt * this.config.player.animationSpeed * 1.8);
+    if (game.isNecromancerClass && game.isNecromancerClass() && (game.necromancerRuntime?.mimicTimer || 0) > 0 && typeof this.drawMimic === "function") {
+      const tile = game.config?.map?.tile || 32;
+      this.drawMimic({
+        size: Math.max(24, (p.size || 22) * 1.35),
+        tongueLength: (game.necromancerRuntime?.mimicTongueTimer || 0) > 0 ? tile * 1.5 : 0,
+        tongueDirX: game.necromancerRuntime?.mimicTongueDirX || p.dirX || 1,
+        tongueDirY: game.necromancerRuntime?.mimicTongueDirY || p.dirY || 0
+      }, playerScreenX, playerScreenY);
+      return;
+    }
     const animFrame = movingVisual ? Math.floor(p._renderAnimPhase) % this.config.player.spriteFramesPerDir : 0;
     const frameX = animFrame * frameSize;
     const frameY = p.facing * frameSize;
@@ -154,8 +186,9 @@ export const rendererEffectsPlayerMethods = {
     let tintColor = null;
     let tintAlpha = 0;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
-      tintColor = "#a6a8ad";
-      tintAlpha = 0.5;
+      const mageVisual = this.getMagePathPresentation(game);
+      tintColor = mageVisual.tint;
+      tintAlpha = mageVisual.alpha;
     } else if (archerPathVisual) {
       tintColor = archerPathVisual.tint;
       tintAlpha = archerPathVisual.alpha;
@@ -178,15 +211,18 @@ export const rendererEffectsPlayerMethods = {
       renderSize,
       tintColor,
       tintAlpha,
-      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (!game.classSpec?.usesRanged && isWarriorRaging(game) ? this.getWarriorDoctrinePresentation(game).filter : archerPathVisual?.filter || "none")
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (!game.classSpec?.usesRanged && isWarriorRaging(game) ? this.getWarriorDoctrinePresentation(game).filter : archerPathVisual?.filter || (game.isNecromancerClass && game.isNecromancerClass() ? this.getMagePathPresentation(game).filter : "none"))
     );
     const baseCd = game.getPlayerFireCooldown ? game.getPlayerFireCooldown() : this.config.player.baseFireCooldown;
     const firePulse = baseCd > 0 ? Math.max(0, Math.min(1, p.fireCooldown / baseCd)) : 0;
     const walkPhase = movingVisual ? p._renderAnimPhase * 0.1 : 0;
+    const magePathVisual = game.isNecromancerClass && game.isNecromancerClass() ? this.getMagePathPresentation(game) : null;
     const hasArcherPathFilter = !!archerPathVisual?.filter && archerPathVisual.filter !== "none";
-    if (shadowVeilActive || hasArcherPathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.save();
+    const hasMagePathFilter = !!magePathVisual?.filter && magePathVisual.filter !== "none";
+    if (shadowVeilActive || hasArcherPathFilter || hasMagePathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.save();
     if (shadowVeilActive) this.ctx.filter = "saturate(45%) brightness(0.9) opacity(0.68)";
     else if (hasArcherPathFilter) this.ctx.filter = archerPathVisual.filter;
+    else if (hasMagePathFilter) this.ctx.filter = magePathVisual.filter;
     else if (!game.classSpec?.usesRanged && isWarriorRaging(game)) this.ctx.filter = this.getWarriorDoctrinePresentation(game).filter;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
       this.drawPlayerNecromancerRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
@@ -195,7 +231,7 @@ export const rendererEffectsPlayerMethods = {
     } else {
       this.drawPlayerAimingRig(p, playerScreenX, playerScreenY, walkPhase, firePulse, this.getRangerWeaponPresentation(game));
     }
-    if (shadowVeilActive || hasArcherPathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.restore();
+    if (shadowVeilActive || hasArcherPathFilter || hasMagePathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.restore();
   },
 
   drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor = null, tintAlpha = 0, filter = "none") {
@@ -464,7 +500,8 @@ export const rendererEffectsPlayerMethods = {
     const runtime = player?.necromancerRuntime || {};
     const wildBlue = (runtime.blueTimer || 0) > 0;
     const mimic = (runtime.mimicTimer || 0) > 0;
-    ctx.strokeStyle = mimic ? "#8b5a34" : wildBlue ? "#38a7ff" : "#6f737b";
+    const mageVisual = this.getMagePathPresentation(player);
+    ctx.strokeStyle = mimic ? "#8b5a34" : wildBlue ? "#38a7ff" : mageVisual.arm;
     ctx.lineWidth = 3.8;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -474,14 +511,14 @@ export const rendererEffectsPlayerMethods = {
     ctx.lineTo(frontHandX, frontHandY);
     ctx.stroke();
 
-    ctx.strokeStyle = mimic ? "#3b2114" : "#111317";
+    ctx.strokeStyle = mimic ? "#3b2114" : mageVisual.staff;
     ctx.lineWidth = 3.2;
     ctx.beginPath();
     ctx.moveTo(staffBaseX, staffBaseY);
     ctx.lineTo(staffTipX, staffTipY);
     ctx.stroke();
 
-    ctx.fillStyle = mimic ? "#c28a55" : wildBlue ? "#72d7ff" : "#23262b";
+    ctx.fillStyle = mimic ? "#c28a55" : wildBlue ? "#72d7ff" : mageVisual.orb;
     ctx.beginPath();
     ctx.arc(staffTipX, staffTipY, 3.5, 0, Math.PI * 2);
     ctx.fill();

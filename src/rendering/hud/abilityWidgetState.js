@@ -27,10 +27,10 @@ export function getHudAbilityState(game) {
       ? "enchanter"
       : "blink";
     const titleMap = {
-      wizard: "Blink + Focus",
+      wizard: "Arcane Focus",
       necromancer: "Death Bolt",
       sorcerer: "Chaos Surge",
-      enchanter: "Blink",
+      enchanter: "Mirage",
       blink: "Blink"
     };
     const colorMap = {

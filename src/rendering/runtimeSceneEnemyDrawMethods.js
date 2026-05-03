@@ -27,6 +27,36 @@ function getControlledUndeadPalette(enemy) {
 
 export const runtimeSceneEnemyDrawMethods = {
   ...runtimeSceneBossDrawMethods,
+  drawFlamingSphere(enemy, screenX, screenY, time = 0) {
+    const ctx = this.ctx;
+    const radius = Math.max(10, (enemy?.size || 24) * 0.48);
+    const pulse = 0.92 + Math.sin(time * 8 + (enemy?.x || 0) * 0.03) * 0.08;
+    ctx.save();
+    ctx.translate(screenX, screenY);
+    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, radius * 1.55);
+    glow.addColorStop(0, "rgba(255, 238, 143, 0.95)");
+    glow.addColorStop(0.42, "rgba(255, 120, 44, 0.86)");
+    glow.addColorStop(1, "rgba(165, 30, 20, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 1.45 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    const core = ctx.createRadialGradient(-radius * 0.18, -radius * 0.18, 1, 0, 0, radius);
+    core.addColorStop(0, "#fff1a8");
+    core.addColorStop(0.5, "#ff7a2f");
+    core.addColorStop(1, "#b5261f");
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 205, 98, 0.88)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.78, time * 2.2, time * 2.2 + Math.PI * 1.35);
+    ctx.stroke();
+    ctx.restore();
+  },
+
   drawGhost(enemyOrScreenX, maybeScreenX, maybeScreenY, maybeSize) {
     const ctx = this.ctx;
     const enemy = typeof enemyOrScreenX === "object" && enemyOrScreenX !== null ? enemyOrScreenX : null;

@@ -127,10 +127,18 @@ function getProjectileLightRadius(projectile) {
 function getZoneLightRadius(zone) {
   if (!zone || (zone.life ?? 0) <= 0) return 0;
   if (Number.isFinite(zone.lightRadius)) return Math.max(0, zone.lightRadius);
+  if (zone.zoneType === "arcaneChain" && zone.damageType === "lightning") return 32 * 1.6;
   return 0;
 }
 
 function getZoneLightOptions(game, zone) {
+  if (zone?.zoneType === "arcaneChain" && zone.damageType === "lightning") {
+    return {
+      lightDecay: 1.35,
+      brightRadiusRatio: 0.24,
+      dimRadiusRatio: 0.95
+    };
+  }
   if (zone?.zoneType === "stormcallerFlash") {
     const cfg = getLightingConfig(game);
     return {
@@ -140,6 +148,23 @@ function getZoneLightOptions(game, zone) {
     };
   }
   return getFlashLightOptions(game);
+}
+
+function getPortalLightRadius(game) {
+  const cfg = getLightingConfig(game);
+  const tile = getTileSize(game);
+  const radiusTiles = Number.isFinite(cfg.portalRadiusTiles) ? Math.max(0, cfg.portalRadiusTiles) : 3;
+  return radiusTiles * tile;
+}
+
+function getPortalLightOptions(game) {
+  const cfg = getLightingConfig(game);
+  return {
+    lightIntensity: Number.isFinite(cfg.portalLightPower) ? Math.max(0, cfg.portalLightPower) : 0.35,
+    lightDecay: Number.isFinite(cfg.portalLightFalloffDecay) ? Math.max(0.1, cfg.portalLightFalloffDecay) : 0.75,
+    brightRadiusRatio: Number.isFinite(cfg.portalLightBrightRadiusRatio) ? Math.max(0.05, Math.min(0.95, cfg.portalLightBrightRadiusRatio)) : 0.2,
+    dimRadiusRatio: Number.isFinite(cfg.portalLightDimRadiusRatio) ? Math.max(0.05, Math.min(1, cfg.portalLightDimRadiusRatio)) : 1
+  };
 }
 
 function decayLanternFuel(game, players, dt) {
@@ -262,6 +287,10 @@ export function getActiveLightSources(game) {
     addSource(light, light.type || "light", radius);
   }
 
+  if (game.portal?.active) {
+    addSource({ ...game.portal, type: "exitPortal" }, "exitPortal", getPortalLightRadius(game), getPortalLightOptions(game));
+  }
+
   for (const arrow of Array.isArray(game.fireArrows) ? game.fireArrows : []) {
     addSource(arrow, "rangerFireArrow", getRangerFireArrowLightRadius(game, arrow), getFireLightOptions(game));
   }
@@ -284,7 +313,7 @@ export function getActiveLightSources(game) {
   }
 
   for (const enemy of Array.isArray(game.enemies) ? game.enemies : []) {
-    addSource(enemy, "enemy", getEnemyLightRadius(game, enemy));
+    addSource(enemy, "enemy", getEnemyLightRadius(game, enemy), enemy?.type === "flaming_sphere" ? getFireLightOptions(game) : null);
     addSource(enemy, "burningEnemy", getBurningEnemyLightRadius(game, enemy), getFireLightOptions(game));
   }
 

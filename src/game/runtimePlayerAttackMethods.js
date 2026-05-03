@@ -589,10 +589,16 @@ export const runtimePlayerAttackMethods = {
     const duration = 3 + Math.max(0, Math.min(1, getMageSpellPowerMultiplier(this) - 1)) * 2;
     if (enemy.isBoss || enemy.isFloorBoss) {
       enemy.weakenedTimer = Math.max(enemy.weakenedTimer || 0, duration);
-      enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, duration);
+      if ((enemy.confusionImmunityTimer || 0) <= 0) {
+        enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, duration);
+        enemy.confusionImmunityTimer = 10;
+      }
       return;
     }
-    enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, duration);
+    if ((enemy.confusionImmunityTimer || 0) <= 0) {
+      enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, duration);
+      enemy.confusionImmunityTimer = 10;
+    }
     if (this.isUndeadEnemy(enemy) && this.canControlMoreUndead()) this.markUndeadAsControlled(enemy);
     else if (this.canControlMoreUndead()) {
       enemy.isControlledUndead = true;
@@ -631,27 +637,28 @@ export const runtimePlayerAttackMethods = {
     const cantrip = getMageSelectedCantrip(this) || "fireBoltCantrip";
     if (cantrip === "necroticBeamCantrip") return false;
     if (this.player.fireCooldown > 0) return false;
+    const cantripPower = getMageSpellPowerMultiplier(this);
     const cooldowns = {
       fireBoltCantrip: 0.3,
       frostShardCantrip: 0.5,
       shockCantrip: 0.4,
       arcaneMissileCantrip: 0.45,
-      greenFlameBladeCantrip: 0.48
+      greenFlameBladeCantrip: 0.576
     };
     this.player.fireCooldown = (cooldowns[cantrip] || 0.4) * (hasMageTalent(this, "rapidCasting") ? 0.85 : 1);
     this.pauseMageManaRegen(hasMageTalent(this, "rapidCasting") ? 0.35 : 0.5);
     if (cantrip === "greenFlameBladeCantrip") {
-      this.performMageGreenFlameBlade(dx, dy);
+      this.performMageGreenFlameBlade(dx, dy, cantripPower);
       this.gainMageRune();
       return true;
     }
     const origin = this.getBowMuzzleOrigin(dx, dy);
     const angle = Math.atan2(origin.dirY, origin.dirX);
     const profile = {
-      fireBoltCantrip: { speed: 340, life: 0.95, size: 6, damage: this.getPrimaryDamage() * 0.95, projectileType: "mage_fireBolt", damageType: "fire", burn: 3 },
-      frostShardCantrip: { speed: 250, life: 1.1, size: 7, damage: this.getPrimaryDamage() * 1.08, projectileType: "mage_frostShard", damageType: "cold", slow: 5, knockback: 24 },
-      shockCantrip: { speed: 560, life: 0.75, size: 5, damage: this.getPrimaryDamage() * 0.72, projectileType: "mage_shock", damageType: "lightning", chainCount: 2 },
-      arcaneMissileCantrip: { speed: 330, life: 0.85, size: 6, damage: this.getPrimaryDamage() * 0.68, projectileType: "mage_arcaneMissile", damageType: "arcane", homing: true, range: (this.config?.map?.tile || 32) * 8 }
+      fireBoltCantrip: { speed: 340, life: 0.95, size: 6, damage: this.getPrimaryDamage() * 0.95 * cantripPower, projectileType: "mage_fireBolt", damageType: "fire", burn: 3 },
+      frostShardCantrip: { speed: 250, life: 1.1, size: 7, damage: this.getPrimaryDamage() * 1.08 * cantripPower, projectileType: "mage_frostShard", damageType: "cold", slow: 5, knockback: 24 },
+      shockCantrip: { speed: 560, life: 0.75, size: 5, damage: this.getPrimaryDamage() * 0.72 * cantripPower, projectileType: "mage_shock", damageType: "lightning", chainCount: 2 },
+      arcaneMissileCantrip: { speed: 330, life: 0.85, size: 6, damage: this.getPrimaryDamage() * 0.68 * cantripPower, projectileType: "mage_arcaneMissile", damageType: "arcane", homing: true, range: (this.config?.map?.tile || 32) * 8 }
     }[cantrip];
     const critMultiplier = this.rollMageCritical();
     const shotAngles = cantrip === "arcaneMissileCantrip" ? [angle - 0.08, angle + 0.08] : [angle];
@@ -696,6 +703,10 @@ export const runtimePlayerAttackMethods = {
     const tile = this.config?.map?.tile || 32;
     const range = tile * 2;
     const angle = Math.atan2(dy, dx);
+    const runtime = this.ensureMageRuntimeState();
+    runtime.mimicTongueTimer = 0.22;
+    runtime.mimicTongueDirX = Math.cos(angle);
+    runtime.mimicTongueDirY = Math.sin(angle);
     this.meleeSwings.push({
       x: this.player.x,
       y: this.player.y,
@@ -721,10 +732,11 @@ export const runtimePlayerAttackMethods = {
     return true;
   },
 
-  performMageGreenFlameBlade(dx, dy) {
+  performMageGreenFlameBlade(dx, dy, power = 1) {
     const tile = this.config?.map?.tile || 32;
-    const range = (hasMageTalent(this, "battlemage") ? 1.65 : 1.15) * tile;
-    const arc = Math.PI * 0.45;
+    const scale = Math.max(0.75, Math.min(1.35, Number.isFinite(power) ? power : 1));
+    const range = (hasMageTalent(this, "battlemage") ? 2.35 : 1.85) * tile * (0.88 + scale * 0.12);
+    const arc = Math.PI * 0.58 * (0.9 + scale * 0.16) * 0.8;
     const angle = Math.atan2(dy, dx);
     this.meleeSwings.push({
       x: this.player.x,
@@ -738,7 +750,8 @@ export const runtimePlayerAttackMethods = {
       maxLife: this.config.effects.meleeSwingLife
     });
     const critMultiplier = this.rollMageCritical();
-    const damage = this.getPrimaryDamage() * (hasMageTalent(this, "battlemage") ? 1.55 : 1.3) * critMultiplier;
+    const damage = this.getPrimaryDamage() * (hasMageTalent(this, "battlemage") ? 1.55 : 1.3) * scale * critMultiplier;
+    let leechTotal = 0;
     for (const enemy of this.enemies || []) {
       if (!enemy || (enemy.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(enemy)) continue;
       const ex = enemy.x - this.player.x;
@@ -750,7 +763,9 @@ export const runtimePlayerAttackMethods = {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       if (Math.abs(diff) > arc * 0.5) continue;
+      const hpBefore = Number.isFinite(enemy.hp) ? enemy.hp : 0;
       this.applyEnemyDamage(enemy, damage, "fire", this.player.id || null, { critical: critMultiplier > 1 });
+      leechTotal += Math.max(0, hpBefore - Math.max(0, Number.isFinite(enemy.hp) ? enemy.hp : 0)) * 0.18;
       enemy.burningTimer = Math.max(enemy.burningTimer || 0, 3);
       enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, damage * 0.2));
       this.applyMageOnHitEffects(enemy, { status: "burning" });
@@ -760,6 +775,21 @@ export const runtimePlayerAttackMethods = {
           if (vecLength((other.x || 0) - enemy.x, (other.y || 0) - enemy.y) <= tile * 1.1) this.applyEnemyDamage(other, damage * 0.35, "fire", this.player.id || null);
         }
       }
+    }
+    for (const br of this.breakables || []) {
+      if (!br || (br.hp || 0) <= 0) continue;
+      const ex = br.x - this.player.x;
+      const ey = br.y - this.player.y;
+      const dist = vecLength(ex, ey);
+      if (dist > range + (br.size || 20) * 0.45) continue;
+      const brAngle = Math.atan2(ey, ex);
+      let diff = brAngle - angle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      if (Math.abs(diff) <= arc * 0.5) br.hp = 0;
+    }
+    if (leechTotal > 0 && typeof this.applyPlayerHealing === "function") {
+      this.applyPlayerHealing(Math.min(leechTotal, (this.player.maxHealth || 1) * 0.08));
     }
     this.triggerMageBattlemageEffects(this.player.x, this.player.y, 0.7);
   },
@@ -793,7 +823,7 @@ export const runtimePlayerAttackMethods = {
     else if (spell === "chromaticOrbSpell") this.castMageChromaticOrb(dx, dy, power, runesConsumed, { sizeMult: wildSizeMult, knockback: wildKnockback, infusion: wildInfusion });
     else if (spell === "cloudDaggersSpell") this.castMageCloudOfDaggers(dx, dy, power * wildSizeMult, durationMult, runesConsumed);
     else if (spell === "confusionSpell") this.castMageConfusion(dx, dy, power * wildSizeMult, durationMult, runesConsumed);
-    else if (spell === "invisibilitySpell") this.castMageInvisibility(power, runesConsumed);
+    else if (spell === "invisibilitySpell") this.castMageSpiritGuardians(dx, dy, power, durationMult, runesConsumed);
     else if (spell === "flamingSphereSpell") this.castMageFlamingSphere(dx, dy, power, durationMult, runesConsumed);
     if (wildMagicEffect === "Split") this.splitLatestMageProjectile();
     this.triggerMageBattlemageEffects(this.player.x, this.player.y, power);
@@ -851,6 +881,7 @@ export const runtimePlayerAttackMethods = {
       critMultiplier: this.rollMageCritical(),
       pierce: true,
       useSegmentHit: true,
+      maxHitsPerFrame: 12,
       knockback: options.knockback || 0,
       wildInfusion: options.infusion || "",
       chromaticElement: element,
@@ -905,14 +936,17 @@ export const runtimePlayerAttackMethods = {
     const tile = this.config?.map?.tile || 32;
     const duration = 4 * durationMult;
     const controlMult = hasMageTalent(this, "enchanterPath") ? 1.25 : 1;
-    const confusionDuration = 5 * controlMult;
+    const confusionDuration = 3 * controlMult;
     const radius = tile * 2 * Math.max(0.85, Math.min(1.25, power));
     this.fireZones.push({ x: target.x, y: target.y, radius, life: duration, totalLife: duration, zoneType: "confusion", ownerId: this.player.id || null });
     for (const enemy of this.enemies || []) {
       if (!enemy || (enemy.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(enemy)) continue;
       if (vecLength((enemy.x || 0) - target.x, (enemy.y || 0) - target.y) > radius + (enemy.size || 20) * 0.35) continue;
-      enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, confusionDuration);
-      enemy.confusionOwnerId = this.player.id || null;
+      if ((enemy.confusionImmunityTimer || 0) <= 0) {
+        enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, confusionDuration);
+        enemy.confusionOwnerId = this.player.id || null;
+        enemy.confusionImmunityTimer = 10;
+      }
       if (runesConsumed >= 3) {
         enemy.weakenedTimer = Math.max(enemy.weakenedTimer || 0, duration);
         for (const other of this.enemies || []) {
@@ -925,23 +959,35 @@ export const runtimePlayerAttackMethods = {
   },
 
   castMageInvisibility(power = 1, runesConsumed = 0) {
+    return this.castMageSpiritGuardians(this.player?.dirX || 1, this.player?.dirY || 0, power, 1, runesConsumed);
+  },
+
+  castMageSpiritGuardians(dx, dy, power = 1, durationMult = 1, runesConsumed = 0) {
     const runtime = this.ensureMageRuntimeState();
-    runtime.invisibilityTimer = Math.max(runtime.invisibilityTimer || 0, 5 * Math.max(0.75, Math.min(1.3, power)));
-    runtime.targetingBreakTimer = Math.max(runtime.targetingBreakTimer || 0, runtime.invisibilityTimer);
-    if (runesConsumed >= 3) {
-      const tile = this.config?.map?.tile || 32;
-      this.fireZones.push({
-        x: this.player.x,
-        y: this.player.y,
-        radius: tile * 1.25,
-        life: 3,
-        totalLife: 3,
-        zoneType: "runicVeil",
-        ownerId: this.player.id || null,
-        coldDamage: this.getPrimaryDamage() * 1.2
-      });
-    }
-    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(this.player.x, this.player.y - 32, "Invisible", "#b7bac8", 0.65, 12);
+    const tile = this.config?.map?.tile || 32;
+    const scale = Math.max(0.75, Math.min(1.35, Number.isFinite(power) ? power : 1));
+    const duration = 4 * Math.max(0.5, durationMult || 1);
+    runtime.invisibilityTimer = Math.max(runtime.invisibilityTimer || 0, 1.25);
+    runtime.targetingBreakTimer = Math.max(runtime.targetingBreakTimer || 0, 1.25);
+    runtime.blinkInvulnTimer = Math.max(runtime.blinkInvulnTimer || 0, 0.12);
+    this.fireZones.push({
+      x: this.player.x,
+      y: this.player.y,
+      radius: tile * 2.05 * scale,
+      life: duration,
+      totalLife: duration,
+      tickTimer: 0,
+      tickInterval: hasMageTalent(this, "lingeringPower") ? 0.2 : 0.28,
+      zoneType: "spiritGuardians",
+      followOwner: true,
+      ownerId: this.player.id || null,
+      damageType: "necrotic",
+      dps: this.getPrimaryDamage() * 1.65 * power,
+      runesConsumed,
+      coldSlow: runesConsumed >= 3
+    });
+    if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(this.player.x, this.player.y - 32, "Spirit Guardians", "#b7f0d0", 0.75, 13);
+    return true;
   },
 
   castMageFlamingSphere(dx, dy, power = 1, durationMult = 1, runesConsumed = 0) {
@@ -953,6 +999,8 @@ export const runtimePlayerAttackMethods = {
       tacticKey: "skeleton_warrior",
       x: target.x,
       y: target.y,
+      anchorX: target.x,
+      anchorY: target.y,
       size: 24,
       speed: 105,
       hp: 28 + this.level * 2,
@@ -970,8 +1018,12 @@ export const runtimePlayerAttackMethods = {
       hpBarTimer: 1.2,
       expireTimer: 5 * durationMult,
       fireAuraDps: this.getPrimaryDamage() * 0.8 * power,
+      fireAuraTickTimer: 0,
+      burnDuration: 3,
       runicFlamesTimer: runesConsumed >= 3 ? 5 : 0,
-      controlledColor: "#ff9b52"
+      controlledColor: "#ff9b52",
+      lightRadius: (this.config?.map?.tile || 32) * 2.25,
+      lightIntensity: 0.2
     };
     this.enemies.push(sphere);
     if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(sphere.x, sphere.y - 26, "Flaming Sphere", "#ffb05f", 0.65, 12);
@@ -1537,7 +1589,7 @@ export const runtimePlayerAttackMethods = {
       }
       return blinked;
     }
-    const blinked = this.activateMageBlink(dx, dy, { decoy: path === "enchanterPath" });
+    const blinked = this.activateMageBlink(dx, dy, { decoy: path === "enchanterPath", label: path === "enchanterPath" ? "Mirage" : "Blink", color: path === "enchanterPath" ? "#8fdc8f" : "#c6a8ff" });
     if (blinked) this.applyMageClassSkillSecondaryBenefit();
     return blinked;
   },
@@ -1587,20 +1639,21 @@ export const runtimePlayerAttackMethods = {
     if (options.decoy) {
       this.enemies.push({
         type: "mage_decoy",
+        tacticKey: "mage_decoy",
         x: this.player.x,
         y: this.player.y,
         size: 22,
         speed: 0,
-        hp: (this.player.maxHealth || 1) * 0.1,
-        maxHp: (this.player.maxHealth || 1) * 0.1,
+        hp: (this.player.maxHealth || 1) * 0.18,
+        maxHp: (this.player.maxHealth || 1) * 0.18,
         damageMin: 0,
         damageMax: 0,
         isControlledUndead: true,
         controllerPlayerId: this.player.id || null,
         summonedByPlayer: true,
         skipRewardsOnDeath: true,
-        tempMageCharmTimer: 3,
-        hpBarTimer: 1.2
+        hpBarTimer: 1.2,
+        decoyFireCooldown: 0.25
       });
     }
     this.moveWithCollisionSubsteps(this.player, moveX, moveY);

@@ -385,6 +385,7 @@ export const runtimeBaseSupportMethods = {
       nr.stoneskinTimer = Math.max(0, (Number.isFinite(nr.stoneskinTimer) ? nr.stoneskinTimer : 0) - dt);
       nr.wildSpeedRegenTimer = Math.max(0, (Number.isFinite(nr.wildSpeedRegenTimer) ? nr.wildSpeedRegenTimer : 0) - dt);
       nr.mimicTimer = Math.max(0, (Number.isFinite(nr.mimicTimer) ? nr.mimicTimer : 0) - dt);
+      nr.mimicTongueTimer = Math.max(0, (Number.isFinite(nr.mimicTongueTimer) ? nr.mimicTongueTimer : 0) - dt);
       if ((nr.mimicTimer || 0) <= 0) nr.mimicHealth = 0;
       nr.influenceCooldownTimer = Math.max(0, (Number.isFinite(nr.influenceCooldownTimer) ? nr.influenceCooldownTimer : 0) - dt);
       nr.runeTimer = Math.max(0, (Number.isFinite(nr.runeTimer) ? nr.runeTimer : 0) - dt);

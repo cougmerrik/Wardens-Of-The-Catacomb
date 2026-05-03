@@ -81,6 +81,8 @@ export function resolveCombatAndDrops({
     const prevY = b.y;
     b.x += b.vx * dt;
     b.y += b.vy * dt;
+    b.prevXForHit = prevX;
+    b.prevYForHit = prevY;
     b.life -= dt;
     if (b.projectileType === "deathBolt" && Number.isFinite(b.detonateX) && Number.isFinite(b.detonateY)) {
       const remaining = vecLength((b.detonateX || 0) - b.x, (b.detonateY || 0) - b.y);
@@ -224,14 +226,16 @@ export function resolveCombatAndDrops({
       if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (b.hitTargets.has(enemy)) continue;
       const projectileHitRadius = (enemy.size + b.size) * 0.5;
+      const hitPrevX = Number.isFinite(b.prevXForHit) ? b.prevXForHit : b.x;
+      const hitPrevY = Number.isFinite(b.prevYForHit) ? b.prevYForHit : b.y;
       const hitDistance = b.useSegmentHit
         ? (() => {
-          const sx = b.x - prevX;
-          const sy = b.y - prevY;
+          const sx = b.x - hitPrevX;
+          const sy = b.y - hitPrevY;
           const lenSq = sx * sx + sy * sy;
           if (lenSq <= 0.001) return vecLength(b.x - enemy.x, b.y - enemy.y);
-          const t = Math.max(0, Math.min(1, (((enemy.x || 0) - prevX) * sx + ((enemy.y || 0) - prevY) * sy) / lenSq));
-          return vecLength((prevX + sx * t) - enemy.x, (prevY + sy * t) - enemy.y);
+          const t = Math.max(0, Math.min(1, (((enemy.x || 0) - hitPrevX) * sx + ((enemy.y || 0) - hitPrevY) * sy) / lenSq));
+          return vecLength((hitPrevX + sx * t) - enemy.x, (hitPrevY + sy * t) - enemy.y);
         })()
         : vecLength(b.x - enemy.x, b.y - enemy.y);
       if (hitDistance < projectileHitRadius) {
@@ -239,7 +243,10 @@ export function resolveCombatAndDrops({
           b.hitTargets.add(enemy);
           continue;
         }
-        const projectileDamage = b.projectileType === "holyWave"
+        const isMageProjectile = typeof b.projectileType === "string" && b.projectileType.startsWith("mage_");
+        const projectileDamage = isMageProjectile
+          ? (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1) * Math.max(0.01, Number.isFinite(b.critMultiplier) ? b.critMultiplier : 1)
+          : b.projectileType === "holyWave"
           ? (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1)
           : typeof game.getRangerArrowDamageAgainst === "function"
           ? game.getRangerArrowDamageAgainst(enemy, b)
@@ -279,6 +286,13 @@ export function resolveCombatAndDrops({
         }
         if (typeof game.applyConsumableOnHitEffects === "function") game.applyConsumableOnHitEffects(enemy, b.ownerId || null);
         if (b.projectileType && String(b.projectileType).startsWith("mage_")) {
+          if (b.mageCantrip && (game.necromancerTalents?.battlemage?.points || 0) > 0) {
+            const owner = typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(b.ownerId || null) : game.player;
+            const tile = game.config?.map?.tile || 32;
+            if (owner && vecLength((enemy.x || 0) - owner.x, (enemy.y || 0) - owner.y) <= tile * 2) {
+              game.applyEnemyDamage(enemy, projectileDamage * 0.25, b.damageType || "arcane", b.ownerId || null);
+            }
+          }
           if ((b.burnDuration || 0) > 0) {
             enemy.burningTimer = Math.max(enemy.burningTimer || 0, b.burnDuration);
             enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, projectileDamage * 0.18));
@@ -303,7 +317,18 @@ export function resolveCombatAndDrops({
               if (!chainTarget) break;
               game.applyEnemyDamage(chainTarget, projectileDamage * 0.65, b.damageType || "lightning", b.ownerId || null);
               b.hitTargets.add(chainTarget);
-              game.fireZones.push({ x: chainSource.x, y: chainSource.y, targetX: chainTarget.x, targetY: chainTarget.y, zoneType: "arcaneChain", life: 0.18, totalLife: 0.18 });
+              game.fireZones.push({
+                x: chainSource.x,
+                y: chainSource.y,
+                targetX: chainTarget.x,
+                targetY: chainTarget.y,
+                zoneType: "arcaneChain",
+                damageType: b.damageType || "lightning",
+                lightRadius: (game.config?.map?.tile || 32) * 1.6,
+                lightIntensity: 0.18,
+                life: 0.18,
+                totalLife: 0.18
+              });
               chainSource = chainTarget;
             }
           }
@@ -378,6 +403,10 @@ export function resolveCombatAndDrops({
         }
         b.hitTargets.add(enemy);
         b.linebreakerHits = (Number.isFinite(b.linebreakerHits) ? b.linebreakerHits : 0) + 1;
+        if (Number.isFinite(b.maxHitsPerFrame) && b.hitTargets.size >= b.maxHitsPerFrame) {
+          b.life = 0;
+          break;
+        }
         if (b.projectileType === "holyWave" || b.pierce) {
           // Piercing projectiles travel through enemies once per target.
         } else if (b.predatorPierce) {
@@ -591,8 +620,8 @@ export function resolveCombatAndDrops({
       }
       continue;
     }
-    if (zone.zoneType === "cloudDaggers" || zone.zoneType === "arcaneBind" || zone.zoneType === "confusion" || zone.zoneType === "runicVeil") {
-      const tickInterval = zone.zoneType === "cloudDaggers" ? Math.max(0.12, zone.tickInterval || 0.25) : 0.25;
+    if (zone.zoneType === "cloudDaggers" || zone.zoneType === "arcaneBind" || zone.zoneType === "confusion" || zone.zoneType === "runicVeil" || zone.zoneType === "spiritGuardians") {
+      const tickInterval = zone.zoneType === "cloudDaggers" || zone.zoneType === "spiritGuardians" ? Math.max(0.12, zone.tickInterval || 0.25) : 0.25;
       zone.tickTimer = Math.max(-2, (Number.isFinite(zone.tickTimer) ? zone.tickTimer : 0) - dt);
       if (zone.zoneType === "runicVeil" && zone.life <= dt + 0.02 && !zone.exploded) {
         zone.exploded = true;
@@ -611,13 +640,23 @@ export function resolveCombatAndDrops({
           if (zone.zoneType === "cloudDaggers") {
             game.applyEnemyDamage(enemy, (zone.dps || 8) * tickInterval, "physical", zone.ownerId || null);
             if (typeof game.applyMageOnHitEffects === "function") game.applyMageOnHitEffects(enemy, { status: "daggers" });
+          } else if (zone.zoneType === "spiritGuardians") {
+            game.applyEnemyDamage(enemy, (zone.dps || 8) * tickInterval, zone.damageType || "necrotic", zone.ownerId || null);
+            if (zone.coldSlow) {
+              enemy.slowTimer = Math.max(enemy.slowTimer || 0, 1.2);
+              enemy.slowPct = Math.max(enemy.slowPct || 0, 0.3);
+            }
+            if (typeof game.applyMageOnHitEffects === "function") game.applyMageOnHitEffects(enemy, { status: zone.damageType || "necrotic", runesConsumed: zone.runesConsumed || 0 });
           } else if (zone.zoneType === "arcaneBind") {
             enemy.slowTimer = Math.max(enemy.slowTimer || 0, 1.2);
             enemy.slowPct = Math.max(enemy.slowPct || 0, 0.35);
             enemy.weakenedTimer = Math.max(enemy.weakenedTimer || 0, 1.2);
           } else if (zone.zoneType === "confusion") {
-            enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, 5);
-            enemy.confusionOwnerId = zone.ownerId || null;
+            if ((enemy.confusionImmunityTimer || 0) <= 0) {
+              enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, 3);
+              enemy.confusionOwnerId = zone.ownerId || null;
+              enemy.confusionImmunityTimer = 10;
+            }
           }
         }
         if (zone.zoneType === "cloudDaggers" && zone.runicBlades) {
@@ -663,6 +702,7 @@ export function resolveCombatAndDrops({
     if ((enemy.slowTimer || 0) <= 0) enemy.slowPct = 0;
     enemy.poisonSlowTimer = Math.max(0, (Number.isFinite(enemy.poisonSlowTimer) ? enemy.poisonSlowTimer : 0) - dt);
     enemy.confusionTimer = Math.max(0, (Number.isFinite(enemy.confusionTimer) ? enemy.confusionTimer : 0) - dt);
+    enemy.confusionImmunityTimer = Math.max(0, (Number.isFinite(enemy.confusionImmunityTimer) ? enemy.confusionImmunityTimer : 0) - dt);
     enemy.weakenedTimer = Math.max(0, (Number.isFinite(enemy.weakenedTimer) ? enemy.weakenedTimer : 0) - dt);
     enemy.curseTimer = Math.max(0, (Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0) - dt);
     enemy.rotTimer = Math.max(0, (Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0) - dt);
@@ -683,6 +723,19 @@ export function resolveCombatAndDrops({
     if (enemy.type === "flaming_sphere") {
       enemy.expireTimer = Math.max(0, (Number.isFinite(enemy.expireTimer) ? enemy.expireTimer : 5) - dt);
       if ((enemy.expireTimer || 0) <= 0) enemy.hp = 0;
+      enemy.fireAuraTickTimer = Math.max(-2, (Number.isFinite(enemy.fireAuraTickTimer) ? enemy.fireAuraTickTimer : 0) - dt);
+      const auraTick = 0.25;
+      while ((enemy.hp || 0) > 0 && enemy.fireAuraTickTimer <= 0) {
+        enemy.fireAuraTickTimer += auraTick;
+        for (const target of activeEnemies) {
+          if (!target || target === enemy || (target.hp || 0) <= 0 || (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(target))) continue;
+          if (vecLength((target.x || 0) - enemy.x, (target.y || 0) - enemy.y) > game.config.map.tile * 1.2 + (target.size || 20) * 0.35) continue;
+          const pulseDamage = Math.max(1, (enemy.fireAuraDps || 4) * auraTick);
+          game.applyEnemyDamage(target, pulseDamage, "fire", enemy.controllerPlayerId || null);
+          target.burningTimer = Math.max(target.burningTimer || 0, enemy.burnDuration || 3);
+          target.burningDps = Math.max(target.burningDps || 0, Math.max(1, pulseDamage * 0.8));
+        }
+      }
       if ((enemy.runicFlamesTimer || 0) > 0) {
         enemy.runicFlamesTimer = Math.max(0, enemy.runicFlamesTimer - dt);
         game.fireZones.push({
@@ -759,7 +812,13 @@ export function resolveCombatAndDrops({
         typeof friendly?.controllerPlayerId === "string" && friendly.controllerPlayerId ? friendly.controllerPlayerId : null;
       if ((friendly.contactAttackCooldown || 0) <= 0) {
         const hostileHpBefore = Number.isFinite(hostile.hp) ? hostile.hp : 0;
-        game.applyEnemyDamage(hostile, game.rollEnemyContactDamage(friendly) * game.getEnemyDamageScale(), "physical", friendlyOwnerId);
+        const friendlyDamageType = friendly.type === "flaming_sphere" ? "fire" : "physical";
+        const friendlyDamage = game.rollEnemyContactDamage(friendly) * game.getEnemyDamageScale();
+        game.applyEnemyDamage(hostile, friendlyDamage, friendlyDamageType, friendlyOwnerId);
+        if (friendly.type === "flaming_sphere") {
+          hostile.burningTimer = Math.max(hostile.burningTimer || 0, friendly.burnDuration || 3);
+          hostile.burningDps = Math.max(hostile.burningDps || 0, Math.max(1, friendlyDamage * 0.18));
+        }
         if (isNecromancerTalentGame(game) && hasNecromancerPlaguecraftRot(game)) {
           hostile.rotTimer = Math.max(hostile.rotTimer || 0, getNecromancerRotDuration());
           hostile.rotDps = Math.max(hostile.rotDps || 0, getNecromancerRotDps(game));
@@ -847,6 +906,7 @@ export function resolveCombatAndDrops({
       if (
         isNecromancerTalentGame(game) &&
         !game.isUndeadEnemy(enemy) &&
+        !(enemy.isBoss || enemy.isFloorBoss) &&
         ((enemy.curseTimer || 0) > 0 || (enemy.rotTimer || 0) > 0) &&
         game.canControlMoreUndead() &&
         Math.random() < getNecromancerPlaguecraftRiseChance(game)
@@ -863,7 +923,7 @@ export function resolveCombatAndDrops({
           rewardOwner === game.player
             ? (game.necromancerRuntime || (game.necromancerRuntime = {}))
             : (rewardOwner.necromancerRuntime || (rewardOwner.necromancerRuntime = {}));
-        if ((runtime.soulSpawnCooldownTimer || 0) <= 0) {
+        if ((runtime.soulSpawnCooldownTimer || 0) <= 0 && Math.random() < 0.1) {
           runtime.souls = Array.isArray(runtime.souls) ? runtime.souls : [];
           runtime.souls.push({
             x: enemy.x,
@@ -877,7 +937,7 @@ export function resolveCombatAndDrops({
           if (rewardOwner === game.player && typeof game.spawnFloatingText === "function") game.spawnFloatingText(enemy.x, enemy.y - 24, "Soul", "#c7f0a0", 0.6, 12);
         }
       }
-      if (rewardOwner && rewardOwner.classType === "necromancer" && (rewardOwner.necromancerTalents?.necromancerPath?.points || 0) > 0) {
+      if (rewardOwner && rewardOwner.classType === "necromancer" && !(enemy.isBoss || enemy.isFloorBoss) && (rewardOwner.necromancerTalents?.necromancerPath?.points || 0) > 0) {
         const runtime =
           rewardOwner === game.player
             ? (game.necromancerRuntime || (game.necromancerRuntime = {}))
@@ -908,7 +968,7 @@ export function resolveCombatAndDrops({
           if (raised && game.markUndeadAsControlled(raised, rewardOwner)) {
             pendingRaisedEnemies.push(raised);
             raised.hp = raised.maxHp;
-            runtime.necroRaiseCooldownTimer = 1;
+            runtime.necroRaiseCooldownTimer = 2;
             if (rewardOwner === game.player && typeof game.spawnFloatingText === "function") game.spawnFloatingText(enemy.x, enemy.y - 30, "Raised", "#b6d9ff", 0.75, 12);
           }
         }
@@ -930,7 +990,7 @@ export function resolveCombatAndDrops({
           if (rewardOwner === game.player && typeof game.spawnFloatingText === "function") {
             game.spawnFloatingText(game.player.x, game.player.y - 34, "Harvest +5%", "#cf9fff", 0.7, 13);
           }
-          if (diedNearOwnerForHarvester && game.canControlMoreUndead(rewardOwner) && Math.random() < 0.4) {
+          if (diedNearOwnerForHarvester && !(enemy.isBoss || enemy.isFloorBoss) && game.canControlMoreUndead(rewardOwner) && Math.random() < 0.4) {
             const ghost = spawnGhost(game, enemy.x, enemy.y);
             if (ghost && game.markUndeadAsControlled(ghost, rewardOwner)) {
               pendingRaisedEnemies.push(ghost);

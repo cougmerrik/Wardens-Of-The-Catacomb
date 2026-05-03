@@ -1,5 +1,6 @@
 import { Game } from "../src/Game.js";
 import { stepGame } from "../src/game/gameStep.js";
+import { getActiveLightSources } from "../src/game/world/lighting.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "../src/rendering/hud/mageHudState.js";
 import {
   canSpendNecromancerNode,
@@ -87,27 +88,87 @@ function validateArcaneMissileCone() {
 function validateChromaticOrbPiercing() {
   const game = makeMage();
   const y = game.player.y;
-  const x = game.player.x + 40;
+  const x = game.player.x + 20;
   game.bullets.push({
     x,
     y,
-    vx: 0,
+    vx: 600,
     vy: 0,
     angle: 0,
     life: 1,
-    size: 10,
+    size: 32,
     damage: 4,
     projectileType: "mage_chromaticOrb",
     damageType: "fire",
     ownerId: game.player.id,
     pierce: true,
+    useSegmentHit: true,
     hitTargets: new Set()
   });
-  const first = { id: "pierce-a", type: "goblin", x, y, size: 20, hp: 20, maxHp: 20 };
-  const second = { id: "pierce-b", type: "goblin", x, y, size: 20, hp: 20, maxHp: 20 };
+  const first = { id: "pierce-a", type: "goblin", x: x + 6, y, size: 20, hp: 20, maxHp: 20 };
+  const second = { id: "pierce-b", type: "goblin", x: x + 16, y, size: 20, hp: 20, maxHp: 20 };
   game.enemies.push(first, second);
   stepGame(game, 1 / 60, { processUi: false });
   assert(first.hp < 20 && second.hp < 20, "Chromatic Orb should damage every enemy it pierces through");
+}
+
+function validateSpiritGuardiansSpell() {
+  const game = makeMage();
+  spend(game, "arcaneMissileCantrip");
+  spend(game, "invisibilitySpell");
+  const enemy = { id: "guardian-target", type: "goblin", x: game.player.x + 30, y: game.player.y, size: 20, hp: 20, maxHp: 20 };
+  game.enemies.push(enemy);
+  game.castMageSpiritGuardians(1, 0, 1, 1, 0);
+  assert(game.necromancerRuntime.invisibilityTimer > 0, "Spirit Guardians should briefly trigger invisibility");
+  assert(game.fireZones.some((zone) => zone.zoneType === "spiritGuardians" && zone.followOwner), "Spirit Guardians should create a following offensive aura");
+  stepGame(game, 0.3, { processUi: false });
+  assert(enemy.hp < 20 && enemy.lastMageStatus === "necrotic", "Spirit Guardians should damage enemies and trigger Mage on-hit effects");
+}
+
+function validateGreenFlameBladeReachAndLeech() {
+  const game = makeMage();
+  spend(game, "greenFlameBladeCantrip");
+  game.player.health = game.player.maxHealth - 10;
+  const tile = game.config.map.tile;
+  const enemy = { id: "gfb-target", type: "goblin", x: game.player.x + tile * 1.6, y: game.player.y, size: 20, hp: 30, maxHp: 30 };
+  const crate = { id: "gfb-crate", type: "crate", x: game.player.x + tile * 1.25, y: game.player.y, size: 20, hp: 1 };
+  game.enemies.push(enemy);
+  game.breakables.push(crate);
+  game.fire(1, 0);
+  assert(enemy.hp < 30, "Green-Flame Blade should hit beyond 1.5 tiles");
+  assert(crate.hp <= 0, "Green-Flame Blade should destroy breakables in its cleave");
+  assert(game.player.fireCooldown >= 0.57, "Green-Flame Blade cooldown should be 20% slower than the previous 0.48s baseline");
+  assert(game.player.health > game.player.maxHealth - 10, "Green-Flame Blade should leech health from damage dealt");
+  const swing = game.meleeSwings.find((candidate) => candidate.style === "greenFlameBlade");
+  assert(swing && swing.range >= tile * 1.7, "Green-Flame Blade swing should render as a longer reach attack");
+  assert(swing.arc < Math.PI * 0.55, "Green-Flame Blade cleave arc should be narrowed");
+}
+
+function validateShockChainLighting() {
+  const game = makeMage();
+  const tile = game.config.map.tile;
+  const source = { id: "shock-a", type: "goblin", x: game.player.x + tile, y: game.player.y, size: 20, hp: 20, maxHp: 20 };
+  const target = { id: "shock-b", type: "goblin", x: game.player.x + tile * 1.7, y: game.player.y, size: 20, hp: 20, maxHp: 20 };
+  game.enemies.push(source, target);
+  game.bullets.push({
+    x: source.x,
+    y: source.y,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    life: 1,
+    size: 6,
+    damage: 4,
+    projectileType: "mage_shock",
+    damageType: "lightning",
+    ownerId: game.player.id,
+    chainCount: 1,
+    hitTargets: new Set()
+  });
+  stepGame(game, 1 / 60, { processUi: false });
+  const chain = game.fireZones.find((zone) => zone.zoneType === "arcaneChain" && zone.damageType === "lightning");
+  assert(chain && chain.lightRadius > 0 && chain.lightIntensity > 0, "Shock chain jump should create a small light source");
+  assert(getActiveLightSources(game).some((source) => source.entityType === "arcaneChain" && source.radius > 0), "Shock chain light should be exposed to lighting");
 }
 
 function validateMageHudState() {
@@ -134,10 +195,14 @@ function validateConfusionPersistsAfterLeavingField() {
   game.input.mouse.worldX = enemy.x;
   game.input.mouse.worldY = enemy.y;
   game.castMageConfusion(1, 0, 1, 1, 0);
-  assert(enemy.confusionTimer >= 4.9, "Confusion should apply a 5 second debuff on initial hit");
+  assert(enemy.confusionTimer >= 2.9, "Confusion should apply a 3 second debuff on initial hit");
+  assert(enemy.confusionImmunityTimer >= 9.9, "Confusion should add a 10 second re-affliction immunity");
+  const firstTimer = enemy.confusionTimer;
+  game.castMageConfusion(1, 0, 1, 1, 0);
+  assert(enemy.confusionTimer === firstTimer, "Confusion should not refresh during immunity");
   enemy.x = game.player.x + 320;
   stepGame(game, 1, { processUi: false });
-  assert(enemy.confusionTimer > 3.8, "Confusion should remain after enemy leaves the field");
+  assert(enemy.confusionTimer > 1.8, "Confusion should remain after enemy leaves the field");
 }
 
 function validateCasterEffectHooks() {
@@ -168,7 +233,52 @@ function validateCasterEffectHooks() {
 
   game.necromancerRuntime.classSkillCooldownTimer = 0;
   game.activateMageBlink(1, 0, { decoy: true });
-  assert(game.enemies.some((enemy) => enemy.type === "mage_decoy" && game.isEnemyFriendlyToPlayer(enemy)), "Enchanter Blink decoy should create a targetable friendly decoy");
+  const decoy = game.enemies.find((enemy) => enemy.type === "mage_decoy" && game.isEnemyFriendlyToPlayer(enemy));
+  assert(decoy, "Enchanter Blink decoy should create a targetable friendly decoy");
+  assert(!decoy.tempMageCharmTimer, "Mirage decoy should persist until killed");
+  game.enemies.push({ id: "mirage-target", type: "goblin", x: decoy.x + 80, y: decoy.y, size: 20, hp: 20, maxHp: 20 });
+  stepGame(game, 0.4, { processUi: false });
+  assert(game.bullets.some((bullet) => bullet.projectileType === "mage_fireBolt" && bullet.ownerId === game.player.id), "Mirage decoy should cast Fire Bolt");
+}
+
+function validateFlamingSphereAndBattlemageHooks() {
+  const game = makeMage();
+  spend(game, "fireBoltCantrip");
+  spend(game, "flamingSphereSpell");
+  spend(game, "battleCaster");
+  spend(game, "wizardPath");
+  spend(game, "arcaneClarity");
+  spend(game, "deepReserves");
+  spend(game, "battlemage");
+  game.input.mouse.worldX = game.player.x + 60;
+  game.input.mouse.worldY = game.player.y;
+  game.castMageFlamingSphere(1, 0, 1, 1, 0);
+  const sphere = game.enemies.find((enemy) => enemy.type === "flaming_sphere");
+  assert(sphere && sphere.lightIntensity === 0.2 && sphere.lightRadius > 0, "Flaming Sphere should create a low-power light source");
+  const target = { id: "sphere-target", type: "goblin", x: sphere.x + 16, y: sphere.y, size: 20, hp: 20, maxHp: 20 };
+  game.enemies.push(target);
+  stepGame(game, 0.3, { processUi: false });
+  assert(target.hp < 20 && target.burningTimer > 0, "Flaming Sphere should deal fire damage and apply Burning");
+
+  const close = { id: "close-cantrip", type: "goblin", x: game.player.x + 30, y: game.player.y, size: 20, hp: 20, maxHp: 20 };
+  game.enemies.push(close);
+  game.bullets.push({
+    x: close.x,
+    y: close.y,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    life: 1,
+    size: 6,
+    damage: 4,
+    projectileType: "mage_fireBolt",
+    damageType: "fire",
+    ownerId: game.player.id,
+    mageCantrip: "fireBoltCantrip",
+    hitTargets: new Set()
+  });
+  stepGame(game, 1 / 60, { processUi: false });
+  assert(close.hp < 16.5, "Battlemage should add bonus damage to close cantrip hits");
 }
 
 function validateRunicRefractionHook() {
@@ -238,6 +348,9 @@ function validateNecroticBeamCharm() {
   }
   assert(game.isEnemyFriendlyToPlayer(skeleton), "Necrotic Beam should charm undead targets");
   assert(skeleton.tempMageCharmTimer > 0, "Base Necrotic Beam charm should be temporary outside Necromancer path");
+  const bossSkeleton = { id: "beam-boss", type: "skeleton", x: game.player.x + 120, y: game.player.y, size: 24, hp: 40, maxHp: 40, isBoss: true };
+  game.enemies.push(bossSkeleton);
+  assert(!game.markUndeadAsControlled(bossSkeleton), "Boss creatures should not be charmed by undead control abilities");
 }
 
 function validateFrostShardSplinter() {
@@ -279,17 +392,23 @@ function validateRunesAndLichSouls() {
   game.fire(1, 0);
   assert(game.necromancerRuntime.runes === 0, "runes should not build without Runic Mastery");
   game.necromancerRuntime.souls = [];
-  const enemy = { id: "dummy", type: "goblin", x: game.player.x + 40, y: game.player.y, size: 20, hp: 1, maxHp: 1, lastDamageOwnerId: game.player.id };
-  game.enemies.push(enemy);
-  game.applyEnemyDamage(enemy, 5, "fire", game.player.id);
-  stepGame(game, 1 / 60, { processUi: false });
-  assert(game.necromancerRuntime.souls.length >= 1, "Lich kill did not create a Soul");
-  const healthBefore = game.player.health = game.player.maxHealth - 10;
-  const soul = game.necromancerRuntime.souls[0];
-  soul.x = game.player.x;
-  soul.y = game.player.y;
-  stepGame(game, 1 / 60, { processUi: false });
-  assert(game.player.health > healthBefore, "Lich Soul should heal only after being collected");
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0.05;
+    const enemy = { id: "dummy", type: "goblin", x: game.player.x + 40, y: game.player.y, size: 20, hp: 1, maxHp: 1, lastDamageOwnerId: game.player.id };
+    game.enemies.push(enemy);
+    game.applyEnemyDamage(enemy, 5, "fire", game.player.id);
+    stepGame(game, 1 / 60, { processUi: false });
+    assert(game.necromancerRuntime.souls.length >= 1, "Lich kill did not create a Soul when 10% drop chance succeeds");
+    const healthBefore = game.player.health = game.player.maxHealth - 10;
+    const soul = game.necromancerRuntime.souls[0];
+    soul.x = game.player.x;
+    soul.y = game.player.y;
+    stepGame(game, 1 / 60, { processUi: false });
+    assert(game.player.health > healthBefore, "Lich Soul should heal only after being collected");
+  } finally {
+    Math.random = originalRandom;
+  }
 }
 
 function validateNecromancerRaisesNonUndead() {
@@ -304,6 +423,14 @@ function validateNecromancerRaisesNonUndead() {
   stepGame(game, 1 / 60, { processUi: false });
   const raised = game.enemies.find((candidate) => candidate && candidate.type === "goblin" && candidate.raisedUndeadCopy && game.isEnemyFriendlyToPlayer(candidate));
   assert(raised, "Necromancer should raise non-undead kills as controlled undead copies");
+  assert(game.necromancerRuntime.necroRaiseCooldownTimer > 1.9, "Necromancer raise-on-kill should use a 2 second internal cooldown");
+  game.necromancerRuntime.necroRaiseCooldownTimer = 0;
+  const boss = { id: "raise-boss", type: "goblin", x: game.player.x + 80, y: game.player.y, size: 28, hp: 1, maxHp: 30, isBoss: true, lastDamageOwnerId: game.player.id };
+  game.enemies.push(boss);
+  game.applyEnemyDamage(boss, 50, "death", game.player.id);
+  stepGame(game, 1 / 60, { processUi: false });
+  const raisedBoss = game.enemies.find((candidate) => candidate && candidate.id !== boss.id && candidate.raisedUndeadCopy && candidate.x === boss.x && candidate.y === boss.y);
+  assert(!raisedBoss, "Boss creatures should not be raised by Necromancer kill conversion");
 }
 
 function main() {
@@ -312,16 +439,20 @@ function main() {
   validateCantripManaSlowdown();
   validateArcaneMissileCone();
   validateChromaticOrbPiercing();
+  validateSpiritGuardiansSpell();
+  validateGreenFlameBladeReachAndLeech();
+  validateShockChainLighting();
   validateMageHudState();
   validateConfusionPersistsAfterLeavingField();
   validateCasterEffectHooks();
   validateRunicRefractionHook();
+  validateFlamingSphereAndBattlemageHooks();
   validateWildMagicHooks();
   validateNecroticBeamCharm();
   validateFrostShardSplinter();
   validateRunesAndLichSouls();
   validateNecromancerRaisesNonUndead();
-  console.log(JSON.stringify({ ok: true, checks: ["tree-gates", "mana-mode", "cantrip-mana-slow", "arcane-missile-cone", "chromatic-orb-pierce", "mage-hud-state", "confusion-persist", "caster-effect-hooks", "runic-refraction", "wild-magic-hooks", "necrotic-beam-charm", "frost-shard-splinter", "lich-souls", "necromancer-raise"] }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: ["tree-gates", "mana-mode", "cantrip-mana-slow", "arcane-missile-cone", "chromatic-orb-pierce", "spirit-guardians", "green-flame-blade-reach-leech", "shock-chain-lighting", "mage-hud-state", "confusion-persist", "caster-effect-hooks", "mirage-decoy", "flaming-sphere", "battlemage-close-cantrip", "runic-refraction", "wild-magic-hooks", "necrotic-beam-charm", "frost-shard-splinter", "lich-souls", "necromancer-raise"] }, null, 2));
 }
 
 main();

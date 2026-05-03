@@ -43,6 +43,10 @@ function main() {
   assert(CONFIG.lighting.stormcallerFlashLightPower === 0.1, "Stormcaller flash light should use 10% power");
   assert(CONFIG.lighting.stormcallerFlashLightFalloffDecay < 1, "Stormcaller flash light should use diffuse falloff");
   assert(CONFIG.lighting.stormcallerFlashLightDimRadiusRatio === 1, "Stormcaller flash light should diffuse to the full radius");
+  assert(CONFIG.lighting.portalRadiusTiles === 3, "exit portal should use a moderate 3 tile light radius");
+  assert(CONFIG.lighting.portalLightPower === 0.35, "exit portal should use moderate light power");
+  assert(CONFIG.lighting.portalLightFalloffDecay < 1, "exit portal light should use diffuse falloff");
+  assert(CONFIG.lighting.portalLightDimRadiusRatio === 1, "exit portal light should diffuse to the full radius");
   assert(CONFIG.lighting.beastMasterDarkVisionTiles === 1, "Beast Master dark vision should add exactly 1 tile");
   assert(!("ghostRadiusTiles" in CONFIG.lighting), "ghosts should not configure a world light radius");
 
@@ -156,6 +160,9 @@ function main() {
   assert(activeClassSources.some((source) => source.sourceType === "holyWave" && source.radius === CONFIG.lighting.torchRadiusTiles * CONFIG.map.tile && source.lightIntensity === CONFIG.lighting.shockReleasePaladinLightPower), "Shock Release projectile should be a low-power active light source");
   assert(activeClassSources.some((source) => source.sourceType === "warCircle" && source.radius === 24 * CONFIG.lighting.warCircleLightRadiusMultiplier && source.lightIntensity === CONFIG.lighting.warCirclePaladinLightPower), "War Circle should light the whole circle plus 10% at low power");
   assert(activeClassSources.some((source) => source.sourceType === "stormcallerFlash" && source.radius === CONFIG.lighting.stormcallerFlashRadiusTiles * CONFIG.map.tile && source.lightIntensity === CONFIG.lighting.stormcallerFlashLightPower && source.lightDecay === CONFIG.lighting.stormcallerFlashLightFalloffDecay), "Stormcaller flashes should be diffuse active light sources");
+  game.portal = { x: game.player.x + 272, y: game.player.y, active: true };
+  const activePortalSources = game.getActiveLightSources();
+  assert(activePortalSources.some((source) => source.sourceType === "exitPortal" && source.entityType === "exitPortal" && source.radius === CONFIG.lighting.portalRadiusTiles * CONFIG.map.tile && source.lightIntensity === CONFIG.lighting.portalLightPower && source.lightDecay === CONFIG.lighting.portalLightFalloffDecay && source.dimRadiusRatio === 1), "exit portal should be a moderate diffuse active light source");
   assert(activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "pinningFire" && source.radius >= CONFIG.lighting.fireZoneMinRadiusTiles * CONFIG.map.tile), "active lights should include pinning fire line segments");
   assert(!activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "sonyaFire"), "enemy fire patches should not be classified as ranger fire light");
   assert(!activeSources.some((source) => source.sourceType === "enemy"), "default ghosts should not be active world lights");

@@ -165,6 +165,8 @@ function serializeEnemy(room, e) {
   if (Number.isFinite(e.burningTimer) && e.burningTimer > 0) base.burningTimer = e.burningTimer;
   if (Number.isFinite(e.burningDps) && e.burningDps > 0) base.burningDps = e.burningDps;
   if (Number.isFinite(e.burningLightRadius) && e.burningLightRadius > 0) base.burningLightRadius = e.burningLightRadius;
+  if (Number.isFinite(e.lightRadius) && e.lightRadius > 0) base.lightRadius = e.lightRadius;
+  if (Number.isFinite(e.lightIntensity) && e.lightIntensity > 0) base.lightIntensity = e.lightIntensity;
   const controlledColor = resolveControlledEnemyColor(room, e);
   if (controlledColor) base.controlledColor = controlledColor;
   switch (e.type) {

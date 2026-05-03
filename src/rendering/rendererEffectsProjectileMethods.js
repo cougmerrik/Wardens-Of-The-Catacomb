@@ -532,7 +532,9 @@ export const rendererEffectsProjectileMethods = {
     const modifier = typeof swing.modifier === "string" ? swing.modifier : "";
     const doctrine = typeof swing.doctrine === "string" ? swing.doctrine : "";
     const palette =
-      doctrine === "paladin"
+      style === "greenFlameBlade"
+        ? { core: "rgba(102, 255, 132, 0.96)", edge: "#91ff9f", shadow: "rgba(12, 122, 44, 0)" }
+        : doctrine === "paladin"
         ? { core: "rgba(255, 236, 176, 0.96)", edge: "#ffe39f", shadow: "rgba(181, 128, 48, 0)" }
         : doctrine === "eldritch"
         ? { core: "rgba(166, 190, 255, 0.94)", edge: "#aac4ff", shadow: "rgba(78, 104, 196, 0)" }
@@ -660,7 +662,11 @@ export const rendererEffectsProjectileMethods = {
     } else {
       ctx.globalAlpha = 0.55 * alpha;
       const slashGrad = ctx.createRadialGradient(x, y, range * 0.15, x + dirX * range * 0.6, y + dirY * range * 0.6, range);
-      if (swing.executeProc) {
+      if (style === "greenFlameBlade") {
+        slashGrad.addColorStop(0, "rgba(190, 255, 170, 0.96)");
+        slashGrad.addColorStop(0.48, "rgba(68, 238, 96, 0.72)");
+        slashGrad.addColorStop(1, "rgba(14, 104, 38, 0)");
+      } else if (swing.executeProc) {
         slashGrad.addColorStop(0, "rgba(255, 106, 106, 0.96)");
         slashGrad.addColorStop(0.55, "rgba(221, 48, 48, 0.7)");
         slashGrad.addColorStop(1, "rgba(128, 12, 12, 0)");
@@ -681,6 +687,14 @@ export const rendererEffectsProjectileMethods = {
       ctx.beginPath();
       ctx.arc(x, y, range * 0.82, start, end);
       ctx.stroke();
+      if (style === "greenFlameBlade") {
+        ctx.globalAlpha = 0.95 * alpha;
+        ctx.strokeStyle = "#baffbf";
+        ctx.lineWidth = 1.7;
+        ctx.beginPath();
+        ctx.arc(x, y, range * 0.96, start + arc * 0.08, end - arc * 0.08);
+        ctx.stroke();
+      }
     }
 
     if (swing.executeProc && style !== "longspear") {
@@ -714,6 +728,103 @@ export const rendererEffectsProjectileMethods = {
     const x = zone.x - cameraX;
     const y = zone.y - cameraY;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (zone.zoneType === "cloudDaggers") {
+      const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 48;
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 4;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const pulse = 0.94 + Math.sin(time * 8 + zone.x * 0.01) * 0.05;
+      const haze = ctx.createRadialGradient(x, y, 2, x, y, radius * pulse);
+      haze.addColorStop(0, `rgba(228, 232, 242, ${0.16 + lifeFrac * 0.12})`);
+      haze.addColorStop(0.52, `rgba(86, 92, 112, ${0.16 + lifeFrac * 0.12})`);
+      haze.addColorStop(1, `rgba(16, 20, 30, ${0.04 + lifeFrac * 0.05})`);
+      ctx.fillStyle = haze;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.strokeStyle = `rgba(238, 242, 250, ${0.62 * lifeFrac + 0.18})`;
+      ctx.fillStyle = `rgba(170, 180, 204, ${0.45 * lifeFrac + 0.18})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 9; i++) {
+        const a = time * (2.5 + (i % 3) * 0.35) + (i / 9) * Math.PI * 2;
+        const r = radius * (0.18 + (i % 4) * 0.16);
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a * 1.07) * r * 0.72;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(a + Math.PI * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(0, -7);
+        ctx.lineTo(3, 2);
+        ctx.lineTo(0, 7);
+        ctx.lineTo(-3, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(0, -7);
+        ctx.lineTo(0, 8);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+      return;
+    }
+    if (zone.zoneType === "confusion") {
+      const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 48;
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 4;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const pulse = 0.95 + Math.sin(time * 5 + zone.y * 0.01) * 0.06;
+      const haze = ctx.createRadialGradient(x, y, 2, x, y, radius * pulse);
+      haze.addColorStop(0, `rgba(224, 156, 255, ${0.2 + lifeFrac * 0.14})`);
+      haze.addColorStop(0.48, `rgba(138, 58, 190, ${0.18 + lifeFrac * 0.16})`);
+      haze.addColorStop(1, `rgba(40, 10, 66, ${0.05 + lifeFrac * 0.08})`);
+      ctx.fillStyle = haze;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(231, 184, 255, ${0.35 * lifeFrac + 0.14})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const a = time * (1.1 + i * 0.12) + i * 1.25;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(a) * radius * 0.18, y + Math.sin(a) * radius * 0.12, radius * (0.22 + i * 0.05), a, a + Math.PI * 1.15);
+        ctx.stroke();
+      }
+      return;
+    }
+    if (zone.zoneType === "spiritGuardians") {
+      const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 64;
+      const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 4;
+      const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+      const pulse = 0.96 + Math.sin(time * 6 + zone.x * 0.01) * 0.05;
+      const aura = ctx.createRadialGradient(x, y, 2, x, y, radius * pulse);
+      aura.addColorStop(0, `rgba(206, 255, 218, ${0.1 + lifeFrac * 0.08})`);
+      aura.addColorStop(0.5, `rgba(104, 222, 150, ${0.12 + lifeFrac * 0.1})`);
+      aura.addColorStop(1, `rgba(18, 74, 42, ${0.03 + lifeFrac * 0.05})`);
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      for (let i = 0; i < 5; i++) {
+        const a = time * (1.8 + i * 0.14) + (i / 5) * Math.PI * 2;
+        const r = radius * (0.32 + (i % 2) * 0.18);
+        const sx = x + Math.cos(a) * r;
+        const sy = y + Math.sin(a) * r * 0.82;
+        ctx.fillStyle = `rgba(220, 255, 226, ${0.52 * lifeFrac + 0.2})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy - 3, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(132, 238, 164, ${0.45 * lifeFrac + 0.16})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.quadraticCurveTo(sx - Math.cos(a) * 8, sy + 10, sx + Math.sin(a) * 5, sy + 16);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
     if (zone.zoneType === "ghostSiphon") {
       const tx = (Number.isFinite(zone.targetX) ? zone.targetX : zone.x) - cameraX;
       const ty = (Number.isFinite(zone.targetY) ? zone.targetY : zone.y) - cameraY;
@@ -1001,9 +1112,10 @@ export const rendererEffectsProjectileMethods = {
       const ty = (Number.isFinite(zone.targetY) ? zone.targetY : zone.y) - cameraY;
       const lifeFrac = Math.max(0, Math.min(1, zone.life / (zone.totalLife || 0.18)));
       const grad = ctx.createLinearGradient(x, y, tx, ty);
-      grad.addColorStop(0, `rgba(110, 92, 255, ${0.18 + lifeFrac * 0.22})`);
-      grad.addColorStop(0.55, `rgba(171, 159, 255, ${0.6 * lifeFrac})`);
-      grad.addColorStop(1, `rgba(228, 223, 255, ${0.18 + lifeFrac * 0.12})`);
+      const lightning = zone.damageType === "lightning";
+      grad.addColorStop(0, lightning ? `rgba(255, 231, 86, ${0.2 + lifeFrac * 0.25})` : `rgba(110, 92, 255, ${0.18 + lifeFrac * 0.22})`);
+      grad.addColorStop(0.55, lightning ? `rgba(255, 250, 173, ${0.65 * lifeFrac})` : `rgba(171, 159, 255, ${0.6 * lifeFrac})`);
+      grad.addColorStop(1, lightning ? `rgba(255, 255, 225, ${0.2 + lifeFrac * 0.14})` : `rgba(228, 223, 255, ${0.18 + lifeFrac * 0.12})`);
       ctx.strokeStyle = grad;
       ctx.lineWidth = 3.2;
       ctx.lineCap = "round";

@@ -591,6 +591,7 @@ export class GameRuntimeBase {
 
   markUndeadAsControlled(enemy, playerEntity = this.player) {
     if (!enemy || !this.isUndeadEnemy(enemy)) return false;
+    if (enemy.isBoss || enemy.isFloorBoss) return false;
     if (this.isControlledUndead(enemy)) return true;
     if (!this.canControlMoreUndead(playerEntity)) return false;
     enemy.isControlledUndead = true;

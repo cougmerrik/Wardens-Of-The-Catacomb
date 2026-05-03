@@ -33,13 +33,13 @@ const MAGE_TALENT_DEFS = [
   { key: "shockCantrip", label: "Shock", tier: 1, group: "cantrip", maxRanks: 1, icon: "SH", color: "#f5e779", description: ["Very fast low-damage projectile.", "Chains to up to 2 nearby enemies."] },
   { key: "arcaneMissileCantrip", label: "Arcane Missile", tier: 1, group: "cantrip", maxRanks: 1, icon: "AM", color: "#c6a8ff", description: ["Homing missile toward the nearest enemy in your aim direction.", "Reliable low damage at up to 8 tiles."] },
   { key: "necroticBeamCantrip", label: "Necrotic Beam", tier: 1, group: "cantrip", maxRanks: 1, icon: "NB", color: "#9b85d8", description: ["Channel a necrotic beam.", "Temporarily charms undead, or permanently charms them as Necromancer."] },
-  { key: "greenFlameBladeCantrip", label: "Green-Flame Blade", tier: 1, group: "cantrip", maxRanks: 1, icon: "GB", color: "#7ee082", description: ["Close-range high-damage melee cantrip.", "Applies Burning and supports Battlemage."] },
+  { key: "greenFlameBladeCantrip", label: "Green-Flame Blade", tier: 1, group: "cantrip", maxRanks: 1, icon: "GB", color: "#7ee082", description: ["Reach melee cantrip with life leech.", "Applies Burning and supports Battlemage."] },
 
   { key: "fireballSpell", label: "Fireball", tier: 2, group: "spell", maxRanks: 1, icon: "FI", color: "#ff754f", description: ["2 mana. Targeted projectile explosion.", "Large radius, high damage, and Burning."] },
   { key: "chromaticOrbSpell", label: "Chromatic Orb", tier: 2, group: "spell", maxRanks: 1, icon: "CO", color: "#f2d77a", description: ["2 mana. Piercing orb that cycles Fire, Frost, and Lightning.", "Flexible multi-target pressure."] },
   { key: "cloudDaggersSpell", label: "Cloud of Daggers", tier: 2, group: "spell", maxRanks: 1, icon: "CD", color: "#d7d9e8", description: ["2 mana. Targeted damage field.", "Lasts 4 seconds with a high tick rate."] },
   { key: "confusionSpell", label: "Confusion", tier: 2, group: "spell", maxRanks: 1, icon: "CF", color: "#e1a8ff", description: ["2 mana. Targeted disruption field.", "Confuses enemies and disables boss special abilities."] },
-  { key: "invisibilitySpell", label: "Invisibility", tier: 2, group: "spell", maxRanks: 1, icon: "IV", color: "#b7bac8", description: ["2 mana. Become invisible for 5 seconds.", "Casting breaks invisibility; damage does not."] },
+  { key: "invisibilitySpell", label: "Spirit Guardians", tier: 2, group: "spell", maxRanks: 1, icon: "SG", color: "#b7f0d0", description: ["2 mana. Briefly vanish and summon orbiting spirits.", "The aura damages enemies and triggers Mage on-hit effects."] },
   { key: "flamingSphereSpell", label: "Flaming Sphere", tier: 2, group: "spell", maxRanks: 1, icon: "SP", color: "#ffb05f", description: ["2 mana. Summon a mobile fire orb for 5 seconds.", "Recasting creates a new sphere at the target location."] },
 
   { key: "highFocus", label: "High Focus", tier: 3, group: "style", maxRanks: 1, icon: "HF", color: "#f4efe3", description: ["Stronger high-mana payoff.", "Harsher low-mana penalty."] },
@@ -283,7 +283,7 @@ export function hasMageArcanePresenceActive(game) {
   if (!player) return false;
   return (game.fireZones || []).some((zone) => {
     if (!zone || zone.life <= 0 || zone.ownerId !== player.id) return false;
-    if (!["arcaneBind", "cloudDaggers", "confusion", "runicVeil", "fire", "arcaneBurst"].includes(zone.zoneType)) return false;
+    if (!["arcaneBind", "cloudDaggers", "confusion", "runicVeil", "fire", "arcaneBurst", "spiritGuardians"].includes(zone.zoneType)) return false;
     const radius = Number.isFinite(zone.radius) ? zone.radius : 0;
     return Math.hypot((zone.x || 0) - (player.x || 0), (zone.y || 0) - (player.y || 0)) <= radius + (player.size || 20) * 0.5;
   });
@@ -346,7 +346,7 @@ export function getNecromancerBeamDamageMultiplier(game) {
 }
 
 export function getNecromancerBaseCharmDurationForLevel() {
-  return 1.25;
+  return 0.55;
 }
 
 export function getNecromancerDeathBoltCooldownReduction() { return 0; }
