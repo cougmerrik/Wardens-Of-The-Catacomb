@@ -63,6 +63,34 @@ function validateManaAndMode() {
   assert(game.bullets.some((bullet) => bullet.projectileType === "mage_fireball"), "fireball projectile not created");
 }
 
+function validateFireballExplodesOnEnemyImpact() {
+  const game = makeMage();
+  const tile = game.config.map.tile;
+  const primary = { id: "fireball-primary", type: "goblin", x: game.player.x + tile * 1.25, y: game.player.y, size: 20, hp: 40, maxHp: 40 };
+  const splash = { id: "fireball-splash", type: "goblin", x: game.player.x + tile * 1.8, y: game.player.y, size: 20, hp: 40, maxHp: 40 };
+  game.enemies.push(primary, splash);
+  game.bullets.push({
+    x: game.player.x + tile * 0.5,
+    y: game.player.y,
+    vx: 420,
+    vy: 0,
+    angle: 0,
+    life: 1,
+    size: 10,
+    projectileType: "mage_fireball",
+    damageType: "fire",
+    ownerId: game.player.id,
+    damage: 12,
+    blastRadius: tile * 2,
+    burnDuration: 3,
+    hitTargets: new Set()
+  });
+  stepGame(game, 0.08, { processUi: false });
+  assert(game.bullets.every((bullet) => bullet.projectileType !== "mage_fireball"), "Fireball should be consumed on enemy impact");
+  assert(primary.hp < 40 && splash.hp < 40, "Fireball should explode and damage nearby enemies on enemy impact");
+  assert(game.fireZones.some((zone) => zone.zoneType === "arcaneBurst"), "Fireball impact should create explosion feedback");
+}
+
 function validateCantripManaSlowdown() {
   const game = makeMage();
   game.necromancerRuntime.mana = 0;
@@ -436,6 +464,7 @@ function validateNecromancerRaisesNonUndead() {
 function main() {
   validateTreeGates();
   validateManaAndMode();
+  validateFireballExplodesOnEnemyImpact();
   validateCantripManaSlowdown();
   validateArcaneMissileCone();
   validateChromaticOrbPiercing();
@@ -452,7 +481,7 @@ function main() {
   validateFrostShardSplinter();
   validateRunesAndLichSouls();
   validateNecromancerRaisesNonUndead();
-  console.log(JSON.stringify({ ok: true, checks: ["tree-gates", "mana-mode", "cantrip-mana-slow", "arcane-missile-cone", "chromatic-orb-pierce", "spirit-guardians", "green-flame-blade-reach-leech", "shock-chain-lighting", "mage-hud-state", "confusion-persist", "caster-effect-hooks", "mirage-decoy", "flaming-sphere", "battlemage-close-cantrip", "runic-refraction", "wild-magic-hooks", "necrotic-beam-charm", "frost-shard-splinter", "lich-souls", "necromancer-raise"] }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: ["tree-gates", "mana-mode", "fireball-impact-explosion", "cantrip-mana-slow", "arcane-missile-cone", "chromatic-orb-pierce", "spirit-guardians", "green-flame-blade-reach-leech", "shock-chain-lighting", "mage-hud-state", "confusion-persist", "caster-effect-hooks", "mirage-decoy", "flaming-sphere", "battlemage-close-cantrip", "runic-refraction", "wild-magic-hooks", "necrotic-beam-charm", "frost-shard-splinter", "lich-souls", "necromancer-raise"] }, null, 2));
 }
 
 main();

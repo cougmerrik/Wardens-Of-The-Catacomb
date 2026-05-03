@@ -243,6 +243,12 @@ export function resolveCombatAndDrops({
           b.hitTargets.add(enemy);
           continue;
         }
+        if (b.projectileType === "mage_fireball") {
+          if (typeof game.triggerMageFireballExplosion === "function") game.triggerMageFireballExplosion(b.x, b.y, b);
+          b.hitTargets.add(enemy);
+          b.life = 0;
+          break;
+        }
         const isMageProjectile = typeof b.projectileType === "string" && b.projectileType.startsWith("mage_");
         const projectileDamage = isMageProjectile
           ? (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1) * Math.max(0.01, Number.isFinite(b.critMultiplier) ? b.critMultiplier : 1)
