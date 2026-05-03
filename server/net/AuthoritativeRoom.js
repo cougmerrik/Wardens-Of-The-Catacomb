@@ -813,9 +813,26 @@ export class AuthoritativeRoom {
         return true;
       });
     }
+    if (state.classType === "necromancer" && input.modeSwapQueued) {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.toggleMageMode !== "function") return false;
+        return context.toggleMageMode();
+      });
+    }
     const wantsPrimary = !!input.firePrimaryQueued || (!!input.firePrimaryHeld && !!input.hasAim);
     if (state.classType === "necromancer") {
-      this.processRemoteNecromancerBeam(state, input, dt);
+      const cantrip = state.necromancerTalents
+        ? Object.entries(state.necromancerTalents).find(([key, node]) => key.endsWith("Cantrip") && (node?.points || 0) > 0)?.[0]
+        : null;
+      const mode = state.necromancerRuntime?.activeMode === "spell" ? "spell" : "cantrip";
+      if (mode === "cantrip" && cantrip === "necroticBeamCantrip") this.processRemoteNecromancerBeam(state, input, dt);
+      else if (wantsPrimary) {
+        this.performActionForActivePlayer(client.id, (context) => {
+          if (typeof context.fire !== "function") return false;
+          context.fire(state.dirX || 1, state.dirY || 0);
+          return true;
+        });
+      }
     } else if (wantsPrimary) {
       this.performActionForActivePlayer(client.id, (context) => {
         if (typeof context.fire !== "function") return false;
@@ -841,8 +858,8 @@ export class AuthoritativeRoom {
     }
     if (state.classType === "necromancer") {
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.fireDeathBolt !== "function") return false;
-        return context.fireDeathBolt(state.dirX || 1, state.dirY || 0);
+        if (typeof context.activateMageClassSkill !== "function") return false;
+        return context.activateMageClassSkill(state.dirX || 1, state.dirY || 0);
       });
     }
   }

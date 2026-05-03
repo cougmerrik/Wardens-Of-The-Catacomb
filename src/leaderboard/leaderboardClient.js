@@ -7,7 +7,7 @@ const CLASS_LABELS = {
   archer: "Elvish Archer",
   fighter: "Castle Warrior",
   warrior: "Castle Warrior",
-  necromancer: "Reformed Necromancer"
+  necromancer: "Mage"
 };
 
 export function sanitizePlayerHandle(value, fallback = "") {

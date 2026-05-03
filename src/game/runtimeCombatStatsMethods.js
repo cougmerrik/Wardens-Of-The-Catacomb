@@ -111,6 +111,17 @@ function getTempestFlavor(doctrine = "") {
   }
 }
 
+function getDoctrineLightPower(game, doctrine = "", paladinConfigKey, eldritchConfigKey) {
+  const lighting = game?.config?.lighting || {};
+  if (doctrine === "paladin") {
+    return Number.isFinite(lighting?.[paladinConfigKey]) ? Math.max(0, lighting[paladinConfigKey]) : 0;
+  }
+  if (doctrine === "eldritch") {
+    return Number.isFinite(lighting?.[eldritchConfigKey]) ? Math.max(0, lighting[eldritchConfigKey]) : 0;
+  }
+  return 0;
+}
+
 export const runtimeCombatStatsMethods = {
   getSpentSkillPointCount() {
     const sumPoints = (tree) => {
@@ -144,6 +155,7 @@ export const runtimeCombatStatsMethods = {
     let resisted = Math.max(1, Math.round(safeDamage * (1 - resistancePct)));
     if (isNecromancerTalentGame(this)) {
       resisted = Math.max(1, Math.round(resisted * (1 - getNecromancerVigorDefenseBonusPct(this))));
+      if ((this.necromancerRuntime?.stoneskinTimer || 0) > 0) resisted = Math.max(1, Math.round(resisted * 0.34));
     }
     const reducedByDefense = Math.max(1, Math.round(resisted - this.getDefenseFlatReduction()));
     return this.getWarriorRageDamageTaken(reducedByDefense, damageType);
@@ -662,6 +674,9 @@ export const runtimeCombatStatsMethods = {
         undeadDamageMultiplier: getWarriorConsecratedUndeadMultiplier(this),
         healingMultiplier: getWarriorConsecratedHealingMultiplier(this),
         defenseShredPct: getWarriorConsecratedShredPct(this),
+        lightRadius: tile * getWarriorConsecratedRadiusTiles(this) * (field.radiusMult || 1) *
+          (Number.isFinite(this.config?.lighting?.warCircleLightRadiusMultiplier) ? Math.max(0, this.config.lighting.warCircleLightRadiusMultiplier) : 1.1),
+        lightIntensity: getDoctrineLightPower(this, doctrine, "warCirclePaladinLightPower", "warCircleEldritchLightPower"),
         tickInterval: 0.3,
         tickTimer: 0.05
       });
@@ -750,8 +765,7 @@ export const runtimeCombatStatsMethods = {
       }
       if (!canSpendNecromancerNode(this, skillKey) && !canSpendNecromancerUtility(this, skillKey)) return false;
       if (spendNecromancerNode(this, skillKey)) {
-        if (skillKey === "deathBoltActive") this.spawnFloatingText(this.player.x, this.player.y - 26, "Death Bolt Unlocked!", "#c4a0ff", 1.0, 15);
-        else this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent improved", "#c4a0ff", 0.85, 14);
+        this.spawnFloatingText(this.player.x, this.player.y - 26, "Mage talent selected", "#c4a0ff", 0.85, 14);
         return true;
       }
       return false;

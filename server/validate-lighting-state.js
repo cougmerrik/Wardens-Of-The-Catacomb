@@ -33,6 +33,17 @@ function main() {
   assert(CONFIG.lighting.lanternFuelPerTorch === 0.2, "lit torches should add 20% lantern fuel");
   assert(CONFIG.lighting.lanternFuelDecayPerSecond > 0, "lantern fuel should decay over time");
   assert(CONFIG.lighting.torchRadiusTiles <= 2.5, "torch radius should stay localized");
+  assert(CONFIG.lighting.warCircleLightRadiusMultiplier === 1.1, "War Circle light radius should extend 10% past the circle");
+  assert(CONFIG.lighting.warCirclePaladinLightPower === 0.25, "Paladin War Circle light should use 25% torch power");
+  assert(CONFIG.lighting.warCircleEldritchLightPower === 0.1, "Eldritch War Circle light should use 10% torch power");
+  assert(CONFIG.lighting.shockReleasePaladinLightPower === 0.25, "Paladin Shock Release light should use 25% torch power");
+  assert(CONFIG.lighting.shockReleaseEldritchLightPower === 0.1, "Eldritch Shock Release light should use 10% torch power");
+  assert(CONFIG.lighting.gladiatorLanternDecayMultiplier === 0.9, "Gladiator doctrine should decay lantern fuel at 90% normal rate");
+  assert(CONFIG.lighting.stormcallerFlashRadiusTiles === 2, "Stormcaller flash light should stay within 2 tiles");
+  assert(CONFIG.lighting.stormcallerFlashLightPower === 0.1, "Stormcaller flash light should use 10% power");
+  assert(CONFIG.lighting.stormcallerFlashLightFalloffDecay < 1, "Stormcaller flash light should use diffuse falloff");
+  assert(CONFIG.lighting.stormcallerFlashLightDimRadiusRatio === 1, "Stormcaller flash light should diffuse to the full radius");
+  assert(CONFIG.lighting.beastMasterDarkVisionTiles === 1, "Beast Master dark vision should add exactly 1 tile");
   assert(!("ghostRadiusTiles" in CONFIG.lighting), "ghosts should not configure a world light radius");
 
   const game = createHeadlessGame();
@@ -71,6 +82,19 @@ function main() {
   const radiusLevelSix = game.getPlayerLightRadius(game.player);
   assert(radiusLevelSix > radiusFullFuelAfterDecay, "player light radius should still scale with level");
 
+  game.player.classType = "fighter";
+  game.warriorTalents = { gladiatorDoctrine: { points: 1 } };
+  game.player.lanternFuel = 0.5;
+  game.updateLightingInteractions(10);
+  const expectedGladiatorFuel = 0.5 - CONFIG.lighting.lanternFuelDecayPerSecond * CONFIG.lighting.gladiatorLanternDecayMultiplier * 10;
+  assert(Math.abs(game.player.lanternFuel - expectedGladiatorFuel) < 0.001, "Gladiator doctrine should slow lantern decay to 90%");
+  game.warriorTalents = {};
+  game.player.lanternFuel = 0.5;
+  game.updateLightingInteractions(10);
+  const expectedNormalFuel = 0.5 - CONFIG.lighting.lanternFuelDecayPerSecond * 10;
+  assert(Math.abs(game.player.lanternFuel - expectedNormalFuel) < 0.001, "non-Gladiator lantern decay should stay normal");
+  game.player.classType = "archer";
+
   const ghost = { type: "ghost", x: game.player.x + 10, y: game.player.y, hp: 10, burningTimer: 1.5 };
   const skeleton = { type: "skeleton", x: game.player.x + 20, y: game.player.y, hp: 10 };
   assert(game.getEnemyLightRadius(ghost) === 0, "ghost sprite glow should not create a world light radius");
@@ -93,6 +117,45 @@ function main() {
   assert(activeSources.some((source) => source.sourceType === "burningEnemy" && source.lightDecay < 2), "ignited enemies should use bright fire light falloff");
   assert(activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "fire" && source.radius > 40), "active lights should include circular ranger fire zones");
   assert(activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "fire" && source.lightDecay < 2), "ranger fire zones should use bright fire light falloff");
+
+  game.player.lanternFuel = 0;
+  game.rangerTalents = { beastMasterPath: { points: 1 } };
+  assert(game.getPlayerLightRadius(game.player) === CONFIG.lighting.beastMasterDarkVisionTiles * CONFIG.map.tile, "Beast Master should see 1 extra tile with empty lantern fuel");
+  game.rangerTalents = {};
+  assert(game.getPlayerLightRadius(game.player) === 0, "non-Beast Master empty lantern fuel should still have no player light radius");
+
+  game.bullets = [{
+    x: game.player.x + 176,
+    y: game.player.y,
+    life: 0.4,
+    projectileType: "holyWave",
+    lightRadius: CONFIG.lighting.torchRadiusTiles * CONFIG.map.tile,
+    lightIntensity: CONFIG.lighting.shockReleasePaladinLightPower
+  }];
+  game.fireZones.push(
+    {
+      x: game.player.x + 208,
+      y: game.player.y,
+      radius: 24,
+      life: 1,
+      zoneType: "warCircle",
+      lightRadius: 24 * CONFIG.lighting.warCircleLightRadiusMultiplier,
+      lightIntensity: CONFIG.lighting.warCirclePaladinLightPower
+    },
+    {
+      x: game.player.x + 240,
+      y: game.player.y,
+      radius: 18,
+      life: 0.18,
+      zoneType: "stormcallerFlash",
+      lightRadius: CONFIG.lighting.stormcallerFlashRadiusTiles * CONFIG.map.tile,
+      lightIntensity: CONFIG.lighting.stormcallerFlashLightPower
+    }
+  );
+  const activeClassSources = game.getActiveLightSources();
+  assert(activeClassSources.some((source) => source.sourceType === "holyWave" && source.radius === CONFIG.lighting.torchRadiusTiles * CONFIG.map.tile && source.lightIntensity === CONFIG.lighting.shockReleasePaladinLightPower), "Shock Release projectile should be a low-power active light source");
+  assert(activeClassSources.some((source) => source.sourceType === "warCircle" && source.radius === 24 * CONFIG.lighting.warCircleLightRadiusMultiplier && source.lightIntensity === CONFIG.lighting.warCirclePaladinLightPower), "War Circle should light the whole circle plus 10% at low power");
+  assert(activeClassSources.some((source) => source.sourceType === "stormcallerFlash" && source.radius === CONFIG.lighting.stormcallerFlashRadiusTiles * CONFIG.map.tile && source.lightIntensity === CONFIG.lighting.stormcallerFlashLightPower && source.lightDecay === CONFIG.lighting.stormcallerFlashLightFalloffDecay), "Stormcaller flashes should be diffuse active light sources");
   assert(activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "pinningFire" && source.radius >= CONFIG.lighting.fireZoneMinRadiusTiles * CONFIG.map.tile), "active lights should include pinning fire line segments");
   assert(!activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "sonyaFire"), "enemy fire patches should not be classified as ranger fire light");
   assert(!activeSources.some((source) => source.sourceType === "enemy"), "default ghosts should not be active world lights");

@@ -1,4 +1,5 @@
 import { formatTime } from "../../utils.js";
+import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 
 function drawMultiplayerNotifications(ctx, game, layout) {
   const current = game?.multiplayerNotificationCurrent;
@@ -74,6 +75,42 @@ export function drawHud(renderer, game, layout) {
     const hasShockRelease = (game?.warriorTalents?.shockRelease?.points || 0) > 0;
     const status = `${guardTimer > 0 ? ` | Guard ${guardTimer.toFixed(1)}s${wardHp > 0 ? ` | Ward ${Math.round(wardHp)}` : ""}` : ""}${hasShockRelease ? ` | Shock ${shockReady ? "Ready" : `${shockCharges}/${shockThreshold}`}` : ""}`;
     ctx.fillText(`${weaponName} | A: ${stanceAName} | B: ${stanceBName}${status}`, 620, 42);
+    ctx.font = "16px Trebuchet MS";
+  }
+  if (game.isNecromancerClass && game.isNecromancerClass()) {
+    const runtime = game.necromancerRuntime || {};
+    const attackLabel = getMageAttackLabel(game);
+    const efficiency = getMageEfficiencyState(game);
+    const mana = Number.isFinite(runtime.mana) ? runtime.mana : 7;
+    const maxMana = typeof game.getMageMaxMana === "function" ? game.getMageMaxMana() : 7;
+    const manaRatio = maxMana > 0 ? Math.max(0, Math.min(1, mana / maxMana)) : 1;
+    const runes = Math.max(0, Math.floor(runtime.runes || 0));
+    ctx.fillStyle = efficiency.color;
+    ctx.fillText(`${attackLabel} | ${efficiency.label}`, 620, 24);
+    const barX = 620;
+    const barY = 30;
+    const barW = 186;
+    const barH = 8;
+    ctx.fillStyle = "rgba(34, 41, 58, 0.94)";
+    ctx.fillRect(barX, barY, barW, barH);
+    const sections = [
+      { x: barX, w: barW * 0.4, color: "#ff7f6e" },
+      { x: barX + barW * 0.4, w: barW * 0.4, color: "#dce7fb" },
+      { x: barX + barW * 0.8, w: barW * 0.2, color: "#7ee7ff" }
+    ];
+    for (const section of sections) {
+      ctx.fillStyle = section.color;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(section.x, barY, section.w - 1, barH);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = efficiency.color;
+    ctx.fillRect(barX, barY, Math.floor(barW * manaRatio), barH);
+    ctx.strokeStyle = efficiency.color;
+    ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
+    ctx.font = "12px Trebuchet MS";
+    ctx.fillStyle = "#bba8ff";
+    ctx.fillText(`${runes > 0 ? `Runes ${runes}/3 | ` : ""}${runtime.invisibilityTimer > 0 ? `Invisible ${runtime.invisibilityTimer.toFixed(1)}s | ` : ""}${runtime.arcaneFocusTimer > 0 ? `Focus ${runtime.arcaneFocusTimer.toFixed(1)}s` : ""}`, 812, 38);
     ctx.font = "16px Trebuchet MS";
   }
 

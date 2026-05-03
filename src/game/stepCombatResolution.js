@@ -44,6 +44,39 @@ export function resolveCombatAndDrops({
       b.life = 0;
       continue;
     }
+    if (b.homing && b.faction !== "enemy") {
+      let target = null;
+      let best = Number.POSITIVE_INFINITY;
+      const range = Number.isFinite(b.range) ? b.range : game.config.map.tile * 8;
+      const originX = Number.isFinite(b.homingOriginX) ? b.homingOriginX : b.x;
+      const originY = Number.isFinite(b.homingOriginY) ? b.homingOriginY : b.y;
+      const dirLen = vecLength(b.homingDirX || 0, b.homingDirY || 0);
+      const dirX = dirLen > 0 ? (b.homingDirX || 0) / dirLen : Math.cos(b.angle || 0);
+      const dirY = dirLen > 0 ? (b.homingDirY || 0) / dirLen : Math.sin(b.angle || 0);
+      const coneCos = Number.isFinite(b.homingConeCos) ? b.homingConeCos : -1;
+      for (const enemy of activeEnemies) {
+        if (!enemy || (enemy.hp || 0) <= 0 || (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy))) continue;
+        const originDist = vecLength((enemy.x || 0) - originX, (enemy.y || 0) - originY);
+        if (originDist > range) continue;
+        if (coneCos > -1 && originDist > 0) {
+          const dot = (((enemy.x || 0) - originX) / originDist) * dirX + (((enemy.y || 0) - originY) / originDist) * dirY;
+          if (dot < coneCos) continue;
+        }
+        const dist = vecLength((enemy.x || 0) - (b.x || 0), (enemy.y || 0) - (b.y || 0));
+        if (dist >= best) continue;
+        target = enemy;
+        best = dist;
+      }
+      if (target) {
+        const speed = vecLength(b.vx || 0, b.vy || 0) || 320;
+        const dx = (target.x || 0) - (b.x || 0);
+        const dy = (target.y || 0) - (b.y || 0);
+        const len = vecLength(dx, dy) || 1;
+        b.vx = (dx / len) * speed;
+        b.vy = (dy / len) * speed;
+        b.angle = Math.atan2(b.vy, b.vx);
+      }
+    }
     const prevX = b.x;
     const prevY = b.y;
     b.x += b.vx * dt;
@@ -58,11 +91,22 @@ export function resolveCombatAndDrops({
         b.pendingDeathBoltExplosion = true;
       }
     }
+    if (b.projectileType === "mage_fireball" && Number.isFinite(b.detonateX) && Number.isFinite(b.detonateY)) {
+      const remaining = vecLength((b.detonateX || 0) - b.x, (b.detonateY || 0) - b.y);
+      const stepDistance = vecLength(b.x - prevX, b.y - prevY);
+      if (remaining <= Math.max(b.size || 10, stepDistance)) {
+        b.x = b.detonateX;
+        b.y = b.detonateY;
+        if (typeof game.triggerMageFireballExplosion === "function") game.triggerMageFireballExplosion(b.x, b.y, b);
+        b.life = 0;
+      }
+    }
     for (const br of activeBreakables) {
       if ((br.hp || 0) <= 0) continue;
       const half = (br.size || 20) * 0.5 + (b.size || 6) * 0.5;
       if (segmentRectHit(prevX, prevY, b.x, b.y, br.x - half, br.y - half, br.x + half, br.y + half)) {
         if (b.projectileType !== "trapArrow") br.hp = 0;
+        if (b.projectileType === "mage_fireball" && typeof game.triggerMageFireballExplosion === "function") game.triggerMageFireballExplosion(b.x, b.y, b);
         b.life = 0;
         break;
       }
@@ -179,7 +223,18 @@ export function resolveCombatAndDrops({
       if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
       if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (b.hitTargets.has(enemy)) continue;
-      if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
+      const projectileHitRadius = (enemy.size + b.size) * 0.5;
+      const hitDistance = b.useSegmentHit
+        ? (() => {
+          const sx = b.x - prevX;
+          const sy = b.y - prevY;
+          const lenSq = sx * sx + sy * sy;
+          if (lenSq <= 0.001) return vecLength(b.x - enemy.x, b.y - enemy.y);
+          const t = Math.max(0, Math.min(1, (((enemy.x || 0) - prevX) * sx + ((enemy.y || 0) - prevY) * sy) / lenSq));
+          return vecLength((prevX + sx * t) - enemy.x, (prevY + sy * t) - enemy.y);
+        })()
+        : vecLength(b.x - enemy.x, b.y - enemy.y);
+      if (hitDistance < projectileHitRadius) {
         if (skeletonIgnoresArrow(enemy)) {
           b.hitTargets.add(enemy);
           continue;
@@ -223,6 +278,98 @@ export function resolveCombatAndDrops({
           }
         }
         if (typeof game.applyConsumableOnHitEffects === "function") game.applyConsumableOnHitEffects(enemy, b.ownerId || null);
+        if (b.projectileType && String(b.projectileType).startsWith("mage_")) {
+          if ((b.burnDuration || 0) > 0) {
+            enemy.burningTimer = Math.max(enemy.burningTimer || 0, b.burnDuration);
+            enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, projectileDamage * 0.18));
+          }
+          if ((b.slowDuration || 0) > 0 || b.damageType === "cold") {
+            enemy.slowTimer = Math.max(enemy.slowTimer || 0, b.slowDuration || 2);
+            enemy.slowPct = Math.max(enemy.slowPct || 0, 0.3);
+          }
+          if ((b.chainCount || 0) > 0) {
+            let chainSource = enemy;
+            for (let i = 0; i < b.chainCount; i++) {
+              let chainTarget = null;
+              let bestDist = Number.POSITIVE_INFINITY;
+              for (const other of activeEnemies) {
+                if (!other || other === chainSource || (other.hp || 0) <= 0 || b.hitTargets.has(other)) continue;
+                if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(other)) continue;
+                const dist = vecLength((other.x || 0) - (chainSource.x || 0), (other.y || 0) - (chainSource.y || 0));
+                if (dist > game.config.map.tile * 2.5 || dist >= bestDist) continue;
+                bestDist = dist;
+                chainTarget = other;
+              }
+              if (!chainTarget) break;
+              game.applyEnemyDamage(chainTarget, projectileDamage * 0.65, b.damageType || "lightning", b.ownerId || null);
+              b.hitTargets.add(chainTarget);
+              game.fireZones.push({ x: chainSource.x, y: chainSource.y, targetX: chainTarget.x, targetY: chainTarget.y, zoneType: "arcaneChain", life: 0.18, totalLife: 0.18 });
+              chainSource = chainTarget;
+            }
+          }
+          if ((b.shockStunChance || 0) > 0 && !(enemy.isBoss || enemy.isFloorBoss) && Math.random() < b.shockStunChance) {
+            enemy.hitCooldown = Math.max(enemy.hitCooldown || 0, b.shockStunDuration || 0.2);
+            enemy.stunTimer = Math.max(enemy.stunTimer || 0, b.shockStunDuration || 0.2);
+          }
+          if (b.wildInfusion === "burning") {
+            enemy.burningTimer = Math.max(enemy.burningTimer || 0, 3);
+            enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, projectileDamage * 0.16));
+          } else if (b.wildInfusion === "poison") {
+            enemy.poisonSlowTimer = Math.max(enemy.poisonSlowTimer || 0, 3);
+            enemy.slowPct = Math.max(enemy.slowPct || 0, 0.2);
+          } else if (b.wildInfusion === "cold") {
+            enemy.slowTimer = Math.max(enemy.slowTimer || 0, 2.5);
+            enemy.slowPct = Math.max(enemy.slowPct || 0, 0.3);
+          }
+          if (b.projectileType === "mage_chromaticOrb" && b.runicRefraction && !b.runicRefractionSpent) {
+            b.runicRefractionSpent = true;
+            const elements = ["fire", "cold", "lightning"].filter((element) => element !== b.damageType);
+            const baseAngle = Number.isFinite(b.angle) ? b.angle : Math.atan2(b.vy || 0, b.vx || 1);
+            const speed = vecLength(b.vx || 0, b.vy || 0) || 430;
+            elements.slice(0, 2).forEach((element, index) => {
+              const angle = baseAngle + (index === 0 ? -0.32 : 0.32);
+              game.bullets.push({
+                ...b,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                angle,
+                damage: Math.max(1, projectileDamage * 0.55),
+                size: Math.max(5, (b.size || 9) * 0.72),
+                damageType: element,
+                chromaticElement: element,
+                runicRefraction: false,
+                wildSplitClone: true,
+                hitTargets: new Set([enemy])
+              });
+            });
+          }
+          if (typeof game.applyMageOnHitEffects === "function") game.applyMageOnHitEffects(enemy, { status: b.wildInfusion || b.damageType || "", runesConsumed: b.runesConsumed || 0 });
+        }
+        if (b.projectileType === "mage_frostShard" && !b.frostShardSplinter) {
+          const baseAngle = Number.isFinite(b.angle) ? b.angle : Math.atan2(b.vy || 0, b.vx || 1);
+          const speed = vecLength(b.vx || 0, b.vy || 0) || 250;
+          for (const offset of [-0.5, 0.5]) {
+            const angle = baseAngle + offset;
+            game.bullets.push({
+              x: b.x,
+              y: b.y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              angle,
+              life: 0.55,
+              size: Math.max(4, (b.size || 7) * 0.82),
+              damage: Math.max(1, projectileDamage * 0.45),
+              projectileType: "mage_frostShard",
+              damageType: "cold",
+              ownerId: b.ownerId || null,
+              slowDuration: Math.max(2, (b.slowDuration || 5) * 0.6),
+              knockback: Math.max(8, (b.knockback || 24) * 0.55),
+              mageCantrip: b.mageCantrip || "frostShardCantrip",
+              frostShardSplinter: true,
+              hitTargets: new Set([enemy])
+            });
+          }
+        }
         if (b.projectileType !== "holyWave" && typeof game.applyRangerOnHitEffects === "function") game.applyRangerOnHitEffects(enemy, b.x, b.y);
         if (Number.isFinite(b.knockback) && b.knockback > 0) {
           const len = vecLength((enemy.x || 0) - (b.x || 0), (enemy.y || 0) - (b.y || 0)) || 1;
@@ -231,14 +378,14 @@ export function resolveCombatAndDrops({
         }
         b.hitTargets.add(enemy);
         b.linebreakerHits = (Number.isFinite(b.linebreakerHits) ? b.linebreakerHits : 0) + 1;
-        if (b.projectileType === "holyWave") {
-          // Holy waves travel through enemies once per target.
+        if (b.projectileType === "holyWave" || b.pierce) {
+          // Piercing projectiles travel through enemies once per target.
         } else if (b.predatorPierce) {
           b.predatorPierce = false;
         } else if (Math.random() >= game.getPiercingChance()) {
           b.life = 0;
         }
-        break;
+        if (!b.pierce) break;
       }
     }
   }
@@ -444,6 +591,47 @@ export function resolveCombatAndDrops({
       }
       continue;
     }
+    if (zone.zoneType === "cloudDaggers" || zone.zoneType === "arcaneBind" || zone.zoneType === "confusion" || zone.zoneType === "runicVeil") {
+      const tickInterval = zone.zoneType === "cloudDaggers" ? Math.max(0.12, zone.tickInterval || 0.25) : 0.25;
+      zone.tickTimer = Math.max(-2, (Number.isFinite(zone.tickTimer) ? zone.tickTimer : 0) - dt);
+      if (zone.zoneType === "runicVeil" && zone.life <= dt + 0.02 && !zone.exploded) {
+        zone.exploded = true;
+        for (const enemy of activeEnemies) {
+          if (!enemy || (enemy.hp || 0) <= 0 || (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy))) continue;
+          if (vecLength(zone.x - enemy.x, zone.y - enemy.y) > zone.radius + enemy.size * 0.35) continue;
+          game.applyEnemyDamage(enemy, zone.coldDamage || 8, "cold", zone.ownerId || null);
+          enemy.slowTimer = Math.max(enemy.slowTimer || 0, 2);
+          enemy.slowPct = Math.max(enemy.slowPct || 0, 0.35);
+        }
+      }
+      while (zone.life > 0 && zone.tickTimer <= 0) {
+        for (const enemy of activeEnemies) {
+          if (!enemy || (enemy.hp || 0) <= 0 || (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy))) continue;
+          if (vecLength(zone.x - enemy.x, zone.y - enemy.y) > zone.radius + enemy.size * 0.35) continue;
+          if (zone.zoneType === "cloudDaggers") {
+            game.applyEnemyDamage(enemy, (zone.dps || 8) * tickInterval, "physical", zone.ownerId || null);
+            if (typeof game.applyMageOnHitEffects === "function") game.applyMageOnHitEffects(enemy, { status: "daggers" });
+          } else if (zone.zoneType === "arcaneBind") {
+            enemy.slowTimer = Math.max(enemy.slowTimer || 0, 1.2);
+            enemy.slowPct = Math.max(enemy.slowPct || 0, 0.35);
+            enemy.weakenedTimer = Math.max(enemy.weakenedTimer || 0, 1.2);
+          } else if (zone.zoneType === "confusion") {
+            enemy.confusionTimer = Math.max(enemy.confusionTimer || 0, 5);
+            enemy.confusionOwnerId = zone.ownerId || null;
+          }
+        }
+        if (zone.zoneType === "cloudDaggers" && zone.runicBlades) {
+          zone.runicBladeTimer = (Number.isFinite(zone.runicBladeTimer) ? zone.runicBladeTimer : 1) - tickInterval;
+          if (zone.runicBladeTimer <= 0) {
+            zone.runicBladeTimer += 1;
+            const target = activeEnemies.find((enemy) => enemy && (enemy.hp || 0) > 0 && !(game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) && vecLength(zone.x - enemy.x, zone.y - enemy.y) <= zone.radius + game.config.map.tile * 2);
+            if (target) game.applyEnemyDamage(target, Math.max(3, (zone.dps || 8) * 0.6), "physical", zone.ownerId || null);
+          }
+        }
+        zone.tickTimer += tickInterval;
+      }
+      continue;
+    }
     if (zone.zoneType && zone.zoneType !== "fire" && zone.zoneType !== "pinningFire") continue;
     for (const br of activeBreakables) {
       if (vecLength(zone.x - br.x, zone.y - br.y) < zone.radius + br.size * 0.32) br.hp = 0;
@@ -474,6 +662,8 @@ export function resolveCombatAndDrops({
     enemy.slowTimer = Math.max(0, (Number.isFinite(enemy.slowTimer) ? enemy.slowTimer : 0) - dt);
     if ((enemy.slowTimer || 0) <= 0) enemy.slowPct = 0;
     enemy.poisonSlowTimer = Math.max(0, (Number.isFinite(enemy.poisonSlowTimer) ? enemy.poisonSlowTimer : 0) - dt);
+    enemy.confusionTimer = Math.max(0, (Number.isFinite(enemy.confusionTimer) ? enemy.confusionTimer : 0) - dt);
+    enemy.weakenedTimer = Math.max(0, (Number.isFinite(enemy.weakenedTimer) ? enemy.weakenedTimer : 0) - dt);
     enemy.curseTimer = Math.max(0, (Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0) - dt);
     enemy.rotTimer = Math.max(0, (Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0) - dt);
     enemy.rangerMarkedTimer = Math.max(0, (Number.isFinite(enemy.rangerMarkedTimer) ? enemy.rangerMarkedTimer : 0) - dt);
@@ -489,6 +679,32 @@ export function resolveCombatAndDrops({
     }
     if ((enemy.bleedTimer || 0) > 0 && Number.isFinite(enemy.bleedDps) && enemy.bleedDps > 0) {
       game.applyEnemyDamage(enemy, enemy.bleedDps * dt, "physical", enemy.lastDamageOwnerId || null);
+    }
+    if (enemy.type === "flaming_sphere") {
+      enemy.expireTimer = Math.max(0, (Number.isFinite(enemy.expireTimer) ? enemy.expireTimer : 5) - dt);
+      if ((enemy.expireTimer || 0) <= 0) enemy.hp = 0;
+      if ((enemy.runicFlamesTimer || 0) > 0) {
+        enemy.runicFlamesTimer = Math.max(0, enemy.runicFlamesTimer - dt);
+        game.fireZones.push({
+          x: enemy.x,
+          y: enemy.y,
+          radius: game.config.map.tile * 0.65,
+          life: 0.45,
+          totalLife: 0.45,
+          zoneType: "fire",
+          ownerId: enemy.controllerPlayerId || null,
+          dps: Math.max(2, enemy.fireAuraDps || 4)
+        });
+      }
+    }
+    if (enemy.tempMageCharmTimer > 0) {
+      enemy.tempMageCharmTimer = Math.max(0, enemy.tempMageCharmTimer - dt);
+      if (enemy.tempMageCharmTimer <= 0 && enemy.dieWhenCharmEnds) enemy.hp = 0;
+      else if (enemy.tempMageCharmTimer <= 0 && enemy.isControlledUndead && !enemy.dieWhenCharmEnds) {
+        enemy.isControlledUndead = false;
+        enemy.controllerPlayerId = null;
+        enemy.summonedByPlayer = false;
+      }
     }
   }
 
@@ -592,6 +808,7 @@ export function resolveCombatAndDrops({
   }
 
   let removeBossSummons = false;
+  const pendingRaisedEnemies = [];
   game.enemies = game.enemies.filter((enemy) => {
     if (enemy.type === "skeleton_warrior" && enemy.collapsed && ((enemy.collapseTimer > 0) || (enemy.reanimateTimer > 0))) return true;
     if (enemy.hp <= 0) {
@@ -636,11 +853,66 @@ export function resolveCombatAndDrops({
       ) {
         const skeleton = spawnSkeleton(game, enemy.x, enemy.y);
         if (skeleton && game.markUndeadAsControlled(skeleton)) {
-          game.enemies.push(skeleton);
+          pendingRaisedEnemies.push(skeleton);
           skeleton.hp = skeleton.maxHp;
         }
       }
       const rewardOwner = getRewardOwner(enemy);
+      if (rewardOwner && rewardOwner.classType === "necromancer" && (rewardOwner.necromancerTalents?.lich?.points || 0) > 0) {
+        const runtime =
+          rewardOwner === game.player
+            ? (game.necromancerRuntime || (game.necromancerRuntime = {}))
+            : (rewardOwner.necromancerRuntime || (rewardOwner.necromancerRuntime = {}));
+        if ((runtime.soulSpawnCooldownTimer || 0) <= 0) {
+          runtime.souls = Array.isArray(runtime.souls) ? runtime.souls : [];
+          runtime.souls.push({
+            x: enemy.x,
+            y: enemy.y,
+            life: 8,
+            healPct: enemy.isBoss || enemy.isFloorBoss ? 0.12 : 0.04,
+            collectRadius: 22,
+            ownerId: rewardOwner.id || null
+          });
+          runtime.soulSpawnCooldownTimer = 0.15;
+          if (rewardOwner === game.player && typeof game.spawnFloatingText === "function") game.spawnFloatingText(enemy.x, enemy.y - 24, "Soul", "#c7f0a0", 0.6, 12);
+        }
+      }
+      if (rewardOwner && rewardOwner.classType === "necromancer" && (rewardOwner.necromancerTalents?.necromancerPath?.points || 0) > 0) {
+        const runtime =
+          rewardOwner === game.player
+            ? (game.necromancerRuntime || (game.necromancerRuntime = {}))
+            : (rewardOwner.necromancerRuntime || (rewardOwner.necromancerRuntime = {}));
+        const guaranteed = enemy.lastDamageType === "necrotic" || enemy.lastDamageType === "death";
+        if ((runtime.necroRaiseCooldownTimer || 0) <= 0 && game.canControlMoreUndead(rewardOwner) && (guaranteed || Math.random() < 0.1)) {
+          const raised = enemy.type === "ghost" ? spawnGhost(game, enemy.x, enemy.y) : {
+            ...enemy,
+            id: null,
+            x: enemy.x,
+            y: enemy.y,
+            hp: Math.max(1, Number.isFinite(enemy.maxHp) ? enemy.maxHp : 12),
+            maxHp: Math.max(1, Number.isFinite(enemy.maxHp) ? enemy.maxHp : 12),
+            baseMaxHp: Math.max(1, Number.isFinite(enemy.baseMaxHp) ? enemy.baseMaxHp : (Number.isFinite(enemy.maxHp) ? enemy.maxHp : 12)),
+            baseSpeed: Number.isFinite(enemy.baseSpeed) ? enemy.baseSpeed : enemy.speed,
+            baseDamageMin: Number.isFinite(enemy.baseDamageMin) ? enemy.baseDamageMin : enemy.damageMin,
+            baseDamageMax: Number.isFinite(enemy.baseDamageMax) ? enemy.baseDamageMax : enemy.damageMax,
+            isBoss: false,
+            isFloorBoss: false,
+            skipRewardsOnDeath: true,
+            raisedUndeadCopy: true,
+            burningTimer: 0,
+            rotTimer: 0,
+            curseTimer: 0,
+            confusionTimer: 0,
+            weakenedTimer: 0
+          };
+          if (raised && game.markUndeadAsControlled(raised, rewardOwner)) {
+            pendingRaisedEnemies.push(raised);
+            raised.hp = raised.maxHp;
+            runtime.necroRaiseCooldownTimer = 1;
+            if (rewardOwner === game.player && typeof game.spawnFloatingText === "function") game.spawnFloatingText(enemy.x, enemy.y - 30, "Raised", "#b6d9ff", 0.75, 12);
+          }
+        }
+      }
       const diedNearOwnerForHarvester =
         !!rewardOwner &&
         typeof rewardOwner.x === "number" &&
@@ -661,7 +933,7 @@ export function resolveCombatAndDrops({
           if (diedNearOwnerForHarvester && game.canControlMoreUndead(rewardOwner) && Math.random() < 0.4) {
             const ghost = spawnGhost(game, enemy.x, enemy.y);
             if (ghost && game.markUndeadAsControlled(ghost, rewardOwner)) {
-              game.enemies.push(ghost);
+              pendingRaisedEnemies.push(ghost);
               ghost.hp = ghost.maxHp;
               if (rewardOwner === game.player && typeof game.spawnFloatingText === "function") {
                 game.spawnFloatingText(enemy.x, enemy.y - 30, "Harvested", "#d8b3ff", 0.8, 13);
@@ -764,6 +1036,7 @@ export function resolveCombatAndDrops({
     }
     return true;
   });
+  if (pendingRaisedEnemies.length > 0) game.enemies.push(...pendingRaisedEnemies);
   if (removeBossSummons) {
     game.enemies = game.enemies.filter((enemy) => !(enemy.type === "skeleton" && enemy.summonerBoss));
   }

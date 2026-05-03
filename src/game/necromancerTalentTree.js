@@ -1,214 +1,76 @@
-const NECROMANCER_ROW_REQUIREMENTS = {
-  0: 0,
-  1: 1,
+const MAGE_GROUP_LIMITS = {
+  cantrip: 1,
+  spell: 1,
+  style: 1,
+  path: 1,
+  general: 2,
+  capstone: 1
+};
+
+const MAGE_TIER_LEVELS = {
+  1: 2,
   2: 3,
-  3: 8,
-  4: 14
+  3: 5,
+  4: 7,
+  5: 9,
+  6: 12
 };
 
-const NECROMANCER_LANE_ORDER = {
-  reaper: 0,
-  gravekeeper: 1,
-  plaguebinder: 2
+const OPEN_PROGRESSION_SP_LEVELS = new Set([2, 3, 5, 7, 9, 10, 12]);
+
+const MAGE_TIER_LABELS = {
+  1: "Cantrip",
+  2: "Spell",
+  3: "Casting Style",
+  4: "Path",
+  5: "System Skills",
+  6: "Capstone"
 };
 
-const NECROMANCER_TALENT_DEFS = [
-  {
-    key: "deathBoltActive",
-    label: "Death Bolt",
-    row: 0,
-    lane: "core",
-    maxRanks: 1,
-    icon: "DB",
-    color: "#9c82ff",
-    description: [
-      "Unlocks the necromancer right-click skill.",
-      "Launch a necrotic projectile that explodes and pulses."
-    ]
-  },
-  {
-    key: "blackCandle",
-    label: "Black Candle",
-    row: 1,
-    lane: "reaper",
-    maxRanks: 3,
-    icon: "BC",
-    color: "#bb99ff",
-    description: [
-      "+5% Death Bolt damage per rank.",
-      "+5% Death Bolt explosion damage per rank.",
-      "+15% necrotic beam damage per rank.",
-      "+10% necrotic beam damage against cursed targets."
-    ]
-  },
-  {
-    key: "controlMastery",
-    label: "Control Mastery",
-    row: 1,
-    lane: "gravekeeper",
-    maxRanks: 3,
-    icon: "CM",
-    color: "#88bcff",
-    description: [
-      "Rank 1-3: +1 control cap and +15% necrotic beam healing per rank."
-    ]
-  },
-  {
-    key: "hexcraft",
-    label: "Hexcraft",
-    row: 1,
-    lane: "plaguebinder",
-    maxRanks: 3,
-    icon: "HX",
-    color: "#a6e67f",
-    description: [
-      "Death Bolt applies Curse on hit.",
-      "Death Bolt deals poison damage.",
-      "Curse: -25% attack speed, -25% defense, +25% poison vulnerability.",
-      "Higher ranks extend duration and improve cursed-target payoff."
-    ]
-  },
-  {
-    key: "deathBoltMastery",
-    label: "Death Mastery",
-    row: 2,
-    lane: "reaper",
-    maxRanks: 3,
-    icon: "DM",
-    color: "#d2bcff",
-    description: [
-      "Rank 1-3: +10% Death Bolt damage and -1.0s Death Bolt cooldown per rank.",
-      "+15% necrotic beam pulse rate per rank.",
-      "Death Bolt and necrotic beam kills grant 1 temporary hp, up to 20% of your max health."
-    ]
-  },
-  {
-    key: "coldCommand",
-    label: "Cold Command",
-    row: 2,
-    lane: "gravekeeper",
-    maxRanks: 3,
-    icon: "CC",
-    color: "#aad3ff",
-    description: [
-      "Rank 1-3: +15% controlled undead health, +10% defense, +10% damage, and +10% attack speed per rank.",
-      "Death Bolt kills have +10% controlled ghost spawn chance per rank if slots are available."
-    ]
-  },
-  {
-    key: "plaguecraft",
-    label: "Plaguecraft",
-    row: 2,
-    lane: "plaguebinder",
-    maxRanks: 3,
-    icon: "PC",
-    color: "#8fd86b",
-    description: [
-      "Rank 1: controlled undead attacks apply Rot.",
-      "Rot: poison damage over time and -25% movement speed.",
-      "Rank 2: controlled undead deaths apply Rot in a 1-tile burst.",
-      "Rank 3: non-undead enemies with Curse or Rot have a 10% chance to rise again as controlled skeletons."
-    ]
-  },
-  {
-    key: "explodingDeath",
-    label: "Exploding Death",
-    row: 3,
-    lane: "reaper",
-    maxRanks: 1,
-    icon: "ED",
-    color: "#eadbff",
-    description: [
-      "Controlled undead deaths explode for necrotic damage.",
-      "Their deaths also grant Vigor of Life: +15% defense, +25% move speed, and healing over time."
-    ]
-  },
-  {
-    key: "boneWard",
-    label: "Bone Ward",
-    row: 3,
-    lane: "gravekeeper",
-    maxRanks: 1,
-    icon: "BW",
-    color: "#d4ebff",
-    description: [
-      "Controlled undead take 10% less damage.",
-      "Controlled undead within 2 tiles gain +10% damage.",
-      "Controlled undead within 2 tiles have a 15% projectile reflect chance."
-    ]
-  },
-  {
-    key: "rotTouched",
-    label: "Rot Touched",
-    row: 3,
-    lane: "plaguebinder",
-    maxRanks: 1,
-    icon: "RT",
-    color: "#c7f0a0",
-    description: [
-      "+20% Death Bolt area duration.",
-      "+10% Death Bolt area radius.",
-      "Enemies that hit you take 5 poison damage."
-    ]
-  },
-  {
-    key: "harvester",
-    label: "Harvester",
-    row: 4,
-    lane: "reaper",
-    maxRanks: 1,
-    icon: "HV",
-    color: "#f3eaff",
-    description: [
-      "Gain a 1-tile necrotic aura.",
-      "Enemies that die within the aura have a 40% chance to rise as controlled ghosts if slots are available.",
-      "Death Bolt cooldown reduced by 20%.",
-      "Each kill increases the next Death Bolt damage by 5%, up to 50%."
-    ]
-  },
-  {
-    key: "legionMaster",
-    label: "Legion Master",
-    row: 4,
-    lane: "gravekeeper",
-    maxRanks: 1,
-    icon: "LM",
-    color: "#eff8ff",
-    description: [
-      "Skeletal warriors gain a 5-tile arrow attack.",
-      "Ghost life steal is increased by 0.2%.",
-      "Death Bolt kills gain +50% controlled ghost spawn chance if slots are available."
-    ]
-  },
-  {
-    key: "blightstorm",
-    label: "Blightstorm",
-    row: 4,
-    lane: "plaguebinder",
-    maxRanks: 1,
-    icon: "BS",
-    color: "#e6f7bf",
-    description: [
-      "Death Bolt fires 3 bolts in a wide cone.",
-      "Necrotic beam applies Curse to damaged enemies.",
-      "Controlled undead deaths create a 2-tile plague burst."
-    ]
-  }
+const MAGE_TALENT_DEFS = [
+  { key: "fireBoltCantrip", label: "Fire Bolt", tier: 1, group: "cantrip", maxRanks: 1, icon: "FB", color: "#ff9b62", description: ["Fast medium projectile.", "Applies Burning for 3 seconds."] },
+  { key: "frostShardCantrip", label: "Frost Shard", tier: 1, group: "cantrip", maxRanks: 1, icon: "FS", color: "#9edcff", description: ["Slow projectile with slightly higher damage.", "Applies Slow for 5 seconds and slight knockback."] },
+  { key: "shockCantrip", label: "Shock", tier: 1, group: "cantrip", maxRanks: 1, icon: "SH", color: "#f5e779", description: ["Very fast low-damage projectile.", "Chains to up to 2 nearby enemies."] },
+  { key: "arcaneMissileCantrip", label: "Arcane Missile", tier: 1, group: "cantrip", maxRanks: 1, icon: "AM", color: "#c6a8ff", description: ["Homing missile toward the nearest enemy in your aim direction.", "Reliable low damage at up to 8 tiles."] },
+  { key: "necroticBeamCantrip", label: "Necrotic Beam", tier: 1, group: "cantrip", maxRanks: 1, icon: "NB", color: "#9b85d8", description: ["Channel a necrotic beam.", "Temporarily charms undead, or permanently charms them as Necromancer."] },
+  { key: "greenFlameBladeCantrip", label: "Green-Flame Blade", tier: 1, group: "cantrip", maxRanks: 1, icon: "GB", color: "#7ee082", description: ["Close-range high-damage melee cantrip.", "Applies Burning and supports Battlemage."] },
+
+  { key: "fireballSpell", label: "Fireball", tier: 2, group: "spell", maxRanks: 1, icon: "FI", color: "#ff754f", description: ["2 mana. Targeted projectile explosion.", "Large radius, high damage, and Burning."] },
+  { key: "chromaticOrbSpell", label: "Chromatic Orb", tier: 2, group: "spell", maxRanks: 1, icon: "CO", color: "#f2d77a", description: ["2 mana. Piercing orb that cycles Fire, Frost, and Lightning.", "Flexible multi-target pressure."] },
+  { key: "cloudDaggersSpell", label: "Cloud of Daggers", tier: 2, group: "spell", maxRanks: 1, icon: "CD", color: "#d7d9e8", description: ["2 mana. Targeted damage field.", "Lasts 4 seconds with a high tick rate."] },
+  { key: "confusionSpell", label: "Confusion", tier: 2, group: "spell", maxRanks: 1, icon: "CF", color: "#e1a8ff", description: ["2 mana. Targeted disruption field.", "Confuses enemies and disables boss special abilities."] },
+  { key: "invisibilitySpell", label: "Invisibility", tier: 2, group: "spell", maxRanks: 1, icon: "IV", color: "#b7bac8", description: ["2 mana. Become invisible for 5 seconds.", "Casting breaks invisibility; damage does not."] },
+  { key: "flamingSphereSpell", label: "Flaming Sphere", tier: 2, group: "spell", maxRanks: 1, icon: "SP", color: "#ffb05f", description: ["2 mana. Summon a mobile fire orb for 5 seconds.", "Recasting creates a new sphere at the target location."] },
+
+  { key: "highFocus", label: "High Focus", tier: 3, group: "style", maxRanks: 1, icon: "HF", color: "#f4efe3", description: ["Stronger high-mana payoff.", "Harsher low-mana penalty."] },
+  { key: "rapidCasting", label: "Rapid Casting", tier: 3, group: "style", maxRanks: 1, icon: "RC", color: "#9fd9ff", description: ["Shorter cantrip regen pause and spell delay.", "Lower peak spell efficiency."] },
+  { key: "bloodCasting", label: "Blood Casting", tier: 3, group: "style", maxRanks: 1, icon: "BC", color: "#df6b6b", description: ["Health can cover missing mana.", "Blood-cast spells cannot self-kill you."] },
+  { key: "battleCaster", label: "Battle Caster", tier: 3, group: "style", maxRanks: 1, icon: "BT", color: "#d5ab73", description: ["Adds defense and periodic arcane shielding.", "Supports close-range spell use."] },
+
+  { key: "wizardPath", label: "Wizard", tier: 4, group: "path", maxRanks: 1, icon: "WZ", color: "#8eb8ff", description: ["Disciplined high-mana caster.", "Arcane Focus replaces Blink."] },
+  { key: "necromancerPath", label: "Necromancer", tier: 4, group: "path", maxRanks: 1, icon: "NE", color: "#a186ff", description: ["Permanent undead control and kill conversion.", "Death Bolt replaces Blink."] },
+  { key: "sorcererPath", label: "Sorcerer", tier: 4, group: "path", maxRanks: 1, icon: "SO", color: "#ff8ed9", description: ["Wild Magic and low-mana chaos.", "Chaos Surge replaces Blink."] },
+  { key: "enchanterPath", label: "Enchanter", tier: 4, group: "path", maxRanks: 1, icon: "EN", color: "#d4b1ff", description: ["Influence, charm, weakening, and decoys.", "Blink leaves a decoy."] },
+
+  { key: "arcaneClarity", label: "Arcane Clarity", tier: 5, group: "general", maxRanks: 1, icon: "AC", color: "#f2e6bc", description: ["After standing still for 3 seconds, gain clarity until moving.", "+25% mana regeneration and +25% spell power."] },
+  { key: "deepReserves", label: "Deep Reserves", tier: 5, group: "general", maxRanks: 1, icon: "DR", color: "#8eb8ff", description: ["+8 maximum mana.", "-15% mana regeneration speed."] },
+  { key: "manaSurge", label: "Mana Surge", tier: 5, group: "general", maxRanks: 1, icon: "MS", color: "#ffcf77", description: ["At low mana, spell delay is reduced by 33%.", "At low mana, spell damage is increased by 20%."] },
+  { key: "phaseBarrier", label: "Phase Barrier", tier: 5, group: "general", maxRanks: 1, icon: "PB", color: "#9dd7ff", description: ["Once per second, spend 1 mana to reduce an incoming hit by 50%.", "Does not trigger at 0 mana."] },
+  { key: "catalyst", label: "Catalyst", tier: 5, group: "general", maxRanks: 1, icon: "CA", color: "#ffb36a", description: ["Swapping modes grants a short Spellweaver window.", "Status-affected kills spread one status to nearby enemies."] },
+  { key: "arcanePresence", label: "Arcane Presence", tier: 5, group: "general", maxRanks: 1, icon: "AP", color: "#b7e0ff", description: ["Standing in owned magical effects improves damage and mana regeneration.", "Also grants +1 flat damage reduction."] },
+  { key: "lingeringPower", label: "Lingering Power", tier: 5, group: "general", maxRanks: 1, icon: "LP", color: "#d7d9e8", description: ["Persistent effects last longer.", "Persistent effects tick faster."] },
+  { key: "arcaneBind", label: "Arcane Bind", tier: 5, group: "general", maxRanks: 1, icon: "AB", color: "#b6f0ff", description: ["Hits can create a short binding field.", "Enemies inside are slowed and weakened."] },
+
+  { key: "archmage", label: "Archmage", tier: 6, group: "capstone", maxRanks: 1, icon: "AR", color: "#f6f0df", description: ["High-mana mastery.", "Maximum high-mana spell bonus rises to +45%."] },
+  { key: "lich", label: "Lich", tier: 6, group: "capstone", maxRanks: 1, icon: "LI", color: "#c7f0a0", description: ["Kills create Souls.", "Souls drift to you and restore health."] },
+  { key: "battlemage", label: "Battlemage", tier: 6, group: "capstone", maxRanks: 1, icon: "BM", color: "#d5ab73", description: ["Close spells grant damage reduction and release Arcane Shockwave.", "Green-Flame Blade gains reach and splash."] },
+  { key: "runicMastery", label: "Runic Mastery", tier: 6, group: "capstone", maxRanks: 1, icon: "RM", color: "#9d8cff", description: ["Cantrip hits build up to 3 Runes.", "Spells consume Runes for stronger and spell-specific effects."] }
 ];
 
-const DEF_BY_KEY = Object.fromEntries(NECROMANCER_TALENT_DEFS.map((def) => [def.key, def]));
+const DEF_BY_KEY = Object.fromEntries(MAGE_TALENT_DEFS.map((def) => [def.key, def]));
 
 export function createNecromancerTalentState() {
-  return Object.fromEntries(
-    NECROMANCER_TALENT_DEFS.map((def) => [
-      def.key,
-      {
-        key: def.key,
-        points: 0,
-        maxPoints: def.maxRanks
-      }
-    ])
-  );
+  return Object.fromEntries(MAGE_TALENT_DEFS.map((def) => [def.key, { key: def.key, points: 0, maxPoints: def.maxRanks }]));
 }
 
 export function cloneNecromancerTalentState(source = null) {
@@ -223,7 +85,7 @@ export function cloneNecromancerTalentState(source = null) {
 }
 
 export function getNecromancerTalentDefs() {
-  return NECROMANCER_TALENT_DEFS.map((def) => ({ ...def }));
+  return MAGE_TALENT_DEFS.map((def) => ({ ...def }));
 }
 
 export function getNecromancerTalentDef(key) {
@@ -239,69 +101,108 @@ export function getNecromancerTalentPoints(game, key) {
   return Number.isFinite(points) ? Math.max(0, points) : 0;
 }
 
-export function getNecromancerUtilityKeys() {
-  return ["moveSpeed", "attackSpeed", "damage", "defense"];
+export function hasMageTalent(game, key) {
+  return getNecromancerTalentPoints(game, key) > 0;
 }
 
-export function getNecromancerUtilityLevel(game, key) {
-  const level = game?.upgrades?.[key]?.level;
-  return Number.isFinite(level) ? Math.max(0, Math.min(4, Math.floor(level))) : 0;
+export const hasNecromancerTalent = hasMageTalent;
+
+export function getNecromancerUtilityKeys() {
+  return [];
+}
+
+export function getNecromancerUtilityLevel() {
+  return 0;
 }
 
 export function getNecromancerSpentSkillPoints(game) {
-  let total = 0;
-  for (const key of getNecromancerUtilityKeys()) total += getNecromancerUtilityLevel(game, key);
-  for (const def of NECROMANCER_TALENT_DEFS) total += getNecromancerTalentPoints(game, def.key);
-  return total;
+  return MAGE_TALENT_DEFS.reduce((sum, def) => sum + getNecromancerTalentPoints(game, def.key), 0);
 }
 
 export function getNecromancerAvailableSkillPoints(game) {
   return Number.isFinite(game?.skillPoints) ? Math.max(0, game.skillPoints) : 0;
 }
 
-export function isNecromancerRowAccessible(game, row) {
-  return getNecromancerSpentSkillPoints(game) >= (NECROMANCER_ROW_REQUIREMENTS[row] || 0);
+export function getMageTierLabel(tier) {
+  return MAGE_TIER_LABELS[tier] || `Tier ${tier}`;
 }
 
-function getNecromancerPreviousRowOptions(def) {
-  if (!def || def.row <= 1) return [];
-  const currentLaneIndex = Number.isFinite(NECROMANCER_LANE_ORDER[def.lane]) ? NECROMANCER_LANE_ORDER[def.lane] : 0;
-  return NECROMANCER_TALENT_DEFS.filter((entry) => {
-    if (!entry || entry.row !== def.row - 1) return false;
-    if (def.row === 4) return entry.lane === def.lane;
-    const previousLaneIndex = Number.isFinite(NECROMANCER_LANE_ORDER[entry.lane]) ? NECROMANCER_LANE_ORDER[entry.lane] : 0;
-    return Math.abs(previousLaneIndex - currentLaneIndex) <= 1;
-  }).map((entry) => entry.key);
+export function getMageSelectedInGroup(game, group) {
+  return MAGE_TALENT_DEFS.filter((def) => def.group === group && getNecromancerTalentPoints(game, def.key) > 0).map((def) => def.key);
+}
+
+export function getMageSelectedCantrip(game) {
+  return getMageSelectedInGroup(game, "cantrip")[0] || null;
+}
+
+export function getMageSelectedSpell(game) {
+  return getMageSelectedInGroup(game, "spell")[0] || null;
+}
+
+export function getMageSelectedStyle(game) {
+  return getMageSelectedInGroup(game, "style")[0] || null;
+}
+
+export function getMageSelectedPath(game) {
+  return getMageSelectedInGroup(game, "path")[0] || null;
+}
+
+export function getMageSelectedTier5Count(game) {
+  return getMageSelectedInGroup(game, "general").length;
+}
+
+export function getMageSelectedCapstones(game) {
+  return getMageSelectedInGroup(game, "capstone").length;
 }
 
 export function getNecromancerSelectedCapstones(game) {
-  return ["harvester", "legionMaster", "blightstorm"].reduce((sum, key) => sum + (getNecromancerTalentPoints(game, key) > 0 ? 1 : 0), 0);
+  return getMageSelectedCapstones(game);
+}
+
+export function getMageGroupLimit(group) {
+  return MAGE_GROUP_LIMITS[group] || 1;
+}
+
+export function isMageTierAccessible(game, tier) {
+  const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
+  if (level < (MAGE_TIER_LEVELS[tier] || 99)) return false;
+  if (tier <= 1) return true;
+  if (tier === 2) return !!getMageSelectedCantrip(game);
+  if (tier === 3) return !!getMageSelectedSpell(game);
+  if (tier === 4) return !!getMageSelectedStyle(game);
+  if (tier === 5) return !!getMageSelectedPath(game);
+  if (tier === 6) return getMageSelectedTier5Count(game) >= 2;
+  return false;
+}
+
+export function getNecromancerRowRequirement(row) {
+  const tier = Math.max(1, Math.min(6, Math.floor(row) + 1));
+  return MAGE_TIER_LEVELS[tier] || 99;
+}
+
+export function isNecromancerRowAccessible(game, row) {
+  return isMageTierAccessible(game, row + 1);
 }
 
 export function getNecromancerUnlockRequirementText(game, def) {
   if (!def) return "";
-  if (def.row === 0) return "Available immediately.";
-  if (def.row === 1) {
-    if (getNecromancerTalentPoints(game, "deathBoltActive") > 0) return "Available now.";
-    return "Requires Death Bolt first.";
+  const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
+  if (level < (MAGE_TIER_LEVELS[def.tier] || 99)) return `Requires level ${MAGE_TIER_LEVELS[def.tier]}.`;
+  if (def.tier === 1) return "Available now.";
+  if (def.tier === 2) return getMageSelectedCantrip(game) ? "Available now." : "Requires a cantrip.";
+  if (def.tier === 3) return getMageSelectedSpell(game) ? "Available now." : "Requires a spell.";
+  if (def.tier === 4) return getMageSelectedStyle(game) ? "Available now." : "Requires a casting style.";
+  if (def.tier === 5) {
+    if (!getMageSelectedPath(game)) return "Requires a path.";
+    if (getMageSelectedTier5Count(game) >= 2) return "Tier 5 limit reached.";
+    return "Pick exactly two Tier 5 skills.";
   }
-  const previousRowOptions = getNecromancerPreviousRowOptions(def);
-  if (def.row === 4) {
-    const capstonesSpent = getNecromancerSelectedCapstones(game);
-    const neededTotal = capstonesSpent <= 0 ? 14 : 20;
-    if (previousRowOptions.length > 0 && !previousRowOptions.some((key) => getNecromancerTalentPoints(game, key) > 0)) {
-      const labels = previousRowOptions.map((key) => getNecromancerTalentDef(key)?.label || key).join(" or ");
-      return `Requires ${labels} first.`;
-    }
-    if (getNecromancerSpentSkillPoints(game) < neededTotal) return `Requires ${neededTotal} total points spent.`;
-    if (capstonesSpent >= 2) return "Capstone limit reached.";
-    return capstonesSpent <= 0 ? "Select your first capstone." : "Select your second capstone.";
+  if (def.tier === 6) {
+    if (getMageSelectedTier5Count(game) < 2) return "Requires exactly two Tier 5 skills.";
+    if (getMageSelectedCapstones(game) >= 1) return "Capstone already selected.";
+    return "Available now.";
   }
-  if (previousRowOptions.length > 0 && !previousRowOptions.some((key) => getNecromancerTalentPoints(game, key) > 0)) {
-    const labels = previousRowOptions.map((key) => getNecromancerTalentDef(key)?.label || key).join(" or ");
-    return `Requires ${labels} first.`;
-  }
-  return `Requires ${NECROMANCER_ROW_REQUIREMENTS[def.row] || 0} total skill points spent.`;
+  return "";
 }
 
 export function canSpendNecromancerNode(game, key) {
@@ -310,70 +211,39 @@ export function canSpendNecromancerNode(game, key) {
   if (!def) return false;
   const node = game?.necromancerTalents?.[key];
   if (!node || node.points >= node.maxPoints) return false;
-  if (def.row === 0) return true;
-  if (getNecromancerTalentPoints(game, "deathBoltActive") <= 0) return false;
-  if (!isNecromancerRowAccessible(game, def.row)) return false;
-  const previousRowOptions = getNecromancerPreviousRowOptions(def);
-  if (previousRowOptions.length > 0 && !previousRowOptions.some((nodeKey) => getNecromancerTalentPoints(game, nodeKey) > 0)) return false;
-  if (def.row === 4) {
-    const capstonesSpent = getNecromancerSelectedCapstones(game);
-    const neededTotal = capstonesSpent <= 0 ? 14 : 20;
-    if (getNecromancerSpentSkillPoints(game) < neededTotal) return false;
-    if (capstonesSpent >= 2) return false;
-  }
+  if (!isMageTierAccessible(game, def.tier)) return false;
+  if (getMageSelectedInGroup(game, def.group).length >= getMageGroupLimit(def.group)) return false;
   return true;
 }
 
-export function canSpendNecromancerUtility(game, key) {
-  if (!isNecromancerTalentGame(game) || getNecromancerAvailableSkillPoints(game) <= 0) return false;
-  if (getNecromancerSpentSkillPoints(game) <= 0 && getNecromancerTalentPoints(game, "deathBoltActive") <= 0) return false;
-  const upgrade = game?.upgrades?.[key];
-  return !!upgrade && Number.isFinite(upgrade.level) && upgrade.level < 4;
+export function canSpendNecromancerUtility() {
+  return false;
 }
 
 export function spendNecromancerNode(game, key) {
   if (!canSpendNecromancerNode(game, key)) return false;
-  const node = game.necromancerTalents[key];
-  node.points += 1;
+  game.necromancerTalents[key].points = 1;
   game.skillPoints -= 1;
+  if (key === "necromancerPath" && typeof game.clearTemporaryMageCharms === "function") game.clearTemporaryMageCharms();
   return true;
 }
 
-export function spendNecromancerUtility(game, key) {
-  if (!canSpendNecromancerUtility(game, key)) return false;
-  game.upgrades[key].level += 1;
-  game.skillPoints -= 1;
-  return true;
+export function spendNecromancerUtility() {
+  return false;
 }
 
-export function formatNecromancerLaneLabel(lane) {
-  if (lane === "reaper") return "Reaper";
-  if (lane === "gravekeeper") return "Gravekeeper";
-  if (lane === "plaguebinder") return "Plaguebinder";
-  return "Core";
+export function formatNecromancerLaneLabel(group) {
+  if (group === "cantrip") return "Cantrip";
+  if (group === "spell") return "Spell";
+  if (group === "style") return "Style";
+  if (group === "path") return "Path";
+  if (group === "general") return "System";
+  if (group === "capstone") return "Capstone";
+  return "Mage";
 }
 
 export function getNecromancerTooltip(game, entry) {
   if (!entry) return null;
-  if (entry.kind === "utility") {
-    const labelMap = {
-      moveSpeed: "Move Speed Training",
-      attackSpeed: "Attack Speed Training",
-      damage: "Damage Training",
-      defense: "Defense Training"
-    };
-    const bodyMap = {
-      moveSpeed: ["Spend 1 SP for +5% move speed.", "Necromancer utility node. Counts toward row unlocks."],
-      attackSpeed: ["Spend 1 SP for +6% attack speed.", "Necromancer utility node. Counts toward row unlocks."],
-      damage: ["Spend 1 SP for +8% damage.", "Necromancer utility node. Counts toward row unlocks."],
-      defense: ["Spend 1 SP for +1.5 flat defense.", "Necromancer utility node. Counts toward row unlocks."]
-    };
-    return {
-      title: labelMap[entry.key] || entry.key,
-      lines: bodyMap[entry.key] || [],
-      requirement: entry.locked ? "Requires at least 1 available skill point." : ""
-    };
-  }
   const def = DEF_BY_KEY[entry.key];
   if (!def) return null;
   return {
@@ -383,210 +253,144 @@ export function getNecromancerTooltip(game, entry) {
   };
 }
 
-export function hasNecromancerDeathBolt(game) {
-  return getNecromancerTalentPoints(game, "deathBoltActive") > 0;
-}
-
 export function getNecromancerSkillPointGainForLevel(level, classType) {
   if (classType !== "necromancer") return 1;
   const safeLevel = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
-  if (safeLevel < 2) return 0;
-  if (safeLevel === 2) return 2;
-  if (safeLevel <= 11) return 1;
-  return safeLevel % 2 === 0 ? 1 : 0;
+  return OPEN_PROGRESSION_SP_LEVELS.has(safeLevel) ? 1 : 0;
 }
 
-export function getNecromancerBlackCandleDamageBonus(game) {
-  return getNecromancerTalentPoints(game, "blackCandle") * 0.05;
+export function getMageBaseMaxMana(game) {
+  let maxMana = 7;
+  if (hasMageTalent(game, "wizardPath")) maxMana += 3;
+  if (hasMageTalent(game, "deepReserves")) maxMana += 8;
+  const runtime = game?.necromancerRuntime || game?.player?.necromancerRuntime || {};
+  if ((runtime.arcaneFocusTimer || 0) > 0) maxMana += 3;
+  return maxMana;
 }
 
-export function getNecromancerBeamDamageMultiplier(game) {
-  return 1 + getNecromancerTalentPoints(game, "blackCandle") * 0.15;
+export function getMageManaRegenPerSecond(game) {
+  let regen = 1;
+  if (hasMageTalent(game, "deepReserves")) regen *= 0.85;
+  if (hasMageTalent(game, "arcaneClarity") && (game?.necromancerRuntime?.arcaneClarityTimer || 0) > 0) regen *= 1.25;
+  if (hasMageArcanePresenceActive(game)) regen *= 1.2;
+  if (hasMageTalent(game, "rapidCasting")) regen *= 1.1;
+  return regen;
 }
 
-export function getNecromancerColdCommandRanks(game) {
-  return getNecromancerTalentPoints(game, "coldCommand");
+export function hasMageArcanePresenceActive(game) {
+  if (!hasMageTalent(game, "arcanePresence")) return false;
+  const player = game?.player;
+  if (!player) return false;
+  return (game.fireZones || []).some((zone) => {
+    if (!zone || zone.life <= 0 || zone.ownerId !== player.id) return false;
+    if (!["arcaneBind", "cloudDaggers", "confusion", "runicVeil", "fire", "arcaneBurst"].includes(zone.zoneType)) return false;
+    const radius = Number.isFinite(zone.radius) ? zone.radius : 0;
+    return Math.hypot((zone.x || 0) - (player.x || 0), (zone.y || 0) - (player.y || 0)) <= radius + (player.size || 20) * 0.5;
+  });
 }
 
-export function getNecromancerControlledUndeadHealthBonusPct(game) {
-  return getNecromancerColdCommandRanks(game) * 0.15;
+export function getMageManaRatio(game) {
+  const runtime = game?.necromancerRuntime || game?.player?.necromancerRuntime || {};
+  const maxMana = Math.max(1, getMageBaseMaxMana(game));
+  return Math.max(0, Math.min(1, (Number.isFinite(runtime.mana) ? runtime.mana : maxMana) / maxMana));
 }
 
-export function getNecromancerControlledUndeadDefenseBonusPct(game) {
-  return getNecromancerColdCommandRanks(game) * 0.1;
+export function getMageSpellPowerMultiplier(game, options = {}) {
+  const runtime = game?.necromancerRuntime || game?.player?.necromancerRuntime || {};
+  const ratio = Number.isFinite(options.manaRatio) ? options.manaRatio : getMageManaRatio(game);
+  let mult = 1;
+  const lockedTier = (runtime.arcaneFocusTimer || 0) > 0 ? runtime.arcaneFocusTier : "";
+  const highThreshold = hasMageTalent(game, "wizardPath") ? 5.6 / Math.max(1, getMageBaseMaxMana(game)) : 0.8;
+  const highCap = hasMageTalent(game, "archmage") ? 0.45 : 0.3;
+  const highRatio = lockedTier === "high" ? 1 : ratio >= highThreshold ? Math.min(1, (ratio - highThreshold) / Math.max(0.01, 1 - highThreshold)) : 0;
+  if (highRatio > 0) mult += highCap * highRatio;
+  else if (lockedTier !== "mid" && ratio < 0.4) mult -= hasMageTalent(game, "manaSurge") || hasMageTalent(game, "sorcererPath") ? 0 : 0.2;
+  if (hasMageTalent(game, "highFocus")) mult += highRatio > 0 ? 0.12 : ratio < 0.4 ? -0.1 : 0;
+  if (hasMageTalent(game, "rapidCasting")) mult -= 0.08;
+  if (hasMageTalent(game, "manaSurge") && ratio < 0.4) mult += 0.2;
+  if (hasMageTalent(game, "arcaneClarity") && (runtime.arcaneClarityTimer || 0) > 0) mult += 0.25;
+  if (hasMageArcanePresenceActive(game)) mult += 0.12;
+  if (hasMageTalent(game, "catalyst") && (runtime.catalystTimer || 0) > 0) mult += 0.1;
+  if (hasMageTalent(game, "runicMastery") && Number.isFinite(options.runesConsumed)) mult += Math.max(0, Math.min(3, options.runesConsumed)) * 0.1;
+  return Math.max(0.35, mult);
 }
 
-export function getNecromancerControlledUndeadDamageBonusPct(game) {
-  return getNecromancerColdCommandRanks(game) * 0.1;
+export function getMageSpellDelayMultiplier(game) {
+  let mult = 1;
+  const ratio = getMageManaRatio(game);
+  if (hasMageTalent(game, "rapidCasting")) mult *= 0.85;
+  if (hasMageTalent(game, "manaSurge") && ratio < 0.4) mult *= 0.67;
+  if (hasMageTalent(game, "catalyst") && (game?.necromancerRuntime?.catalystTimer || 0) > 0) mult *= 0.85;
+  return Math.max(0.25, mult);
 }
 
-export function getNecromancerControlledUndeadAttackSpeedBonusPct(game) {
-  return getNecromancerColdCommandRanks(game) * 0.1;
+export function getMagePersistentDurationMultiplier(game) {
+  let mult = 1;
+  if (hasMageTalent(game, "lingeringPower")) mult *= 1.25;
+  const spellMult = getMageSpellPowerMultiplier(game);
+  return mult * Math.max(0.75, Math.min(1.3, spellMult));
 }
 
-export function getNecromancerBaseCharmDurationForLevel(level) {
-  const safeLevel = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
-  const start = 1.5;
-  const minimum = 0.33;
-  if (safeLevel >= 10) return minimum;
-  const t = Math.max(0, Math.min(1, (safeLevel - 1) / 9));
-  const eased = t * t * (3 - 2 * t);
-  return start + (minimum - start) * eased;
-}
-
-export function getNecromancerDeathBoltCooldownReduction(game) {
-  let reduction = getNecromancerTalentPoints(game, "deathBoltMastery");
-  if (getNecromancerTalentPoints(game, "harvester") > 0) reduction += 0.2 * (game?.config?.deathBolt?.cooldown || 10);
-  return reduction;
-}
-
-export function getNecromancerDeathBoltDamageMultiplier(game) {
-  let mult = 1 + getNecromancerBlackCandleDamageBonus(game);
-  mult += getNecromancerTalentPoints(game, "deathBoltMastery") * 0.1;
-  const bonusPct = game?.necromancerRuntime?.harvesterBonusPct || 0;
-  return mult * (1 + bonusPct);
-}
-
-export function getNecromancerDeathBoltExplosionDamageMultiplier(game) {
-  return 1 + getNecromancerBlackCandleDamageBonus(game);
-}
-
-export function getNecromancerDeathBoltZoneDurationMultiplier(game) {
-  return 1 + (getNecromancerTalentPoints(game, "rotTouched") > 0 ? 0.2 : 0);
-}
-
-export function getNecromancerDeathBoltRadiusMultiplier(game) {
-  let mult = 1 + (getNecromancerTalentPoints(game, "rotTouched") > 0 ? 0.1 : 0);
-  if (getNecromancerTalentPoints(game, "hexcraft") >= 3) mult += 0.15;
-  return mult;
+export function hasNecromancerDeathBolt(game) {
+  return hasMageTalent(game, "necromancerPath");
 }
 
 export function getNecromancerControlCapBonus(game) {
-  return getNecromancerTalentPoints(game, "controlMastery");
+  return hasMageTalent(game, "necromancerPath") ? 3 : 0;
 }
 
-export function getNecromancerBeamHealingMultiplier(game) {
-  return 1 + getNecromancerTalentPoints(game, "controlMastery") * 0.15;
+export function getNecromancerBeamDamageMultiplier(game) {
+  let mult = 1.3;
+  if (hasMageTalent(game, "necromancerPath")) mult += 0.15;
+  return mult * getMageSpellPowerMultiplier(game);
 }
 
-export function getNecromancerDeathBoltGhostSpawnChance(game) {
-  let chance = getNecromancerTalentPoints(game, "coldCommand") * 0.1;
-  if (getNecromancerTalentPoints(game, "legionMaster") > 0) chance += 0.5;
-  return Math.max(0, Math.min(1, chance));
+export function getNecromancerBaseCharmDurationForLevel() {
+  return 1.25;
 }
 
-export function getNecromancerDeathBoltMasteryTempHpOnKill(game) {
-  return getNecromancerTalentPoints(game, "deathBoltMastery") > 0 ? 1 : 0;
+export function getNecromancerDeathBoltCooldownReduction() { return 0; }
+export function getNecromancerDeathBoltDamageMultiplier(game) { return getMageSpellPowerMultiplier(game); }
+export function getNecromancerDeathBoltExplosionDamageMultiplier(game) { return getMageSpellPowerMultiplier(game); }
+export function getNecromancerDeathBoltZoneDurationMultiplier(game) { return getMagePersistentDurationMultiplier(game); }
+export function getNecromancerDeathBoltRadiusMultiplier(game) { return Math.max(0.75, Math.min(1.45, getMageSpellPowerMultiplier(game))); }
+export function getNecromancerBeamHealingMultiplier(game) { return hasMageTalent(game, "necromancerPath") ? 1.25 : 1; }
+export function getNecromancerDeathBoltGhostSpawnChance(game) { return hasMageTalent(game, "necromancerPath") ? 1 : 0; }
+export function getNecromancerDeathBoltMasteryTempHpOnKill() { return 0; }
+export function getNecromancerTempHpCap(game, entity = game?.player) { return Math.max(0, Math.floor((entity?.maxHealth || 0) * 0.3)); }
+export function getNecromancerBeamPulseRateMultiplier(game) { return hasMageTalent(game, "rapidCasting") ? 1.2 : 1; }
+export function getNecromancerBoneWardDamageReduction() { return 0; }
+export function getNecromancerBoneWardDamageBonus() { return 0; }
+export function getNecromancerBoneWardReflectChance() { return 0; }
+export function hasNecromancerCurse() { return false; }
+export function getNecromancerCurseDuration() { return 3; }
+export function getNecromancerCurseUndeadDamageBonus() { return 0; }
+export function getNecromancerRotDuration() { return 3; }
+export function getNecromancerRotSlowPct() { return 0.25; }
+export function getNecromancerRotDps(game) { return Math.max(1, (typeof game?.getDeathBoltBaseDamage === "function" ? game.getDeathBoltBaseDamage() : 8) * 0.12); }
+export function hasNecromancerExplodingDeath(game) { return hasMageTalent(game, "lich"); }
+export function getNecromancerExplodingDeathDamage() { return 5; }
+export function getNecromancerExplodingDeathRadiusTiles() { return 2; }
+export function getNecromancerVigorDefenseBonusPct(game) { return (game?.necromancerRuntime?.battlemageGuardTimer || 0) > 0 ? 0.3 : 0; }
+export function getNecromancerVigorMoveSpeedBonusPct() { return 0; }
+export function getNecromancerVigorBeamDamageMultiplier() { return 1; }
+export function getNecromancerVigorHealFraction() { return 0; }
+export function hasNecromancerPlaguecraftRot() { return false; }
+export function hasNecromancerPlaguecraftDeathBurst() { return false; }
+export function getNecromancerPlaguecraftRiseChance() { return 0; }
+export function hasNecromancerHarvester() { return false; }
+export function hasNecromancerLegionMaster() { return false; }
+export function hasNecromancerBlightstorm() { return false; }
+export function getNecromancerBlackCandleCursedBeamBonus() { return 0; }
+export function getNecromancerRotTouchedRetaliationDamage() { return 0; }
+export function getNecromancerGhostLifeSteal() { return 0; }
+export function getNecromancerBlackCandleDamageBonus() { return 0; }
+export function getNecromancerColdCommandRanks() { return 0; }
+export function getNecromancerControlledUndeadHealthBonusPct(game) { return hasMageTalent(game, "necromancerPath") ? 0.2 : 0; }
+export function getNecromancerControlledUndeadDefenseBonusPct(game) { return hasMageTalent(game, "necromancerPath") ? 0.1 : 0; }
+export function getNecromancerControlledUndeadDamageBonusPct(game) {
+  let bonus = hasMageTalent(game, "necromancerPath") ? 0.1 : 0;
+  bonus += getMageManaRatio(game) * 0.2;
+  return bonus;
 }
-
-export function getNecromancerTempHpCap(game, entity = game?.player) {
-  const maxHealth = Number.isFinite(entity?.maxHealth) ? entity.maxHealth : 0;
-  return Math.max(0, Math.floor(maxHealth * 0.2));
-}
-
-export function getNecromancerBeamPulseRateMultiplier(game) {
-  return 1 + getNecromancerTalentPoints(game, "deathBoltMastery") * 0.15;
-}
-
-
-export function getNecromancerBoneWardDamageReduction(game) {
-  return getNecromancerTalentPoints(game, "boneWard") >= 1 ? 0.1 : 0;
-}
-
-export function getNecromancerBoneWardDamageBonus(game, enemy, owner = game?.player) {
-  if (getNecromancerTalentPoints(game, "boneWard") < 1 || !enemy || !owner) return 0;
-  return Math.hypot((enemy.x || 0) - (owner.x || 0), (enemy.y || 0) - (owner.y || 0)) <= (game?.config?.map?.tile || 32) * 2 ? 0.1 : 0;
-}
-
-export function getNecromancerBoneWardReflectChance(game, enemy, owner = game?.player) {
-  if (getNecromancerTalentPoints(game, "boneWard") < 1 || !enemy || !owner) return 0;
-  return Math.hypot((enemy.x || 0) - (owner.x || 0), (enemy.y || 0) - (owner.y || 0)) <= (game?.config?.map?.tile || 32) * 2 ? 0.15 : 0;
-}
-
-export function hasNecromancerCurse(game) {
-  return getNecromancerTalentPoints(game, "hexcraft") > 0;
-}
-
-export function getNecromancerCurseDuration(game) {
-  return 3 + (getNecromancerTalentPoints(game, "hexcraft") >= 2 ? 1 : 0);
-}
-
-export function getNecromancerCurseUndeadDamageBonus(game) {
-  return getNecromancerTalentPoints(game, "hexcraft") >= 2 ? 0.2 : 0;
-}
-
-export function getNecromancerRotDuration() {
-  return 3;
-}
-
-export function getNecromancerRotSlowPct() {
-  return 0.25;
-}
-
-export function getNecromancerRotDps(game) {
-  return Math.max(1, game.getDeathBoltBaseDamage() * 0.12);
-}
-
-export function hasNecromancerExplodingDeath(game) {
-  return getNecromancerTalentPoints(game, "explodingDeath") > 0;
-}
-
-export function getNecromancerExplodingDeathDamage() {
-  return 5;
-}
-
-export function getNecromancerExplodingDeathRadiusTiles() {
-  return 2;
-}
-
-export function getNecromancerVigorDefenseBonusPct(game) {
-  return (game?.necromancerRuntime?.vigorTimer || 0) > 0 ? 0.15 : 0;
-}
-
-export function getNecromancerVigorMoveSpeedBonusPct(game) {
-  return (game?.necromancerRuntime?.vigorTimer || 0) > 0 ? 0.25 : 0;
-}
-
-export function getNecromancerVigorBeamDamageMultiplier(game) {
-  return (game?.necromancerRuntime?.vigorBeamTimer || 0) > 0 ? 1.35 : 1;
-}
-
-export function getNecromancerVigorHealFraction() {
-  return 0.15;
-}
-
-export function hasNecromancerPlaguecraftRot(game) {
-  return getNecromancerTalentPoints(game, "plaguecraft") >= 1;
-}
-
-export function hasNecromancerPlaguecraftDeathBurst(game) {
-  return getNecromancerTalentPoints(game, "plaguecraft") >= 2;
-}
-
-export function getNecromancerPlaguecraftRiseChance(game) {
-  return getNecromancerTalentPoints(game, "plaguecraft") >= 3 ? 0.2 : 0;
-}
-
-export function hasNecromancerHarvester(game) {
-  return getNecromancerTalentPoints(game, "harvester") > 0;
-}
-
-export function hasNecromancerLegionMaster(game) {
-  return getNecromancerTalentPoints(game, "legionMaster") > 0;
-}
-
-export function hasNecromancerBlightstorm(game) {
-  return getNecromancerTalentPoints(game, "blightstorm") > 0;
-}
-
-export function getNecromancerBlackCandleCursedBeamBonus(game, enemy) {
-  return getNecromancerTalentPoints(game, "blackCandle") > 0 && (enemy?.curseTimer || 0) > 0 ? 0.1 : 0;
-}
-
-export function getNecromancerRotTouchedRetaliationDamage(game) {
-  return getNecromancerTalentPoints(game, "rotTouched") > 0 ? 5 : 0;
-}
-
-export function getNecromancerGhostLifeSteal(game) {
-  return hasNecromancerLegionMaster(game) ? 0.002 : 0;
-}
+export function getNecromancerControlledUndeadAttackSpeedBonusPct(game) { return getMageManaRatio(game) * 0.15; }

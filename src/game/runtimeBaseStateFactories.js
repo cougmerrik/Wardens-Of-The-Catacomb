@@ -78,11 +78,37 @@ export function createWarriorRuntimeState() {
 
 export function createNecromancerRuntimeState() {
   return {
+    activeMode: "cantrip",
+    mana: 7,
+    manaRegenPauseTimer: 0,
+    spellCastTimer: 0,
+    pendingSpell: null,
+    classSkillCooldownTimer: 0,
+    blinkInvulnTimer: 0,
+    invisibilityTimer: 0,
+    targetingBreakTimer: 0,
+    catalystTimer: 0,
+    arcaneClarityTimer: 0,
+    arcaneClarityChargeTimer: 0,
+    phaseBarrierCooldownTimer: 0,
+    arcaneFocusTimer: 0,
+    arcaneFocusTier: "",
+    chaosSurgeTimer: 0,
+    wildMagicCooldownTimer: 0,
+    influenceCooldownTimer: 0,
+    runes: 0,
+    runeTimer: 0,
+    battlemageGuardTimer: 0,
+    battlemageShockwaveCooldownTimer: 0,
+    battleCasterShieldTimer: 0,
+    souls: [],
+    soulSpawnCooldownTimer: 0,
     vigorTimer: 0,
     vigorBeamTimer: 0,
     vigorHealPool: 0,
     vigorTotalDuration: 0,
     harvesterBonusPct: 0,
+    mimicHealth: 0,
     tempHp: 0
   };
 }

@@ -306,7 +306,7 @@ export class GameRuntimeBase {
   }
 
   isUndeadEnemy(enemy) {
-    return enemy?.type === "ghost" || enemy?.type === "skeleton_warrior" || enemy?.type === "skeleton";
+    return !!enemy?.raisedUndeadCopy || enemy?.type === "ghost" || enemy?.type === "skeleton_warrior" || enemy?.type === "skeleton";
   }
 
   isControlledUndead(enemy) {
@@ -333,8 +333,7 @@ export class GameRuntimeBase {
 
   getNecromancerControlCap(points = this.skills.undeadMastery.points) {
     if (isNecromancerTalentGame(this)) {
-      const base = Number.isFinite(this.config.necromancer?.baseControlCap) ? this.config.necromancer.baseControlCap : 1;
-      return Math.min(8, base + getNecromancerControlCapBonus(this));
+      return 3 + getNecromancerControlCapBonus(this);
     }
     const p = Number.isFinite(points) ? Math.max(0, Math.floor(points)) : 0;
     const base = Number.isFinite(this.config.necromancer?.baseControlCap) ? this.config.necromancer.baseControlCap : 1;
@@ -344,9 +343,7 @@ export class GameRuntimeBase {
   getNecromancerControlCapForPlayer(playerEntity = this.player) {
     if (isNecromancerTalentGame(this)) {
       if (this.isPrimaryPlayerEntity && this.isPrimaryPlayerEntity(playerEntity)) return this.getNecromancerControlCap();
-      const base = Number.isFinite(this.config.necromancer?.baseControlCap) ? this.config.necromancer.baseControlCap : 1;
-      const bonus = Number.isFinite(playerEntity?.necromancerTalents?.controlMastery?.points) ? playerEntity.necromancerTalents.controlMastery.points : 0;
-      return Math.min(8, base + bonus);
+      return (playerEntity?.necromancerTalents?.necromancerPath?.points || 0) > 0 ? 6 : 3;
     }
     const points = this.isPrimaryPlayerEntity && this.isPrimaryPlayerEntity(playerEntity)
       ? this.skills.undeadMastery.points

@@ -142,7 +142,8 @@ export const runtimeBaseDifficultyMethods = {
     const multiplier = enemy?.isControlledUndead && Number.isFinite(enemy?.damageBuffMultiplier) && (enemy?.damageBuffTimer || 0) > 0
       ? Math.max(0.1, enemy.damageBuffMultiplier)
       : 1;
-    return { min: Math.min(min, max) * multiplier, max: Math.max(min, max) * multiplier };
+    const weakenedMultiplier = (enemy?.weakenedTimer || 0) > 0 ? 0.72 : 1;
+    return { min: Math.min(min, max) * multiplier * weakenedMultiplier, max: Math.max(min, max) * multiplier * weakenedMultiplier };
   },
 
   rollEnemyContactDamage(enemy) {

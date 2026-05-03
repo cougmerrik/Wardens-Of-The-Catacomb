@@ -461,7 +461,10 @@ export const rendererEffectsPlayerMethods = {
     const staffTipX = chestX + ax * 20;
     const staffTipY = chestY + ay * 20;
 
-    ctx.strokeStyle = "#6f737b";
+    const runtime = player?.necromancerRuntime || {};
+    const wildBlue = (runtime.blueTimer || 0) > 0;
+    const mimic = (runtime.mimicTimer || 0) > 0;
+    ctx.strokeStyle = mimic ? "#8b5a34" : wildBlue ? "#38a7ff" : "#6f737b";
     ctx.lineWidth = 3.8;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -471,14 +474,14 @@ export const rendererEffectsPlayerMethods = {
     ctx.lineTo(frontHandX, frontHandY);
     ctx.stroke();
 
-    ctx.strokeStyle = "#111317";
+    ctx.strokeStyle = mimic ? "#3b2114" : "#111317";
     ctx.lineWidth = 3.2;
     ctx.beginPath();
     ctx.moveTo(staffBaseX, staffBaseY);
     ctx.lineTo(staffTipX, staffTipY);
     ctx.stroke();
 
-    ctx.fillStyle = "#23262b";
+    ctx.fillStyle = mimic ? "#c28a55" : wildBlue ? "#72d7ff" : "#23262b";
     ctx.beginPath();
     ctx.arc(staffTipX, staffTipY, 3.5, 0, Math.PI * 2);
     ctx.fill();

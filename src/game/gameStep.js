@@ -10,6 +10,7 @@ import {
   getNecromancerTempHpCap,
   getNecromancerVigorBeamDamageMultiplier,
   hasNecromancerBlightstorm,
+  getMageSelectedCantrip,
   isNecromancerTalentGame
 } from "./necromancerTalentTree.js";
 
@@ -228,7 +229,17 @@ export function stepGame(game, dt, controls = {}) {
     }
   }
 
-  if (primaryPlayerAlive && game.isNecromancerClass && game.isNecromancerClass()) {
+  if (primaryPlayerAlive && controls.modeSwapQueued && game.isNecromancerClass && game.isNecromancerClass() && typeof game.toggleMageMode === "function") {
+    game.toggleMageMode();
+  }
+
+  const necromancerBeamCantripActive =
+    primaryPlayerAlive &&
+    game.isNecromancerClass &&
+    game.isNecromancerClass() &&
+    (!isNecromancerTalentGame(game) ||
+      ((game.necromancerRuntime?.activeMode || "cantrip") === "cantrip" && (getMageSelectedCantrip(game) || "fireBoltCantrip") === "necroticBeamCantrip"));
+  if (necromancerBeamCantripActive) {
     const beam = game.necromancerBeam || (game.necromancerBeam = {
       active: false,
       targetId: null,
@@ -359,6 +370,10 @@ export function stepGame(game, dt, controls = {}) {
           beam.progress += dt;
           if (beam.progress >= game.getNecromancerCharmDuration()) {
             if (game.markUndeadAsControlled(bestTarget)) {
+              if (!game.necromancerTalents?.necromancerPath?.points) {
+                bestTarget.tempMageCharmTimer = 5;
+                bestTarget.dieWhenCharmEnds = true;
+              }
               beam.progress = 0;
               game.spawnFloatingText(bestTarget.x, bestTarget.y - bestTarget.size * 0.7, "Charmed", "#8eb8ff", 0.9, 14);
             }
@@ -374,6 +389,14 @@ export function stepGame(game, dt, controls = {}) {
             const damage = game.getDeathBoltBaseDamage() * 0.27 * getNecromancerBeamDamageMultiplier(game) * (1 + getNecromancerBlackCandleCursedBeamBonus(game, bestTarget)) * getNecromancerVigorBeamDamageMultiplier(game);
             const hpBefore = Number.isFinite(bestTarget.hp) ? bestTarget.hp : 0;
             game.applyEnemyDamage(bestTarget, damage, "necrotic", game.player.id || null);
+            const dealt = Math.max(0, hpBefore - Math.max(0, Number.isFinite(bestTarget.hp) ? bestTarget.hp : 0));
+            if (dealt > 0) {
+              const runtime = game.necromancerRuntime || (game.necromancerRuntime = {});
+              const cap = Math.max(0, (game.player?.maxHealth || 0) * 0.15);
+              const gain = Math.max(0.25, dealt * 0.2);
+              runtime.tempHp = Math.min(cap, Math.max(0, Number.isFinite(runtime.tempHp) ? runtime.tempHp : 0) + gain);
+              if (typeof game.markPlayerHealthBarVisible === "function") game.markPlayerHealthBarVisible();
+            }
             if (hasNecromancerBlightstorm(game)) {
               bestTarget.curseTimer = Math.max(bestTarget.curseTimer || 0, getNecromancerCurseDuration(game));
             }
@@ -570,6 +593,27 @@ export function stepGame(game, dt, controls = {}) {
     if (enemy.charmLocked) continue;
     if ((enemy.hitCooldown || 0) > 0) continue;
     const appliedEnemySpeedScale = enemySpeedScale * (1 - Math.max(0, Math.min(0.85, enemy.pinningSlowPct || 0)));
+    if ((enemy.confusionTimer || 0) > 0 && (enemy.isBoss || enemy.isFloorBoss)) {
+      enemy.castWindup = 0;
+      enemy.castCooldown = Math.max(enemy.castCooldown || 0, 0.35);
+      enemy.chargeWindupTimer = 0;
+      enemy.chargeTimer = 0;
+      enemy.chargeCooldown = Math.max(enemy.chargeCooldown || 0, 0.35);
+      enemy.stompCooldown = Math.max(enemy.stompCooldown || 0, 0.35);
+      enemy.summonCooldown = Math.max(enemy.summonCooldown || 0, 0.35);
+    }
+    if ((enemy.confusionTimer || 0) > 0 && !enemy.isBoss && !enemy.isFloorBoss && !(game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy))) {
+      enemy.confusionWanderTimer = Math.max(0, (Number.isFinite(enemy.confusionWanderTimer) ? enemy.confusionWanderTimer : 0) - dt);
+      if (enemy.confusionWanderTimer <= 0 || !Number.isFinite(enemy.confusionWanderAngle)) {
+        enemy.confusionWanderAngle = Math.random() * Math.PI * 2;
+        enemy.confusionWanderTimer = 0.35 + Math.random() * 0.45;
+      }
+      const confusionSpeed = appliedEnemySpeedScale * 0.72;
+      if (typeof game.moveWithCollision === "function") {
+        game.moveWithCollision(enemy, Math.cos(enemy.confusionWanderAngle) * (enemy.speed || 0) * confusionSpeed * dt, Math.sin(enemy.confusionWanderAngle) * (enemy.speed || 0) * confusionSpeed * dt);
+      }
+      continue;
+    }
     if (typeof game.updateEnemyTactics === "function") game.updateEnemyTactics(enemy, dt, appliedEnemySpeedScale);
     else if (typeof game.updateGenericEnemy === "function") game.updateGenericEnemy(enemy, dt, appliedEnemySpeedScale);
     else game.moveEnemyTowardPlayer(enemy, appliedEnemySpeedScale, dt);

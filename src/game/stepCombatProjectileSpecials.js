@@ -5,6 +5,25 @@ function spawnStormcallerRicochetSplits(game, bullet) {
   const speed = Math.max(160, Math.hypot(bullet.vx || 0, bullet.vy || 0));
   const baseAngle = Math.atan2(bullet.vy || 0, bullet.vx || 1);
   const splitLife = Math.max(0.12, Math.min(Number.isFinite(bullet.life) ? bullet.life : 0.5, 0.55));
+  const tile = game.config?.map?.tile || 32;
+  const radiusTiles = Number.isFinite(game.config?.lighting?.stormcallerFlashRadiusTiles)
+    ? Math.max(0, game.config.lighting.stormcallerFlashRadiusTiles)
+    : 2.25;
+  if (Array.isArray(game.fireZones) && radiusTiles > 0) {
+    game.fireZones.push({
+      x: bullet.x,
+      y: bullet.y,
+      radius: tile * 0.55,
+      lightRadius: radiusTiles * tile,
+      lightIntensity: Number.isFinite(game.config?.lighting?.stormcallerFlashLightPower)
+        ? Math.max(0, Math.min(1, game.config.lighting.stormcallerFlashLightPower))
+        : 0.45,
+      life: 0.18,
+      totalLife: 0.18,
+      zoneType: "stormcallerFlash",
+      ownerId: bullet.ownerId || null
+    });
+  }
   for (const offset of [-0.36, 0.36]) {
     const angle = baseAngle + offset;
     game.bullets.push({

@@ -465,6 +465,23 @@ export const runtimeSceneDrawMethods = {
       ctx.closePath();
       ctx.fill();
     }
+    if ((enemy.confusionTimer || 0) > 0) {
+      const fx = Math.floor(screenX);
+      const fy = Math.floor(screenY + enemy.size * 0.42 - 13);
+      ctx.strokeStyle = "rgba(218, 160, 255, 0.96)";
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(fx - 6, fy);
+      ctx.bezierCurveTo(fx - 3, fy - 6, fx + 3, fy + 6, fx + 6, fy);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(112, 53, 178, 0.92)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(fx - 5, fy + 4);
+      ctx.bezierCurveTo(fx - 2, fy - 1, fx + 2, fy + 9, fx + 5, fy + 4);
+      ctx.stroke();
+    }
     if ((enemy.rotTimer || 0) > 0) {
       const fx = Math.floor(screenX + 10);
       const fy = Math.floor(screenY + enemy.size * 0.42);

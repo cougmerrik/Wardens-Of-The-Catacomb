@@ -2,7 +2,7 @@ import { drawStatsGameOverActions } from "./statsGameOverActions.js";
 import { getAndroidHudCardX } from "./androidLayout.js";
 import { drawPinnedAbilityTooltip } from "./abilityWidgetTooltip.js";
 import { getHudAbilityState } from "./abilityWidgetState.js";
-import { getNecromancerTalentPoints } from "../../game/necromancerTalentTree.js";
+import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 function formatEnemyTypeLabel(type) {
   const raw = typeof type === "string" && type.length > 0 ? type : "unknown";
   return raw
@@ -304,14 +304,13 @@ function buildCharacterColumns(game) {
       ["Execute", `${(game.getWarriorExecuteChance() * 100).toFixed(1)}% @ ${(game.getWarriorExecuteThreshold() * 100).toFixed(1)}% HP`]
     ]);
   } else if (game.isNecromancerClass && game.isNecromancerClass()) {
-    classKit = createSection("Necromancer Kit", [
-      ["Control Mastery", `Lv ${getNecromancerTalentPoints(game, "controlMastery")}`],
-      ["Cold Command", `Lv ${getNecromancerTalentPoints(game, "coldCommand")}`],
+    const efficiency = getMageEfficiencyState(game);
+    classKit = createSection("Mage Kit", [
+      ["Attack", getMageAttackLabel(game)],
+      ["Efficiency", efficiency.shortLabel],
       ["Controlled Undead", `${game.getControlledUndeadCount()}/${game.getNecromancerControlCap()}`],
-      ["Charm Time", `${game.getNecromancerCharmDuration().toFixed(2)}s`],
-      ["Death Bolt", `Lv ${getNecromancerTalentPoints(game, "deathBoltActive")}`],
-      ["Death Bolt Dmg", `${game.getDeathBoltBaseDamage().toFixed(1)}`],
-      ["Plaguecraft", `Lv ${getNecromancerTalentPoints(game, "plaguecraft")}`]
+      ["Runes", `${Math.floor(game.necromancerRuntime?.runes || 0)}/3`],
+      ["Death Bolt Dmg", `${game.getDeathBoltBaseDamage().toFixed(1)}`]
     ]);
   }
 
