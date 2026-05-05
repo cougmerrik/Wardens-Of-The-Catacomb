@@ -1,3 +1,5 @@
+import { LIGHTING_CONFIG } from "./configLighting.js";
+
 export const CONFIG = {
   classes: {
     archer: {
@@ -76,51 +78,7 @@ export const CONFIG = {
     defaultBiomeKey: "catacomb",
     biomeCycle: ["catacomb", "catacomb", "catacomb", "sewer"]
   },
-  lighting: {
-    enabled: true,
-    ambientDarknessAlpha: 0.99,
-    maxDarknessAlpha: 0.99,
-    enemyMaxDarknessAlpha: 0.99,
-    enemyLightFalloffDecay: 2.4,
-    brightRadiusRatio: 0.24,
-    dimRadiusRatio: 0.74,
-    playerBaseRadiusTiles: 0,
-    playerFuelRadiusTiles: 23.595,
-    playerRadiusPerLevelTiles: 0.08,
-    lanternInitialFuel: 0.5,
-    lanternMaxFuel: 1.0,
-    lanternFuelPerTorch: 0.2,
-    lanternFuelDecayPerSecond: 0.012,
-    torchRadiusTiles: 2.25,
-    warCircleLightRadiusMultiplier: 1.1,
-    warCirclePaladinLightPower: 0.25,
-    warCircleEldritchLightPower: 0.1,
-    shockReleasePaladinLightPower: 0.25,
-    shockReleaseEldritchLightPower: 0.1,
-    gladiatorLanternDecayMultiplier: 0.9,
-    beastMasterDarkVisionTiles: 1,
-    stormcallerFlashRadiusTiles: 2,
-    stormcallerFlashLightPower: 0.1,
-    stormcallerFlashLightFalloffDecay: 0.65,
-    stormcallerFlashLightBrightRadiusRatio: 0.18,
-    stormcallerFlashLightDimRadiusRatio: 1.0,
-    portalRadiusTiles: 3,
-    portalLightPower: 0.35,
-    portalLightFalloffDecay: 0.75,
-    portalLightBrightRadiusRatio: 0.2,
-    portalLightDimRadiusRatio: 1.0,
-    fireArrowProjectileRadiusTiles: 4.5,
-    fireZoneRadiusMultiplier: 2.0,
-    fireZoneMinRadiusTiles: 3.0,
-    burningEnemyRadiusTiles: 3.25,
-    fireLightFalloffDecay: 1.45,
-    fireLightBrightRadiusRatio: 0.42,
-    fireLightDimRadiusRatio: 0.94,
-    touchDistanceTiles: 0.75,
-    torchSnuffCooldown: 1.0,
-    maxTorches: 80,
-    torchCountFactor: 180
-  },
+  lighting: LIGHTING_CONFIG,
   player: {
     maxHealth: 100,
     hpBarDuration: 1.25,

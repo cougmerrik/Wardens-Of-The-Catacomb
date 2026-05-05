@@ -15,17 +15,21 @@ Recommended approach:
 - Review touch controls and HUD changes in design form before any Android runtime implementation begins
 - Ship Android support in phases, with a playable single-player build before multiplayer polish and store work
 
-## Current State
+## Current Implementation State
 
 The current codebase has these relevant properties:
 
 - The client is vanilla JavaScript, HTML, CSS, and canvas
 - The game already runs in a browser without an engine dependency
 - Multiplayer depends on a separate Node WebSocket server in `server/networkServer.js`
-- The network setup UI defaults to `ws://localhost:8090`, which is desktop-local and not suitable for a packaged phone build
-- Input is currently centered on keyboard and mouse in `src/InputController.js`
+- Android packaging uses Capacitor with `www/` as the generated web asset target
+- `scripts/prepare-capacitor-web.js` prepares the Android web bundle with Android runtime defaults
+- Runtime config now supports platform identity, server URL defaults, override policy, and gameplay-ad policy
+- The network setup UI resolves through runtime config and saved override state instead of a hardcoded desktop-only default
+- Input supports keyboard/mouse on web and Android touch controls through the same `InputController` gameplay-intent surface
 - Audio already has interaction-unlock and focus/visibility handling in `src/audio/MusicController.js`
-- There is no existing mobile shell, manifest, service worker, touch HUD, or Android build pipeline
+- Android HUD and touch-region helpers live in `src/rendering/hud/androidLayout.js`
+- Android native build commands are exposed through npm scripts and the repo-local Gradle wrapper script
 
 ## Goals
 

@@ -30,10 +30,7 @@ import {
 } from "./gameUiSessionRuntime.js";
 import { initializeNetworkGameState } from "./networkSessionGameInit.js";
 import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./networkRenderRuntime.js";
-import {
-  persistSuccessfulServerUrlChoice,
-  resolveActiveServerUrl,
-} from "../runtime/runtimeConfig.js";
+import { persistSuccessfulServerUrlChoice, resolveActiveServerUrl } from "../runtime/runtimeConfig.js";
 
 const NET_INPUT_DT = 1 / 60;
 const NET_CLOCK_OFFSET_SMOOTHING = 0.12;
@@ -86,7 +83,6 @@ export function createNetworkSessionController({
   let netSnapshotJitterMs = 0;
   let netLastSnapshotGapMs = 33;
   let netInitialSnapshotApplied = false;
-
   const isNetworkController = () => !!(netControllerId && netPlayerId && netControllerId === netPlayerId);
 
   const getDebugState = () => ({

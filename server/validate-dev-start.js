@@ -87,6 +87,24 @@ async function getDebugState(page) {
   return page.evaluate(() => window.__WOTC_DEBUG__?.getState?.() || null);
 }
 
+async function runDebug(page, action, payload = {}) {
+  return page.evaluate(
+    ({ command, data }) => window.__WOTC_DEBUG__?.run?.(command, data) || null,
+    { command: action, data: payload }
+  );
+}
+
+async function waitForDebugState(page, predicate, timeoutMs, message) {
+  const startedAt = Date.now();
+  let state = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    state = await getDebugState(page).catch(() => null);
+    if (predicate(state)) return state;
+    await delay(100);
+  }
+  throw new Error(`${message}: ${JSON.stringify(state?.tile || state || null)}`);
+}
+
 async function runScenario(page, classKey, floor) {
   const errors = [];
   page.removeAllListeners("console");
@@ -110,15 +128,15 @@ async function runScenario(page, classKey, floor) {
   }, String(floor));
   await page.locator("#start-game").click();
 
-  await page.waitForFunction(
-    ({ targetFloor }) => {
-      const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.floor === targetFloor && state.walkable === true && state.tile?.value === "P";
-    },
-    { targetFloor: floor },
-    { timeout: 10000 }
+  await waitForDebugState(
+    page,
+    (state) => !!state && state.floor === floor && state.walkable === true && state.tile?.value === "P",
+    10000,
+    `timed out waiting for dev start ${classKey} floor ${floor}`
   );
 
+  const pauseResult = await runDebug(page, "setPaused", { paused: false });
+  assert(pauseResult?.ok === true, `failed to clear paused state for ${classKey} floor ${floor}: ${JSON.stringify(pauseResult)}`);
   const before = await getDebugState(page);
   assert(before && before.floor === floor, `expected floor ${floor}, got ${before?.floor}`);
   assert(before.walkable === true, `start position on floor ${floor} was not walkable`);

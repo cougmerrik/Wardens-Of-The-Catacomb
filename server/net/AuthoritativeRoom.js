@@ -1,60 +1,11 @@
 import { GameSim } from "../../src/sim/GameSim.js";
-import {
-  createNecromancerBeamState,
-  createRangerRuntimeState,
-  createWarriorRuntimeState,
-  createSkillState,
-  createUpgradeState
-} from "../../src/game/runtimeBaseStateFactories.js";
 import { cloneRangerTalentState, createRangerTalentState } from "../../src/game/rangerTalentTree.js";
 import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/game/warriorTalentTree.js";
 import { cloneNecromancerTalentState, createNecromancerTalentState } from "../../src/game/necromancerTalentTree.js";
 import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
+import { cloneNecromancerBeamState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
-
-function cloneSkillState(source = null) {
-  const next = createSkillState();
-  if (!source || typeof source !== "object") return next;
-  for (const [key, skill] of Object.entries(next)) {
-    const raw = source[key];
-    if (!raw || typeof raw !== "object") continue;
-    if (Number.isFinite(raw.points)) skill.points = Math.max(0, Math.min(skill.maxPoints, Math.floor(raw.points)));
-  }
-  return next;
-}
-
-function cloneUpgradeState(source = null) {
-  const next = createUpgradeState();
-  if (!source || typeof source !== "object") return next;
-  for (const [key, upgrade] of Object.entries(next)) {
-    const raw = source[key];
-    if (!raw || typeof raw !== "object") continue;
-    if (Number.isFinite(raw.level)) upgrade.level = Math.max(0, Math.min(upgrade.maxLevel, Math.floor(raw.level)));
-  }
-  return next;
-}
-
-function cloneRangerRuntimeState(source = null) {
-  return {
-    ...createRangerRuntimeState(),
-    ...(source && typeof source === "object" ? source : {})
-  };
-}
-
-function cloneWarriorRuntimeState(source = null) {
-  return {
-    ...createWarriorRuntimeState(),
-    ...(source && typeof source === "object" ? source : {})
-  };
-}
-
-function cloneNecromancerBeamState(source = null) {
-  return {
-    ...createNecromancerBeamState(),
-    ...(source && typeof source === "object" ? source : {})
-  };
-}
 
 export class AuthoritativeRoom {
   constructor(id, classType, options) {
