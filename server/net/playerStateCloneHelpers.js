@@ -1,5 +1,6 @@
 import {
   createNecromancerBeamState,
+  createNecromancerRuntimeState,
   createRangerRuntimeState,
   createWarriorRuntimeState,
   createSkillState,
@@ -40,6 +41,18 @@ export function cloneWarriorRuntimeState(source = null) {
     ...createWarriorRuntimeState(),
     ...(source && typeof source === "object" ? source : {})
   };
+}
+
+export function cloneNecromancerRuntimeState(source = null) {
+  const next = {
+    ...createNecromancerRuntimeState(),
+    ...(source && typeof source === "object" ? source : {})
+  };
+  next.souls = Array.isArray(next.souls) ? next.souls.map((soul) => ({ ...soul })) : [];
+  next.pendingSpell = next.pendingSpell && typeof next.pendingSpell === "object"
+    ? { ...next.pendingSpell }
+    : next.pendingSpell || null;
+  return next;
 }
 
 export function cloneNecromancerBeamState(source = null) {
