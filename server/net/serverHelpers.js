@@ -50,6 +50,11 @@ export function sanitizeInput(raw, previous) {
   return next;
 }
 
-export function safeSend(ws, obj) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
+export function safeSend(transport, obj) {
+  if (transport && typeof transport.sendJson === "function") return transport.sendJson(obj);
+  if (transport?.readyState === transport?.OPEN) {
+    transport.send(JSON.stringify(obj));
+    return true;
+  }
+  return false;
 }

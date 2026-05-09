@@ -1136,12 +1136,12 @@ export class AuthoritativeRoom {
     const msg = JSON.stringify({ type, roomId: this.id, ...payload });
     let dropped = 0;
     for (const client of this.clients.values()) {
-      if (client.ws.readyState !== client.ws.OPEN) continue;
-      if (type === "state.snapshot" && client.ws.bufferedAmount > this.options.maxWsBufferedBytes) {
+      if (!client.transport?.isOpen()) continue;
+      if (type === "state.snapshot" && client.transport.bufferedAmount > this.options.maxWsBufferedBytes) {
         dropped += 1;
         continue;
       }
-      client.ws.send(msg);
+      client.transport.send(msg);
     }
     const elapsed = this.options.monotonicNowMs() - t0;
     if (type === "state.snapshot") {
@@ -1195,9 +1195,7 @@ export class AuthoritativeRoom {
       }))
     };
     if (toClient) {
-      if (toClient.ws.readyState === toClient.ws.OPEN) {
-        toClient.ws.send(JSON.stringify({ type: "state.mapMeta", roomId: this.id, ...payload }));
-      }
+      toClient.transport?.sendJson({ type: "state.mapMeta", roomId: this.id, ...payload });
       return;
     }
     this.broadcast("state.mapMeta", payload);
@@ -1230,16 +1228,14 @@ export class AuthoritativeRoom {
       }))
     };
     if (toClient) {
-      if (toClient.ws.readyState === toClient.ws.OPEN) {
-        toClient.ws.send(JSON.stringify({ type: "state.map", roomId: this.id, ...payload }));
-      }
+      toClient.transport?.sendJson({ type: "state.map", roomId: this.id, ...payload });
       return;
     }
     this.broadcast("state.map", payload);
   }
 
   sendMapChunksToClient(client, nowMs = Date.now()) {
-    if (!client || client.ws.readyState !== client.ws.OPEN) return;
+    if (!client?.transport?.isOpen()) return;
     const chunkState = this.clientChunkState.get(client.id);
     if (!chunkState) return;
     const tile = this.sim.config.map.tile || 32;
@@ -1257,17 +1253,15 @@ export class AuthoritativeRoom {
         if (chunkState.sent.has(key) && nowMs - this.lastChunkPushMs < this.options.mapChunkPushMs) continue;
         const chunk = this.options.buildMapChunkRows(this.sim, cx, cy, this.options.mapChunkSize);
         if (!chunk) continue;
-        client.ws.send(
-          JSON.stringify({
-            type: "state.mapChunk",
-            roomId: this.id,
-            mapSignature: sig,
-            cx,
-            cy,
-            chunkSize: this.options.mapChunkSize,
-            rows: chunk.rows
-          })
-        );
+        client.transport.sendJson({
+          type: "state.mapChunk",
+          roomId: this.id,
+          mapSignature: sig,
+          cx,
+          cy,
+          chunkSize: this.options.mapChunkSize,
+          rows: chunk.rows
+        });
         chunkState.sent.add(key);
       }
     }
@@ -1386,7 +1380,7 @@ export class AuthoritativeRoom {
   }
 
   sendMeta(toClient, nowMs = Date.now(), force = true) {
-    if (!toClient || toClient.ws.readyState !== toClient.ws.OPEN) return;
+    if (!toClient?.transport?.isOpen()) return;
     const meta = this.options.serializeMetaState(this);
     const payloadJson = JSON.stringify(meta);
     const changed = payloadJson !== this.lastMetaPayloadJson;
@@ -1394,15 +1388,13 @@ export class AuthoritativeRoom {
       this.lastMetaPayloadJson = payloadJson;
       this.lastMetaBroadcastMs = nowMs;
     }
-    toClient.ws.send(
-      JSON.stringify({
-        type: "state.meta",
-        roomId: this.id,
-        serverTime: nowMs,
-        mapSignature: this.mapSignature(),
-        meta
-      })
-    );
+    toClient.transport.sendJson({
+      type: "state.meta",
+      roomId: this.id,
+      serverTime: nowMs,
+      mapSignature: this.mapSignature(),
+      meta
+    });
   }
 
   getTelemetrySnapshot() {

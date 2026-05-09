@@ -40,6 +40,11 @@ This document summarizes the current high-level architecture and validation work
   - `npm run cap:sync:android` rebuilds and syncs the Capacitor Android project
   - `npm run android:assembleDebug` builds the debug APK through the repo-local Gradle wrapper script
 - The iOS path remains intentionally open through the shared web bundle and Capacitor architecture, but no iOS native project is part of the current branch state.
+- Marketplace-oriented network defaults should assume secure production transport:
+  - production multiplayer URLs should use `wss://`
+  - development `ws://` endpoints should remain local/test-only
+  - mobile native shells should avoid broad cleartext or App Transport Security exceptions unless a release-specific backend constraint makes a narrow exception unavoidable
+- Android transport defaults are centralized in `scripts/mobileTransportDefaults.js` so bundle preparation and validation use the same production `wss://` default.
 
 ## Recent Refactor Summary
 - Large gameplay, server, bootstrap, and renderer files were split into reusable modules.
@@ -85,6 +90,19 @@ This document summarizes the current high-level architecture and validation work
 
 ## Network Model
 - The server is authoritative.
+- Multiplayer transport work is intentionally iterative:
+  - keep the current custom authoritative game protocol as the production path
+  - isolate transport mechanics behind small adapters before changing room or snapshot behavior
+  - keep browser WebSocket as the default adapter for web and Capacitor builds
+  - use local/in-memory adapters for deterministic unit-style validation where a live socket is unnecessary
+  - evaluate framework migration only after the adapter boundary is stable
+- Transport adapter boundaries now exist on both sides of the multiplayer protocol:
+  - client transports live under `src/net/transports/`, with browser WebSocket and local in-memory adapters used by `NetClient`
+  - server socket wrapping lives in `server/net/transports/WsClientTransport.js`
+  - `AuthoritativeRoom` sends through the server adapter contract for open checks, buffered snapshot throttling, JSON sends, map chunks, targeted meta sends, and broadcasts
+  - `validate:network-transport` covers client local transport behavior, the server `ws` wrapper, safe JSON sending, close handling, and invalid JSON error propagation
+- Colyseus remains a candidate for a future backend spike, especially for matchmaking, room discovery, reconnection support, SDK reach, and Redis-backed multi-process scaling. It is not the default migration target for this branch because the current implementation already owns authoritative simulation, custom snapshot/delta sync, map chunk streaming, prediction/reconciliation, and branch-specific validators.
+- Detailed framework comparison and migration gates live in [Network Framework Evaluation](NETWORK_FRAMEWORK_EVALUATION.md).
 - Rooms now support a dedicated shared lobby phase and a true multiplayer active phase.
 - A room tracks:
   - `roomOwnerId` for lobby ownership
@@ -161,6 +179,10 @@ This document summarizes the current high-level architecture and validation work
   - recommended pre-commit gate
 - `npm run validate:closeout`
   - branch closeout gate that runs all grouped validation suites
+- `npm run validate:closeout:selective -- --list`
+  - prints a changed-file-aware closeout plan from `origin/main` without running it
+- `npm run validate:closeout:selective`
+  - runs core validation plus targeted gates selected from changed files; broad or high-risk diffs can still escalate to full closeout
 
 ### Browser Validation Coverage
 - `validate:solo-xp`
@@ -211,6 +233,8 @@ This document summarizes the current high-level architecture and validation work
   - compares floor `1`, map-only later floors, and loaded later floors so map-growth and enemy-density costs can be evaluated separately
 
 ### Mobile Build Validation
+- `npm run validate:mobile-transport`
+  - verifies Android runtime transport defaults, generated config shape, runtime URL resolution, and absence of broad Android cleartext network settings
 - `npm run build:android:web`
   - rebuilds `www/` from the tracked web client assets and writes Android runtime config defaults
 - `npm run cap:sync:android`
@@ -241,7 +265,9 @@ This document summarizes the current high-level architecture and validation work
 - Repo scripts were updated to resolve from the project root in UNC-path environments.
 - `server/perfRunner.js` was hardened to resolve its root from `import.meta.url`, matching the other tooling fixes.
 - `server/run-validation-suite.js` now groups the growing validation surface into maintainable suites instead of requiring every workflow step to list individual commands manually.
-- `server/run-validation-suite.js` supports `--list`, `--only`, `--from`, and `--until` for validation triage. Use these options to rerun failed gates or resume late-suite debugging, then run one clean full closeout before staging.
+- `server/run-validation-suite.js` supports `--list`, `--only`, `--from`, `--until`, and `--base` for validation triage. Use these options to rerun failed gates or resume late-suite debugging.
+- `closeout:selective` uses `server/validation/selectiveCloseoutPlan.js` to map changed files to closeout gates. It always includes core checks, ignores generated `artifacts/` and `www/` outputs, escalates broad runtime/config diffs to full closeout, and adds targeted gameplay, network, lighting, mobile, framework, and perf validators based on changed paths.
+- Use full `npm run validate:closeout` when the selective plan escalates, when branch risk is hard to classify, or before a release-critical merge.
 - Shared browser/network harness helpers now live under `server/validation/`, which keeps individual validators below the LOC gate while preserving a common startup, port-probing, and failure-capture path.
 - `?dev=1` now bypasses the splash and goes straight to Mode Select so local playtesting and `validate:dev-start` are not blocked by browser-specific media preload timing.
 - The perf baselines were refreshed from post-fix runs on 2026-03-17/18, so future comparisons should use the current baseline files instead of the earlier pre-correction artifacts.

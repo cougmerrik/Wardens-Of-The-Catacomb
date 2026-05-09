@@ -10,6 +10,7 @@ import { average, makeSamplePusher, monotonicNowMs, percentile } from "./net/tel
 import { buildDeltaCollection } from "./net/deltaProtocol.js";
 import { buildMapChunkRows } from "./net/mapChunkStreaming.js";
 import { installRoomDevBossOverride } from "./net/installRoomDevBossOverride.js";
+import { createWsClientTransport } from "./net/transports/WsClientTransport.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
@@ -92,9 +93,10 @@ wss.on("connection", (ws) => {
   if (ws._socket && typeof ws._socket.setNoDelay === "function") {
     ws._socket.setNoDelay(true);
   }
+  const transport = createWsClientTransport(ws);
   const client = {
     id: uid("p"),
-    ws,
+    transport,
     roomId: null,
     name: "Player",
     classType: "archer",
@@ -103,16 +105,16 @@ wss.on("connection", (ws) => {
     lastInputSeq: 0
   };
 
-  safeSend(ws, {
+  safeSend(transport, {
     type: "hello",
     playerId: client.id,
     protocol: 2,
     note: "Server authoritative alpha. Multiplayer room scaffolding is in progress."
   });
 
-  ws.on("message", (raw) => {
+  transport.onMessage((raw) => {
     handleClientMessage(raw, {
-      ws,
+      ws: transport,
       client,
       rooms,
       getOrCreateRoom,
@@ -127,7 +129,7 @@ wss.on("connection", (ws) => {
     });
   });
 
-  ws.on("close", () => {
+  transport.onClose(() => {
     handleClientClose(client, rooms);
   });
 });
