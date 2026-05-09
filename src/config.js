@@ -1,3 +1,5 @@
+import { LIGHTING_CONFIG } from "./configLighting.js";
+
 export const CONFIG = {
   classes: {
     archer: {
@@ -48,21 +50,21 @@ export const CONFIG = {
     },
     necromancer: {
       key: "necromancer",
-      label: "Reformed Necromancer",
+      label: "Mage",
       usesRanged: true,
       combatStyle: "necromancer",
       baseLifeLeech: 0,
-      baseMaxHealth: 88,
+      baseMaxHealth: 92,
       baseDefenseFlat: 0,
       baseResistances: {},
       baseMoveSpeed: 148,
       baseAttackCooldown: 0.08,
       minAttackCooldown: 0.08,
-      primaryDamageMin: 0,
-      primaryDamageMax: 0,
+      primaryDamageMin: 5,
+      primaryDamageMax: 8,
       projectileSpeed: 0,
       passiveRegenPct: 0.01,
-      levelHpGain: 7,
+      levelHpGain: 8,
       levelWeaponDamagePct: 0.03,
       levelControlPowerPct: 0.03,
       levelCharmTimeReductionPct: 0.015
@@ -76,34 +78,7 @@ export const CONFIG = {
     defaultBiomeKey: "catacomb",
     biomeCycle: ["catacomb", "catacomb", "catacomb", "sewer"]
   },
-  lighting: {
-    enabled: true,
-    ambientDarknessAlpha: 0.99,
-    maxDarknessAlpha: 0.99,
-    enemyMaxDarknessAlpha: 0.99,
-    enemyLightFalloffDecay: 2.4,
-    brightRadiusRatio: 0.24,
-    dimRadiusRatio: 0.74,
-    playerBaseRadiusTiles: 0,
-    playerFuelRadiusTiles: 23.595,
-    playerRadiusPerLevelTiles: 0.08,
-    lanternInitialFuel: 0.5,
-    lanternMaxFuel: 1.0,
-    lanternFuelPerTorch: 0.2,
-    lanternFuelDecayPerSecond: 0.012,
-    torchRadiusTiles: 2.25,
-    fireArrowProjectileRadiusTiles: 4.5,
-    fireZoneRadiusMultiplier: 2.0,
-    fireZoneMinRadiusTiles: 3.0,
-    burningEnemyRadiusTiles: 3.25,
-    fireLightFalloffDecay: 1.45,
-    fireLightBrightRadiusRatio: 0.42,
-    fireLightDimRadiusRatio: 0.94,
-    touchDistanceTiles: 0.75,
-    torchSnuffCooldown: 1.0,
-    maxTorches: 80,
-    torchCountFactor: 180
-  },
+  lighting: LIGHTING_CONFIG,
   player: {
     maxHealth: 100,
     hpBarDuration: 1.25,

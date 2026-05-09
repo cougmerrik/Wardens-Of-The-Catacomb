@@ -1,17 +1,16 @@
 import {
   canSpendRangerNode,
-  canSpendRangerUtility,
-  formatLaneLabel,
   getRangerAvailableSkillPoints,
+  getRangerGroupLimit,
+  getRangerSelectedInGroup,
   getRangerSpentSkillPoints,
   getRangerTalentDefs,
   getRangerTalentPoints,
+  getRangerTierLabel,
   getRangerTooltip,
-  getRangerUnlockRequirementText,
-  getRangerUtilityLevel,
-  isRangerRowAccessible
+  isRangerTierAccessible
 } from "../../game/rangerTalentTree.js";
-import { drawSkillRefundFooter } from "./skillTreeMenuSections.js";
+import { drawSkillRefundFooter, drawSkillTreeTitle, getSkillTierHeader } from "./skillTreeMenuSections.js";
 
 function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
@@ -51,13 +50,13 @@ function drawTooltip(ctx, renderer, mouseX, mouseY, tooltip) {
   for (const line of lines) width = Math.max(width, ctx.measureText(line).width);
   const lineH = 16;
   const padding = 10;
-  const boxW = width + padding * 2;
+  const boxW = Math.min(360, width + padding * 2);
   const boxH = lines.length * lineH + padding * 2 - 4;
   const x = Math.max(10, Math.min(renderer.canvas.width - boxW - 10, mouseX + 16));
   const y = Math.max(26, Math.min(renderer.canvas.height - boxH - 10, mouseY - 10));
   ctx.fillStyle = "rgba(8, 11, 17, 0.97)";
   ctx.fillRect(x, y, boxW, boxH);
-  ctx.strokeStyle = "rgba(182, 196, 222, 0.78)";
+  ctx.strokeStyle = "rgba(154, 219, 194, 0.78)";
   ctx.strokeRect(x + 0.5, y + 0.5, boxW - 1, boxH - 1);
   lines.forEach((line, index) => {
     ctx.fillStyle = index === 0 ? "#f6f0df" : line.startsWith("Requirement:") ? "#ffcf9b" : "#d8e0ec";
@@ -82,8 +81,8 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
   const contentTop = menuY + 48;
   const contentBottom = menuY + menuH - 84;
   const visibleH = contentBottom - contentTop;
-  const rowH = 98;
-  const contentHeight = 5 * rowH + 40;
+  const getTierHeight = (tier) => (tier === 5 ? 184 : 116);
+  const contentHeight = [1, 2, 3, 4, 5, 6].reduce((sum, tier) => sum + getTierHeight(tier), 44);
   const scrollMax = Math.max(0, contentHeight - visibleH);
   const scroll = Math.max(0, Math.min(scrollMax, game.uiScroll?.skillTree || 0));
   game.uiScroll.skillTree = scroll;
@@ -92,9 +91,7 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
   game.uiRects.skillTreeNodes = [];
   const sy = (y) => y - scroll;
 
-  ctx.fillStyle = "#f3efe3";
-  ctx.font = "bold 20px Trebuchet MS";
-  ctx.fillText("Ranger Talent Tree", menuX + 16, menuY + 30);
+  drawSkillTreeTitle(ctx, menuX, menuY);
   ctx.font = "13px Trebuchet MS";
   ctx.fillStyle = "#d2d9e8";
   ctx.textAlign = "right";
@@ -107,97 +104,48 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
   ctx.clip();
 
   const defs = getRangerTalentDefs();
-  const rowNodes = new Map();
-  for (const def of defs) {
-    const list = rowNodes.get(def.row) || [];
-    list.push(def);
-    rowNodes.set(def.row, list);
-  }
-  const utilityDefs = [
-    { key: "moveSpeed", label: "Move Speed Training", icon: "MV", color: "#7cd5ff" },
-    { key: "attackSpeed", label: "Attack Speed Training", icon: "AT", color: "#88efaa" },
-    { key: "damage", label: "Damage Training", icon: "DM", color: "#ffba6d" },
-    { key: "defense", label: "Defense Training", icon: "DF", color: "#cbb5ff" }
-  ];
-
-  let hovered = null;
   const mouseX = game.input?.mouse?.screenX;
   const mouseY = game.input?.mouse?.screenY;
+  let hovered = null;
 
-  for (let row = 0; row <= 4; row++) {
-    const rowY = sy(menuY + 62 + row * rowH);
-    const rowRect = { x: menuX + 18, y: rowY, w: menuW - 36, h: rowH - 10 };
-    const accessible = row === 0 || isRangerRowAccessible(game, row);
-    ctx.fillStyle = accessible ? "rgba(17, 24, 35, 0.94)" : "rgba(22, 22, 26, 0.86)";
-    ctx.fillRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
-    ctx.strokeStyle = accessible ? "rgba(134, 156, 196, 0.55)" : "rgba(88, 92, 104, 0.52)";
-    ctx.strokeRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
-    ctx.fillStyle = accessible ? "#eef3fe" : "#9198a4";
+  let tierCursorY = menuY + 62;
+  for (let tier = 1; tier <= 6; tier++) {
+    const tierH = getTierHeight(tier);
+    const tierY = sy(tierCursorY);
+    const tierDefs = defs.filter((def) => def.tier === tier);
+    const tierRect = { x: menuX + 18, y: tierY, w: menuW - 36, h: tierH - 10 };
+    const accessible = isRangerTierAccessible(game, tier);
+    const group = tierDefs[0]?.group || "";
+    const selectedCount = getRangerSelectedInGroup(game, group).length;
+    const groupLimit = getRangerGroupLimit(group);
+    ctx.fillStyle = accessible ? "rgba(15, 28, 27, 0.94)" : "rgba(22, 24, 26, 0.86)";
+    ctx.fillRect(tierRect.x, tierRect.y, tierRect.w, tierRect.h);
+    ctx.strokeStyle = accessible ? "rgba(116, 190, 164, 0.55)" : "rgba(88, 92, 104, 0.52)";
+    ctx.strokeRect(tierRect.x, tierRect.y, tierRect.w, tierRect.h);
+    ctx.fillStyle = accessible ? "#e7fff6" : "#9198a4";
     ctx.font = "bold 14px Trebuchet MS";
-    const label = row === 0 ? "Row 0  Core + Utility" : `Row ${row}  Requires ${row === 1 ? "Fire Arrow" : `${row === 2 ? 3 : row === 3 ? 8 : 14} total points`}`;
-    ctx.fillText(label, rowRect.x + 12, rowRect.y + 20);
-    if (!accessible && row > 0) {
-      ctx.font = "12px Trebuchet MS";
-      ctx.fillStyle = "#bda885";
-      const gateText =
-        row === 1
-          ? "Requires Fire Arrow first."
-          : row === 4
-          ? "Requires 14 total points for the first capstone, then 20 for the second."
-          : `Requires ${row === 2 ? 3 : 8} total points spent.`;
-      ctx.fillText(gateText, rowRect.x + 12, rowRect.y + 36);
-    }
+    ctx.fillText(getSkillTierHeader(tier, getRangerTierLabel(tier), selectedCount, groupLimit), tierRect.x + 12, tierRect.y + 20);
 
-    if (row === 0) {
-      const activeDef = defs.find((def) => def.key === "fireArrowActive");
-      const activeRect = { x: rowRect.x + 14, y: rowRect.y + 30, w: 120, h: 48 };
-      const activeLocked = !canSpendRangerNode(game, activeDef.key) && getRangerTalentPoints(game, activeDef.key) <= 0;
-      drawIcon(ctx, { x: activeRect.x, y: activeRect.y, w: 30, h: 30 }, activeDef.icon, activeDef.color, activeLocked);
-      ctx.fillStyle = activeLocked ? "#9ea4af" : "#f2efe7";
-      ctx.font = "bold 13px Trebuchet MS";
-      ctx.fillText(activeDef.label, activeRect.x + 40, activeRect.y + 14);
-      drawRankPips(ctx, activeRect.x + 40, activeRect.y + 20, getRangerTalentPoints(game, activeDef.key), 1, activeDef.color, activeLocked);
-      game.uiRects.skillTreeNodes.push({ key: activeDef.key, kind: "node", rect: activeRect });
-      if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, activeRect)) {
-        hovered = getRangerTooltip(game, { key: activeDef.key, kind: "node", locked: activeLocked });
-      }
-
-      utilityDefs.forEach((def, index) => {
-        const x = rowRect.x + 150 + index * 86;
-        const rect = { x, y: rowRect.y + 28, w: 78, h: 54 };
-        const level = getRangerUtilityLevel(game, def.key);
-        const locked = !canSpendRangerUtility(game, def.key) && level <= 0;
-        drawIcon(ctx, { x: rect.x + 4, y: rect.y + 4, w: 24, h: 24 }, def.icon, def.color, locked);
-        ctx.fillStyle = locked ? "#9ea4af" : "#f2efe7";
-        ctx.font = "bold 11px Trebuchet MS";
-        ctx.fillText(def.label.split(" ")[0], rect.x + 34, rect.y + 16);
-        drawRankPips(ctx, rect.x + 6, rect.y + 34, level, 4, def.color, locked);
-        game.uiRects.skillTreeNodes.push({ key: def.key, kind: "utility", rect });
-        if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
-          hovered = getRangerTooltip(game, { key: def.key, kind: "utility", locked });
-        }
-      });
-      continue;
-    }
-
-    const nodes = (rowNodes.get(row) || []).filter((def) => def.key !== "fireArrowActive");
-    nodes.forEach((def, index) => {
-      const rect = { x: rowRect.x + 18 + index * 152, y: rowRect.y + 34, w: 136, h: 44 };
+    const cols = tier === 5 ? 4 : Math.min(5, tierDefs.length);
+    const cardW = Math.max(86, Math.min(tier === 5 ? 136 : 112, (tierRect.w - 34) / cols - 8));
+    const cardH = tier === 5 ? 54 : 48;
+    tierDefs.forEach((def, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const rect = { x: tierRect.x + 14 + col * (cardW + 8), y: tierRect.y + 32 + row * (cardH + 6), w: cardW, h: cardH };
       const points = getRangerTalentPoints(game, def.key);
       const locked = !canSpendRangerNode(game, def.key) && points <= 0;
       drawIcon(ctx, { x: rect.x + 4, y: rect.y + 6, w: 28, h: 28 }, def.icon, def.color, locked || !accessible);
       ctx.fillStyle = locked || !accessible ? "#9ea4af" : "#f2efe7";
-      ctx.font = "bold 12px Trebuchet MS";
+      ctx.font = "bold 11px Trebuchet MS";
       ctx.fillText(def.label, rect.x + 38, rect.y + 16);
-      ctx.font = "11px Trebuchet MS";
-      ctx.fillStyle = locked || !accessible ? "#828894" : "#cfd7e6";
-      ctx.fillText(formatLaneLabel(def.lane), rect.x + 38, rect.y + 30);
-      drawRankPips(ctx, rect.x + 38, rect.y + 32, points, def.maxRanks, def.color, locked || !accessible);
+      drawRankPips(ctx, rect.x + 38, rect.y + 29, points, def.maxRanks, def.color, locked || !accessible);
       game.uiRects.skillTreeNodes.push({ key: def.key, kind: "node", rect });
       if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
         hovered = getRangerTooltip(game, { key: def.key, kind: "node", locked: locked || !accessible });
       }
     });
+    tierCursorY += tierH;
   }
 
   ctx.restore();

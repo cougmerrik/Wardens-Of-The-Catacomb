@@ -2,7 +2,7 @@ import { drawStatsGameOverActions } from "./statsGameOverActions.js";
 import { getAndroidHudCardX } from "./androidLayout.js";
 import { drawPinnedAbilityTooltip } from "./abilityWidgetTooltip.js";
 import { getHudAbilityState } from "./abilityWidgetState.js";
-import { getNecromancerTalentPoints } from "../../game/necromancerTalentTree.js";
+import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 function formatEnemyTypeLabel(type) {
   const raw = typeof type === "string" && type.length > 0 ? type : "unknown";
   return raw
@@ -79,6 +79,44 @@ function drawAbilityCooldownWidget(renderer, game, x, y, size) {
     ctx.restore();
   }
   if (game.isAndroidLayout && game.uiPinnedTooltip?.source === "abilityWidget") drawPinnedAbilityTooltip(renderer, rect, state);
+}
+
+function drawAndroidSwapWidget(renderer, game, abilityRect) {
+  if (!game?.isAndroidLayout || !abilityRect) return;
+  const canSwap = !!(game.isArcherClass?.() || game.isWarriorClass?.());
+  if (!canSwap) {
+    game.uiRects.hudSwapButton = null;
+    return;
+  }
+  const ctx = renderer.ctx;
+  const w = abilityRect.w;
+  const h = 44;
+  const gap = 12;
+  const rect = {
+    x: abilityRect.x,
+    y: Math.max(8, abilityRect.y - h - gap),
+    w,
+    h
+  };
+  const cooldown = game.isArcherClass?.()
+    ? Math.max(0, game.rangerRuntime?.swapCooldownTimer || 0)
+    : Math.max(0, game.warriorRuntime?.attackSwapCooldownTimer || 0);
+  const ready = cooldown <= 0;
+  game.uiRects.hudSwapButton = rect;
+  ctx.save();
+  ctx.fillStyle = ready ? "rgba(24, 58, 48, 0.88)" : "rgba(54, 55, 66, 0.86)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = ready ? "rgba(139, 231, 190, 0.72)" : "rgba(218, 228, 246, 0.22)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  ctx.fillStyle = ready ? "#dcfff0" : "#c8ced8";
+  ctx.font = "bold 13px Trebuchet MS";
+  ctx.textAlign = "center";
+  ctx.fillText(ready ? "Swap" : `${cooldown.toFixed(1)}s`, rect.x + rect.w * 0.5, rect.y + 18);
+  ctx.font = "bold 10px Trebuchet MS";
+  ctx.fillText("Q", rect.x + rect.w * 0.5, rect.y + 33);
+  ctx.textAlign = "left";
+  ctx.restore();
 }
 
 function drawHudButton(ctx, rect, label, active, activeFill) {
@@ -239,38 +277,39 @@ function buildCharacterColumns(game) {
 
   let classKit = null;
   if (game.isArcherClass && game.isArcherClass()) {
+    const runtime = game.rangerRuntime || {};
+    const mode = runtime.weaponMode === "melee" ? "Melee" : "Ranged";
+    const combo = Math.max(0, Math.floor(runtime.combo || 0));
+    const abilityState = getHudAbilityState(game);
     classKit = createSection("Ranger Kit", [
-      ["Fire Arrow", game.isFireArrowUnlocked() ? "Unlocked" : "Locked"],
-      ["Fire Cooldown", game.player.fireArrowCooldown > 0 ? `${game.player.fireArrowCooldown.toFixed(1)}s` : "Ready"],
-      ["Fire AoE Radius", game.isFireArrowUnlocked() ? game.getFireArrowBlastRadius().toFixed(1) : "-"],
-      ["Pierce Chance", `${(game.getPiercingChance() * 100).toFixed(1)}%`],
-      ["Multiarrow", `${game.getMultiarrowCount()} (${game.getMultiarrowSpreadDeg().toFixed(1)}deg)`],
+      ["Mode", mode],
+      ["Combo", `${combo}/30`],
+      ["Q Swap", runtime.swapCooldownTimer > 0 ? `${runtime.swapCooldownTimer.toFixed(1)}s` : "Ready"],
+      [abilityState.title, abilityState.cooldownRemaining > 0 ? `${abilityState.cooldownRemaining.toFixed(1)}s` : "Ready"],
       ["Tree SP", `${game.skillPoints} available`]
     ]);
   } else if (game.isWarriorClass && game.isWarriorClass()) {
+    const classSkillName = typeof game.getWarriorClassSkillName === "function" ? game.getWarriorClassSkillName() : "Class Skill";
+    const classSkillCooldown = game.warriorRageCooldownTimer > 0 ? `Cooldown ${game.warriorRageCooldownTimer.toFixed(1)}s` : "Ready";
     classKit = createSection("Warrior Kit", [
-      ["Frenzy Skill", `Lv ${game.skills.warriorMomentum.points}`],
-      ["Frenzy", game.warriorMomentumTimer > 0 ? `${game.warriorMomentumTimer.toFixed(1)}s` : "Idle"],
-      ["Rage Skill", `Lv ${game.skills.warriorRage.points}`],
+      ["Weapon", typeof game.getWarriorWeaponForm === "function" ? game.getWarriorWeaponForm() : "broadswing"],
+      ["Class Skill", classSkillName],
       [
-        "Rage",
+        "Class State",
         game.warriorRageActiveTimer > 0
           ? `Active ${game.warriorRageActiveTimer.toFixed(1)}s`
-          : game.warriorRageCooldownTimer > 0
-          ? `Cooldown ${game.warriorRageCooldownTimer.toFixed(1)}s`
-          : "Ready"
+          : classSkillCooldown
       ],
       ["Execute", `${(game.getWarriorExecuteChance() * 100).toFixed(1)}% @ ${(game.getWarriorExecuteThreshold() * 100).toFixed(1)}% HP`]
     ]);
   } else if (game.isNecromancerClass && game.isNecromancerClass()) {
-    classKit = createSection("Necromancer Kit", [
-      ["Control Mastery", `Lv ${getNecromancerTalentPoints(game, "controlMastery")}`],
-      ["Cold Command", `Lv ${getNecromancerTalentPoints(game, "coldCommand")}`],
+    const efficiency = getMageEfficiencyState(game);
+    classKit = createSection("Mage Kit", [
+      ["Attack", getMageAttackLabel(game)],
+      ["Efficiency", efficiency.shortLabel],
       ["Controlled Undead", `${game.getControlledUndeadCount()}/${game.getNecromancerControlCap()}`],
-      ["Charm Time", `${game.getNecromancerCharmDuration().toFixed(2)}s`],
-      ["Death Bolt", `Lv ${getNecromancerTalentPoints(game, "deathBoltActive")}`],
-      ["Death Bolt Dmg", `${game.getDeathBoltBaseDamage().toFixed(1)}`],
-      ["Plaguecraft", `Lv ${getNecromancerTalentPoints(game, "plaguecraft")}`]
+      ["Runes", `${Math.floor(game.necromancerRuntime?.runes || 0)}/3`],
+      ["Death Bolt Dmg", `${game.getDeathBoltBaseDamage().toFixed(1)}`]
     ]);
   }
 
@@ -392,13 +431,11 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   ctx.fillText("Pace", panelX + 10, paceRowY);
   ctx.fillStyle = outpace.color;
   ctx.fillText(outpace.label, panelX + 42, paceRowY);
-  drawAbilityCooldownWidget(
-    renderer,
-    game,
-    layout.isAndroid ? 18 : panelX + panelW - 64,
-    layout.isAndroid ? renderer.canvas.height - layout.xpBarH - 132 : (isNecromancer ? panelY + 58 : panelY + 44),
-    layout.isAndroid ? 68 : 42
-  );
+  const abilityX = layout.isAndroid ? 18 : panelX + panelW - 64;
+  const abilityY = layout.isAndroid ? renderer.canvas.height - layout.xpBarH - 132 : (isNecromancer ? panelY + 58 : panelY + 44);
+  const abilitySize = layout.isAndroid ? 68 : 42;
+  drawAbilityCooldownWidget(renderer, game, abilityX, abilityY, abilitySize);
+  drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget);
 
   if (!layout.isAndroid) {
     const buttonW = Math.floor((panelW - 20) / 3), buttonH = 28, buttonX = panelX + 10, buttonGap = 5;

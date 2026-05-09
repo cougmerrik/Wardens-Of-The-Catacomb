@@ -8,8 +8,7 @@ import {
   maybeSpawnDrop as maybeSpawnDropEntity,
   xpFromEnemy as xpFromEnemyEntity
 } from "./enemySystems.js";
-import { getRangerTalentPoints } from "./rangerTalentTree.js";
-
+import { getRangerMaxHealthBonusPct } from "./rangerTalentTree.js";
 export const runtimePlayerCombatMethods = {
   xpFromEnemy(enemy) {
     return xpFromEnemyEntity(this, enemy);
@@ -23,9 +22,7 @@ export const runtimePlayerCombatMethods = {
       this.level += 1;
       this.skillPoints += this.getSkillPointGainForLevel(this.level, this.classType);
       const hpGain = Number.isFinite(this.classSpec.levelHpGain) ? this.classSpec.levelHpGain : 10;
-      const adjustedHpGain = this.classType === "archer"
-        ? hpGain * (1 + (getRangerTalentPoints(this, "fleetstep") > 0 ? 0.06 : 0))
-        : hpGain;
+      const adjustedHpGain = this.classType === "archer" ? hpGain * (1 + getRangerMaxHealthBonusPct(this)) : hpGain;
       this.player.maxHealth += adjustedHpGain;
       this.player.health = Math.min(this.player.maxHealth, this.player.health + adjustedHpGain);
       this.markPlayerHealthBarVisible();
@@ -182,13 +179,17 @@ export const runtimePlayerCombatMethods = {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       if (Math.abs(diff) <= halfArc) {
-        this.applyEnemyDamage(enemy, this.rollPrimaryDamage(), "melee");
+        this.applyEnemyDamage(enemy, this.rollPrimaryDamage(), "melee", this.player.id || null);
         const threshold = this.getWarriorExecuteThreshold();
         const chance = this.getWarriorExecuteChance();
         const hpRatio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;
-        if (!enemy.isBoss && chance > 0 && enemy.hp > 0 && hpRatio > 0 && hpRatio <= threshold && Math.random() < chance) {
-          enemy.hp = 0;
-          executeProc = true;
+        if (chance > 0 && enemy.hp > 0 && hpRatio > 0 && hpRatio <= threshold && Math.random() < chance) {
+          if (enemy.isBoss || enemy.isFloorBoss) {
+            this.applyEnemyDamage(enemy, this.rollPrimaryDamage() * 1.5, "melee", this.player.id || null, { critical: true });
+          } else {
+            enemy.hp = 0;
+            executeProc = true;
+          }
         }
       }
     }

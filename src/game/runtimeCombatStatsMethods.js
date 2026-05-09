@@ -4,6 +4,7 @@ import {
   getRangerCritChance,
   getRangerCritMultiplier,
   getRangerDamageBonus,
+  getRangerComboAttackSpeedBonus,
   getRangerDanceAttackSpeedBonus,
   getRangerDanceDefenseBonus,
   getRangerFireArrowDurationMultiplier,
@@ -11,12 +12,13 @@ import {
   getRangerFireArrowImpactMultiplier,
   getRangerFireRadiusBonus,
   getRangerLinebreakerDamagePerHit,
-  getRangerMaxHealthBonusPct,
   getRangerMoveSpeedBonus,
   getRangerMultishotBonus,
   getRangerProjectileSpeedBonus,
   getRangerStationaryPierceBonus,
+  getRangerSwapAttackSpeedBonus,
   getRangerTalentPoints,
+  getRangerCurrentWeaponModeStats,
   getRangerVolleyCooldownReduction,
   hasFireMastery,
   hasPinningShot,
@@ -109,6 +111,17 @@ function getTempestFlavor(doctrine = "") {
   }
 }
 
+function getDoctrineLightPower(game, doctrine = "", paladinConfigKey, eldritchConfigKey) {
+  const lighting = game?.config?.lighting || {};
+  if (doctrine === "paladin") {
+    return Number.isFinite(lighting?.[paladinConfigKey]) ? Math.max(0, lighting[paladinConfigKey]) : 0;
+  }
+  if (doctrine === "eldritch") {
+    return Number.isFinite(lighting?.[eldritchConfigKey]) ? Math.max(0, lighting[eldritchConfigKey]) : 0;
+  }
+  return 0;
+}
+
 export const runtimeCombatStatsMethods = {
   getSpentSkillPointCount() {
     const sumPoints = (tree) => {
@@ -122,7 +135,7 @@ export const runtimeCombatStatsMethods = {
     if (isNecromancerTalentGame(this)) return sumPoints(this.necromancerTalents);
     if (isWarriorTalentGame(this)) return sumPoints(this.warriorTalents);
     if (this.isArcherClass && this.isArcherClass()) return sumPoints(this.rangerTalents);
-    return sumPoints(this.skills);
+    return 0;
   },
 
   getPlayerResistancePct(damageType = "physical") {
@@ -142,12 +155,20 @@ export const runtimeCombatStatsMethods = {
     let resisted = Math.max(1, Math.round(safeDamage * (1 - resistancePct)));
     if (isNecromancerTalentGame(this)) {
       resisted = Math.max(1, Math.round(resisted * (1 - getNecromancerVigorDefenseBonusPct(this))));
+      if ((this.necromancerRuntime?.stoneskinTimer || 0) > 0) resisted = Math.max(1, Math.round(resisted * 0.34));
     }
     const reducedByDefense = Math.max(1, Math.round(resisted - this.getDefenseFlatReduction()));
     return this.getWarriorRageDamageTaken(reducedByDefense, damageType);
   },
 
   getPlayerFireCooldown() {
+    if (this.isArcherClass && this.isArcherClass()) {
+      const modeStats = getRangerCurrentWeaponModeStats(this);
+      if (modeStats && Number.isFinite(modeStats.cooldown)) {
+        const attackMultiplier = this.getAttackSpeedMultiplier() * (1 + getRangerComboAttackSpeedBonus(this) + getRangerSwapAttackSpeedBonus(this));
+        return Math.max(this.classSpec.minAttackCooldown || 0.08, modeStats.cooldown / Math.max(0.1, attackMultiplier));
+      }
+    }
     const levelAttackBonusPct = Number.isFinite(this.classSpec.levelAttackSpeedPct)
       ? Math.max(0, this.classSpec.levelAttackSpeedPct) * Math.max(0, this.level - 1)
       : 0;
@@ -353,7 +374,7 @@ export const runtimeCombatStatsMethods = {
 
   isFireArrowUnlocked() {
     if (this.isArcherClass && this.isArcherClass()) {
-      return getRangerTalentPoints(this, "fireArrowActive") > 0;
+      return getRangerTalentPoints(this, "rangerPath") > 0;
     }
     return this.skills.fireArrow.points > 0;
   },
@@ -653,6 +674,9 @@ export const runtimeCombatStatsMethods = {
         undeadDamageMultiplier: getWarriorConsecratedUndeadMultiplier(this),
         healingMultiplier: getWarriorConsecratedHealingMultiplier(this),
         defenseShredPct: getWarriorConsecratedShredPct(this),
+        lightRadius: tile * getWarriorConsecratedRadiusTiles(this) * (field.radiusMult || 1) *
+          (Number.isFinite(this.config?.lighting?.warCircleLightRadiusMultiplier) ? Math.max(0, this.config.lighting.warCircleLightRadiusMultiplier) : 1.1),
+        lightIntensity: getDoctrineLightPower(this, doctrine, "warCirclePaladinLightPower", "warCircleEldritchLightPower"),
         tickInterval: 0.3,
         tickTimer: 0.05
       });
@@ -725,16 +749,10 @@ export const runtimeCombatStatsMethods = {
       }
       if (!canSpendRangerNode(this, skillKey) && !canSpendRangerUtility(this, skillKey)) return false;
       if (spendRangerNode(this, skillKey)) {
-        if (skillKey === "fleetstep") {
-          const hpGain = Math.max(1, this.player.maxHealth * 0.06);
-          this.player.maxHealth += hpGain;
-          this.player.health = Math.min(this.player.maxHealth, this.player.health + hpGain);
-          this.markPlayerHealthBarVisible();
-        }
-        if (skillKey === "fireArrowActive") {
+        if (skillKey === "rangerPath") {
           this.spawnFloatingText(this.player.x, this.player.y - 26, "Fire Arrow Unlocked!", "#f6b36a", 1.0, 15);
         } else {
-          this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent improved", "#9fd9ff", 0.85, 14);
+          this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent selected", "#9fd9ff", 0.85, 14);
         }
         return true;
       }
@@ -747,8 +765,7 @@ export const runtimeCombatStatsMethods = {
       }
       if (!canSpendNecromancerNode(this, skillKey) && !canSpendNecromancerUtility(this, skillKey)) return false;
       if (spendNecromancerNode(this, skillKey)) {
-        if (skillKey === "deathBoltActive") this.spawnFloatingText(this.player.x, this.player.y - 26, "Death Bolt Unlocked!", "#c4a0ff", 1.0, 15);
-        else this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent improved", "#c4a0ff", 0.85, 14);
+        this.spawnFloatingText(this.player.x, this.player.y - 26, "Mage talent selected", "#c4a0ff", 0.85, 14);
         return true;
       }
       return false;
@@ -761,36 +778,6 @@ export const runtimeCombatStatsMethods = {
       }
       return false;
     }
-    const skill = this.skills[skillKey];
-    if (!skill) return false;
-    if (this.skillPoints <= 0) return false;
-    if (skill.points >= skill.maxPoints) return false;
-    if (!this.classSpec.usesRanged && (skillKey === "fireArrow" || skillKey === "piercingStrike" || skillKey === "multiarrow")) {
-      return false;
-    }
-    if (this.classSpec.usesRanged && (skillKey === "warriorMomentum" || skillKey === "warriorRage" || skillKey === "warriorExecute")) {
-      return false;
-    }
-    skill.points += 1;
-    this.skillPoints -= 1;
-    if (skillKey === "fireArrow" && skill.points === 1) {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Fire Arrow Unlocked!", "#f6b36a", 1.0, 15);
-    }
-    if (skillKey === "piercingStrike") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Piercing chance increased", "#a7d8ff", 0.85, 14);
-    }
-    if (skillKey === "multiarrow") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Multiarrow improved", "#c3f4a3", 0.85, 14);
-    }
-    if (skillKey === "warriorMomentum") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Frenzy improved", "#ffd089", 0.85, 14);
-    }
-    if (skillKey === "warriorRage") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Rage improved", "#ff8a8a", 0.85, 14);
-    }
-    if (skillKey === "warriorExecute") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Execute improved", "#ff6d6d", 0.85, 14);
-    }
-    return true;
+    return false;
   }
 };

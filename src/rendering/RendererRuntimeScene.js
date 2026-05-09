@@ -136,6 +136,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     else if (enemy.type === "minotaur") this.drawMinotaur(enemy, screenX, screenY);
     else if (enemy.type === "golem") this.drawGolemBoss(enemy, screenX, screenY, game.time);
     else if (enemy.type === "shardling") this.drawShardling(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "wolf") this.drawWolf(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "flaming_sphere") this.drawFlamingSphere(enemy, screenX, screenY, game.time);
     else if (enemy.type === "skeleton") this.drawSkeleton(enemy, screenX, screenY);
     else if (enemy.type === "mimic") {
       if (enemy.dormant) this.drawBreakable(game, { type: "box", size: enemy.size }, screenX, screenY);
@@ -152,6 +154,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     const screenX = enemy.x - cameraX;
     const screenY = enemy.y - cameraY;
     drawArcaneMarkSigil(ctx, enemy, screenX, screenY, game.time);
+    if ((enemy.poisonSlowTimer || 0) > 0) this.drawPoisonSlowIcon(enemy, screenX, screenY);
     this.drawEnemyHealthBar(enemy, screenX, screenY);
   }
 
@@ -183,15 +186,6 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     game.uiRects.skillTreeNodes = [];
     game.uiRects.skillTreeScrollArea = null;
     game.uiRects.skillTreeScrollMax = 0;
-    game.uiRects.skillFireArrowNode = null;
-    game.uiRects.skillPiercingNode = null;
-    game.uiRects.skillMultiarrowNode = null;
-    game.uiRects.skillWarriorMomentumNode = null;
-    game.uiRects.skillWarriorRageNode = null;
-    game.uiRects.skillWarriorExecuteNode = null;
-    game.uiRects.skillUndeadMasteryNode = null;
-    game.uiRects.skillDeathBoltNode = null;
-    game.uiRects.skillExplodingDeathNode = null;
     game.uiRects.statsButton = null;
     game.uiRects.statsClose = null;
     game.uiRects.statsRunTab = null;
@@ -200,6 +194,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     game.uiRects.gameOverLeaderboardButton = null;
     game.uiRects.gameOverMenuButton = null;
     game.uiRects.hudAbilityWidget = null;
+    game.uiRects.hudSwapButton = null;
     game.uiRects.consumableSlots = [];
     game.uiRects.touchMoveRegion = null;
     game.uiRects.touchAimRegion = null;
@@ -253,7 +248,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     this.drawExperienceBar(game, layout);
     this.drawBossSpeechCallout(game, cameraX, cameraY, layout);
     this.drawHud(game, layout);
-    const minimapBottom = this.drawMinimap(game, layout);
+    const classStatusBottom = this.drawClassStatusPanel(game, layout);
+    const minimapBottom = this.drawMinimap(game, layout, classStatusBottom + this.sidebarPadding);
     const statsBottom = this.drawPlayerStatsPanel(game, layout, minimapBottom + this.sidebarPadding);
     if (!game.statsPanelOpen) this.drawGroupPanel(game, layout, statsBottom + this.sidebarPadding);
     if (game.shopOpen) this.drawShopMenu(game, layout);

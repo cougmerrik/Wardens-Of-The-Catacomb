@@ -40,7 +40,8 @@ function runLocalPerfSample(durationMs = 2200, stepMs = 1000 / 72) {
       aimY: sim.player.y,
       firePrimaryQueued: i % 9 === 0,
       firePrimaryHeld: i % 2 === 0,
-      fireAltQueued: false
+      fireAltQueued: false,
+      modeSwapQueued: false
     });
     timings.push(performance.now() - t0);
   }
@@ -63,7 +64,8 @@ function makeInput(seq, elapsedMs) {
     aimY: 320 + Math.sin(t * 1.9) * 120,
     firePrimaryQueued: seq % 6 === 0,
     firePrimaryHeld: seq % 2 === 0,
-    fireAltQueued: false
+    fireAltQueued: false,
+    modeSwapQueued: false
   };
 }
 

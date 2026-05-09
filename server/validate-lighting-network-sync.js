@@ -60,6 +60,28 @@ function main() {
     burningLightRadius: 96
   };
   serverGame.enemies = [burningEnemy];
+  serverGame.bullets = [{
+    x: serverGame.player.x + 72,
+    y: serverGame.player.y,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    life: 0.5,
+    size: 20,
+    projectileType: "holyWave",
+    lightRadius: 72,
+    lightIntensity: 0.25
+  }];
+  serverGame.fireZones = [{
+    x: serverGame.player.x + 96,
+    y: serverGame.player.y,
+    radius: 40,
+    life: 1,
+    totalLife: 1,
+    zoneType: "warCircle",
+    lightRadius: 44,
+    lightIntensity: 0.25
+  }];
   const fullState = serializeState(room);
   assert(fullState.player.lanternFuel === 0.42, "serialized primary player should include lantern fuel");
   assert(fullState.enemies.length === 1, "serialized state should include the nearby burning enemy");
@@ -68,6 +90,8 @@ function main() {
   assert(Array.isArray(fullState.lightSources), "serialized state should include lightSources");
   assert(fullState.lightSources.length === serverGame.lightSources.length, "serialized state should include all torches");
   assert(fullState.lightSources.every((light) => typeof light.id === "string" && light.type === "torch"), "serialized torches should include stable ids and type");
+  assert(fullState.bullets.some((bullet) => bullet.projectileType === "holyWave" && bullet.lightRadius === 72 && bullet.lightIntensity === 0.25), "serialized bullets should include light radius and intensity");
+  assert(fullState.fireZones.some((zone) => zone.zoneType === "warCircle" && zone.lightRadius === 44 && zone.lightIntensity === 0.25), "serialized fire zones should include light radius and intensity");
 
   const joinState = buildJoinKeyframeState(fullState);
   assert(Array.isArray(joinState.delta.lightSources.spawn), "join keyframe should include light source spawns");
@@ -96,9 +120,9 @@ function main() {
       lightSources: fullState.lightSources,
       breakables: [],
       wallTraps: [],
-      bullets: [],
+      bullets: fullState.bullets,
       fireArrows: [],
-      fireZones: [],
+      fireZones: fullState.fireZones,
       meleeSwings: []
     },
     controller: false
@@ -108,6 +132,14 @@ function main() {
   assert(
     clientGame.getActiveLightSources().some((source) => source.sourceType === "burningEnemy" && source.radius === 96),
     "client active lights should include synced burning enemy light"
+  );
+  assert(
+    clientGame.getActiveLightSources().some((source) => source.sourceType === "holyWave" && source.radius === 72 && source.lightIntensity === 0.25),
+    "client active lights should include synced projectile light intensity"
+  );
+  assert(
+    clientGame.getActiveLightSources().some((source) => source.sourceType === "warCircle" && source.radius === 44 && source.lightIntensity === 0.25),
+    "client active lights should include synced fire-zone light intensity"
   );
 
   const deltaCache = new Map();

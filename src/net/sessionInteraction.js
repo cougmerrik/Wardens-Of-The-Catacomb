@@ -24,7 +24,7 @@ export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, 
     previous.hasAim &&
     (Math.abs((input.aimDirX || 0) - (previous.aimDirX || 0)) > 0.01 || Math.abs((input.aimDirY || 0) - (previous.aimDirY || 0)) > 0.01);
   const changedPrimaryHold = !!input.firePrimaryHeld !== !!previous.firePrimaryHeld;
-  const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued || !!input.swapAttackQueued;
+  const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued || !!input.swapAttackQueued || !!input.modeSwapQueued;
   const hasContinuousInput = !!input.firePrimaryHeld || !!input.moveX || !!input.moveY;
   if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || hasQueuedAction || hasContinuousInput) return true;
   return nowMs - lastInputSendAt >= forceSendIdleMs;
@@ -265,6 +265,12 @@ export function handleNetworkUiActions(game, netClient, isController) {
       else if (canSendRoomAction) netClient.sendAction({ kind: "setStatsView", view: "character" });
       continue;
     }
+    if (playerAlive && hit(click.x, click.y, game.uiRects.hudSwapButton)) {
+      clearPinnedUiTooltip();
+      recordAction(click, "hudSwapButton", "modeSwap");
+      game.input?.queueKey?.("q");
+      continue;
+    }
     const itemRects = game.uiRects.shopItems || [];
     for (const item of itemRects) {
       if (!playerAlive) break;
@@ -306,60 +312,6 @@ export function handleNetworkUiActions(game, netClient, isController) {
       break;
     }
     if (handledSkillNode) continue;
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillFireArrowNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillFireArrowNode", "spendSkill", "fireArrow");
-      netClient.sendAction({ kind: "spendSkill", key: "fireArrow" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillPiercingNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillPiercingNode", "spendSkill", "piercingStrike");
-      netClient.sendAction({ kind: "spendSkill", key: "piercingStrike" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillMultiarrowNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillMultiarrowNode", "spendSkill", "multiarrow");
-      netClient.sendAction({ kind: "spendSkill", key: "multiarrow" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillWarriorMomentumNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillWarriorMomentumNode", "spendSkill", "warriorMomentum");
-      netClient.sendAction({ kind: "spendSkill", key: "warriorMomentum" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillWarriorRageNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillWarriorRageNode", "spendSkill", "warriorRage");
-      netClient.sendAction({ kind: "spendSkill", key: "warriorRage" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillWarriorExecuteNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillWarriorExecuteNode", "spendSkill", "warriorExecute");
-      netClient.sendAction({ kind: "spendSkill", key: "warriorExecute" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillUndeadMasteryNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillUndeadMasteryNode", "spendSkill", "undeadMastery");
-      netClient.sendAction({ kind: "spendSkill", key: "undeadMastery" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillDeathBoltNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillDeathBoltNode", "spendSkill", "deathBolt");
-      netClient.sendAction({ kind: "spendSkill", key: "deathBolt" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillExplodingDeathNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillExplodingDeathNode", "spendSkill", "explodingDeath");
-      netClient.sendAction({ kind: "spendSkill", key: "explodingDeath" });
-      continue;
-    }
     if (isAndroidTouchUi) clearPinnedUiTooltip();
     recordAction(click, "", "", "");
     if (hit(click.x, click.y, game.uiRects.returnMenuButton)) {

@@ -1,60 +1,11 @@
 import { GameSim } from "../../src/sim/GameSim.js";
-import {
-  createNecromancerBeamState,
-  createRangerRuntimeState,
-  createWarriorRuntimeState,
-  createSkillState,
-  createUpgradeState
-} from "../../src/game/runtimeBaseStateFactories.js";
 import { cloneRangerTalentState, createRangerTalentState } from "../../src/game/rangerTalentTree.js";
 import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/game/warriorTalentTree.js";
 import { cloneNecromancerTalentState, createNecromancerTalentState } from "../../src/game/necromancerTalentTree.js";
 import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
+import { cloneNecromancerBeamState, cloneNecromancerRuntimeState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
-
-function cloneSkillState(source = null) {
-  const next = createSkillState();
-  if (!source || typeof source !== "object") return next;
-  for (const [key, skill] of Object.entries(next)) {
-    const raw = source[key];
-    if (!raw || typeof raw !== "object") continue;
-    if (Number.isFinite(raw.points)) skill.points = Math.max(0, Math.min(skill.maxPoints, Math.floor(raw.points)));
-  }
-  return next;
-}
-
-function cloneUpgradeState(source = null) {
-  const next = createUpgradeState();
-  if (!source || typeof source !== "object") return next;
-  for (const [key, upgrade] of Object.entries(next)) {
-    const raw = source[key];
-    if (!raw || typeof raw !== "object") continue;
-    if (Number.isFinite(raw.level)) upgrade.level = Math.max(0, Math.min(upgrade.maxLevel, Math.floor(raw.level)));
-  }
-  return next;
-}
-
-function cloneRangerRuntimeState(source = null) {
-  return {
-    ...createRangerRuntimeState(),
-    ...(source && typeof source === "object" ? source : {})
-  };
-}
-
-function cloneWarriorRuntimeState(source = null) {
-  return {
-    ...createWarriorRuntimeState(),
-    ...(source && typeof source === "object" ? source : {})
-  };
-}
-
-function cloneNecromancerBeamState(source = null) {
-  return {
-    ...createNecromancerBeamState(),
-    ...(source && typeof source === "object" ? source : {})
-  };
-}
 
 export class AuthoritativeRoom {
   constructor(id, classType, options) {
@@ -241,7 +192,7 @@ export class AuthoritativeRoom {
       consumables: cloneConsumableInventoryState(),
       rangerRuntime: cloneRangerRuntimeState(),
       warriorRuntime: cloneWarriorRuntimeState(),
-      necromancerRuntime: { vigorTimer: 0, vigorBeamTimer: 0, vigorHealPool: 0, vigorTotalDuration: 0, harvesterBonusPct: 0, tempHp: 0 },
+      necromancerRuntime: cloneNecromancerRuntimeState(),
       consumableRuntime: { tempHp: 0 },
       warriorMomentumTimer: 0,
       warriorRageActiveTimer: 0,
@@ -465,14 +416,7 @@ export class AuthoritativeRoom {
     context.consumables = cloneConsumableInventoryState(state.consumables);
     context.rangerRuntime = cloneRangerRuntimeState(state.rangerRuntime);
     context.warriorRuntime = cloneWarriorRuntimeState(state.warriorRuntime);
-    context.necromancerRuntime = {
-      vigorTimer: Number.isFinite(state?.necromancerRuntime?.vigorTimer) ? state.necromancerRuntime.vigorTimer : 0,
-      vigorBeamTimer: Number.isFinite(state?.necromancerRuntime?.vigorBeamTimer) ? state.necromancerRuntime.vigorBeamTimer : 0,
-      vigorHealPool: Number.isFinite(state?.necromancerRuntime?.vigorHealPool) ? state.necromancerRuntime.vigorHealPool : 0,
-      vigorTotalDuration: Number.isFinite(state?.necromancerRuntime?.vigorTotalDuration) ? state.necromancerRuntime.vigorTotalDuration : 0,
-      harvesterBonusPct: Number.isFinite(state?.necromancerRuntime?.harvesterBonusPct) ? state.necromancerRuntime.harvesterBonusPct : 0,
-      tempHp: Number.isFinite(state?.necromancerRuntime?.tempHp) ? state.necromancerRuntime.tempHp : 0
-    };
+    context.necromancerRuntime = cloneNecromancerRuntimeState(state.necromancerRuntime);
     context.player.consumableRuntime = {
       tempHp: Number.isFinite(state?.consumableRuntime?.tempHp) ? state.consumableRuntime.tempHp : 0
     };
@@ -508,14 +452,7 @@ export class AuthoritativeRoom {
     state.consumables = cloneConsumableInventoryState(context.consumables);
     state.rangerRuntime = cloneRangerRuntimeState(context.rangerRuntime);
     state.warriorRuntime = cloneWarriorRuntimeState(context.warriorRuntime);
-    state.necromancerRuntime = {
-      vigorTimer: Number.isFinite(context?.necromancerRuntime?.vigorTimer) ? context.necromancerRuntime.vigorTimer : 0,
-      vigorBeamTimer: Number.isFinite(context?.necromancerRuntime?.vigorBeamTimer) ? context.necromancerRuntime.vigorBeamTimer : 0,
-      vigorHealPool: Number.isFinite(context?.necromancerRuntime?.vigorHealPool) ? context.necromancerRuntime.vigorHealPool : 0,
-      vigorTotalDuration: Number.isFinite(context?.necromancerRuntime?.vigorTotalDuration) ? context.necromancerRuntime.vigorTotalDuration : 0,
-      harvesterBonusPct: Number.isFinite(context?.necromancerRuntime?.harvesterBonusPct) ? context.necromancerRuntime.harvesterBonusPct : 0,
-      tempHp: Number.isFinite(context?.necromancerRuntime?.tempHp) ? context.necromancerRuntime.tempHp : 0
-    };
+    state.necromancerRuntime = cloneNecromancerRuntimeState(context.necromancerRuntime);
     state.consumableRuntime = {
       tempHp: Number.isFinite(context?.player?.consumableRuntime?.tempHp) ? context.player.consumableRuntime.tempHp : 0
     };
@@ -762,6 +699,7 @@ export class AuthoritativeRoom {
         input.firePrimaryQueued = false;
         input.firePrimaryHeld = false;
         input.fireAltQueued = false;
+        input.modeSwapQueued = false;
         continue;
       }
       const mx = Number.isFinite(input.moveX) ? input.moveX : 0;
@@ -793,6 +731,7 @@ export class AuthoritativeRoom {
       input.swapAttackQueued = false;
       input.firePrimaryQueued = false;
       input.fireAltQueued = false;
+      input.modeSwapQueued = false;
     }
   }
 
@@ -804,9 +743,33 @@ export class AuthoritativeRoom {
         return context.toggleWarriorAttackMode();
       });
     }
+    if (state.classType === "archer" && input.modeSwapQueued) {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.switchRangerWeaponMode !== "function") return false;
+        context.switchRangerWeaponMode();
+        return true;
+      });
+    }
+    if (state.classType === "necromancer" && input.modeSwapQueued) {
+      this.performActionForActivePlayer(client.id, (context) => {
+        if (typeof context.toggleMageMode !== "function") return false;
+        return context.toggleMageMode();
+      });
+    }
     const wantsPrimary = !!input.firePrimaryQueued || (!!input.firePrimaryHeld && !!input.hasAim);
     if (state.classType === "necromancer") {
-      this.processRemoteNecromancerBeam(state, input, dt);
+      const cantrip = state.necromancerTalents
+        ? Object.entries(state.necromancerTalents).find(([key, node]) => key.endsWith("Cantrip") && (node?.points || 0) > 0)?.[0]
+        : null;
+      const mode = state.necromancerRuntime?.activeMode === "spell" ? "spell" : "cantrip";
+      if (mode === "cantrip" && cantrip === "necroticBeamCantrip") this.processRemoteNecromancerBeam(state, input, dt);
+      else if (wantsPrimary) {
+        this.performActionForActivePlayer(client.id, (context) => {
+          if (typeof context.fire !== "function") return false;
+          context.fire(state.dirX || 1, state.dirY || 0);
+          return true;
+        });
+      }
     } else if (wantsPrimary) {
       this.performActionForActivePlayer(client.id, (context) => {
         if (typeof context.fire !== "function") return false;
@@ -832,8 +795,8 @@ export class AuthoritativeRoom {
     }
     if (state.classType === "necromancer") {
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.fireDeathBolt !== "function") return false;
-        return context.fireDeathBolt(state.dirX || 1, state.dirY || 0);
+        if (typeof context.activateMageClassSkill !== "function") return false;
+        return context.activateMageClassSkill(state.dirX || 1, state.dirY || 0);
       });
     }
   }
@@ -1163,6 +1126,7 @@ export class AuthoritativeRoom {
       controllerClient.input.swapAttackQueued = false;
       controllerClient.input.firePrimaryQueued = false;
       controllerClient.input.fireAltQueued = false;
+      controllerClient.input.modeSwapQueued = false;
     }
     this.options.pushTelemetrySample(this.telemetry.tickDurationsMs, this.options.monotonicNowMs() - t0);
   }

@@ -110,6 +110,17 @@ async function getDebugState(page) {
   return page.evaluate(() => window.__WOTC_DEBUG__?.getState?.() || null);
 }
 
+async function waitForDebugState(page, predicate, timeoutMs, message) {
+  const startedAt = Date.now();
+  let state = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    state = await getDebugState(page).catch(() => null);
+    if (predicate(state)) return state;
+    await delay(100);
+  }
+  throw new Error(`${message}: ${JSON.stringify(state?.ui || state || null)}`);
+}
+
 function findSkillTreeNode(state, key) {
   const nodes = Array.isArray(state?.ui?.skillTreeNodes) ? state.ui.skillTreeNodes : [];
   return nodes.find((node) => node?.key === key)?.rect || null;
@@ -143,6 +154,63 @@ async function captureFailure(page, error, state) {
   return { screenshotPath, statePath };
 }
 
+async function runRefundScenario(page, { classKey, spendKey, expectedClassType }) {
+  await page.goto(`${GAME_URL}/?refundScenario=${encodeURIComponent(classKey)}`, { waitUntil: "networkidle" });
+  await page.keyboard.press("Space");
+  await page.locator("#mode-select").waitFor({ state: "visible", timeout: 10000 });
+  await page.locator("#menu-single").click();
+  await page.locator("#character-select").waitFor({ state: "visible", timeout: 10000 });
+  await page.locator("#character-select #net-player-name").fill(`RefundSolo-${classKey}`);
+  await page.locator(`#character-select [data-class-option="${classKey}"]`).click();
+  await page.locator("#start-game").click();
+
+  await waitForDebugState(
+    page,
+    (state) => !!state && state.networkReady === false && state.player?.classType === expectedClassType,
+    15000,
+    `timed out waiting for ${classKey} game start`
+  );
+
+  await runDebug(page, "grantSkillPoints", { amount: 2 });
+  await runDebug(page, "grantGold", { amount: 400 });
+  await runDebug(page, "grantLevels", { amount: 1 });
+  const requiredLevel = 2;
+  await waitForDebugState(
+    page,
+    (state) => !!state && state.ui?.skillPoints >= 2 && state.ui?.gold >= 400 && (state.player?.level || 1) >= requiredLevel,
+    5000,
+    `timed out waiting for ${classKey} debug progress`
+  );
+
+  const spendResult = await runDebug(page, "spendSkill", { key: spendKey });
+  assert(spendResult?.ok === true, `failed to spend ${spendKey} for ${classKey}: ${JSON.stringify(spendResult)}`);
+  const spentBeforeRefund = spendResult.spentSkillPoints;
+  const skillPointsBeforeRefund = spendResult.skillPoints;
+  const goldBeforeRefund = spendResult.gold;
+  const refundCost = spendResult.refundCost;
+
+  assert(spendResult.talentPoints === 1, `expected ${spendKey} to have one point for ${classKey}, got ${spendResult.talentPoints}`);
+  assert(spentBeforeRefund === 1, `expected one spent point before refund for ${classKey}, got ${spentBeforeRefund}`);
+  assert(refundCost > 0, `expected positive refund cost for ${classKey}, got ${refundCost}`);
+
+  const refundResult = await runDebug(page, "refundAllSkills");
+  assert(refundResult?.ok === true, `failed to refund skills for ${classKey}: ${JSON.stringify(refundResult)}`);
+
+  assert(refundResult.spentSkillPoints === 0, `refund did not clear spent points for ${classKey}: ${JSON.stringify(refundResult)}`);
+  assert(refundResult.skillPoints === skillPointsBeforeRefund + spentBeforeRefund, `refund did not restore skill points for ${classKey}: ${JSON.stringify(refundResult)}`);
+  assert(refundResult.gold === goldBeforeRefund - refundCost, `refund gold mismatch for ${classKey}: before=${goldBeforeRefund}, cost=${refundCost}, after=${refundResult.gold}`);
+  assert(refundResult.refundCount === 1, `refund count did not increment for ${classKey}: ${refundResult.refundCount}`);
+
+  return {
+    classKey,
+    spendKey,
+    refundCost,
+    goldAfterRefund: refundResult.gold,
+    skillPointsAfterRefund: refundResult.skillPoints,
+    refundCount: refundResult.refundCount
+  };
+}
+
 async function main() {
   await ensurePortAvailable(HTTP_PORT, "HTTP");
   const python = choosePythonCommand();
@@ -151,65 +219,22 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  const page = await context.newPage();
+  let page = null;
   let lastState = null;
+  const scenarios = [
+    { classKey: "archer", expectedClassType: "archer", spendKey: "longbow" },
+    { classKey: "warrior", expectedClassType: "fighter", spendKey: "broadswing" },
+    { classKey: "necromancer", expectedClassType: "necromancer", spendKey: "fireBoltCantrip" }
+  ];
+  const results = [];
   try {
-    await page.goto(GAME_URL, { waitUntil: "networkidle" });
-    await page.keyboard.press("Space");
-    await page.locator("#mode-select").waitFor({ state: "visible", timeout: 10000 });
-    await page.locator("#menu-single").click();
-    await page.locator("#character-select").waitFor({ state: "visible", timeout: 10000 });
-    await page.locator("#character-select #net-player-name").fill("RefundSolo");
-    await page.locator('#character-select [data-class-option="archer"]').click();
-    await page.locator("#start-game").click();
-
-    await page.waitForFunction(() => {
-      const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.networkReady === false && !!state.ui?.skillTreeButton;
-    }, null, { timeout: 15000 });
-
-    await runDebug(page, "grantSkillPoints", { amount: 2 });
-    await runDebug(page, "grantGold", { amount: 400 });
-    await page.waitForFunction(() => {
-      const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.skillPoints >= 2 && state.ui?.gold >= 400;
-    }, null, { timeout: 5000 });
-
-    lastState = await getDebugState(page);
-    await clickCanvasRect(page, lastState.ui.skillTreeButton);
-    await page.waitForFunction(() => {
-      const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.skillTreeOpen === true && !!state.ui?.refundButton && Array.isArray(state.ui?.skillTreeNodes) && state.ui.skillTreeNodes.some((node) => node?.key === "fireArrowActive");
-    }, null, { timeout: 5000 });
-
-    let skillState = await getDebugState(page);
-    const fireArrowNode = findSkillTreeNode(skillState, "fireArrowActive");
-    assert(fireArrowNode, "fireArrowActive node not available in skill tree");
-    await clickCanvasRect(page, fireArrowNode);
-    await page.waitForFunction(() => {
-      const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.talentLevels?.fireArrowActive === 1 && state.ui?.spentSkillPoints === 1;
-    }, null, { timeout: 5000 });
-
-    skillState = await getDebugState(page);
-    const spentBeforeRefund = skillState.ui.spentSkillPoints;
-    const skillPointsBeforeRefund = skillState.ui.skillPoints;
-    const goldBeforeRefund = skillState.ui.gold;
-    const refundCost = skillState.ui.refundCost;
-
-    assert(spentBeforeRefund === 1, `expected one spent point before refund, got ${spentBeforeRefund}`);
-    assert(refundCost > 0, `expected positive refund cost, got ${refundCost}`);
-
-    await clickCanvasRect(page, skillState.ui.refundButton);
-    await page.waitForFunction(() => {
-      const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.refundCount === 1 && state.ui?.spentSkillPoints === 0 && state.ui?.talentLevels?.fireArrowActive === 0;
-    }, null, { timeout: 5000 });
-
-    lastState = await getDebugState(page);
-    assert(lastState.ui.skillPoints === skillPointsBeforeRefund + spentBeforeRefund, `refund did not restore skill points: ${JSON.stringify(lastState.ui)}`);
-    assert(lastState.ui.gold === goldBeforeRefund - refundCost, `refund gold mismatch: before=${goldBeforeRefund}, cost=${refundCost}, after=${lastState.ui.gold}`);
-    assert(lastState.ui.refundCount === 1, `refund count did not increment: ${lastState.ui.refundCount}`);
+    for (const scenario of scenarios) {
+      page = await context.newPage();
+      results.push(await runRefundScenario(page, scenario));
+      lastState = await getDebugState(page);
+      await page.close();
+      page = null;
+    }
 
     mkdirSync(artifactsDir, { recursive: true });
     const successPath = resolve(artifactsDir, "validate-skill-refund-success.json");
@@ -217,9 +242,7 @@ async function main() {
       successPath,
       JSON.stringify(
         {
-          skillPointsBeforeRefund,
-          goldBeforeRefund,
-          refundCost,
+          results,
           finalUi: lastState.ui
         },
         null,
@@ -227,17 +250,15 @@ async function main() {
       )
     );
     console.log(JSON.stringify({
-      refundCost,
-      goldAfterRefund: lastState.ui.gold,
-      skillPointsAfterRefund: lastState.ui.skillPoints,
-      refundCount: lastState.ui.refundCount,
+      results,
       successPath
     }, null, 2));
   } catch (error) {
-    const state = await getDebugState(page).catch(() => lastState);
-    const artifacts = await captureFailure(page, error, state);
+    const state = page ? await getDebugState(page).catch(() => lastState) : lastState;
+    const artifacts = page ? await captureFailure(page, error, state) : { screenshotPath: "", statePath: "" };
     throw new Error(`${error instanceof Error ? error.message : String(error)}\nArtifacts: ${artifacts.screenshotPath}, ${artifacts.statePath}`);
   } finally {
+    if (page) await page.close().catch(() => {});
     await browser.close();
     stopChildren();
   }

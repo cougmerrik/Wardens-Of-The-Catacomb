@@ -1081,6 +1081,56 @@ if (typeof window !== "undefined") {
       if (torch.lit) torch.snuffCooldown = 0;
       return { ok: true, id: torch.id || null, lit: torch.lit };
     }
+    if (action === "setPaused") {
+      game.paused = payload.paused === true;
+      if (!game.paused && game.input) {
+        game.input.keyQueued?.delete?.("escape");
+        game.input.keys?.delete?.("escape");
+      }
+      if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
+      return { ok: true, paused: game.paused };
+    }
+    if (action === "setSkillTreeOpen") {
+      game.skillTreeOpen = payload.open !== false;
+      if (game.skillTreeOpen) {
+        game.paused = false;
+        game.shopOpen = false;
+        game.statsPanelOpen = false;
+      }
+      if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
+      return { ok: true, skillTreeOpen: game.skillTreeOpen };
+    }
+    if (action === "spendSkill") {
+      const key = typeof payload.key === "string" ? payload.key : "";
+      const spent = typeof game.spendSkillPoint === "function" ? game.spendSkillPoint(key) : false;
+      const talentPoints =
+        game.rangerTalents?.[key]?.points ??
+        game.warriorTalents?.[key]?.points ??
+        game.necromancerTalents?.[key]?.points ??
+        game.skills?.[key]?.points ??
+        0;
+      const spentSkillPoints = typeof game.getSpentSkillPointCount === "function" ? game.getSpentSkillPointCount() : 0;
+      const refundCost = typeof game.getSkillRefundCost === "function" ? game.getSkillRefundCost(spentSkillPoints, game.refundCount) : 0;
+      return { ok: !!spent, key, talentPoints, spentSkillPoints, skillPoints: game.skillPoints, gold: game.gold, refundCost };
+    }
+    if (action === "refundAllSkills") {
+      const refunded = typeof game.refundAllSkills === "function" ? game.refundAllSkills() : false;
+      const spentSkillPoints = typeof game.getSpentSkillPointCount === "function" ? game.getSpentSkillPointCount() : 0;
+      return { ok: !!refunded, spentSkillPoints, skillPoints: game.skillPoints, gold: game.gold, refundCount: game.refundCount };
+    }
+    if (action === "grantLevels") {
+      const amount = Number.isFinite(payload.amount) ? Math.max(0, Math.floor(payload.amount)) : 0;
+      if (game.networkEnabled && netClient && typeof netClient.sendAction === "function") {
+        netClient.sendAction({ kind: "debugGrantProgress", levelDelta: amount });
+        return { ok: true, sent: true, levelDelta: amount };
+      }
+      game.level = Math.max(1, (Number.isFinite(game.level) ? game.level : 1) + amount);
+      if (game.player) game.player.level = game.level;
+      return {
+        ok: true,
+        level: game.level
+      };
+    }
     return { ok: false, error: `unknown action: ${action}` };
   }
 
@@ -1139,7 +1189,7 @@ if (typeof window !== "undefined") {
           maxHealth: game.player?.maxHealth || 0,
           hpBarTimer: game.player?.hpBarTimer || 0,
           hpBarVisible: typeof game.showPlayerHealthBar === "function" ? !!game.showPlayerHealthBar() : false,
-          level: game.player?.level || 1,
+          level: Number.isFinite(game.level) ? game.level : (game.player?.level || 1),
           xp: Number.isFinite(game.experience) ? game.experience : (game.player?.xp || 0),
           score: game.score || 0,
           gold: game.gold || 0,
@@ -2161,7 +2211,7 @@ function startNetworkGame() {
     const nowMs = performance.now();
     const inputDt = netLastInputProcessAt > 0 ? Math.min(0.05, Math.max(0.001, (nowMs - netLastInputProcessAt) / 1000)) : NET_INPUT_DT;
     netLastInputProcessAt = nowMs;
-    if (nowMs - netLastInputSendAt < NET_MIN_SEND_MS && !input.firePrimaryQueued && !input.fireAltQueued && !input.swapAttackQueued) {
+    if (nowMs - netLastInputSendAt < NET_MIN_SEND_MS && !input.firePrimaryQueued && !input.fireAltQueued && !input.swapAttackQueued && !input.modeSwapQueued) {
       return;
     }
     if (!shouldSendNetworkInput(input, nowMs, netLastSentInput, netLastInputSendAt, NET_FORCE_SEND_IDLE_MS)) return;
@@ -2175,6 +2225,7 @@ function startNetworkGame() {
       aimDirX: input.aimDirX,
       aimDirY: input.aimDirY,
       swapAttackQueued: input.swapAttackQueued,
+      modeSwapQueued: input.modeSwapQueued,
       firePrimaryHeld: input.firePrimaryHeld,
       firePrimaryQueued: input.firePrimaryQueued,
       fireAltQueued: input.fireAltQueued

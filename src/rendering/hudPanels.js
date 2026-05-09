@@ -1,1 +1,1 @@
-export { drawGroupPanel, drawHud, drawPausedOverlay, drawPlayerStatsPanel, drawShopMenu, drawSkillTreeMenu } from "./hud/index.js";
+export { drawClassStatusPanel, drawGroupPanel, drawHud, drawPausedOverlay, drawPlayerStatsPanel, drawShopMenu, drawSkillTreeMenu } from "./hud/index.js";

@@ -30,7 +30,7 @@ import {
 import { GameRuntimeWorld } from "./GameRuntimeWorld.js";
 import { runtimePlayerAttackMethods } from "./runtimePlayerAttackMethods.js";
 import { runtimePlayerCombatMethods } from "./runtimePlayerCombatMethods.js";
-import { getRangerTalentPoints } from "./rangerTalentTree.js";
+import { getRangerMaxHealthBonusPct } from "./rangerTalentTree.js";
 import { getWarriorIronGuardMaxHealthBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
 
 export class GameRuntimeSystems extends GameRuntimeWorld {
@@ -281,8 +281,8 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       this.skillPoints += this.getSkillPointGainForLevel(this.level, this.classType);
       const hpGain = Number.isFinite(this.classSpec.levelHpGain) ? this.classSpec.levelHpGain : 10;
       let adjustedHpGain = hpGain;
-      if (this.classType === "archer") adjustedHpGain = hpGain * (1 + (getRangerTalentPoints(this, "fleetstep") > 0 ? 0.06 : 0));
-      else if (isWarriorTalentGame(this)) adjustedHpGain = hpGain * (1 + getWarriorIronGuardMaxHealthBonusPct(this));
+      if (this.classType === "archer") adjustedHpGain = hpGain * (1 + getRangerMaxHealthBonusPct(this));
+      if (isWarriorTalentGame(this)) adjustedHpGain = hpGain * (1 + getWarriorIronGuardMaxHealthBonusPct(this));
       this.player.maxHealth += adjustedHpGain;
       this.player.health = Math.min(this.player.maxHealth, this.player.health + adjustedHpGain);
       this.markPlayerHealthBarVisible();

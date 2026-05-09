@@ -1,11 +1,4 @@
-const WARRIOR_TIER_LEVELS = {
-  1: 2,
-  2: 3,
-  3: 4,
-  4: 6,
-  5: 8,
-  6: 10
-};
+import { getOpenProgressionSkillPointGainForLevel, getOpenProgressionTierLevel } from "./openProgression.js";
 
 const WARRIOR_TIER_PICK_LIMITS = {
   1: 1,
@@ -506,7 +499,7 @@ export function getWarriorSpentSkillPoints(game) {
 
 export function getWarriorRowRequirement(row) {
   const tier = Math.max(1, Math.min(6, Math.floor(row) + 1));
-  return WARRIOR_TIER_LEVELS[tier] || 99;
+  return getOpenProgressionTierLevel(tier);
 }
 
 export function isWarriorRowAccessible(game, row) {
@@ -518,7 +511,8 @@ export function isWarriorRowAccessible(game, row) {
 export function getWarriorUnlockRequirementText(game, def) {
   if (!def) return "";
   const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
-  if (level < (WARRIOR_TIER_LEVELS[def.tier] || 99)) return `Requires level ${WARRIOR_TIER_LEVELS[def.tier]}.`;
+  const requiredLevel = getOpenProgressionTierLevel(def.tier);
+  if (level < requiredLevel) return `Requires level ${requiredLevel}.`;
   if (!hasRequiredPreviousTier(game, def.tier)) return `Requires a Tier ${def.tier - 1} pick first.`;
   if (wouldDuplicateStanceModifier(game, def.key)) return "Cannot pick the same stance modifier twice.";
   const selected = getTierSelections(game, def.tier);
@@ -533,7 +527,7 @@ export function canSpendWarriorNode(game, key) {
   const node = game?.warriorTalents?.[key];
   if (!node || node.points >= node.maxPoints) return false;
   const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
-  if (level < (WARRIOR_TIER_LEVELS[def.tier] || 99)) return false;
+  if (level < getOpenProgressionTierLevel(def.tier)) return false;
   if (!hasRequiredPreviousTier(game, def.tier)) return false;
   if (wouldDuplicateStanceModifier(game, key)) return false;
   const selected = getTierSelections(game, def.tier);
@@ -941,9 +935,5 @@ export function hasWarriorEldritchInvestment(game) {
 
 export function getWarriorSkillPointGainForLevel(level, classType) {
   if (classType !== "fighter") return 1;
-  const safeLevel = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
-  if (safeLevel < 2) return 0;
-  if (safeLevel === 2) return 2;
-  if (safeLevel <= 11) return 1;
-  return safeLevel % 2 === 0 ? 1 : 0;
+  return getOpenProgressionSkillPointGainForLevel(level);
 }

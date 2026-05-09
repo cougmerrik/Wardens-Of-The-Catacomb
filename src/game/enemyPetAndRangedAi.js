@@ -1,4 +1,5 @@
 import { vecLength } from "../utils.js";
+import { getRangerComboTier, hasRangerTalent } from "./rangerTalentTree.js";
 import {
   findRatCoverTarget,
   getEnemyAttackOwnerId,
@@ -41,9 +42,16 @@ function updateFriendlySkeletonBodyguard(game, enemy, dt, speedScale, attackRang
       ? game.getControllingPlayerEntityForEnemy(enemy)
       : game.player;
   if (!owner) return false;
+  enemy.wolfPounceCooldown = Math.max(0, (Number.isFinite(enemy.wolfPounceCooldown) ? enemy.wolfPounceCooldown : 0) - dt);
   const ownerSpeed = typeof game.getPlayerMoveSpeedFor === "function" ? game.getPlayerMoveSpeedFor(owner) : game.getPlayerMoveSpeed();
   enemy.speed = Math.max(Number.isFinite(enemy.speed) ? enemy.speed : 0, ownerSpeed * 1.05);
   const tile = game.config?.map?.tile || 32;
+  const ownerGame = owner === game.player ? game : owner;
+  const wolfApexTier = enemy.type === "wolf" && hasRangerTalent(ownerGame, "apexPredator") ? getRangerComboTier(ownerGame) : 0;
+  if (enemy.type === "wolf") {
+    enemy.direWolf = wolfApexTier > 0;
+    enemy.size = wolfApexTier >= 3 ? 30 : wolfApexTier >= 2 ? 27 : wolfApexTier >= 1 ? 25 : 22;
+  }
   const follow = (game.config?.necromancer?.followDistanceTiles || 2.2) * tile;
   const anchor =
     typeof game.getControlledUndeadFormationPoint === "function"
@@ -69,7 +77,48 @@ function updateFriendlySkeletonBodyguard(game, enemy, dt, speedScale, attackRang
     if (typeof game.setEnemyTacticPhase === "function") game.setEnemyTacticPhase(enemy, "guard");
     if (attackRange > 0 && dist <= attackRange && (enemy.attackCooldown || 0) <= 0) {
       enemy.attackCooldown = (game.config.enemy.skeletonWarriorAttackCooldown || 1.0) / Math.max(0.4, 1 + (enemy.controlledAttackSpeedBonusPct || 0));
-      game.applyEnemyDamage(guardThreat, game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale(), "physical", ownerId);
+      let damage = game.rollEnemyContactDamage(enemy) * game.getEnemyDamageScale();
+      const apexTier = wolfApexTier;
+      if (apexTier > 0) {
+        enemy.direWolf = true;
+        enemy.size = Math.max(enemy.size || 22, apexTier >= 3 ? 30 : apexTier >= 2 ? 27 : 25);
+        damage *= 1 + apexTier * 0.12;
+        guardThreat.slowTimer = Math.max(guardThreat.slowTimer || 0, 0.8 + apexTier * 0.25);
+        guardThreat.slowPct = Math.max(guardThreat.slowPct || 0, 0.12 + apexTier * 0.04);
+        enemy.controlledAttackSpeedBonusPct = Math.max(enemy.controlledAttackSpeedBonusPct || 0, 0.15 + apexTier * 0.08);
+        if (apexTier >= 3 && (enemy.wolfPounceCooldown || 0) <= 0) {
+          damage *= 1.55;
+          enemy.vx = (enemy.vx || 0) + enemy.dirX * 120;
+          enemy.vy = (enemy.vy || 0) + enemy.dirY * 120;
+          enemy.wolfPounceCooldown = 4;
+          const radius = tile * 1.25;
+          for (const other of game.enemies || []) {
+            if (!other || other === guardThreat || (other.hp || 0) <= 0) continue;
+            if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(other)) continue;
+            if (vecLength((other.x || 0) - guardThreat.x, (other.y || 0) - guardThreat.y) > radius + (other.size || 20) * 0.35) continue;
+            game.applyEnemyDamage(other, damage * 0.55, "physical", ownerId);
+            const odx = (other.x || 0) - (guardThreat.x || enemy.x);
+            const ody = (other.y || 0) - (guardThreat.y || enemy.y);
+            const olen = vecLength(odx, ody) || 1;
+            other.vx = (other.vx || 0) + (odx / olen) * 115;
+            other.vy = (other.vy || 0) + (ody / olen) * 115;
+          }
+          guardThreat.vx = (guardThreat.vx || 0) + enemy.dirX * 140;
+          guardThreat.vy = (guardThreat.vy || 0) + enemy.dirY * 140;
+          if (typeof game.spawnFloatingText === "function") {
+            game.spawnFloatingText(enemy.x, enemy.y - enemy.size, "Dire Wolf", "#d2d7df", 0.9, 14);
+            game.spawnFloatingText(guardThreat.x, guardThreat.y - guardThreat.size, "Pounce", "#d2d7df", 0.75, 13);
+          }
+        }
+      } else if (enemy.type === "wolf") {
+        enemy.direWolf = false;
+      }
+      if (enemy.type === "wolf" && hasRangerTalent(ownerGame, "venomCoating")) {
+        guardThreat.slowTimer = Math.max(guardThreat.slowTimer || 0, 1.2);
+        guardThreat.slowPct = Math.max(guardThreat.slowPct || 0, 0.16);
+        guardThreat.poisonSlowTimer = Math.max(guardThreat.poisonSlowTimer || 0, 1.2);
+      }
+      game.applyEnemyDamage(guardThreat, damage, "physical", ownerId);
       return true;
     }
     moveEnemyTowardPoint(game, enemy, guardThreat, dt, Math.max(0.95, speedScale), Math.max(6, tile * 0.18));

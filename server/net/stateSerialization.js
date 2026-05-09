@@ -132,6 +132,8 @@ function serializeBullet(room, b, domain = "bullet", prefix = "b") {
   if (typeof b.kind === "string" && b.kind !== "arrow") payload.kind = b.kind;
   if (typeof b.faction === "string" && b.faction !== "player") payload.faction = b.faction;
   if (Number.isFinite(b.damage)) payload.damage = b.damage;
+  if (Number.isFinite(b.lightRadius)) payload.lightRadius = b.lightRadius;
+  if (Number.isFinite(b.lightIntensity)) payload.lightIntensity = b.lightIntensity;
   if (typeof b.projectileType === "string" && b.projectileType !== "bullet") payload.projectileType = b.projectileType;
   return payload;
 }
@@ -163,6 +165,8 @@ function serializeEnemy(room, e) {
   if (Number.isFinite(e.burningTimer) && e.burningTimer > 0) base.burningTimer = e.burningTimer;
   if (Number.isFinite(e.burningDps) && e.burningDps > 0) base.burningDps = e.burningDps;
   if (Number.isFinite(e.burningLightRadius) && e.burningLightRadius > 0) base.burningLightRadius = e.burningLightRadius;
+  if (Number.isFinite(e.lightRadius) && e.lightRadius > 0) base.lightRadius = e.lightRadius;
+  if (Number.isFinite(e.lightIntensity) && e.lightIntensity > 0) base.lightIntensity = e.lightIntensity;
   const controlledColor = resolveControlledEnemyColor(room, e);
   if (controlledColor) base.controlledColor = controlledColor;
   switch (e.type) {
@@ -330,8 +334,10 @@ export function serializeMetaState(source) {
     skills: sim.skills,
     rangerTalents: sim.rangerTalents,
     warriorTalents: sim.warriorTalents,
+    necromancerTalents: sim.necromancerTalents,
     rangerRuntime: sim.rangerRuntime,
     warriorRuntime: sim.warriorRuntime,
+    necromancerRuntime: sim.necromancerRuntime,
     upgrades: sim.upgrades,
     consumables: sim.consumables,
     shopStock: sim.shopStock
@@ -351,7 +357,7 @@ export function serializeState(room) {
   const activeWallTraps = (sim.wallTraps || []).filter((t) => isInsideBounds(t, activeBounds, 48));
   const activeBullets = sim.bullets.filter((b) => isInsideBounds(b, activeBounds, 128));
   const activeFireArrows = sim.fireArrows.filter((a) => isInsideBounds(a, activeBounds, 144));
-  const activeFireZones = sim.fireZones.filter((z) => isInsideBounds(z, activeBounds, (Number.isFinite(z.radius) ? z.radius : 0) + 28));
+  const activeFireZones = sim.fireZones.filter((z) => isInsideBounds(z, activeBounds, Math.max(Number.isFinite(z.radius) ? z.radius : 0, Number.isFinite(z.lightRadius) ? z.lightRadius : 0) + 28));
   const activeMeleeSwings = sim.meleeSwings.filter((s) => isInsideBounds(s, activeBounds, (Number.isFinite(s.range) ? s.range : 0) + 24));
   const activePlayers = typeof room.getActivePlayerStates === "function" ? room.getActivePlayerStates() : [];
   const primaryPlayer =
@@ -380,9 +386,15 @@ export function serializeState(room) {
       id: getStableId(room, "fireZone", "fz", z),
       x: z.x,
       y: z.y,
+      targetX: z.targetX,
+      targetY: z.targetY,
       radius: z.radius,
+      lightRadius: z.lightRadius,
+      lightIntensity: z.lightIntensity,
       life: z.life,
-      zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire"
+      totalLife: z.totalLife,
+      zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire",
+      damageType: typeof z.damageType === "string" ? z.damageType : ""
     })),
     meleeSwings: activeMeleeSwings.map((s) => ({
       id: getStableId(room, "meleeSwing", "ms", s),

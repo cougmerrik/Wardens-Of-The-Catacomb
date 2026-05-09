@@ -1,4 +1,5 @@
 import { vecLength, directionIndexFromVector } from "../utils.js";
+import { updateConfusedEnemy, updateFriendlyMageSummon } from "./gameStepMageSummons.js";
 import { resolveCombatAndDrops } from "./stepCombatResolution.js";
 import { getWarriorPassiveRegenBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
 import {
@@ -10,6 +11,7 @@ import {
   getNecromancerTempHpCap,
   getNecromancerVigorBeamDamageMultiplier,
   hasNecromancerBlightstorm,
+  getMageSelectedCantrip,
   isNecromancerTalentGame
 } from "./necromancerTalentTree.js";
 
@@ -156,16 +158,6 @@ export function stepGame(game, dt, controls = {}) {
     game.moveWithCollisionSubsteps(game.player, (mx / len) * game.player.speed * dt, (my / len) * game.player.speed * dt);
   }
   game.player.moving = !!(mx || my);
-  if (game.isArcherClass && game.isArcherClass()) {
-    if (game.player.moving) {
-      game.rangerDanceMoveTimer = (Number.isFinite(game.rangerDanceMoveTimer) ? game.rangerDanceMoveTimer : 0) + dt;
-      if (game.rangerDanceMoveTimer >= 6 && (game.rangerTalents?.danceOfThorns?.points || 0) > 0) {
-        game.rangerDanceOfThornsTimer = Math.max(game.rangerDanceOfThornsTimer || 0, 0.3);
-      }
-    } else {
-      game.rangerDanceMoveTimer = 0;
-    }
-  }
   if (primaryPlayerAlive) game.revealAroundPlayer();
   if (typeof game.updateLightingInteractions === "function") game.updateLightingInteractions(dt);
 
@@ -238,7 +230,17 @@ export function stepGame(game, dt, controls = {}) {
     }
   }
 
-  if (primaryPlayerAlive && game.isNecromancerClass && game.isNecromancerClass()) {
+  if (primaryPlayerAlive && controls.modeSwapQueued && game.isNecromancerClass && game.isNecromancerClass() && typeof game.toggleMageMode === "function") {
+    game.toggleMageMode();
+  }
+
+  const necromancerBeamCantripActive =
+    primaryPlayerAlive &&
+    game.isNecromancerClass &&
+    game.isNecromancerClass() &&
+    (!isNecromancerTalentGame(game) ||
+      ((game.necromancerRuntime?.activeMode || "cantrip") === "cantrip" && (getMageSelectedCantrip(game) || "fireBoltCantrip") === "necroticBeamCantrip"));
+  if (necromancerBeamCantripActive) {
     const beam = game.necromancerBeam || (game.necromancerBeam = {
       active: false,
       targetId: null,
@@ -333,7 +335,7 @@ export function stepGame(game, dt, controls = {}) {
       for (const enemy of game.enemies) {
         if ((enemy.hp || 0) <= 0) continue;
         if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
-        const validCharmTarget = game.isUndeadEnemy(enemy);
+        const validCharmTarget = game.isUndeadEnemy(enemy) && !(enemy.isBoss || enemy.isFloorBoss);
         const validBeamTarget = validCharmTarget || offensiveBeamEnabled;
         if (!validBeamTarget) continue;
         const beamDist = vecLength(enemy.x - game.player.x, enemy.y - game.player.y);
@@ -369,6 +371,10 @@ export function stepGame(game, dt, controls = {}) {
           beam.progress += dt;
           if (beam.progress >= game.getNecromancerCharmDuration()) {
             if (game.markUndeadAsControlled(bestTarget)) {
+              if (!game.necromancerTalents?.necromancerPath?.points) {
+                bestTarget.tempMageCharmTimer = 5;
+                bestTarget.dieWhenCharmEnds = true;
+              }
               beam.progress = 0;
               game.spawnFloatingText(bestTarget.x, bestTarget.y - bestTarget.size * 0.7, "Charmed", "#8eb8ff", 0.9, 14);
             }
@@ -384,6 +390,14 @@ export function stepGame(game, dt, controls = {}) {
             const damage = game.getDeathBoltBaseDamage() * 0.27 * getNecromancerBeamDamageMultiplier(game) * (1 + getNecromancerBlackCandleCursedBeamBonus(game, bestTarget)) * getNecromancerVigorBeamDamageMultiplier(game);
             const hpBefore = Number.isFinite(bestTarget.hp) ? bestTarget.hp : 0;
             game.applyEnemyDamage(bestTarget, damage, "necrotic", game.player.id || null);
+            const dealt = Math.max(0, hpBefore - Math.max(0, Number.isFinite(bestTarget.hp) ? bestTarget.hp : 0));
+            if (dealt > 0) {
+              const runtime = game.necromancerRuntime || (game.necromancerRuntime = {});
+              const cap = Math.max(0, (game.player?.maxHealth || 0) * 0.15);
+              const gain = Math.max(0.25, dealt * 0.2);
+              runtime.tempHp = Math.min(cap, Math.max(0, Number.isFinite(runtime.tempHp) ? runtime.tempHp : 0) + gain);
+              if (typeof game.markPlayerHealthBarVisible === "function") game.markPlayerHealthBarVisible();
+            }
             if (hasNecromancerBlightstorm(game)) {
               bestTarget.curseTimer = Math.max(bestTarget.curseTimer || 0, getNecromancerCurseDuration(game));
             }
@@ -415,6 +429,7 @@ export function stepGame(game, dt, controls = {}) {
     if (controls.swapAttackQueued && typeof game.toggleWarriorAttackMode === "function") {
       game.toggleWarriorAttackMode();
     }
+    if (controls.modeSwapQueued && typeof game.switchRangerWeaponMode === "function") game.switchRangerWeaponMode();
     if (controls.firePrimaryQueued) game.fire(game.player.dirX, game.player.dirY);
     if (!controls.firePrimaryQueued && controls.firePrimaryHeld && controls.hasAim) {
       game.fire(game.player.dirX, game.player.dirY);
@@ -576,9 +591,11 @@ export function stepGame(game, dt, controls = {}) {
     const alwaysActiveBoss = !!enemy?.isFloorBoss && (typeof game.isFloorBossActive !== "function" || game.isFloorBossActive());
     if (!alwaysActiveBoss && !isActive(enemy, 72)) continue;
     activeEnemies.push(enemy);
+    if (updateFriendlyMageSummon(game, enemy, dt, enemySpeedScale)) continue;
     if (enemy.charmLocked) continue;
     if ((enemy.hitCooldown || 0) > 0) continue;
     const appliedEnemySpeedScale = enemySpeedScale * (1 - Math.max(0, Math.min(0.85, enemy.pinningSlowPct || 0)));
+    if (updateConfusedEnemy(game, enemy, dt, appliedEnemySpeedScale)) continue;
     if (typeof game.updateEnemyTactics === "function") game.updateEnemyTactics(enemy, dt, appliedEnemySpeedScale);
     else if (typeof game.updateGenericEnemy === "function") game.updateGenericEnemy(enemy, dt, appliedEnemySpeedScale);
     else game.moveEnemyTowardPlayer(enemy, appliedEnemySpeedScale, dt);

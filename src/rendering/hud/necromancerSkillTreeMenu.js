@@ -1,31 +1,19 @@
 import {
   canSpendNecromancerNode,
-  canSpendNecromancerUtility,
-  formatNecromancerLaneLabel,
+  getMageGroupLimit,
+  getMageSelectedInGroup,
+  getMageTierLabel,
   getNecromancerAvailableSkillPoints,
   getNecromancerSpentSkillPoints,
   getNecromancerTalentDefs,
   getNecromancerTalentPoints,
   getNecromancerTooltip,
-  getNecromancerUtilityLevel,
   isNecromancerRowAccessible
 } from "../../game/necromancerTalentTree.js";
-import { drawSkillRefundFooter } from "./skillTreeMenuSections.js";
+import { drawSkillRefundFooter, drawSkillTreeTitle, getSkillTierHeader } from "./skillTreeMenuSections.js";
 
 function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
-}
-
-function drawRankPips(ctx, x, y, filled, total, color, locked) {
-  const size = 10;
-  const gap = 4;
-  for (let i = 0; i < total; i++) {
-    const px = x + i * (size + gap);
-    ctx.fillStyle = i < filled ? color : locked ? "rgba(68, 74, 86, 0.92)" : "rgba(28, 34, 44, 0.96)";
-    ctx.fillRect(px, y, size, size);
-    ctx.strokeStyle = locked ? "rgba(110, 116, 128, 0.72)" : "rgba(220, 228, 238, 0.52)";
-    ctx.strokeRect(px + 0.5, y + 0.5, size - 1, size - 1);
-  }
 }
 
 function drawIcon(ctx, rect, icon, fill, locked) {
@@ -74,15 +62,12 @@ function getPinnedTooltip(game) {
 
 export function drawNecromancerSkillTreeMenu(renderer, game, layout, frame) {
   const ctx = renderer.ctx;
-  const menuX = frame.menuX;
-  const menuY = frame.menuY;
-  const menuW = frame.menuW;
-  const menuH = frame.menuH;
+  const { menuX, menuY, menuW, menuH } = frame;
   const contentTop = menuY + 48;
   const contentBottom = menuY + menuH - 84;
   const visibleH = contentBottom - contentTop;
-  const rowH = 98;
-  const contentHeight = 5 * rowH + 40;
+  const rowH = 100;
+  const contentHeight = 6 * rowH + 28;
   const scrollMax = Math.max(0, contentHeight - visibleH);
   const scroll = Math.max(0, Math.min(scrollMax, game.uiScroll?.skillTree || 0));
   game.uiScroll.skillTree = scroll;
@@ -91,9 +76,7 @@ export function drawNecromancerSkillTreeMenu(renderer, game, layout, frame) {
   game.uiRects.skillTreeNodes = [];
   const sy = (y) => y - scroll;
 
-  ctx.fillStyle = "#f3efe3";
-  ctx.font = "bold 20px Trebuchet MS";
-  ctx.fillText("Necromancer Talent Tree", menuX + 16, menuY + 30);
+  drawSkillTreeTitle(ctx, menuX, menuY);
   ctx.font = "13px Trebuchet MS";
   ctx.fillStyle = "#d2d9e8";
   ctx.textAlign = "right";
@@ -110,92 +93,42 @@ export function drawNecromancerSkillTreeMenu(renderer, game, layout, frame) {
   ctx.clip();
 
   const defs = getNecromancerTalentDefs();
-  const rowNodes = new Map();
-  for (const def of defs) {
-    const list = rowNodes.get(def.row) || [];
-    list.push(def);
-    rowNodes.set(def.row, list);
-  }
-  const utilityDefs = [
-    { key: "moveSpeed", label: "Move Speed Training", icon: "MV", color: "#7cd5ff" },
-    { key: "attackSpeed", label: "Attack Speed Training", icon: "AT", color: "#88efaa" },
-    { key: "damage", label: "Damage Training", icon: "DM", color: "#ffba6d" },
-    { key: "defense", label: "Defense Training", icon: "DF", color: "#cbb5ff" }
-  ];
-
   let hovered = null;
   const mouseX = game.input?.mouse?.screenX;
   const mouseY = game.input?.mouse?.screenY;
 
-  for (let row = 0; row <= 4; row++) {
-    const rowY = sy(menuY + 62 + row * rowH);
+  for (let tier = 1; tier <= 6; tier++) {
+    const rowY = sy(menuY + 62 + (tier - 1) * rowH);
     const rowRect = { x: menuX + 18, y: rowY, w: menuW - 36, h: rowH - 10 };
-    const accessible = row === 0 || isNecromancerRowAccessible(game, row);
+    const accessible = isNecromancerRowAccessible(game, tier - 1);
     ctx.fillStyle = accessible ? "rgba(18, 16, 28, 0.94)" : "rgba(20, 20, 26, 0.86)";
     ctx.fillRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
     ctx.strokeStyle = accessible ? "rgba(160, 132, 216, 0.55)" : "rgba(88, 92, 104, 0.52)";
     ctx.strokeRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
     ctx.fillStyle = accessible ? "#f1ecff" : "#9198a4";
     ctx.font = "bold 14px Trebuchet MS";
-    const label = row === 0 ? "Row 0  Core + Utility" : `Row ${row}  Requires ${row === 1 ? "Death Bolt" : `${row === 2 ? 3 : row === 3 ? 8 : 14} total points`}`;
-    ctx.fillText(label, rowRect.x + 12, rowRect.y + 20);
-    if (!accessible && row > 0) {
-      ctx.font = "12px Trebuchet MS";
-      ctx.fillStyle = "#bda885";
-      const gateText =
-        row === 1
-          ? "Requires Death Bolt first."
-          : row === 4
-          ? "Requires 14 total points for the first capstone, then 20 for the second."
-          : `Requires ${row === 2 ? 3 : 8} total points spent.`;
-      ctx.fillText(gateText, rowRect.x + 12, rowRect.y + 36);
-    }
+    const nodes = defs.filter((def) => def.tier === tier);
+    const group = nodes[0]?.group || "";
+    const selectedCount = getMageSelectedInGroup(game, group).length;
+    const groupLimit = getMageGroupLimit(group);
+    ctx.fillText(getSkillTierHeader(tier, getMageTierLabel(tier), selectedCount, groupLimit), rowRect.x + 12, rowRect.y + 20);
 
-    if (row === 0) {
-      const activeDef = defs.find((def) => def.key === "deathBoltActive");
-      const activeRect = { x: rowRect.x + 14, y: rowRect.y + 30, w: 120, h: 48 };
-      const activeLocked = !canSpendNecromancerNode(game, activeDef.key) && getNecromancerTalentPoints(game, activeDef.key) <= 0;
-      drawIcon(ctx, { x: activeRect.x, y: activeRect.y, w: 30, h: 30 }, activeDef.icon, activeDef.color, activeLocked);
-      ctx.fillStyle = activeLocked ? "#9ea4af" : "#f2efe7";
-      ctx.font = "bold 13px Trebuchet MS";
-      ctx.fillText(activeDef.label, activeRect.x + 40, activeRect.y + 14);
-      drawRankPips(ctx, activeRect.x + 40, activeRect.y + 20, getNecromancerTalentPoints(game, activeDef.key), 1, activeDef.color, activeLocked);
-      game.uiRects.skillTreeNodes.push({ key: activeDef.key, kind: "node", rect: activeRect });
-      if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, activeRect)) {
-        hovered = getNecromancerTooltip(game, { key: activeDef.key, kind: "node", locked: activeLocked });
-      }
-
-      utilityDefs.forEach((def, index) => {
-        const x = rowRect.x + 150 + index * 86;
-        const rect = { x, y: rowRect.y + 28, w: 78, h: 54 };
-        const level = getNecromancerUtilityLevel(game, def.key);
-        const locked = !canSpendNecromancerUtility(game, def.key) && level <= 0;
-        drawIcon(ctx, { x: rect.x + 4, y: rect.y + 4, w: 24, h: 24 }, def.icon, def.color, locked);
-        ctx.fillStyle = locked ? "#9ea4af" : "#f2efe7";
-        ctx.font = "bold 11px Trebuchet MS";
-        ctx.fillText(def.label.split(" ")[0], rect.x + 34, rect.y + 16);
-        drawRankPips(ctx, rect.x + 6, rect.y + 34, level, 4, def.color, locked);
-        game.uiRects.skillTreeNodes.push({ key: def.key, kind: "utility", rect });
-        if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
-          hovered = getNecromancerTooltip(game, { key: def.key, kind: "utility", locked });
-        }
-      });
-      continue;
-    }
-
-    const nodes = (rowNodes.get(row) || []).filter((def) => def.key !== "deathBoltActive");
+    const columns = tier === 5 ? 4 : Math.min(4, nodes.length);
+    const nodeW = Math.floor((rowRect.w - 28 - (columns - 1) * 8) / columns);
     nodes.forEach((def, index) => {
-      const rect = { x: rowRect.x + 18 + index * 152, y: rowRect.y + 34, w: 136, h: 44 };
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      const rect = { x: rowRect.x + 14 + col * (nodeW + 8), y: rowRect.y + 30 + row * 28, w: nodeW, h: 26 };
       const points = getNecromancerTalentPoints(game, def.key);
       const locked = !canSpendNecromancerNode(game, def.key) && points <= 0;
-      drawIcon(ctx, { x: rect.x + 4, y: rect.y + 6, w: 28, h: 28 }, def.icon, def.color, locked || !accessible);
-      ctx.fillStyle = locked || !accessible ? "#9ea4af" : "#f2efe7";
-      ctx.font = "bold 12px Trebuchet MS";
-      ctx.fillText(def.label, rect.x + 38, rect.y + 16);
-      ctx.font = "11px Trebuchet MS";
-      ctx.fillStyle = locked || !accessible ? "#828894" : "#cfd7e6";
-      ctx.fillText(formatNecromancerLaneLabel(def.lane), rect.x + 38, rect.y + 30);
-      drawRankPips(ctx, rect.x + 38, rect.y + 32, points, def.maxRanks, def.color, locked || !accessible);
+      drawIcon(ctx, { x: rect.x + 3, y: rect.y + 3, w: 20, h: 20 }, def.icon, def.color, locked || !accessible);
+      ctx.fillStyle = locked || !accessible ? "#9ea4af" : points > 0 ? "#fff0bd" : "#f2efe7";
+      ctx.font = "bold 11px Trebuchet MS";
+      ctx.fillText(def.label, rect.x + 28, rect.y + 16);
+      if (points > 0) {
+        ctx.fillStyle = def.color;
+        ctx.fillRect(rect.x + rect.w - 11, rect.y + 8, 7, 7);
+      }
       game.uiRects.skillTreeNodes.push({ key: def.key, kind: "node", rect });
       if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
         hovered = getNecromancerTooltip(game, { key: def.key, kind: "node", locked: locked || !accessible });

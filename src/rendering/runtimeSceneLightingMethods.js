@@ -209,8 +209,9 @@ export const runtimeSceneLightingMethods = {
       const sourceBrightRatio = typeof this.getLightSourceBrightRatio === "function" ? this.getLightSourceBrightRatio(source, brightRatio) : brightRatio;
       const sourceDimRatio = typeof this.getLightSourceDimRatio === "function" ? this.getLightSourceDimRatio(source, dimRatio) : dimRatio;
       const stops = [0, sourceBrightRatio * 0.5, sourceBrightRatio, (sourceBrightRatio + sourceDimRatio) * 0.5, sourceDimRatio, (sourceDimRatio + 1) * 0.5, 1];
+      const intensity = Number.isFinite(source.lightIntensity) ? Math.max(0, Math.min(1, source.lightIntensity)) : 1;
       for (const stop of stops) {
-        const alpha = stop >= 1 ? 0 : stop <= 0 ? 1 : Math.exp(-decay * stop);
+        const alpha = (stop >= 1 ? 0 : stop <= 0 ? 1 : Math.exp(-decay * stop)) * intensity;
         gradient.addColorStop(stop, `rgba(255, 255, 255, ${alpha.toFixed(3)})`);
       }
       overlayCtx.fillStyle = gradient;
