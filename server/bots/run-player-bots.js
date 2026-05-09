@@ -22,6 +22,7 @@ function parseArgs(argv) {
     duration: Number.parseInt(process.env.BOT_DURATION || "60", 10),
     classType: process.env.BOT_CLASS || "random",
     namePrefix: process.env.BOT_NAME_PREFIX || "Bot",
+    readyMode: process.env.BOT_READY_MODE || "immediate",
     staggerMs: Number.parseInt(process.env.BOT_STAGGER_MS || "350", 10),
     seed: process.env.BOT_SEED || `${Date.now()}`,
     logLevel: process.env.BOT_LOG_LEVEL || "info"
@@ -35,6 +36,7 @@ function parseArgs(argv) {
     else if (arg === "--duration" && next) options.duration = Number.parseInt(next, 10), i++;
     else if (arg === "--class" && next) options.classType = next, i++;
     else if (arg === "--name-prefix" && next) options.namePrefix = next, i++;
+    else if (arg === "--ready-mode" && next) options.readyMode = next, i++;
     else if (arg === "--stagger-ms" && next) options.staggerMs = Number.parseInt(next, 10), i++;
     else if (arg === "--seed" && next) options.seed = next, i++;
     else if (arg === "--log-level" && next) options.logLevel = next, i++;
@@ -44,6 +46,7 @@ function parseArgs(argv) {
   options.duration = Number.isFinite(options.duration) ? Math.max(1, Math.floor(options.duration)) : 60;
   options.staggerMs = Number.isFinite(options.staggerMs) ? Math.max(0, Math.floor(options.staggerMs)) : 350;
   if (!CLASSES.includes(options.classType)) options.classType = "random";
+  if (options.readyMode !== "wait-for-human") options.readyMode = "immediate";
   return options;
 }
 
@@ -58,6 +61,7 @@ Options:
   --duration <seconds>        Run duration before closing bots.
   --class <class|random>      archer, fighter, necromancer, or random.
   --name-prefix <prefix>      Bot handle prefix.
+  --ready-mode <mode>         immediate or wait-for-human.
   --stagger-ms <ms>           Delay between bot joins.
   --seed <seed>               Deterministic seed for class and movement choices.
   --log-level <level>         silent or info.`);
@@ -88,6 +92,8 @@ export async function runBots(options = {}) {
       name: `${config.namePrefix}-${i + 1}`,
       classType,
       random: botRandom,
+      readyMode: config.readyMode,
+      botNamePrefix: config.namePrefix,
       logger
     });
     bots.push(bot);
@@ -115,6 +121,7 @@ export async function runBots(options = {}) {
     url: config.url,
     room: config.room,
     duration: config.duration,
+    readyMode: config.readyMode,
     bots: metrics,
     totals: {
       joined: metrics.filter((bot) => bot.joined).length,
@@ -137,7 +144,8 @@ async function main() {
   }
   const result = await runBots(options);
   console.log(JSON.stringify(result, null, 2));
-  if (result.totals.joined < options.bots || result.totals.started < options.bots) process.exitCode = 1;
+  const requireStarted = options.readyMode !== "wait-for-human";
+  if (result.totals.joined < options.bots || (requireStarted && result.totals.started < options.bots)) process.exitCode = 1;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

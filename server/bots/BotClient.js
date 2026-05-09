@@ -13,6 +13,9 @@ export class BotClient extends EventEmitter {
     classType,
     random = Math.random,
     inputIntervalMs = INPUT_INTERVAL_MS,
+    readyMode = "immediate",
+    botNamePrefix = "Bot",
+    autoReady = true,
     logger = null
   }) {
     super();
@@ -22,6 +25,9 @@ export class BotClient extends EventEmitter {
     this.classType = classType || "archer";
     this.random = random;
     this.inputIntervalMs = inputIntervalMs;
+    this.readyMode = readyMode === "wait-for-human" ? "wait-for-human" : "immediate";
+    this.botNamePrefix = typeof botNamePrefix === "string" && botNamePrefix.trim() ? botNamePrefix.trim() : "Bot";
+    this.autoReady = autoReady !== false;
     this.logger = logger;
     this.ws = null;
     this.state = createEmptyBotState();
@@ -29,12 +35,15 @@ export class BotClient extends EventEmitter {
     this.seq = 0;
     this.inputTimer = null;
     this.readySent = false;
+    this.waitingForHumanLogged = false;
     this.closed = false;
     this.metrics = {
       name: this.name,
       classType: this.classType,
       joined: false,
       readied: false,
+      humanSeen: false,
+      humanReadySeen: false,
       started: false,
       connectedAtMs: 0,
       disconnectedAtMs: 0,
@@ -115,9 +124,21 @@ export class BotClient extends EventEmitter {
     });
   }
 
-  readyUp() {
+  readyUp({ force = false } = {}) {
     if (this.readySent || this.state.phase !== "lobby") return;
+    if (!this.autoReady && !force) return;
     const self = this.state.roster.find((player) => player?.id === this.state.playerId);
+    const humanPresent = this.hasNonBotPlayer();
+    const humanReady = this.hasReadyNonBotPlayer();
+    this.metrics.humanSeen = this.metrics.humanSeen || humanPresent;
+    this.metrics.humanReadySeen = this.metrics.humanReadySeen || humanReady;
+    if (this.readyMode === "wait-for-human" && !humanReady) {
+      if (!this.waitingForHumanLogged) {
+        this.log("waiting for ready non-bot player before readying");
+        this.waitingForHumanLogged = true;
+      }
+      return;
+    }
     if (self?.ready || self?.locked) {
       this.readySent = true;
       this.metrics.readied = true;
@@ -129,6 +150,31 @@ export class BotClient extends EventEmitter {
     });
     this.metrics.readied = this.readySent;
     if (this.readySent) this.log("ready");
+  }
+
+  hasNonBotPlayer() {
+    for (const player of this.state.roster) {
+      if (!player || player.id === this.state.playerId) continue;
+      const handle = typeof player.handle === "string" && player.handle ? player.handle : player.name || "";
+      if (!this.isBotHandle(handle)) return true;
+    }
+    return false;
+  }
+
+  hasReadyNonBotPlayer() {
+    for (const player of this.state.roster) {
+      if (!player || player.id === this.state.playerId) continue;
+      const handle = typeof player.handle === "string" && player.handle ? player.handle : player.name || "";
+      if (this.isBotHandle(handle)) continue;
+      if (player.ready || player.locked) return true;
+    }
+    return false;
+  }
+
+  isBotHandle(handle) {
+    const text = typeof handle === "string" ? handle.trim() : "";
+    if (!text) return false;
+    return text === this.botNamePrefix || text.startsWith(`${this.botNamePrefix}-`);
   }
 
   startInputLoop() {
