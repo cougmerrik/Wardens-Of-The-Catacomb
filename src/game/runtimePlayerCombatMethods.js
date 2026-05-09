@@ -179,7 +179,7 @@ export const runtimePlayerCombatMethods = {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       if (Math.abs(diff) <= halfArc) {
-        this.applyEnemyDamage(enemy, this.rollPrimaryDamage(), "melee");
+        this.applyEnemyDamage(enemy, this.rollPrimaryDamage(), "melee", this.player.id || null);
         const threshold = this.getWarriorExecuteThreshold();
         const chance = this.getWarriorExecuteChance();
         const hpRatio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;

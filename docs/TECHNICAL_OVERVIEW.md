@@ -9,8 +9,37 @@ This document summarizes the current high-level architecture and validation work
 - `src/mapGenerator.js`: biome-specific procedural map generators for catacomb and sewer floors
 - `src/rendering/*`: renderer, HUD, scene drawing, and effects
 - `src/net/*`: client-side networking, prediction, interpolation, and map sync helpers
+- `src/runtime/runtimeConfig.js`: platform-aware runtime defaults, network URL resolution, and persisted server override helpers
+- `scripts/prepare-capacitor-web.js`: deterministic Capacitor web-bundle preparation for Android builds
+- [capacitor.config.ts](../capacitor.config.ts): Capacitor app metadata and `www/` web asset target
 - [server/networkServer.js](../server/networkServer.js): authoritative WebSocket server entrypoint
 - `server/net/*`: server-side room, protocol, scheduler, telemetry, and serialization helpers
+
+## Mobile Platform Runtime
+- Android support uses Capacitor as a packaging shell around the existing web/canvas client. Gameplay, rendering, networking, and validation continue to run through the shared JavaScript runtime rather than a native gameplay fork.
+- Platform identity flows through runtime config and `Game` construction:
+  - web builds default to the local hostname/WebSocket fallback when no runtime config is supplied
+  - Android bundle preparation writes `platform: "android"` into `www/config.js`
+  - Android web assets default multiplayer to `wss://wardens-of-the-catacomb-production.up.railway.app`
+  - Android disables gameplay ads through `showGameplayAds: false`
+  - manual server override remains enabled for local and alternate test servers
+- Server URL resolution is centralized in `src/runtime/runtimeConfig.js`:
+  - current input value wins first
+  - saved `wotcServerUrlOverride` wins next
+  - build-provided `defaultWsUrl` wins next
+  - local hostname fallback is last
+- The network setup UI exposes reset-to-default behavior and persists a successful custom server choice separately from build defaults.
+- Android gameplay uses the same `InputController` intent surface as desktop. On Android, touch input supplies:
+  - floating movement stick
+  - floating aim stick with held-primary behavior
+  - tap-to-UI hit routing for HUD/overlay actions
+- Android HUD layout helpers live under `src/rendering/hud/androidLayout.js`. They provide touch regions, draw active stick guides, and keep compact HUD panels away from the lower movement/aim zones.
+- Browser bootstrap owns Android-specific menu/gameplay chrome such as utility buttons, gameplay-control visibility, Android canvas sizing, and Android dev-mode unlock handling.
+- Android build commands:
+  - `npm run build:android:web` prepares `www/`
+  - `npm run cap:sync:android` rebuilds and syncs the Capacitor Android project
+  - `npm run android:assembleDebug` builds the debug APK through the repo-local Gradle wrapper script
+- The iOS path remains intentionally open through the shared web bundle and Capacitor architecture, but no iOS native project is part of the current branch state.
 
 ## Recent Refactor Summary
 - Large gameplay, server, bootstrap, and renderer files were split into reusable modules.
@@ -180,6 +209,15 @@ This document summarizes the current high-level architecture and validation work
   - verifies browser rendering, debug state, active light sources, faint dark-area visibility, and HUD/sidebar readability
 - `perf:floor-scaling`
   - compares floor `1`, map-only later floors, and loaded later floors so map-growth and enemy-density costs can be evaluated separately
+
+### Mobile Build Validation
+- `npm run build:android:web`
+  - rebuilds `www/` from the tracked web client assets and writes Android runtime config defaults
+- `npm run cap:sync:android`
+  - runs the Android web-bundle build and syncs the Capacitor native project
+- `npm run android:assembleDebug`
+  - builds the Android debug APK through `scripts/run-android-gradle.js`
+- Local Android SDK/JDK availability determines whether native assemble can run on a given workstation. When the SDK is unavailable, preserve the web-bundle and core regression validations and rerun native assemble on an Android-capable machine before release packaging.
 
 ## Performance Workflow
 - Baseline metrics are stored in:

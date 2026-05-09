@@ -46,7 +46,6 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           Number.isFinite(node?.points) ? Math.max(0, Math.floor(node.points)) : 0
         ])
       );
-      const skillLevels = pointLevels(game.skills);
       const talentLevels = {
         ...pointLevels(game.rangerTalents),
         ...pointLevels(game.warriorTalents),
@@ -219,7 +218,6 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
                 rect: entry?.rect || null
               }))
             : [],
-          skillLevels,
           talentLevels,
           shopItems: Array.isArray(game.uiRects?.shopItems)
             ? game.uiRects.shopItems.slice(0, 4).map((entry) => ({
@@ -250,17 +248,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               : [],
             sharedCooldown: Number.isFinite(game.consumables?.sharedCooldown) ? game.consumables.sharedCooldown : 0
           },
-          skillNodes: {
-            fireArrow: game.uiRects?.skillFireArrowNode || null,
-            piercingStrike: game.uiRects?.skillPiercingNode || null,
-            multiarrow: game.uiRects?.skillMultiarrowNode || null,
-            warriorMomentum: game.uiRects?.skillWarriorMomentumNode || null,
-            warriorRage: game.uiRects?.skillWarriorRageNode || null,
-            warriorExecute: game.uiRects?.skillWarriorExecuteNode || null,
-            undeadMastery: game.uiRects?.skillUndeadMasteryNode || null,
-            deathBolt: game.uiRects?.skillDeathBoltNode || null,
-            explodingDeath: game.uiRects?.skillExplodingDeathNode || null
-          },
+          skillNodes: Array.isArray(game.uiRects?.skillTreeNodes) ? game.uiRects.skillTreeNodes : [],
           recentUiClicks: Array.isArray(game.input?.mouse?.recentUiLeftClicks)
             ? game.input.mouse.recentUiLeftClicks.slice(-8)
             : [],

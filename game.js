@@ -1081,6 +1081,43 @@ if (typeof window !== "undefined") {
       if (torch.lit) torch.snuffCooldown = 0;
       return { ok: true, id: torch.id || null, lit: torch.lit };
     }
+    if (action === "setPaused") {
+      game.paused = payload.paused === true;
+      if (!game.paused && game.input) {
+        game.input.keyQueued?.delete?.("escape");
+        game.input.keys?.delete?.("escape");
+      }
+      if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
+      return { ok: true, paused: game.paused };
+    }
+    if (action === "setSkillTreeOpen") {
+      game.skillTreeOpen = payload.open !== false;
+      if (game.skillTreeOpen) {
+        game.paused = false;
+        game.shopOpen = false;
+        game.statsPanelOpen = false;
+      }
+      if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
+      return { ok: true, skillTreeOpen: game.skillTreeOpen };
+    }
+    if (action === "spendSkill") {
+      const key = typeof payload.key === "string" ? payload.key : "";
+      const spent = typeof game.spendSkillPoint === "function" ? game.spendSkillPoint(key) : false;
+      const talentPoints =
+        game.rangerTalents?.[key]?.points ??
+        game.warriorTalents?.[key]?.points ??
+        game.necromancerTalents?.[key]?.points ??
+        game.skills?.[key]?.points ??
+        0;
+      const spentSkillPoints = typeof game.getSpentSkillPointCount === "function" ? game.getSpentSkillPointCount() : 0;
+      const refundCost = typeof game.getSkillRefundCost === "function" ? game.getSkillRefundCost(spentSkillPoints, game.refundCount) : 0;
+      return { ok: !!spent, key, talentPoints, spentSkillPoints, skillPoints: game.skillPoints, gold: game.gold, refundCost };
+    }
+    if (action === "refundAllSkills") {
+      const refunded = typeof game.refundAllSkills === "function" ? game.refundAllSkills() : false;
+      const spentSkillPoints = typeof game.getSpentSkillPointCount === "function" ? game.getSpentSkillPointCount() : 0;
+      return { ok: !!refunded, spentSkillPoints, skillPoints: game.skillPoints, gold: game.gold, refundCount: game.refundCount };
+    }
     if (action === "grantLevels") {
       const amount = Number.isFinite(payload.amount) ? Math.max(0, Math.floor(payload.amount)) : 0;
       if (game.networkEnabled && netClient && typeof netClient.sendAction === "function") {

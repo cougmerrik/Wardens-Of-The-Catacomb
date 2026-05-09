@@ -186,15 +186,6 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     game.uiRects.skillTreeNodes = [];
     game.uiRects.skillTreeScrollArea = null;
     game.uiRects.skillTreeScrollMax = 0;
-    game.uiRects.skillFireArrowNode = null;
-    game.uiRects.skillPiercingNode = null;
-    game.uiRects.skillMultiarrowNode = null;
-    game.uiRects.skillWarriorMomentumNode = null;
-    game.uiRects.skillWarriorRageNode = null;
-    game.uiRects.skillWarriorExecuteNode = null;
-    game.uiRects.skillUndeadMasteryNode = null;
-    game.uiRects.skillDeathBoltNode = null;
-    game.uiRects.skillExplodingDeathNode = null;
     game.uiRects.statsButton = null;
     game.uiRects.statsClose = null;
     game.uiRects.statsRunTab = null;
@@ -257,7 +248,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     this.drawExperienceBar(game, layout);
     this.drawBossSpeechCallout(game, cameraX, cameraY, layout);
     this.drawHud(game, layout);
-    const minimapBottom = this.drawMinimap(game, layout);
+    const classStatusBottom = this.drawClassStatusPanel(game, layout);
+    const minimapBottom = this.drawMinimap(game, layout, classStatusBottom + this.sidebarPadding);
     const statsBottom = this.drawPlayerStatsPanel(game, layout, minimapBottom + this.sidebarPadding);
     if (!game.statsPanelOpen) this.drawGroupPanel(game, layout, statsBottom + this.sidebarPadding);
     if (game.shopOpen) this.drawShopMenu(game, layout);

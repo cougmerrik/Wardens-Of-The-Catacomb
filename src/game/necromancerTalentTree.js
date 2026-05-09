@@ -1,3 +1,5 @@
+import { getOpenProgressionSkillPointGainForLevel, getOpenProgressionTierLevel } from "./openProgression.js";
+
 const MAGE_GROUP_LIMITS = {
   cantrip: 1,
   spell: 1,
@@ -6,17 +8,6 @@ const MAGE_GROUP_LIMITS = {
   general: 2,
   capstone: 1
 };
-
-const MAGE_TIER_LEVELS = {
-  1: 2,
-  2: 3,
-  3: 5,
-  4: 7,
-  5: 9,
-  6: 12
-};
-
-const OPEN_PROGRESSION_SP_LEVELS = new Set([2, 3, 5, 7, 9, 10, 12]);
 
 const MAGE_TIER_LABELS = {
   1: "Cantrip",
@@ -165,7 +156,7 @@ export function getMageGroupLimit(group) {
 
 export function isMageTierAccessible(game, tier) {
   const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
-  if (level < (MAGE_TIER_LEVELS[tier] || 99)) return false;
+  if (level < getOpenProgressionTierLevel(tier)) return false;
   if (tier <= 1) return true;
   if (tier === 2) return !!getMageSelectedCantrip(game);
   if (tier === 3) return !!getMageSelectedSpell(game);
@@ -177,7 +168,7 @@ export function isMageTierAccessible(game, tier) {
 
 export function getNecromancerRowRequirement(row) {
   const tier = Math.max(1, Math.min(6, Math.floor(row) + 1));
-  return MAGE_TIER_LEVELS[tier] || 99;
+  return getOpenProgressionTierLevel(tier);
 }
 
 export function isNecromancerRowAccessible(game, row) {
@@ -187,7 +178,8 @@ export function isNecromancerRowAccessible(game, row) {
 export function getNecromancerUnlockRequirementText(game, def) {
   if (!def) return "";
   const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
-  if (level < (MAGE_TIER_LEVELS[def.tier] || 99)) return `Requires level ${MAGE_TIER_LEVELS[def.tier]}.`;
+  const requiredLevel = getOpenProgressionTierLevel(def.tier);
+  if (level < requiredLevel) return `Requires level ${requiredLevel}.`;
   if (def.tier === 1) return "Available now.";
   if (def.tier === 2) return getMageSelectedCantrip(game) ? "Available now." : "Requires a cantrip.";
   if (def.tier === 3) return getMageSelectedSpell(game) ? "Available now." : "Requires a spell.";
@@ -255,8 +247,7 @@ export function getNecromancerTooltip(game, entry) {
 
 export function getNecromancerSkillPointGainForLevel(level, classType) {
   if (classType !== "necromancer") return 1;
-  const safeLevel = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
-  return OPEN_PROGRESSION_SP_LEVELS.has(safeLevel) ? 1 : 0;
+  return getOpenProgressionSkillPointGainForLevel(level);
 }
 
 export function getMageBaseMaxMana(game) {

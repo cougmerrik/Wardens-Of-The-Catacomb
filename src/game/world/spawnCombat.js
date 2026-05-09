@@ -140,7 +140,7 @@ export function applyEnemyDamage(game, enemy, amount, damageType = "physical", o
   if (enemy?.invincible) return;
   if (enemy?.type === "wolf" && game.isEnemyFriendlyToPlayer?.(enemy) && !options.allowFriendlyPetDamage) {
     const owner = typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(ownerId) : null;
-    if (owner || !ownerId) return;
+    if (owner) return;
   }
   if (enemy?.type === "skeleton_warrior" && enemy.collapsed) {
     if (damageType === "fire" || damageType === "melee") {

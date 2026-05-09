@@ -1,5 +1,4 @@
 import { formatTime } from "../../utils.js";
-import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 
 function drawMultiplayerNotifications(ctx, game, layout) {
   const current = game?.multiplayerNotificationCurrent;
@@ -56,64 +55,6 @@ export function drawHud(renderer, game, layout) {
     ctx.fillStyle = game.networkRole === "Controller" ? "#8fe3a2" : "#dfc670";
     ctx.fillText(`Net: ${game.networkRole || "Connected"}`, 470, 24);
   }
-  if (game.isWarriorClass && game.isWarriorClass()) {
-    const runtime = game.warriorRuntime || {};
-    const weaponName = typeof game.getWarriorWeaponProfile === "function" ? game.getWarriorWeaponProfile().weaponLabel : "Broadswing";
-    const stanceAName = typeof game.getWarriorModeDisplayName === "function" ? game.getWarriorModeDisplayName("primary") : "Balanced";
-    const stanceBName = typeof game.getWarriorModeDisplayName === "function" ? game.getWarriorModeDisplayName("secondary") : "Balanced";
-    const mode = runtime.activeAttackMode === "secondary" ? stanceBName : stanceAName;
-    const swapCd = Math.max(0, runtime.attackSwapCooldownTimer || 0);
-    const guardTimer = Math.max(0, game.player?.blockBonusTimer || 0);
-    const wardHp = Math.max(0, runtime.eldritchWardHp || 0);
-    const shockReady = !!runtime.shockReleaseReady;
-    const shockCharges = Math.max(0, runtime.shockReleaseCharges || 0);
-    const shockThreshold = typeof game.getWarriorShockReleaseThreshold === "function" ? game.getWarriorShockReleaseThreshold() : 5;
-    ctx.fillStyle = "#dce7fb";
-    ctx.fillText(`Mode: ${mode}${swapCd > 0 ? ` (${swapCd.toFixed(1)}s)` : ""}`, 620, 24);
-    ctx.font = "12px Trebuchet MS";
-    ctx.fillStyle = "#9eb0d6";
-    const hasShockRelease = (game?.warriorTalents?.shockRelease?.points || 0) > 0;
-    const status = `${guardTimer > 0 ? ` | Guard ${guardTimer.toFixed(1)}s${wardHp > 0 ? ` | Ward ${Math.round(wardHp)}` : ""}` : ""}${hasShockRelease ? ` | Shock ${shockReady ? "Ready" : `${shockCharges}/${shockThreshold}`}` : ""}`;
-    ctx.fillText(`${weaponName} | A: ${stanceAName} | B: ${stanceBName}${status}`, 620, 42);
-    ctx.font = "16px Trebuchet MS";
-  }
-  if (game.isNecromancerClass && game.isNecromancerClass()) {
-    const runtime = game.necromancerRuntime || {};
-    const attackLabel = getMageAttackLabel(game);
-    const efficiency = getMageEfficiencyState(game);
-    const mana = Number.isFinite(runtime.mana) ? runtime.mana : 7;
-    const maxMana = typeof game.getMageMaxMana === "function" ? game.getMageMaxMana() : 7;
-    const manaRatio = maxMana > 0 ? Math.max(0, Math.min(1, mana / maxMana)) : 1;
-    const runes = Math.max(0, Math.floor(runtime.runes || 0));
-    ctx.fillStyle = efficiency.color;
-    ctx.fillText(`${attackLabel} | ${efficiency.label}`, 620, 24);
-    const barX = 620;
-    const barY = 30;
-    const barW = 186;
-    const barH = 8;
-    ctx.fillStyle = "rgba(34, 41, 58, 0.94)";
-    ctx.fillRect(barX, barY, barW, barH);
-    const sections = [
-      { x: barX, w: barW * 0.4, color: "#ff7f6e" },
-      { x: barX + barW * 0.4, w: barW * 0.4, color: "#dce7fb" },
-      { x: barX + barW * 0.8, w: barW * 0.2, color: "#7ee7ff" }
-    ];
-    for (const section of sections) {
-      ctx.fillStyle = section.color;
-      ctx.globalAlpha = 0.3;
-      ctx.fillRect(section.x, barY, section.w - 1, barH);
-    }
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = efficiency.color;
-    ctx.fillRect(barX, barY, Math.floor(barW * manaRatio), barH);
-    ctx.strokeStyle = efficiency.color;
-    ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
-    ctx.font = "12px Trebuchet MS";
-    ctx.fillStyle = "#bba8ff";
-    ctx.fillText(`${runes > 0 ? `Runes ${runes}/3 | ` : ""}${runtime.invisibilityTimer > 0 ? `Invisible ${runtime.invisibilityTimer.toFixed(1)}s | ` : ""}${runtime.arcaneFocusTimer > 0 ? `Focus ${runtime.arcaneFocusTimer.toFixed(1)}s` : ""}`, 812, 38);
-    ctx.font = "16px Trebuchet MS";
-  }
-
   const objective = typeof game.getFloorObjectiveText === "function" ? game.getFloorObjectiveText() : "";
   const detail = typeof game.getFloorObjectiveDetail === "function" ? game.getFloorObjectiveDetail() : "";
   const boss = typeof game.getActiveFloorBossEnemy === "function" ? game.getActiveFloorBossEnemy() : null;
@@ -162,34 +103,6 @@ export function drawHud(renderer, game, layout) {
     }
     ctx.fillText(title, layout.playW / 2, barY - 4 + 12);
     ctx.textAlign = "left";
-  }
-
-  if (game.isArcherClass && game.isArcherClass()) {
-    const runtime = game.rangerRuntime || {};
-    const combo = Math.max(0, Math.min(30, Math.floor(Number.isFinite(runtime.combo) ? runtime.combo : 0)));
-    const tier = combo >= 20 ? 3 : combo >= 10 ? 2 : combo >= 5 ? 1 : 0;
-    const tierColor = tier === 3 ? "#6ff6ff" : tier === 2 ? "#ffd76d" : tier === 1 ? "#7ee189" : "#8a96a3";
-    const mode = runtime.weaponMode === "melee" ? "Melee" : "Ranged";
-    const qCooldown = Math.max(0, runtime.swapCooldownTimer || 0);
-    const boxW = 210;
-    const boxH = 34;
-    const boxX = Math.max(570, layout.playW - boxW - 14);
-    const boxY = 31;
-    ctx.fillStyle = "rgba(9, 19, 20, 0.94)";
-    ctx.fillRect(boxX, boxY, boxW, boxH);
-    ctx.strokeStyle = tierColor;
-    ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
-    ctx.fillStyle = "#dff8ef";
-    ctx.font = "bold 12px Trebuchet MS";
-    ctx.fillText(`${mode}  Q ${qCooldown > 0 ? qCooldown.toFixed(1) : "Ready"}`, boxX + 10, boxY + 14);
-    ctx.fillStyle = tierColor;
-    ctx.font = "bold 15px Trebuchet MS";
-    ctx.fillText(`Combo ${combo}`, boxX + 10, boxY + 29);
-    const barW = 82;
-    ctx.fillStyle = "rgba(38, 48, 55, 0.9)";
-    ctx.fillRect(boxX + boxW - barW - 10, boxY + 21, barW, 7);
-    ctx.fillStyle = tierColor;
-    ctx.fillRect(boxX + boxW - barW - 10, boxY + 21, Math.floor(barW * (combo / 30)), 7);
   }
 
   drawPauseOwnerBanner(ctx, game, layout);

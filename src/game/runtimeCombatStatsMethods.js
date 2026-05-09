@@ -135,7 +135,7 @@ export const runtimeCombatStatsMethods = {
     if (isNecromancerTalentGame(this)) return sumPoints(this.necromancerTalents);
     if (isWarriorTalentGame(this)) return sumPoints(this.warriorTalents);
     if (this.isArcherClass && this.isArcherClass()) return sumPoints(this.rangerTalents);
-    return sumPoints(this.skills);
+    return 0;
   },
 
   getPlayerResistancePct(damageType = "physical") {
@@ -778,36 +778,6 @@ export const runtimeCombatStatsMethods = {
       }
       return false;
     }
-    const skill = this.skills[skillKey];
-    if (!skill) return false;
-    if (this.skillPoints <= 0) return false;
-    if (skill.points >= skill.maxPoints) return false;
-    if (!this.classSpec.usesRanged && (skillKey === "fireArrow" || skillKey === "piercingStrike" || skillKey === "multiarrow")) {
-      return false;
-    }
-    if (this.classSpec.usesRanged && (skillKey === "warriorMomentum" || skillKey === "warriorRage" || skillKey === "warriorExecute")) {
-      return false;
-    }
-    skill.points += 1;
-    this.skillPoints -= 1;
-    if (skillKey === "fireArrow" && skill.points === 1) {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Fire Arrow Unlocked!", "#f6b36a", 1.0, 15);
-    }
-    if (skillKey === "piercingStrike") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Piercing chance increased", "#a7d8ff", 0.85, 14);
-    }
-    if (skillKey === "multiarrow") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Multiarrow improved", "#c3f4a3", 0.85, 14);
-    }
-    if (skillKey === "warriorMomentum") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Frenzy improved", "#ffd089", 0.85, 14);
-    }
-    if (skillKey === "warriorRage") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Rage improved", "#ff8a8a", 0.85, 14);
-    }
-    if (skillKey === "warriorExecute") {
-      this.spawnFloatingText(this.player.x, this.player.y - 26, "Execute improved", "#ff6d6d", 0.85, 14);
-    }
-    return true;
+    return false;
   }
 };

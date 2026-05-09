@@ -312,60 +312,6 @@ export function handleNetworkUiActions(game, netClient, isController) {
       break;
     }
     if (handledSkillNode) continue;
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillFireArrowNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillFireArrowNode", "spendSkill", "fireArrow");
-      netClient.sendAction({ kind: "spendSkill", key: "fireArrow" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillPiercingNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillPiercingNode", "spendSkill", "piercingStrike");
-      netClient.sendAction({ kind: "spendSkill", key: "piercingStrike" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillMultiarrowNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillMultiarrowNode", "spendSkill", "multiarrow");
-      netClient.sendAction({ kind: "spendSkill", key: "multiarrow" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillWarriorMomentumNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillWarriorMomentumNode", "spendSkill", "warriorMomentum");
-      netClient.sendAction({ kind: "spendSkill", key: "warriorMomentum" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillWarriorRageNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillWarriorRageNode", "spendSkill", "warriorRage");
-      netClient.sendAction({ kind: "spendSkill", key: "warriorRage" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillWarriorExecuteNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillWarriorExecuteNode", "spendSkill", "warriorExecute");
-      netClient.sendAction({ kind: "spendSkill", key: "warriorExecute" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillUndeadMasteryNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillUndeadMasteryNode", "spendSkill", "undeadMastery");
-      netClient.sendAction({ kind: "spendSkill", key: "undeadMastery" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillDeathBoltNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillDeathBoltNode", "spendSkill", "deathBolt");
-      netClient.sendAction({ kind: "spendSkill", key: "deathBolt" });
-      continue;
-    }
-    if (playerAlive && hit(click.x, click.y, game.uiRects.skillExplodingDeathNode)) {
-      clearPinnedUiTooltip();
-      recordAction(click, "skillExplodingDeathNode", "spendSkill", "explodingDeath");
-      netClient.sendAction({ kind: "spendSkill", key: "explodingDeath" });
-      continue;
-    }
     if (isAndroidTouchUi) clearPinnedUiTooltip();
     recordAction(click, "", "", "");
     if (hit(click.x, click.y, game.uiRects.returnMenuButton)) {

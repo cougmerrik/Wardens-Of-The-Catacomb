@@ -393,7 +393,8 @@ export function serializeState(room) {
       lightIntensity: z.lightIntensity,
       life: z.life,
       totalLife: z.totalLife,
-      zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire"
+      zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire",
+      damageType: typeof z.damageType === "string" ? z.damageType : ""
     })),
     meleeSwings: activeMeleeSwings.map((s) => ({
       id: getStableId(room, "meleeSwing", "ms", s),

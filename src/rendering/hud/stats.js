@@ -289,17 +289,16 @@ function buildCharacterColumns(game) {
       ["Tree SP", `${game.skillPoints} available`]
     ]);
   } else if (game.isWarriorClass && game.isWarriorClass()) {
+    const classSkillName = typeof game.getWarriorClassSkillName === "function" ? game.getWarriorClassSkillName() : "Class Skill";
+    const classSkillCooldown = game.warriorRageCooldownTimer > 0 ? `Cooldown ${game.warriorRageCooldownTimer.toFixed(1)}s` : "Ready";
     classKit = createSection("Warrior Kit", [
-      ["Frenzy Skill", `Lv ${game.skills.warriorMomentum.points}`],
-      ["Frenzy", game.warriorMomentumTimer > 0 ? `${game.warriorMomentumTimer.toFixed(1)}s` : "Idle"],
-      ["Rage Skill", `Lv ${game.skills.warriorRage.points}`],
+      ["Weapon", typeof game.getWarriorWeaponForm === "function" ? game.getWarriorWeaponForm() : "broadswing"],
+      ["Class Skill", classSkillName],
       [
-        "Rage",
+        "Class State",
         game.warriorRageActiveTimer > 0
           ? `Active ${game.warriorRageActiveTimer.toFixed(1)}s`
-          : game.warriorRageCooldownTimer > 0
-          ? `Cooldown ${game.warriorRageCooldownTimer.toFixed(1)}s`
-          : "Ready"
+          : classSkillCooldown
       ],
       ["Execute", `${(game.getWarriorExecuteChance() * 100).toFixed(1)}% @ ${(game.getWarriorExecuteThreshold() * 100).toFixed(1)}% HP`]
     ]);
