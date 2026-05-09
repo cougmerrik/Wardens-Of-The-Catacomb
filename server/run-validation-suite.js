@@ -25,6 +25,7 @@ const SCRIPT_TARGETS = {
   "validate:network-pause": "server/validate-network-pause.js",
   "validate:network-ui": "server/validate-network-ui.js",
   "validate:network-refund": "server/validate-network-refund.js",
+  "validate:network-bots": "server/validate-network-bots.js",
   "perf:test": "server/perfRunner.js",
   "perf:network-browser": "server/perfNetworkBrowser.js",
   "perf:floor-scaling": "server/perfFloorScaling.js"
@@ -43,7 +44,8 @@ const SUITES = {
     "validate:network-audio",
     "validate:network-pause",
     "validate:network-ui",
-    "validate:network-refund"
+    "validate:network-refund",
+    "validate:network-bots"
   ],
   perf: ["perf:test", "perf:network-browser", "perf:floor-scaling"],
   "pre-commit": ["check", "validate:loc", "validate:boss", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],
@@ -66,6 +68,7 @@ const SUITES = {
     "validate:network-pause",
     "validate:network-ui",
     "validate:network-refund",
+    "validate:network-bots",
     "perf:test",
     "perf:network-browser",
     "perf:floor-scaling"
