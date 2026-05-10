@@ -3,9 +3,15 @@ import { AudioGraph } from "./AudioGraph.js";
 import { SpatialAudio } from "./SpatialAudio.js";
 import {
   getStoredVoiceChatEnabled,
+  getStoredVoiceChatMode,
+  getStoredVoiceChatPushToTalkKey,
   getStoredVoiceChatVolume,
   normalizeVoiceChatVolume,
   persistVoiceChatEnabled,
+  normalizePushToTalkKey,
+  normalizeVoiceChatMode,
+  persistVoiceChatMode,
+  persistVoiceChatPushToTalkKey,
   persistVoiceChatVolume
 } from "../audio/audioSettings.js";
 
@@ -15,15 +21,31 @@ export class VoiceManager {
     this.spatialAudio = new SpatialAudio({ audioGraph: this.audioGraph });
     this.transport = new AgoraTransport({
       onRemoteTrack: (playerId, track) => this.attachRemoteTrack(playerId, track),
-      onRemoteLeft: (playerId) => this.audioGraph.disconnectRemote(playerId)
+      onRemoteLeft: (playerId) => this.audioGraph.disconnectRemote(this.resolvePlayerId(playerId))
     });
     this.config = { enabled: false };
     this.localPlayerId = null;
+    this.localVoiceUid = null;
+    this.voiceUidToPlayerId = new Map();
     this.state = "disabled";
     this.lastError = "";
     this.userEnabled = getStoredVoiceChatEnabled();
+    this.transmissionMode = getStoredVoiceChatMode();
+    this.pushToTalkKey = getStoredVoiceChatPushToTalkKey();
+    this.keysDown = new Set();
     this.voiceVolume = getStoredVoiceChatVolume();
     this.audioGraph.setVoiceVolume(this.voiceVolume);
+    this.handleKeyDown = (event) => this.setPushKeyDown(event, true);
+    this.handleKeyUp = (event) => this.setPushKeyDown(event, false);
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", this.handleKeyDown);
+      window.addEventListener("keyup", this.handleKeyUp);
+      window.addEventListener("blur", () => {
+        this.keysDown.clear();
+        this.syncMicMutedState();
+      });
+    }
+    this.syncMicMutedState();
   }
 
   configure(config = {}) {
@@ -34,9 +56,10 @@ export class VoiceManager {
     }
   }
 
-  async join({ config = this.config, playerId } = {}) {
+  async join({ config = this.config, playerId, voiceUid = null } = {}) {
     this.configure(config);
     this.localPlayerId = typeof playerId === "string" && playerId ? playerId : this.localPlayerId;
+    if (Number.isFinite(voiceUid)) this.localVoiceUid = Math.max(1, Math.floor(voiceUid));
     if (!this.userEnabled || !this.config.enabled || !this.localPlayerId) return false;
     this.state = "joining";
     this.lastError = "";
@@ -46,16 +69,25 @@ export class VoiceManager {
         appId: this.config.appId,
         channel: this.config.channel,
         token: this.config.token || null,
-        uid: this.localPlayerId,
+        uid: this.localVoiceUid || this.localPlayerId,
         sdkUrl: this.config.sdkUrl
       });
+      await this.syncMicMutedState();
       this.state = "joined";
       return true;
     } catch (error) {
       this.state = "error";
-      this.lastError = error instanceof Error ? error.message : String(error);
+      this.lastError = this.describeJoinError(error);
       return false;
     }
+  }
+
+  describeJoinError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("CAN_NOT_GET_GATEWAY_SERVER") || message.includes("dynamic use static key")) {
+      return "Agora token required for this App ID. Use an unsecured test App ID or add per-channel RTC token generation.";
+    }
+    return message;
   }
 
   syncServerConfig(game, config) {
@@ -67,20 +99,33 @@ export class VoiceManager {
     }
   }
 
-  joinServerRoom(game, config, playerId) {
+  joinServerRoom(game, config, playerId, voiceUid = null) {
     if (!config || typeof config !== "object") return Promise.resolve(false);
     this.syncServerConfig(game, config);
-    return this.join({ config: this.config, playerId }).then(() => {
+    return this.join({ config: this.config, playerId, voiceUid }).then(() => {
       if (game) game.voiceDebug = this.getDebugState();
     });
   }
 
   attachRemoteTrack(playerId, track) {
-    if (!playerId || playerId === this.localPlayerId || !track) return;
-    if (!this.audioGraph.connectRemoteTrack(playerId, track) && typeof track.play === "function") {
+    const resolvedPlayerId = this.resolvePlayerId(playerId);
+    if (!resolvedPlayerId || resolvedPlayerId === this.localPlayerId || !track) return;
+    if (!this.audioGraph.connectRemoteTrack(resolvedPlayerId, track) && typeof track.play === "function") {
       try {
         track.play();
       } catch {}
+    }
+  }
+
+  resolvePlayerId(playerId) {
+    return this.voiceUidToPlayerId.get(String(playerId)) || playerId;
+  }
+
+  syncRoster(players) {
+    this.voiceUidToPlayerId.clear();
+    for (const player of Array.isArray(players) ? players : []) {
+      if (!player || typeof player.id !== "string" || !Number.isFinite(player.voiceUid)) continue;
+      this.voiceUidToPlayerId.set(String(Math.floor(player.voiceUid)), player.id);
     }
   }
 
@@ -94,12 +139,49 @@ export class VoiceManager {
     if (persist) persistVoiceChatEnabled(this.userEnabled);
     if (!this.userEnabled) this.leave();
     else if (this.config?.enabled && this.state === "disabled") this.state = "idle";
+    this.syncMicMutedState();
   }
 
   setVoiceVolume(volume, { persist = true } = {}) {
     this.voiceVolume = normalizeVoiceChatVolume(volume);
     this.audioGraph.setVoiceVolume(this.voiceVolume);
     if (persist) persistVoiceChatVolume(this.voiceVolume);
+  }
+
+  setTransmissionMode(mode, { persist = true } = {}) {
+    this.transmissionMode = normalizeVoiceChatMode(mode);
+    if (persist) persistVoiceChatMode(this.transmissionMode);
+    this.syncMicMutedState();
+  }
+
+  setPushToTalkKey(key, { persist = true } = {}) {
+    this.pushToTalkKey = normalizePushToTalkKey(key);
+    if (persist) persistVoiceChatPushToTalkKey(this.pushToTalkKey);
+    this.syncMicMutedState();
+  }
+
+  setPushKeyDown(event, down) {
+    if (!event || typeof event.key !== "string") return;
+    const key = normalizePushToTalkKey(event.key, "");
+    if (!key) return;
+    if (down) this.keysDown.add(key);
+    else this.keysDown.delete(key);
+    if (key === this.pushToTalkKey) this.syncMicMutedState();
+  }
+
+  isPushToTalkHeld() {
+    return this.keysDown.has(this.pushToTalkKey);
+  }
+
+  shouldMuteLocalMic() {
+    if (!this.userEnabled) return true;
+    if (this.transmissionMode === "muted") return true;
+    if (this.transmissionMode === "pushToTalk") return !this.isPushToTalkHeld();
+    return false;
+  }
+
+  async syncMicMutedState() {
+    await this.transport.setMuted(this.shouldMuteLocalMic());
   }
 
   async leave() {
@@ -112,6 +194,10 @@ export class VoiceManager {
     return {
       enabled: !!this.config?.enabled,
       userEnabled: !!this.userEnabled,
+      muted: this.shouldMuteLocalMic(),
+      transmissionMode: this.transmissionMode,
+      pushToTalkKey: this.pushToTalkKey,
+      pushToTalkHeld: this.isPushToTalkHeld(),
       volume: this.voiceVolume,
       provider: this.config?.provider || "",
       channel: this.config?.channel || "",

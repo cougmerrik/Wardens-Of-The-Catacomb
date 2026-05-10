@@ -98,6 +98,8 @@ const optionsBackButton = document.getElementById("options-back");
 const menuVolumeInput = document.getElementById("menu-volume");
 const menuVolumeValue = document.getElementById("menu-volume-value");
 const voiceChatEnabledInput = document.getElementById("voice-chat-enabled");
+const voiceChatModeSelect = document.getElementById("voice-chat-mode");
+const voiceChatPushKeyButton = document.getElementById("voice-chat-push-key");
 const voiceChatVolumeInput = document.getElementById("voice-chat-volume");
 const voiceChatVolumeValue = document.getElementById("voice-chat-volume-value");
 const disableAdsInput = document.getElementById("disable-ads");
@@ -169,6 +171,7 @@ let netInputTimer = 0, netRenderRaf = 0;
 let netPlayerId = null, netControllerId = null;
 let netRoomOwnerId = null, netPauseOwnerId = null, netRoomPhase = "active", netRosterPlayers = [];
 let netJoinedRoomId = "";
+let netVoiceUid = null;
 let netVoiceConfig = { enabled: false };
 let netLobbyCountdownEndsAt = 0, netLobbyInlineText = "";
 let netRequestedStartFloor = 1;
@@ -315,11 +318,24 @@ function syncMenuVolumeControl() {
 
 function syncVoiceChatControls() {
   if (voiceChatEnabledInput) voiceChatEnabledInput.checked = !!voiceManager.userEnabled;
+  if (voiceChatModeSelect) {
+    voiceChatModeSelect.value = voiceManager.transmissionMode;
+    voiceChatModeSelect.disabled = !voiceManager.userEnabled;
+  }
+  if (voiceChatPushKeyButton) {
+    voiceChatPushKeyButton.textContent = formatVoiceKeyLabel(voiceManager.pushToTalkKey);
+    voiceChatPushKeyButton.disabled = !voiceManager.userEnabled || voiceManager.transmissionMode !== "pushToTalk";
+  }
   if (!voiceChatVolumeInput) return;
   const percent = Math.round(voiceManager.voiceVolume * 100);
   voiceChatVolumeInput.disabled = !voiceManager.userEnabled;
   voiceChatVolumeInput.value = String(percent);
   if (voiceChatVolumeValue) voiceChatVolumeValue.textContent = `${percent}%`;
+}
+
+function formatVoiceKeyLabel(key) {
+  if (key === " ") return "Space";
+  return typeof key === "string" && key ? key.length === 1 ? key.toUpperCase() : key : "Set";
 }
 
 function syncDisableAdsControl() {
@@ -1495,7 +1511,7 @@ function stopNetworkSession() {
   voiceManager.leave();
   netPlayerId = null; netControllerId = null;
   netRoomOwnerId = null; netPauseOwnerId = null; netRoomPhase = "active"; netRosterPlayers = [];
-  netJoinedRoomId = ""; netVoiceConfig = { enabled: false }; netLobbyCountdownEndsAt = 0; netLobbyInlineText = ""; netRequestedStartFloor = 1;
+  netJoinedRoomId = ""; netVoiceUid = null; netVoiceConfig = { enabled: false }; netLobbyCountdownEndsAt = 0; netLobbyInlineText = ""; netRequestedStartFloor = 1;
   netPendingWsUrl = ""; netPendingRoomId = ""; netPendingHandle = "";
   netInputSeq = 0; netLastAckSeq = 0;
   netPendingInputs = []; netMapSignature = ""; netPendingSnapshot = null;
@@ -1758,7 +1774,7 @@ function shouldBypassSnapshotBuffer(game = currentGame) {
 
 function joinVoiceForCurrentNetworkRoom() {
   if (!netVoiceConfig?.enabled || !netPlayerId || !voiceManager.userEnabled) return;
-  voiceManager.join({ config: netVoiceConfig, playerId: netPlayerId }).then(() => {
+  voiceManager.join({ config: netVoiceConfig, playerId: netPlayerId, voiceUid: netVoiceUid }).then(() => {
     if (currentGame) currentGame.voiceDebug = voiceManager.getDebugState();
   });
 }
@@ -1918,6 +1934,7 @@ function startNetworkGame() {
   });
   netClient.on("hello", (msg) => {
     netPlayerId = msg.playerId || null;
+    if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
     if (msg.voice && typeof msg.voice === "object") {
       netVoiceConfig = msg.voice;
       voiceManager.configure(netVoiceConfig);
@@ -1929,7 +1946,6 @@ function startNetworkGame() {
     netRoomOwnerId = msg.ownerId || netRoomOwnerId;
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || netControllerId;
-    joinVoiceForCurrentNetworkRoom();
     startNetworkGameplay();
   });
   netClient.on("join.ok", (msg) => {
@@ -1939,9 +1955,10 @@ function startNetworkGame() {
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || null;
     if (msg.playerId) netPlayerId = msg.playerId;
+    if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
     if (msg.voice && typeof msg.voice === "object") {
       netVoiceConfig = msg.voice;
-      if (msg.phase === "active") joinVoiceForCurrentNetworkRoom();
+      joinVoiceForCurrentNetworkRoom();
     }
     renderNetworkLobby();
     if (msg.phase === "active") {
@@ -1970,6 +1987,7 @@ function startNetworkGame() {
     netLobbyCountdownEndsAt = Number.isFinite(msg.lobbyCountdownEndsAt) ? msg.lobbyCountdownEndsAt : 0;
     netLobbyInlineText = typeof msg.lobbyInlineMessage === "string" ? msg.lobbyInlineMessage : "";
     netRosterPlayers = Array.isArray(msg.players) ? msg.players.slice() : [];
+    voiceManager.syncRoster(netRosterPlayers);
     if (msg.voice && typeof msg.voice === "object") {
       netVoiceConfig = msg.voice;
       voiceManager.configure(netVoiceConfig);
@@ -2382,8 +2400,31 @@ if (voiceChatEnabledInput) {
   voiceChatEnabledInput.addEventListener("change", () => {
     voiceManager.setUserEnabled(voiceChatEnabledInput.checked);
     syncVoiceChatControls();
-    if (voiceManager.userEnabled && netRoomPhase === "active") joinVoiceForCurrentNetworkRoom();
+    if (voiceManager.userEnabled) joinVoiceForCurrentNetworkRoom();
     if (currentGame) currentGame.voiceDebug = voiceManager.getDebugState();
+  });
+}
+
+if (voiceChatModeSelect) {
+  voiceChatModeSelect.addEventListener("change", () => {
+    voiceManager.setTransmissionMode(voiceChatModeSelect.value);
+    syncVoiceChatControls();
+    if (currentGame) currentGame.voiceDebug = voiceManager.getDebugState();
+  });
+}
+
+if (voiceChatPushKeyButton) {
+  voiceChatPushKeyButton.addEventListener("click", () => {
+    voiceChatPushKeyButton.textContent = "...";
+    const capture = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      voiceManager.setPushToTalkKey(event.key);
+      syncVoiceChatControls();
+      if (currentGame) currentGame.voiceDebug = voiceManager.getDebugState();
+      window.removeEventListener("keydown", capture, true);
+    };
+    window.addEventListener("keydown", capture, true);
   });
 }
 

@@ -62,7 +62,17 @@
           </label>
           <label for="voice-chat-enabled" class="menu-toggle-control">
             <span class="menu-toggle-control__label">Voice Chat</span>
-            <input id="voice-chat-enabled" class="menu-toggle-control__checkbox" type="checkbox" checked />
+            <input id="voice-chat-enabled" class="menu-toggle-control__checkbox" type="checkbox" />
+          </label>
+          <label class="field-label" for="voice-chat-mode">Microphone</label>
+          <select id="voice-chat-mode" class="field-input">
+            <option value="openMic">Open Mic</option>
+            <option value="pushToTalk">Push to Talk</option>
+            <option value="muted">Mute</option>
+          </select>
+          <label for="voice-chat-push-key" class="menu-toggle-control">
+            <span class="menu-toggle-control__label">Push to Talk Button</span>
+            <button type="button" id="voice-chat-push-key" class="start-game ghost mini">V</button>
           </label>
         </section>
         <section class="options-panel" aria-label="Display settings">

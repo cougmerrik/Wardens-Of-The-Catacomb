@@ -4,6 +4,7 @@ import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/gam
 import { cloneNecromancerTalentState, createNecromancerTalentState } from "../../src/game/necromancerTalentTree.js";
 import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
 import { cloneNecromancerBeamState, cloneNecromancerRuntimeState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
+import { buildAgoraVoiceUid } from "./voiceConfig.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -112,6 +113,10 @@ export class AuthoritativeRoom {
     };
   }
 
+  getVoiceUid(playerId) {
+    return buildAgoraVoiceUid(playerId);
+  }
+
   mapSignature() {
     return typeof this.sim.getMapSignature === "function"
       ? this.sim.getMapSignature()
@@ -146,6 +151,7 @@ export class AuthoritativeRoom {
   getRosterEntry(client) {
     return {
       id: client.id,
+      voiceUid: buildAgoraVoiceUid(client.id),
       handle: client.name,
       name: client.name,
       classType: client.classType,
@@ -219,6 +225,7 @@ export class AuthoritativeRoom {
       facing: 0,
       moving: false,
       alive: true,
+      spectateTargetId: "",
       color: this.getClientRunColor(client)
     };
   }
@@ -395,6 +402,7 @@ export class AuthoritativeRoom {
     state.facing = this.sim.player.facing;
     state.moving = !!this.sim.player.moving;
     state.alive = this.sim.player.health > 0;
+    state.spectateTargetId = state.alive ? "" : (typeof client.input?.spectateTargetId === "string" ? client.input.spectateTargetId : "");
     state.consumableRuntime = {
       tempHp: Number.isFinite(this.sim.player?.consumableRuntime?.tempHp) ? this.sim.player.consumableRuntime.tempHp : 0
     };
@@ -704,6 +712,7 @@ export class AuthoritativeRoom {
       const alive = state.alive !== false && (state.health || 0) > 0;
       if (!alive) {
         state.moving = false;
+        state.spectateTargetId = typeof input.spectateTargetId === "string" ? input.spectateTargetId : "";
         input.moveX = 0;
         input.moveY = 0;
         input.swapAttackQueued = false;
@@ -720,6 +729,7 @@ export class AuthoritativeRoom {
         this.sim.moveWithCollisionSubsteps(state, (mx / len) * state.speed * dt, (my / len) * state.speed * dt);
       }
       state.moving = !!(mx || my);
+      state.spectateTargetId = "";
       if (input.hasAim) {
         if (Number.isFinite(input.aimDirX) && Number.isFinite(input.aimDirY)) {
           const alen = Math.hypot(input.aimDirX, input.aimDirY) || 1;

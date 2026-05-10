@@ -13,7 +13,7 @@ import { installRoomDevBossOverride } from "./net/installRoomDevBossOverride.js"
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
-import { buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
+import { buildAgoraVoiceUid, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
 const HOST = typeof process.env.HOST === "string" && process.env.HOST.trim() ? process.env.HOST.trim() : "";
@@ -109,6 +109,7 @@ wss.on("connection", (ws) => {
   safeSend(ws, {
     type: "hello",
     playerId: client.id,
+    voiceUid: buildAgoraVoiceUid(client.id),
     protocol: 2,
     voice: buildVoiceRoomConfig(voiceConfig, ""),
     note: "Server authoritative alpha. Multiplayer room scaffolding is in progress."

@@ -1,9 +1,8 @@
 import {
   DEFAULT_PROXIMITY_RULES,
   computeDistanceGain,
-  computeOcclusionGain,
-  computeStereoPan,
-  hasClosedDoorBetween
+  computeOcclusion,
+  computeStereoPan
 } from "./ProximityRules.js";
 import { resolveReverbZone } from "./ReverbZones.js";
 
@@ -24,13 +23,18 @@ export class SpatialAudio {
       if (!remote || typeof remote.id !== "string" || remote.id === localPlayerId) continue;
       activeRemoteIds.add(remote.id);
       const distance = Math.hypot((remote.x || 0) - (listener.x || 0), (remote.y || 0) - (listener.y || 0));
-      const occlusionGain = computeOcclusionGain(game, listener, remote, this.rules);
-      const gain = computeDistanceGain(distance, this.rules) * occlusionGain;
+      const spectatorBlocked =
+        remote.alive === false &&
+        typeof remote.spectateTargetId === "string" &&
+        localPlayerId &&
+        remote.spectateTargetId !== localPlayerId;
+      const occlusion = computeOcclusion(game, listener, remote, this.rules);
+      const gain = spectatorBlocked ? 0 : computeDistanceGain(distance, this.rules) * occlusion.gain;
       const pan = computeStereoPan(listener, remote);
       this.audioGraph.updateRemote(remote.id, {
         gain,
         pan,
-        muffled: hasClosedDoorBetween(game, listener, remote)
+        filterFrequency: occlusion.filterFrequency
       });
     }
     this.audioGraph.retainRemotePlayers(activeRemoteIds);

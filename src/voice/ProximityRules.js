@@ -1,10 +1,14 @@
 export const DEFAULT_PROXIMITY_RULES = {
   nearPx: 72,
   farPx: 640,
-  floorGain: 0.06,
+  floorGain: 0,
   rolloff: 1.65,
-  roomOcclusionGain: 0.55,
-  closedDoorGain: 0.32
+  wallOcclusionGain: 0.12,
+  closedDoorGain: 0.24,
+  clearFilterHz: 16000,
+  wallFilterHz: 720,
+  doorFilterHz: 1300,
+  maxRoomSearchTiles: 20
 };
 
 function clamp01(value) {
@@ -48,9 +52,68 @@ export function hasClosedDoorBetween(game, listener, source) {
   return Math.hypot(door.x - px, door.y - py) <= 52;
 }
 
-export function computeOcclusionGain(game, listener, source, rules = DEFAULT_PROXIMITY_RULES) {
-  if (hasClosedDoorBetween(game, listener, source)) {
-    return clamp01(Number.isFinite(rules.closedDoorGain) ? rules.closedDoorGain : DEFAULT_PROXIMITY_RULES.closedDoorGain);
+function getTileAt(game, tx, ty) {
+  if (!game || !Array.isArray(game.map) || !Number.isFinite(tx) || !Number.isFinite(ty)) return "#";
+  if (ty < 0 || tx < 0 || ty >= game.map.length || tx >= game.map[0].length) return "#";
+  const row = game.map[ty];
+  return typeof row === "string" ? row[tx] : Array.isArray(row) ? row[tx] : "#";
+}
+
+function isAcousticPassableTile(game, tx, ty) {
+  const tile = getTileAt(game, tx, ty);
+  if (tile === "#" || tile === "?") return false;
+  if (tile === "D" && game?.door?.open !== true) return false;
+  return true;
+}
+
+export function areInSameAcousticRoom(game, listener, source, rules = DEFAULT_PROXIMITY_RULES) {
+  const tileSize = game?.config?.map?.tile || 32;
+  const sx = Math.floor((Number.isFinite(listener?.x) ? listener.x : 0) / tileSize);
+  const sy = Math.floor((Number.isFinite(listener?.y) ? listener.y : 0) / tileSize);
+  const tx = Math.floor((Number.isFinite(source?.x) ? source.x : 0) / tileSize);
+  const ty = Math.floor((Number.isFinite(source?.y) ? source.y : 0) / tileSize);
+  if (sx === tx && sy === ty) return true;
+  if (!isAcousticPassableTile(game, sx, sy) || !isAcousticPassableTile(game, tx, ty)) return false;
+  const maxTiles = Math.max(1, Math.floor(rules.maxRoomSearchTiles || DEFAULT_PROXIMITY_RULES.maxRoomSearchTiles));
+  if (Math.abs(tx - sx) + Math.abs(ty - sy) > maxTiles * 2) return false;
+  const minX = Math.max(0, Math.min(sx, tx) - maxTiles);
+  const maxX = Math.min((game.map?.[0]?.length || 1) - 1, Math.max(sx, tx) + maxTiles);
+  const minY = Math.max(0, Math.min(sy, ty) - maxTiles);
+  const maxY = Math.min((game.map?.length || 1) - 1, Math.max(sy, ty) + maxTiles);
+  const seen = new Set([`${sx},${sy}`]);
+  const queue = [{ x: sx, y: sy }];
+  for (let i = 0; i < queue.length; i += 1) {
+    const cur = queue[i];
+    for (const dir of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
+      const nx = cur.x + dir.x;
+      const ny = cur.y + dir.y;
+      if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
+      if (!isAcousticPassableTile(game, nx, ny)) continue;
+      if (nx === tx && ny === ty) return true;
+      const key = `${nx},${ny}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      queue.push({ x: nx, y: ny });
+    }
   }
-  return 1;
+  return false;
+}
+
+export function computeOcclusion(game, listener, source, rules = DEFAULT_PROXIMITY_RULES) {
+  if (hasClosedDoorBetween(game, listener, source)) {
+    return {
+      gain: clamp01(Number.isFinite(rules.closedDoorGain) ? rules.closedDoorGain : DEFAULT_PROXIMITY_RULES.closedDoorGain),
+      filterFrequency: Number.isFinite(rules.doorFilterHz) ? rules.doorFilterHz : DEFAULT_PROXIMITY_RULES.doorFilterHz
+    };
+  }
+  if (!areInSameAcousticRoom(game, listener, source, rules)) {
+    return {
+      gain: clamp01(Number.isFinite(rules.wallOcclusionGain) ? rules.wallOcclusionGain : DEFAULT_PROXIMITY_RULES.wallOcclusionGain),
+      filterFrequency: Number.isFinite(rules.wallFilterHz) ? rules.wallFilterHz : DEFAULT_PROXIMITY_RULES.wallFilterHz
+    };
+  }
+  return {
+    gain: 1,
+    filterFrequency: Number.isFinite(rules.clearFilterHz) ? rules.clearFilterHz : DEFAULT_PROXIMITY_RULES.clearFilterHz
+  };
 }

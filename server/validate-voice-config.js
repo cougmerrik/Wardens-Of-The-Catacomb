@@ -1,4 +1,4 @@
-import { buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
+import { buildAgoraVoiceUid, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -26,6 +26,8 @@ function main() {
   assert(room.provider === "agora", "voice provider should be Agora");
   assert(room.appId === "cli-app", "voice room should include Agora app id");
   assert(room.channel === "wardens-raid-room", `unexpected voice channel: ${room.channel}`);
+  assert(Number.isInteger(buildAgoraVoiceUid("p_test")) && buildAgoraVoiceUid("p_test") > 0, "voice uid should be a positive integer");
+  assert(buildAgoraVoiceUid("p_test") === buildAgoraVoiceUid("p_test"), "voice uid should be stable");
 
   console.log("Voice config validation passed.");
 }

@@ -27,6 +27,7 @@ export class AgoraTransport {
     this.joined = false;
     this.channel = "";
     this.uid = null;
+    this.muted = false;
   }
 
   async loadSdk(sdkUrl = DEFAULT_SDK_URL) {
@@ -55,15 +56,31 @@ export class AgoraTransport {
     this.client.on("user-left", (user) => {
       if (this.onRemoteLeft) this.onRemoteLeft(String(user.uid || ""));
     });
-    await this.client.join(appId, channel, token || null, uid);
+    const resolvedUid = Number.isFinite(uid) ? Math.floor(uid) : uid;
+    await this.client.join(appId, channel, token || null, resolvedUid);
     this.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
       encoderConfig: "speech_standard"
     });
+    await this.applyMuted();
     await this.client.publish([this.localAudioTrack]);
     this.joined = true;
     this.channel = channel;
-    this.uid = uid;
+    this.uid = resolvedUid;
     return true;
+  }
+
+  async setMuted(muted) {
+    this.muted = !!muted;
+    await this.applyMuted();
+  }
+
+  async applyMuted() {
+    if (!this.localAudioTrack) return;
+    if (typeof this.localAudioTrack.setEnabled === "function") {
+      await this.localAudioTrack.setEnabled(!this.muted).catch(() => {});
+    } else if (typeof this.localAudioTrack.setMuted === "function") {
+      await this.localAudioTrack.setMuted(this.muted).catch(() => {});
+    }
   }
 
   async leave() {

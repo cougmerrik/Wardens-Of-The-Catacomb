@@ -1,7 +1,7 @@
 export function collectInput(game, consumeQueued = true) {
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
   const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen;
-  return game.input.getGameplayIntent({
+  const input = game.input.getGameplayIntent({
     playerX: Number.isFinite(game?.player?.x) ? game.player.x : 0,
     playerY: Number.isFinite(game?.player?.y) ? game.player.y : 0,
     gameplayBlocked,
@@ -9,6 +9,8 @@ export function collectInput(game, consumeQueued = true) {
     fallbackAimDirX: 0,
     fallbackAimDirY: 0
   });
+  input.spectateTargetId = !playerAlive && typeof game?.spectateTargetId === "string" ? game.spectateTargetId : "";
+  return input;
 }
 
 export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, forceSendIdleMs) {
@@ -24,9 +26,10 @@ export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, 
     previous.hasAim &&
     (Math.abs((input.aimDirX || 0) - (previous.aimDirX || 0)) > 0.01 || Math.abs((input.aimDirY || 0) - (previous.aimDirY || 0)) > 0.01);
   const changedPrimaryHold = !!input.firePrimaryHeld !== !!previous.firePrimaryHeld;
+  const changedSpectateTarget = (input.spectateTargetId || "") !== (previous.spectateTargetId || "");
   const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued || !!input.swapAttackQueued || !!input.modeSwapQueued;
   const hasContinuousInput = !!input.firePrimaryHeld || !!input.moveX || !!input.moveY;
-  if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || hasQueuedAction || hasContinuousInput) return true;
+  if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || changedSpectateTarget || hasQueuedAction || hasContinuousInput) return true;
   return nowMs - lastInputSendAt >= forceSendIdleMs;
 }
 

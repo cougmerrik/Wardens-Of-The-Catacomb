@@ -57,3 +57,13 @@ export function buildVoiceRoomConfig(baseConfig, roomId) {
     channel
   };
 }
+
+export function buildAgoraVoiceUid(playerId) {
+  const text = typeof playerId === "string" && playerId ? playerId : "player";
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) || 1;
+}

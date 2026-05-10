@@ -250,6 +250,7 @@ export function handleClientMessage(raw, context) {
       ownerId: room.roomOwnerId,
       pauseOwnerId: room.pauseOwnerId,
       controllerId: room.controllerId,
+      voiceUid: typeof room.getVoiceUid === "function" ? room.getVoiceUid(client.id) : null,
       classType: room.sim.classType,
       voice: typeof room.getVoiceRoomConfig === "function"
         ? room.getVoiceRoomConfig()

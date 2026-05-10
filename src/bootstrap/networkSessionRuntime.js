@@ -46,6 +46,7 @@ export function createNetworkSessionController({
   let netInputTimer = 0;
   let netRenderRaf = 0;
   let netPlayerId = null;
+  let netVoiceUid = null;
   let netControllerId = null;
   let netInputSeq = 0;
   let netLastAckSeq = 0;
@@ -85,6 +86,7 @@ export function createNetworkSessionController({
 
   const resetNetworkState = () => {
     netPlayerId = null;
+    netVoiceUid = null;
     netControllerId = null;
     netInputSeq = 0;
     netLastAckSeq = 0;
@@ -247,19 +249,22 @@ export function createNetworkSessionController({
     });
     netClient.on("hello", (msg) => {
       netPlayerId = msg.playerId || null;
+      if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
       game.networkLocalPlayerId = netPlayerId;
       voiceManager.syncServerConfig(game, msg.voice);
     });
     netClient.on("join.ok", (msg) => {
       if (msg.playerId) netPlayerId = game.networkLocalPlayerId = msg.playerId;
+      if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
       netControllerId = msg.controllerId || null;
-      voiceManager.joinServerRoom(game, msg.voice, netPlayerId);
+      voiceManager.joinServerRoom(game, msg.voice, netPlayerId, netVoiceUid);
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Joined "${msg.roomId}" as ${game.networkRole}`);
     });
     netClient.on("room.roster", (msg) => {
       netControllerId = msg.controllerId || null;
       game.networkRosterPlayers = Array.isArray(msg.players) ? msg.players : [];
+      voiceManager.syncRoster(game.networkRosterPlayers);
       voiceManager.syncServerConfig(game, msg.voice);
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       const players = Array.isArray(msg.players) ? msg.players.length : 0;

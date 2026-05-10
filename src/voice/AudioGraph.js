@@ -54,12 +54,12 @@ export class AudioGraph {
     return true;
   }
 
-  updateRemote(playerId, { gain = 1, pan = 0, muffled = false } = {}) {
+  updateRemote(playerId, { gain = 1, pan = 0, filterFrequency = 16000 } = {}) {
     const entry = this.remoteNodes.get(playerId);
     if (!entry || !this.audioContext) return;
     setParam(entry.gain?.gain, Math.max(0, Math.min(1, gain)) * this.voiceVolume, this.audioContext);
     if (entry.panner) setParam(entry.panner.pan, Math.max(-1, Math.min(1, pan)), this.audioContext);
-    if (entry.filter) setParam(entry.filter.frequency, muffled ? 1600 : 16000, this.audioContext, 0.12);
+    if (entry.filter) setParam(entry.filter.frequency, Math.max(280, Math.min(16000, filterFrequency)), this.audioContext, 0.12);
   }
 
   setVoiceVolume(volume) {
