@@ -98,6 +98,9 @@ const optionsBackButton = document.getElementById("options-back");
 const menuVolumeInput = document.getElementById("menu-volume");
 const menuVolumeValue = document.getElementById("menu-volume-value");
 const voiceChatEnabledInput = document.getElementById("voice-chat-enabled");
+const voiceChatVolumeControl = document.getElementById("voice-chat-volume-control");
+const voiceChatModeControl = document.getElementById("voice-chat-mode-control");
+const voiceChatPushKeyControl = document.getElementById("voice-chat-push-key-control");
 const voiceChatModeSelect = document.getElementById("voice-chat-mode");
 const voiceChatPushKeyButton = document.getElementById("voice-chat-push-key");
 const voiceChatVolumeInput = document.getElementById("voice-chat-volume");
@@ -313,23 +316,30 @@ function syncMenuVolumeControl() {
   if (!menuVolumeInput) return;
   const percent = Math.round(music.masterVolume * 100);
   menuVolumeInput.value = String(percent);
+  menuVolumeInput.style.setProperty("--slider-fill-percent", `${percent}%`);
   if (menuVolumeValue) menuVolumeValue.textContent = `${percent}%`;
 }
 
 function syncVoiceChatControls() {
+  const voiceEnabled = !!voiceManager.userEnabled;
+  const pushToTalkEnabled = voiceEnabled && voiceManager.transmissionMode === "pushToTalk";
   if (voiceChatEnabledInput) voiceChatEnabledInput.checked = !!voiceManager.userEnabled;
+  if (voiceChatVolumeControl) voiceChatVolumeControl.hidden = !voiceEnabled;
+  if (voiceChatModeControl) voiceChatModeControl.hidden = !voiceEnabled;
+  if (voiceChatPushKeyControl) voiceChatPushKeyControl.hidden = !pushToTalkEnabled;
   if (voiceChatModeSelect) {
     voiceChatModeSelect.value = voiceManager.transmissionMode;
-    voiceChatModeSelect.disabled = !voiceManager.userEnabled;
+    voiceChatModeSelect.disabled = !voiceEnabled;
   }
   if (voiceChatPushKeyButton) {
     voiceChatPushKeyButton.textContent = formatVoiceKeyLabel(voiceManager.pushToTalkKey);
-    voiceChatPushKeyButton.disabled = !voiceManager.userEnabled || voiceManager.transmissionMode !== "pushToTalk";
+    voiceChatPushKeyButton.disabled = !pushToTalkEnabled;
   }
   if (!voiceChatVolumeInput) return;
   const percent = Math.round(voiceManager.voiceVolume * 100);
-  voiceChatVolumeInput.disabled = !voiceManager.userEnabled;
+  voiceChatVolumeInput.disabled = !voiceEnabled;
   voiceChatVolumeInput.value = String(percent);
+  voiceChatVolumeInput.style.setProperty("--slider-fill-percent", `${percent}%`);
   if (voiceChatVolumeValue) voiceChatVolumeValue.textContent = `${percent}%`;
 }
 
