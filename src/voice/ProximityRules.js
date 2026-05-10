@@ -1,8 +1,8 @@
 export const DEFAULT_PROXIMITY_RULES = {
   nearPx: 72,
-  farPx: 640,
+  farPx: 960,
   floorGain: 0,
-  rolloff: 1.65,
+  rolloff: 2.4,
   wallOcclusionGain: 0.12,
   closedDoorGain: 0.24,
   clearFilterHz: 16000,

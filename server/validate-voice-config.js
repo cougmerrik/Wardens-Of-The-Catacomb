@@ -1,4 +1,5 @@
 import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
+import { computeDistanceGain } from "../src/voice/ProximityRules.js";
 import { SpatialAudio } from "../src/voice/SpatialAudio.js";
 import { VoiceManager } from "../src/voice/VoiceManager.js";
 
@@ -53,6 +54,10 @@ async function main() {
   assert(typeof secureClientConfig.token === "string" && secureClientConfig.token.length > 20, "secure config should include generated RTC token");
   assert(secureClientConfig.tokenExpiresAt === 2120, "secure token expiration should include TTL");
   assert(!Object.prototype.hasOwnProperty.call(secureClientConfig, "appCertificate"), "secure client config should not expose the App Certificate");
+  assert(computeDistanceGain(32 * 10) > 0.85, "open voice should remain clear around 10 tiles");
+  assert(computeDistanceGain(32 * 14) > 0.65, "open voice should have a longer mid-distance tail");
+  assert(computeDistanceGain(32 * 23) > 0.25, "open voice should keep a long tail past 20 tiles");
+  assert(computeDistanceGain(32 * 30) === 0, "open voice should fully fade at 30 tiles");
 
   const retainCalls = [];
   const updates = [];

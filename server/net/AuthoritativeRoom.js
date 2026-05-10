@@ -5,6 +5,7 @@ import { cloneNecromancerTalentState, createNecromancerTalentState } from "../..
 import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
 import { cloneNecromancerBeamState, cloneNecromancerRuntimeState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
+import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -277,23 +278,7 @@ export class AuthoritativeRoom {
   }
 
   initializeActivePlayers() {
-    this.activePlayers.clear();
-    const baseSpawn = { x: this.sim.player?.x || 0, y: this.sim.player?.y || 0 };
-    const tile = this.sim.config?.map?.tile || 32;
-    let slot = 0;
-    for (const client of this.clients.values()) {
-      const angle = slot * ((Math.PI * 2) / Math.max(1, this.clients.size));
-      const offsetX = Math.cos(angle) * tile * 0.85;
-      const offsetY = Math.sin(angle) * tile * 0.85;
-      const candidate =
-        slot === 0 || typeof this.sim.findNearestSafePoint !== "function"
-          ? baseSpawn
-          : this.sim.findNearestSafePoint(baseSpawn.x + offsetX, baseSpawn.y + offsetY, 8);
-      this.activePlayers.set(client.id, this.createActivePlayerState(client, candidate));
-      slot += 1;
-    }
-    this.syncSimPrimaryPlayerState();
-    this.syncPrimaryActivePlayerFromSim();
+    createRandomActivePlayerStates(this);
   }
 
   syncSimPrimaryPlayerState() {
@@ -1117,9 +1102,12 @@ export class AuthoritativeRoom {
     const preFireArrowCount = this.sim.fireArrows.length;
     const dt = Math.min((nowMs - this.lastTickMs) / 1000, 0.05);
     this.lastTickMs = nowMs;
+    const previousFloor = Number.isFinite(this.sim.floor) ? this.sim.floor : null;
     this.sim.networkActivePlayers = this.getSimulationPlayerEntities();
     this.sim.tick(dt, this.getControllerInput());
-    this.updateRemoteActivePlayers(dt);
+    const floorAdvanced = previousFloor !== null && Number.isFinite(this.sim.floor) && this.sim.floor > previousFloor;
+    if (floorAdvanced) placeActivePlayersAtRandomFloorSpawns(this);
+    this.updateRemoteActivePlayers(floorAdvanced ? 0 : dt);
     this.syncPrimaryActivePlayerFromSim();
     if (this.sim.gameOver && !this.finalResults) {
       this.finalResults = this.buildFinalResults();
