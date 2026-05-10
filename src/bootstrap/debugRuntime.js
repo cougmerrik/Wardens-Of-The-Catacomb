@@ -1,4 +1,4 @@
-export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNetworkDebugState }) {
+export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNetworkDebugState, getVoiceDebugState = null }) {
   if (typeof window === "undefined") return;
   window.__WOTC_DEBUG__ = {
     getState() {
@@ -264,6 +264,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
             : null
         },
         audio: typeof getMusicDebugState === "function" ? getMusicDebugState() : null,
+        voice: typeof getVoiceDebugState === "function" ? getVoiceDebugState() : game.voiceDebug || null,
         documentHasFocus: typeof document.hasFocus === "function" ? document.hasFocus() : null,
         documentVisibilityState: typeof document.visibilityState === "string" ? document.visibilityState : ""
       };

@@ -250,7 +250,10 @@ export function handleClientMessage(raw, context) {
       ownerId: room.roomOwnerId,
       pauseOwnerId: room.pauseOwnerId,
       controllerId: room.controllerId,
-      classType: room.sim.classType
+      classType: room.sim.classType,
+      voice: typeof room.getVoiceRoomConfig === "function"
+        ? room.getVoiceRoomConfig()
+        : room.voiceConfig || { enabled: false }
     });
     if (room.phase === "active") {
       room.sendMapState(client);

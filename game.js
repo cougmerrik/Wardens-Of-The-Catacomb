@@ -78,6 +78,7 @@ import {
   resolveLeaderboardApiUrl,
   resolveDefaultServerUrl
 } from "./src/runtime/runtimeConfig.js";
+import { VoiceManager } from "./src/voice/VoiceManager.js";
 
 const canvas = document.getElementById("game");
 const layout = document.querySelector(".layout");
@@ -96,6 +97,9 @@ const optionsScreen = document.getElementById("options-screen");
 const optionsBackButton = document.getElementById("options-back");
 const menuVolumeInput = document.getElementById("menu-volume");
 const menuVolumeValue = document.getElementById("menu-volume-value");
+const voiceChatEnabledInput = document.getElementById("voice-chat-enabled");
+const voiceChatVolumeInput = document.getElementById("voice-chat-volume");
+const voiceChatVolumeValue = document.getElementById("voice-chat-volume-value");
 const disableAdsInput = document.getElementById("disable-ads");
 const topAdBanner = document.getElementById("top-ad-banner");
 const topAdImage = document.getElementById("top-ad-image");
@@ -153,6 +157,7 @@ const leaderboardGlobalBody = document.getElementById("leaderboard-global-body")
 const leaderboardSessionBody = document.getElementById("leaderboard-session-body");
 const menuScrollIndicator = document.getElementById("menu-scroll-indicator");
 const music = new MusicController();
+const voiceManager = new VoiceManager();
 const splashLogo = new Image();
 const SPLASH_FADE_MS = 1800;
 const SPLASH_AUTO_DISMISS_MS = 5000;
@@ -164,6 +169,7 @@ let netInputTimer = 0, netRenderRaf = 0;
 let netPlayerId = null, netControllerId = null;
 let netRoomOwnerId = null, netPauseOwnerId = null, netRoomPhase = "active", netRosterPlayers = [];
 let netJoinedRoomId = "";
+let netVoiceConfig = { enabled: false };
 let netLobbyCountdownEndsAt = 0, netLobbyInlineText = "";
 let netRequestedStartFloor = 1;
 let netRequestedBossOverride = FLOOR_BOSS_OVERRIDE_AUTO;
@@ -305,6 +311,15 @@ function syncMenuVolumeControl() {
   const percent = Math.round(music.masterVolume * 100);
   menuVolumeInput.value = String(percent);
   if (menuVolumeValue) menuVolumeValue.textContent = `${percent}%`;
+}
+
+function syncVoiceChatControls() {
+  if (voiceChatEnabledInput) voiceChatEnabledInput.checked = !!voiceManager.userEnabled;
+  if (!voiceChatVolumeInput) return;
+  const percent = Math.round(voiceManager.voiceVolume * 100);
+  voiceChatVolumeInput.disabled = !voiceManager.userEnabled;
+  voiceChatVolumeInput.value = String(percent);
+  if (voiceChatVolumeValue) voiceChatVolumeValue.textContent = `${percent}%`;
 }
 
 function syncDisableAdsControl() {
@@ -535,6 +550,7 @@ syncCanvasMetrics();
 syncAndroidGameplayControls();
 syncDevModeUi();
 syncMenuVolumeControl();
+syncVoiceChatControls();
 syncDisableAdsControl();
 if (topAdImage && AD_IMAGE_SOURCES.length > 0) rotateTopAd(true);
 syncTopAdVisibility();
@@ -613,6 +629,7 @@ function showNetworkSetup() {
 
 function showOptionsScreen() {
   menuState.screen = "options";
+  syncVoiceChatControls();
   if (menuPanel) menuPanel.hidden = false;
   if (networkSession) networkSession.hidden = true;
   setCanvasVisible(false);
@@ -1430,6 +1447,7 @@ if (typeof window !== "undefined") {
             }))
           : [],
         audio: typeof music.getDebugState === "function" ? music.getDebugState() : null,
+        voice: typeof voiceManager.getDebugState === "function" ? voiceManager.getDebugState() : null,
         documentHasFocus: typeof document.hasFocus === "function" ? document.hasFocus() : null,
         documentVisibilityState: typeof document.visibilityState === "string" ? document.visibilityState : ""
       };
@@ -1474,9 +1492,10 @@ function stopNetworkSession() {
     netClient.disconnect();
     netClient = null;
   }
+  voiceManager.leave();
   netPlayerId = null; netControllerId = null;
   netRoomOwnerId = null; netPauseOwnerId = null; netRoomPhase = "active"; netRosterPlayers = [];
-  netJoinedRoomId = ""; netLobbyCountdownEndsAt = 0; netLobbyInlineText = ""; netRequestedStartFloor = 1;
+  netJoinedRoomId = ""; netVoiceConfig = { enabled: false }; netLobbyCountdownEndsAt = 0; netLobbyInlineText = ""; netRequestedStartFloor = 1;
   netPendingWsUrl = ""; netPendingRoomId = ""; netPendingHandle = "";
   netInputSeq = 0; netLastAckSeq = 0;
   netPendingInputs = []; netMapSignature = ""; netPendingSnapshot = null;
@@ -1717,6 +1736,10 @@ function startNetworkRenderLoop(game) {
     canRunPredictedCollision: () => canRunPredictedCollision(game, isKnownMapTileAt),
     prunePredictedProjectiles,
     netPredictedProjectiles,
+    updateVoice: (networkGame) => {
+      voiceManager.update(networkGame);
+      networkGame.voiceDebug = voiceManager.getDebugState();
+    },
     setNetRenderRaf: (value) => {
       netRenderRaf = value;
     }
@@ -1731,6 +1754,13 @@ function shouldBypassSnapshotBuffer(game = currentGame) {
     game.networkHasChunks &&
     hasLocalPrediction(game)
   );
+}
+
+function joinVoiceForCurrentNetworkRoom() {
+  if (!netVoiceConfig?.enabled || !netPlayerId || !voiceManager.userEnabled) return;
+  voiceManager.join({ config: netVoiceConfig, playerId: netPlayerId }).then(() => {
+    if (currentGame) currentGame.voiceDebug = voiceManager.getDebugState();
+  });
 }
 
 function startLocalGame() {
@@ -1798,6 +1828,8 @@ function startNetworkGameplay() {
   game.networkRoomOwnerId = netRoomOwnerId;
   game.networkPauseOwnerId = netPauseOwnerId;
   game.networkRosterPlayers = netRosterPlayers.slice();
+  game.networkVoice = netVoiceConfig;
+  game.voiceDebug = voiceManager.getDebugState();
   game.networkReady = false;
   game.networkHasMap = false;
   game.networkHasChunks = false;
@@ -1886,6 +1918,10 @@ function startNetworkGame() {
   });
   netClient.on("hello", (msg) => {
     netPlayerId = msg.playerId || null;
+    if (msg.voice && typeof msg.voice === "object") {
+      netVoiceConfig = msg.voice;
+      voiceManager.configure(netVoiceConfig);
+    }
     renderNetworkLobby();
   });
   netClient.on("room.started", (msg) => {
@@ -1893,6 +1929,7 @@ function startNetworkGame() {
     netRoomOwnerId = msg.ownerId || netRoomOwnerId;
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || netControllerId;
+    joinVoiceForCurrentNetworkRoom();
     startNetworkGameplay();
   });
   netClient.on("join.ok", (msg) => {
@@ -1901,6 +1938,11 @@ function startNetworkGame() {
     netRoomOwnerId = msg.ownerId || netRoomOwnerId;
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
     netControllerId = msg.controllerId || null;
+    if (msg.playerId) netPlayerId = msg.playerId;
+    if (msg.voice && typeof msg.voice === "object") {
+      netVoiceConfig = msg.voice;
+      if (msg.phase === "active") joinVoiceForCurrentNetworkRoom();
+    }
     renderNetworkLobby();
     if (msg.phase === "active") {
       const game = startNetworkGameplay();
@@ -1928,6 +1970,10 @@ function startNetworkGame() {
     netLobbyCountdownEndsAt = Number.isFinite(msg.lobbyCountdownEndsAt) ? msg.lobbyCountdownEndsAt : 0;
     netLobbyInlineText = typeof msg.lobbyInlineMessage === "string" ? msg.lobbyInlineMessage : "";
     netRosterPlayers = Array.isArray(msg.players) ? msg.players.slice() : [];
+    if (msg.voice && typeof msg.voice === "object") {
+      netVoiceConfig = msg.voice;
+      voiceManager.configure(netVoiceConfig);
+    }
     if (isDevMode && netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId) {
       const desiredBossOverride = normalizeFloorBossOverride(selectedBossOverride);
       if (netClient && desiredBossOverride !== netRequestedBossOverride) {
@@ -1950,6 +1996,8 @@ function startNetworkGame() {
       activeGame.networkPauseOwnerId = netPauseOwnerId;
       activeGame.networkLocalPlayerId = netPlayerId;
       activeGame.networkRosterPlayers = netRosterPlayers;
+      activeGame.networkVoice = netVoiceConfig;
+      activeGame.voiceDebug = voiceManager.getDebugState();
       activeGame.networkDeathRulesMode = normalizeNetworkDeathRulesMode(netRequestedDeathRulesMode);
       if (netRoomPhase === "active" && typeof activeGame.pushMultiplayerNotification === "function") {
         const nextIds = new Set(netRosterPlayers.filter((player) => player?.id).map((player) => player.id));
@@ -2327,6 +2375,23 @@ if (menuVolumeInput) {
     const nextVolume = Number(menuVolumeInput.value) / 100;
     music.setMasterVolume(nextVolume);
     syncMenuVolumeControl();
+  });
+}
+
+if (voiceChatEnabledInput) {
+  voiceChatEnabledInput.addEventListener("change", () => {
+    voiceManager.setUserEnabled(voiceChatEnabledInput.checked);
+    syncVoiceChatControls();
+    if (voiceManager.userEnabled && netRoomPhase === "active") joinVoiceForCurrentNetworkRoom();
+    if (currentGame) currentGame.voiceDebug = voiceManager.getDebugState();
+  });
+}
+
+if (voiceChatVolumeInput) {
+  voiceChatVolumeInput.addEventListener("input", () => {
+    voiceManager.setVoiceVolume(Number(voiceChatVolumeInput.value) / 100);
+    syncVoiceChatControls();
+    if (currentGame) currentGame.voiceDebug = voiceManager.getDebugState();
   });
 }
 

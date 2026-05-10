@@ -110,6 +110,7 @@ export function installRoomDevBossOverride(room) {
       lobbyCountdownEndsAt: this.lobbyCountdownEndsAt || 0,
       lobbyCountdownRemainingMs: this.getLobbyCountdownRemainingMs(),
       lobbyInlineMessage: this.lobbyInlineMessage,
+      voice: typeof this.getVoiceRoomConfig === "function" ? this.getVoiceRoomConfig() : this.voiceConfig || { enabled: false },
       players: this.getRosterEntries()
     });
   };

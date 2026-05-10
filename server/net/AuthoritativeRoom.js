@@ -101,6 +101,17 @@ export class AuthoritativeRoom {
     this.pauseOwnerId = typeof value === "string" && value ? value : null;
   }
 
+  getVoiceRoomConfig() {
+    if (!this.voiceConfig || !this.voiceConfig.enabled) return { enabled: false };
+    return {
+      ...this.voiceConfig,
+      channel:
+        typeof this.voiceConfig.channel === "string" && this.voiceConfig.channel
+          ? this.voiceConfig.channel
+          : `wardens-${this.id}`
+    };
+  }
+
   mapSignature() {
     return typeof this.sim.getMapSignature === "function"
       ? this.sim.getMapSignature()
@@ -1162,6 +1173,7 @@ export class AuthoritativeRoom {
       lobbyCountdownEndsAt: this.lobbyCountdownEndsAt || 0,
       lobbyCountdownRemainingMs: this.getLobbyCountdownRemainingMs(),
       lobbyInlineMessage: this.lobbyInlineMessage,
+      voice: this.getVoiceRoomConfig(),
       players: this.getRosterEntries()
     });
   }
