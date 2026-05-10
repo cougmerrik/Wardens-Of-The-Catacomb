@@ -17,6 +17,7 @@ export class SpatialAudio {
     if (!this.audioGraph || !game?.player) return;
     const listener = game.player;
     const remotePlayers = Array.isArray(game.remotePlayers) ? game.remotePlayers : [];
+    if (remotePlayers.length === 0) return;
     const activeRemoteIds = new Set();
     this.lastZone = resolveReverbZone(game, listener);
     for (const remote of remotePlayers) {

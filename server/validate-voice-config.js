@@ -1,4 +1,5 @@
 import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
+import { SpatialAudio } from "../src/voice/SpatialAudio.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -51,6 +52,20 @@ function main() {
   assert(typeof secureClientConfig.token === "string" && secureClientConfig.token.length > 20, "secure config should include generated RTC token");
   assert(secureClientConfig.tokenExpiresAt === 2120, "secure token expiration should include TTL");
   assert(!Object.prototype.hasOwnProperty.call(secureClientConfig, "appCertificate"), "secure client config should not expose the App Certificate");
+
+  const retainCalls = [];
+  const updates = [];
+  const spatial = new SpatialAudio({
+    audioGraph: {
+      retainRemotePlayers: (ids) => retainCalls.push(Array.from(ids || [])),
+      updateRemote: (id, state) => updates.push({ id, state })
+    }
+  });
+  spatial.update({ player: { x: 0, y: 0 }, remotePlayers: [] }, "local");
+  assert(retainCalls.length === 0, "spatial audio should not disconnect tracks before remote player snapshots arrive");
+  spatial.update({ player: { x: 0, y: 0 }, remotePlayers: [{ id: "remote", x: 32, y: 0 }] }, "local");
+  assert(updates.length === 1 && updates[0].id === "remote", "spatial audio should update known remote players");
+  assert(retainCalls.length === 1 && retainCalls[0][0] === "remote", "spatial audio should retain known remote player tracks");
 
   console.log("Voice config validation passed.");
 }
