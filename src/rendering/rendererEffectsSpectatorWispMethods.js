@@ -1,4 +1,20 @@
 export const rendererEffectsSpectatorWispMethods = {
+  getSpectatorWispAnchorOffset(spectatorId, targetSize = 22) {
+    const slots = [
+      { x: 0, y: -1.25 },
+      { x: -1.08, y: -0.55 },
+      { x: 1.08, y: -0.55 },
+      { x: -0.72, y: 0.78 },
+      { x: 0.72, y: 0.78 }
+    ];
+    const text = typeof spectatorId === "string" && spectatorId ? spectatorId : "spectator";
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) | 0;
+    const slot = slots[Math.abs(hash) % slots.length];
+    const radius = Math.max(18, targetSize * 1.15);
+    return { x: slot.x * radius, y: slot.y * radius };
+  },
+
   getSpectatorWispEntries(game) {
     if (!game?.networkEnabled) return [];
     const entries = [];
@@ -35,7 +51,8 @@ export const rendererEffectsSpectatorWispMethods = {
       const target = this.findSpectatorWispTarget(game, entry.targetId);
       if (!target) continue;
       activeIds.add(entry.id);
-      const state = this.updateSpectatorWispState(game, entry, target, now);
+      const offset = this.getSpectatorWispAnchorOffset(entry.id, target.size || 22);
+      const state = this.updateSpectatorWispState(game, entry, { x: target.x + offset.x, y: target.y + offset.y }, now);
       this.drawSpectatorWisp(state.x - cameraX, state.y - cameraY - 30, entry.color, state.alpha, now * 0.001 + i);
     }
     for (const id of Object.keys(game.spectatorWispRenderState)) {
