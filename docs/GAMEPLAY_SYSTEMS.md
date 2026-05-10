@@ -45,10 +45,11 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - class-based max-health growth
   - class-based offensive scaling
   - class-specific passive stat growth
-- In multiplayer, progression is per-player rather than shared:
-  - XP, gold, score, skills, upgrades, cooldowns, and class build state belong to the acting player
+- In multiplayer, some progression remains per-player while rewards are shared:
+  - XP from kills and gold from pickups are granted to each living active player
+  - kill score, skills, upgrades, cooldowns, and class build state belong to the acting player
   - kill rewards are last-hit based
-  - controlled-necromancer summons inherit kill, damage, XP, and score credit for their owning necromancer
+  - controlled-necromancer summons inherit kill and damage credit for their owning necromancer, while XP rewards still fan out to the group
 
 ## Biomes
 - Floors resolve through a biome layer before generation, trap placement, breakable placement, and rendering.
@@ -219,6 +220,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - The run ends only when all connected players are dead.
 - Dead players automatically spectate living teammates after a short death beat.
 - Spectators can cycle living targets and use passive UI like stats.
+- Spectators appear near their current spectate target as small wisps using the spectator's stable run color; target changes fade out and fade back in instead of moving the wisp directly.
 - Dead players cannot move, attack, shop, or spend skills.
 - If the pause owner dies, they keep pause authority while connected; authority only transfers on disconnect.
 
@@ -259,11 +261,14 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Network mode synthesizes enemy damage floating text client-side from authoritative enemy HP changes instead of replicating full floating-text state.
 - Local-player health in multiplayer is driven from authoritative snapshot health plus replicated player HP-bar visibility timers.
 - Torch state is synchronized through map meta/state, snapshots, and deltas so relit or snuffed torches stay aligned between network clients.
+- Optional Agora voice chat can be enabled by server startup config. Voice chat defaults off and can be enabled from Options; when active, remote player voices are attenuated by distance, panned left/right from player positions, muffled through closed doors and walls, and scaled by a separate voice volume. Microphone modes include Open Mic, Push to Talk with a configurable button, and Mute. Allies fade out fully beyond 20 tiles.
+- Dead spectators can only be heard by the living player they are currently spectating.
 - Browser/network validation now covers:
   - join safety
   - multiplayer combat input
   - hit-confirmation timing
   - refund spend/reset sync
+  - shared XP/gold reward sync
   - archer projectile alignment
   - focused-tab audio stability
 
