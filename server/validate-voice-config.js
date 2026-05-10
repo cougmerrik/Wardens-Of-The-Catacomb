@@ -76,6 +76,30 @@ async function main() {
   assert(voiceManager.audioGraph.remoteNodes.get("p_remote")?.marker === "remote-track", "remote track should be keyed by Wardens player id");
   await voiceManager.leave();
 
+  const fallbackVolumes = [];
+  let fallbackPlayed = false;
+  let fallbackStopped = false;
+  const fallbackGraph = new VoiceManager().audioGraph;
+  const fallbackConnected = fallbackGraph.connectRemoteTrack("p_fallback", {
+    play: () => {
+      fallbackPlayed = true;
+    },
+    stop: () => {
+      fallbackStopped = true;
+    },
+    setVolume: (volume) => {
+      fallbackVolumes.push(volume);
+    }
+  });
+  assert(fallbackConnected === true, "fallback Agora remote track should connect without a MediaStreamTrack");
+  assert(fallbackPlayed === true, "fallback Agora remote track should play");
+  assert(fallbackGraph.remoteNodes.get("p_fallback")?.fallbackPlayback === true, "fallback remote track should be retained");
+  fallbackGraph.setVoiceVolume(0.5);
+  fallbackGraph.updateRemote("p_fallback", { gain: 0.4 });
+  assert(fallbackVolumes.at(-1) === 20, "fallback remote track volume should follow spatial gain and voice volume");
+  fallbackGraph.disconnectRemote("p_fallback");
+  assert(fallbackStopped === true, "fallback remote track should stop on disconnect");
+
   console.log("Voice config validation passed.");
 }
 

@@ -8,6 +8,16 @@ function setParam(param, value, audioContext, smoothingSec = 0.08) {
   }
 }
 
+function setRemoteTrackVolume(remoteAudioTrack, volume) {
+  if (!remoteAudioTrack || typeof remoteAudioTrack.setVolume !== "function") return false;
+  try {
+    remoteAudioTrack.setVolume(Math.round(Math.max(0, Math.min(1, volume)) * 100));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export class AudioGraph {
   constructor({ audioContext = null } = {}) {
     const Ctor = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -28,11 +38,25 @@ export class AudioGraph {
   }
 
   connectRemoteTrack(playerId, remoteAudioTrack) {
-    if (!this.audioContext || !playerId || !remoteAudioTrack) return false;
+    if (!playerId || !remoteAudioTrack) return false;
     this.disconnectRemote(playerId);
     const mediaTrack =
       typeof remoteAudioTrack.getMediaStreamTrack === "function" ? remoteAudioTrack.getMediaStreamTrack() : null;
-    if (!mediaTrack) return false;
+    if (!this.audioContext || !mediaTrack) {
+      if (typeof remoteAudioTrack.play !== "function") return false;
+      try {
+        remoteAudioTrack.play();
+      } catch {
+        return false;
+      }
+      setRemoteTrackVolume(remoteAudioTrack, this.voiceVolume);
+      this.remoteNodes.set(playerId, {
+        fallbackPlayback: true,
+        remoteAudioTrack,
+        connectedAtMs: Date.now()
+      });
+      return true;
+    }
     const stream = new MediaStream([mediaTrack]);
     const source = this.audioContext.createMediaStreamSource(stream);
     const gain = this.audioContext.createGain();
@@ -57,14 +81,18 @@ export class AudioGraph {
 
   updateRemote(playerId, { gain = 1, pan = 0, filterFrequency = 16000 } = {}) {
     const entry = this.remoteNodes.get(playerId);
-    if (!entry || !this.audioContext) return;
+    if (!entry) return;
     const remoteGain = Math.max(0, Math.min(1, gain));
     const finalGain = remoteGain * this.voiceVolume;
     const nextPan = Math.max(-1, Math.min(1, pan));
     const nextFilterFrequency = Math.max(280, Math.min(16000, filterFrequency));
-    setParam(entry.gain?.gain, finalGain, this.audioContext);
-    if (entry.panner) setParam(entry.panner.pan, nextPan, this.audioContext);
-    if (entry.filter) setParam(entry.filter.frequency, nextFilterFrequency, this.audioContext, 0.12);
+    if (entry.fallbackPlayback) {
+      setRemoteTrackVolume(entry.remoteAudioTrack, finalGain);
+    } else if (this.audioContext) {
+      setParam(entry.gain?.gain, finalGain, this.audioContext);
+      if (entry.panner) setParam(entry.panner.pan, nextPan, this.audioContext);
+      if (entry.filter) setParam(entry.filter.frequency, nextFilterFrequency, this.audioContext, 0.12);
+    }
     this.lastRemoteState.set(playerId, {
       gain: remoteGain,
       finalGain,
@@ -87,6 +115,11 @@ export class AudioGraph {
           node.disconnect();
         } catch {}
       }
+    }
+    if (entry.fallbackPlayback && entry.remoteAudioTrack && typeof entry.remoteAudioTrack.stop === "function") {
+      try {
+        entry.remoteAudioTrack.stop();
+      } catch {}
     }
     this.remoteNodes.delete(playerId);
     this.lastRemoteState.delete(playerId);

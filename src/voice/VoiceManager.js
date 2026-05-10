@@ -122,11 +122,7 @@ export class VoiceManager {
   attachRemoteTrack(playerId, track) {
     const resolvedPlayerId = this.resolvePlayerId(playerId);
     if (!resolvedPlayerId || resolvedPlayerId === this.localPlayerId || !track) return;
-    if (!this.audioGraph.connectRemoteTrack(resolvedPlayerId, track) && typeof track.play === "function") {
-      try {
-        track.play();
-      } catch {}
-    }
+    this.audioGraph.connectRemoteTrack(resolvedPlayerId, track);
   }
 
   resolvePlayerId(playerId) {
@@ -222,6 +218,7 @@ export class VoiceManager {
       remoteTrackStates: Array.from(this.audioGraph.remoteNodes.entries()).map(([id, entry]) => ({
         id,
         connectedAtMs: entry?.connectedAtMs || 0,
+        fallbackPlayback: !!entry?.fallbackPlayback,
         spatial: this.audioGraph.lastRemoteState.get(id) || null
       })),
       voiceUidMap: Array.from(this.voiceUidToPlayerId.entries()).map(([voiceUid, playerId]) => ({ voiceUid, playerId })),
