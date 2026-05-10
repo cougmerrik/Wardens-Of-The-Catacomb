@@ -1,11 +1,12 @@
 import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
 import { SpatialAudio } from "../src/voice/SpatialAudio.js";
+import { VoiceManager } from "../src/voice/VoiceManager.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function main() {
+async function main() {
   const disabled = resolveVoiceConfig({ env: {}, argv: [] });
   assert(disabled.enabled === false, "voice should be disabled without an Agora app id");
   assert(buildVoiceRoomConfig(disabled, "alpha").enabled === false, "disabled server config should not expose a voice room");
@@ -66,6 +67,14 @@ function main() {
   spatial.update({ player: { x: 0, y: 0 }, remotePlayers: [{ id: "remote", x: 32, y: 0 }] }, "local");
   assert(updates.length === 1 && updates[0].id === "remote", "spatial audio should update known remote players");
   assert(retainCalls.length === 1 && retainCalls[0][0] === "remote", "spatial audio should retain known remote player tracks");
+
+  const voiceManager = new VoiceManager();
+  const rawUid = "123456";
+  voiceManager.audioGraph.remoteNodes.set(rawUid, { marker: "remote-track" });
+  voiceManager.syncRoster([{ id: "p_remote", voiceUid: 123456 }]);
+  assert(!voiceManager.audioGraph.remoteNodes.has(rawUid), "raw Agora uid remote track should be re-keyed after roster sync");
+  assert(voiceManager.audioGraph.remoteNodes.get("p_remote")?.marker === "remote-track", "remote track should be keyed by Wardens player id");
+  await voiceManager.leave();
 
   console.log("Voice config validation passed.");
 }

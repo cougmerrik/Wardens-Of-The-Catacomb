@@ -137,7 +137,9 @@ export class VoiceManager {
     this.voiceUidToPlayerId.clear();
     for (const player of Array.isArray(players) ? players : []) {
       if (!player || typeof player.id !== "string" || !Number.isFinite(player.voiceUid)) continue;
-      this.voiceUidToPlayerId.set(String(Math.floor(player.voiceUid)), player.id);
+      const voiceUid = String(Math.floor(player.voiceUid));
+      this.voiceUidToPlayerId.set(voiceUid, player.id);
+      this.audioGraph.renameRemote(voiceUid, player.id);
     }
   }
 
@@ -216,7 +218,22 @@ export class VoiceManager {
       state: this.state,
       lastError: this.lastError,
       remoteTrackCount: this.audioGraph.remoteNodes.size,
-      spatialZone: this.spatialAudio.lastZone?.key || ""
+      remoteTrackIds: Array.from(this.audioGraph.remoteNodes.keys()),
+      remoteTrackStates: Array.from(this.audioGraph.remoteNodes.entries()).map(([id, entry]) => ({
+        id,
+        connectedAtMs: entry?.connectedAtMs || 0,
+        spatial: this.audioGraph.lastRemoteState.get(id) || null
+      })),
+      voiceUidMap: Array.from(this.voiceUidToPlayerId.entries()).map(([voiceUid, playerId]) => ({ voiceUid, playerId })),
+      localVoiceUid: this.localVoiceUid,
+      transportJoined: !!this.transport.joined,
+      transportChannel: this.transport.channel || "",
+      transportUid: this.transport.uid,
+      spatialZone: this.spatialAudio.lastZone?.key || "",
+      spatialRemoteCount: this.spatialAudio.lastRemoteCount,
+      spatialActiveRemoteIds: this.spatialAudio.lastActiveRemoteIds.slice(),
+      spatialRemoteDebug: this.spatialAudio.lastRemoteDebug.slice(),
+      spatialUpdatedAtMs: this.spatialAudio.lastUpdateAtMs
     };
   }
 }

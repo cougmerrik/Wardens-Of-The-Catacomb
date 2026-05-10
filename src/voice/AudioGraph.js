@@ -13,6 +13,7 @@ export class AudioGraph {
     const Ctor = globalThis.AudioContext || globalThis.webkitAudioContext;
     this.audioContext = audioContext || (Ctor ? new Ctor() : null);
     this.remoteNodes = new Map();
+    this.lastRemoteState = new Map();
     this.voiceVolume = 1;
   }
 
@@ -50,16 +51,27 @@ export class AudioGraph {
       gain.connect(filter);
       filter.connect(this.audioContext.destination);
     }
-    this.remoteNodes.set(playerId, { source, gain, panner, filter, stream, remoteAudioTrack });
+    this.remoteNodes.set(playerId, { source, gain, panner, filter, stream, remoteAudioTrack, connectedAtMs: Date.now() });
     return true;
   }
 
   updateRemote(playerId, { gain = 1, pan = 0, filterFrequency = 16000 } = {}) {
     const entry = this.remoteNodes.get(playerId);
     if (!entry || !this.audioContext) return;
-    setParam(entry.gain?.gain, Math.max(0, Math.min(1, gain)) * this.voiceVolume, this.audioContext);
-    if (entry.panner) setParam(entry.panner.pan, Math.max(-1, Math.min(1, pan)), this.audioContext);
-    if (entry.filter) setParam(entry.filter.frequency, Math.max(280, Math.min(16000, filterFrequency)), this.audioContext, 0.12);
+    const remoteGain = Math.max(0, Math.min(1, gain));
+    const finalGain = remoteGain * this.voiceVolume;
+    const nextPan = Math.max(-1, Math.min(1, pan));
+    const nextFilterFrequency = Math.max(280, Math.min(16000, filterFrequency));
+    setParam(entry.gain?.gain, finalGain, this.audioContext);
+    if (entry.panner) setParam(entry.panner.pan, nextPan, this.audioContext);
+    if (entry.filter) setParam(entry.filter.frequency, nextFilterFrequency, this.audioContext, 0.12);
+    this.lastRemoteState.set(playerId, {
+      gain: remoteGain,
+      finalGain,
+      pan: nextPan,
+      filterFrequency: nextFilterFrequency,
+      updatedAtMs: Date.now()
+    });
   }
 
   setVoiceVolume(volume) {
@@ -77,6 +89,22 @@ export class AudioGraph {
       }
     }
     this.remoteNodes.delete(playerId);
+    this.lastRemoteState.delete(playerId);
+  }
+
+  renameRemote(oldPlayerId, nextPlayerId) {
+    if (!oldPlayerId || !nextPlayerId || oldPlayerId === nextPlayerId) return false;
+    const entry = this.remoteNodes.get(oldPlayerId);
+    if (!entry) return false;
+    if (this.remoteNodes.has(nextPlayerId)) this.disconnectRemote(nextPlayerId);
+    this.remoteNodes.delete(oldPlayerId);
+    this.remoteNodes.set(nextPlayerId, entry);
+    const state = this.lastRemoteState.get(oldPlayerId);
+    if (state) {
+      this.lastRemoteState.delete(oldPlayerId);
+      this.lastRemoteState.set(nextPlayerId, state);
+    }
+    return true;
   }
 
   retainRemotePlayers(playerIds) {
