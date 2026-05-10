@@ -365,9 +365,11 @@ export const runtimeBaseSupportMethods = {
     entity.level = Number.isFinite(entity.level) ? entity.level : 1;
     entity.skillPoints = Number.isFinite(entity.skillPoints) ? entity.skillPoints : 0;
     entity.levelWeaponDamageBonus = Number.isFinite(entity.levelWeaponDamageBonus) ? entity.levelWeaponDamageBonus : 0;
+    let leveled = false;
     while (entity.experience >= entity.expToNextLevel) {
       entity.experience -= entity.expToNextLevel;
       entity.level += 1;
+      leveled = true;
       entity.skillPoints += this.getSkillPointGainForLevel(entity.level, entity.classType);
       const hpGain = Number.isFinite(classSpec.levelHpGain) ? classSpec.levelHpGain : 10;
       let adjustedHpGain = hpGain;
@@ -390,6 +392,10 @@ export const runtimeBaseSupportMethods = {
       entity.levelWeaponDamageBonus += Math.max(1, baseAvg * Math.max(0, dmgPct));
       entity.expToNextLevel = Math.floor(entity.expToNextLevel * this.config.progression.xpLevelScaling);
       this.spawnFloatingText(entity.x, entity.y - 30, `Level ${entity.level}!`, "#9be18a", 1.0, 15);
+    }
+    if (leveled && typeof this.updateFloorBossTrigger === "function" && this.updateFloorBossTrigger()) {
+      const target = this.floorBoss?.triggerLevel || this.getFloorBossTriggerLevel();
+      this.spawnFloatingText(entity.x, entity.y - 80, `Boss Ready: Lv ${target}`, "#c78bff", 1.4, 16);
     }
   },
 

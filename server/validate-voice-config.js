@@ -67,6 +67,30 @@ async function main() {
   spatial.update({ player: { x: 0, y: 0 }, remotePlayers: [{ id: "remote", x: 32, y: 0 }] }, "local");
   assert(updates.length === 1 && updates[0].id === "remote", "spatial audio should update known remote players");
   assert(retainCalls.length === 1 && retainCalls[0][0] === "remote", "spatial audio should retain known remote player tracks");
+  const spectatorUpdates = [];
+  const spectatorSpatial = new SpatialAudio({
+    audioGraph: {
+      retainRemotePlayers: () => {},
+      updateRemote: (id, state) => spectatorUpdates.push({ id, state })
+    }
+  });
+  spectatorSpatial.update({
+    player: { id: "local", x: 0, y: 0, alive: true },
+    config: { map: { tile: 32 } },
+    remotePlayers: [{ id: "spectator", x: 1697, y: 0, alive: false, spectateTargetId: "local" }]
+  }, "local");
+  assert(spectatorUpdates[0]?.state?.gain === 1, "remote spectators watching the local player should speak from the local player's position");
+  spectatorUpdates.length = 0;
+  spectatorSpatial.update({
+    player: { id: "local", x: 1697, y: 0, alive: false },
+    spectateTargetId: "target",
+    config: { map: { tile: 32 } },
+    remotePlayers: [
+      { id: "target", x: 0, y: 0, alive: true },
+      { id: "speaker", x: 0, y: 0, alive: true }
+    ]
+  }, "local");
+  assert(spectatorUpdates.find((entry) => entry.id === "speaker")?.state?.gain === 1, "local spectators should listen from their spectate target");
 
   const voiceManager = new VoiceManager();
   const rawUid = "123456";
@@ -99,6 +123,13 @@ async function main() {
   assert(fallbackVolumes.at(-1) === 20, "fallback remote track volume should follow spatial gain and voice volume");
   fallbackGraph.disconnectRemote("p_fallback");
   assert(fallbackStopped === true, "fallback remote track should stop on disconnect");
+
+  const resetManager = new VoiceManager();
+  resetManager.audioGraph.remoteNodes.set("p_reset", { marker: "remote-track" });
+  resetManager.audioGraph.lastRemoteState.set("p_reset", { gain: 0, finalGain: 0 });
+  resetManager.resetSpatialPlayback();
+  assert(resetManager.audioGraph.lastRemoteState.get("p_reset")?.gain === 1, "lobby voice reset should restore remote gain");
+  await resetManager.leave();
 
   console.log("Voice config validation passed.");
 }

@@ -132,10 +132,15 @@ export const runtimeFloorBossMethods = {
   updateFloorBossTrigger() {
     const boss = this.syncFloorBossState();
     if (boss.phase !== "idle") return false;
-    if (!Number.isFinite(this.level) || this.level < boss.triggerLevel) return false;
+    const players = typeof this.getLivingPlayerEntities === "function" ? this.getLivingPlayerEntities() : [];
+    const highestPlayerLevel = players.reduce((highest, player) => {
+      const level = Number.isFinite(player?.level) ? player.level : player === this.player && Number.isFinite(this.level) ? this.level : 0;
+      return Math.max(highest, level);
+    }, Number.isFinite(this.level) ? this.level : 0);
+    if (highestPlayerLevel < boss.triggerLevel) return false;
     boss.phase = "queued";
     boss.spawnPending = true;
-    boss.spawnTriggeredAtLevel = this.level;
+    boss.spawnTriggeredAtLevel = highestPlayerLevel;
     return true;
   },
 

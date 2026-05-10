@@ -1528,6 +1528,7 @@ function stopNetworkSession() {
 
 function returnNetworkGameToLobby() {
   closeLeaderboardModal();
+  voiceManager.resetSpatialPlayback();
   currentGame = cleanupCurrentGameRuntime(currentGame);
   netRoomPhase = "lobby";
   netLobbyCountdownEndsAt = 0;
@@ -1992,6 +1993,7 @@ function startNetworkGame() {
       netVoiceConfig = msg.voice;
       voiceManager.configure(netVoiceConfig);
     }
+    if (netRoomPhase === "lobby") voiceManager.resetSpatialPlayback();
     if (isDevMode && netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId) {
       const desiredBossOverride = normalizeFloorBossOverride(selectedBossOverride);
       if (netClient && desiredBossOverride !== netRequestedBossOverride) {

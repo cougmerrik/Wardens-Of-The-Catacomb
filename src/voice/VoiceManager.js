@@ -144,6 +144,14 @@ export class VoiceManager {
     this.spatialAudio.update(game, this.localPlayerId);
   }
 
+  resetSpatialPlayback() {
+    this.audioGraph.resetSpatialState({ gain: 1, pan: 0, filterFrequency: 16000 });
+    this.spatialAudio.lastRemoteCount = 0;
+    this.spatialAudio.lastActiveRemoteIds = [];
+    this.spatialAudio.lastRemoteDebug = [];
+    this.spatialAudio.lastUpdateAtMs = Date.now();
+  }
+
   setUserEnabled(enabled, { persist = true } = {}) {
     this.userEnabled = !!enabled;
     if (persist) persistVoiceChatEnabled(this.userEnabled);

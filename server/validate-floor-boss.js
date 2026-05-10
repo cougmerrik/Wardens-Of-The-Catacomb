@@ -77,6 +77,37 @@ function validateTriggerLevels() {
   return floors;
 }
 
+function validateRemotePlayerBossTrigger() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  const remote = {
+    id: "p_remote",
+    classType: "fighter",
+    x: game.player.x + 32,
+    y: game.player.y,
+    size: game.player.size,
+    health: 100,
+    maxHealth: 100,
+    alive: true,
+    level: 4,
+    experience: 0,
+    expToNextLevel: game.config.progression.baseXpToLevel,
+    skillPoints: 0,
+    levelWeaponDamageBonus: 0
+  };
+  game.remotePlayers = [remote];
+  game.level = 1;
+  assert(game.floorBoss.phase === "idle", "boss should start idle");
+  game.gainExperienceForPlayerEntity(remote, remote.expToNextLevel);
+  assert(remote.level === 5, `remote player expected level 5, got ${remote.level}`);
+  assert(game.floorBoss.phase === "queued", `remote player level-up should queue boss, got ${game.floorBoss.phase}`);
+  assert(game.floorBoss.spawnTriggeredAtLevel === 5, `remote trigger level expected 5, got ${game.floorBoss.spawnTriggeredAtLevel}`);
+  return {
+    localLevel: game.level,
+    remoteLevel: remote.level,
+    bossPhase: game.floorBoss.phase
+  };
+}
+
 function validateSonyaBirthdayVariant() {
   const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   game.isHaleyBirthday = () => true;
@@ -302,6 +333,7 @@ function main() {
   const results = {
     triggerLevels: validateTriggerLevels(),
     sonyaBirthdayVariant: validateSonyaBirthdayVariant(),
+    remotePlayerBossTrigger: validateRemotePlayerBossTrigger(),
     floorThreeGolemVariant: validateFloorThreeGolemVariant(),
     safePlayerSpawn: validateSafePlayerSpawn(),
     localProgression: validateLocalProgression(),

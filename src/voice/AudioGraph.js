@@ -106,6 +106,12 @@ export class AudioGraph {
     this.voiceVolume = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 1));
   }
 
+  resetSpatialState({ gain = 1, pan = 0, filterFrequency = 16000 } = {}) {
+    for (const playerId of this.remoteNodes.keys()) {
+      this.updateRemote(playerId, { gain, pan, filterFrequency });
+    }
+  }
+
   disconnectRemote(playerId) {
     const entry = this.remoteNodes.get(playerId);
     if (!entry) return;

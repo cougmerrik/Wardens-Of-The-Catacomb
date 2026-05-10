@@ -17,9 +17,40 @@ export class SpatialAudio {
     this.lastUpdateAtMs = 0;
   }
 
+  findPlayer(game, playerId, localPlayerId = null) {
+    if (!playerId) return null;
+    if (playerId === localPlayerId && game?.player) return game.player;
+    return (Array.isArray(game?.remotePlayers) ? game.remotePlayers : []).find((player) => player?.id === playerId) || null;
+  }
+
+  resolveListener(game, localPlayerId = null) {
+    const player = game?.player || null;
+    if (
+      player &&
+      player.alive === false &&
+      typeof game?.spectateTargetId === "string" &&
+      game.spectateTargetId
+    ) {
+      return this.findPlayer(game, game.spectateTargetId, localPlayerId) || player;
+    }
+    return player;
+  }
+
+  resolveVoiceSource(game, remote, localPlayerId = null) {
+    if (
+      remote?.alive === false &&
+      typeof remote.spectateTargetId === "string" &&
+      remote.spectateTargetId
+    ) {
+      return this.findPlayer(game, remote.spectateTargetId, localPlayerId) || remote;
+    }
+    return remote;
+  }
+
   update(game, localPlayerId = null) {
     if (!this.audioGraph || !game?.player) return;
-    const listener = game.player;
+    const listener = this.resolveListener(game, localPlayerId);
+    if (!listener) return;
     const remotePlayers = Array.isArray(game.remotePlayers) ? game.remotePlayers : [];
     this.lastRemoteCount = remotePlayers.length;
     if (remotePlayers.length === 0) return;
@@ -30,17 +61,19 @@ export class SpatialAudio {
     for (const remote of remotePlayers) {
       if (!remote || typeof remote.id !== "string" || remote.id === localPlayerId) continue;
       activeRemoteIds.add(remote.id);
-      const distance = Math.hypot((remote.x || 0) - (listener.x || 0), (remote.y || 0) - (listener.y || 0));
+      const source = this.resolveVoiceSource(game, remote, localPlayerId);
+      const distance = Math.hypot((source.x || 0) - (listener.x || 0), (source.y || 0) - (listener.y || 0));
       const spectatorBlocked =
         remote.alive === false &&
         typeof remote.spectateTargetId === "string" &&
         localPlayerId &&
         remote.spectateTargetId !== localPlayerId;
-      const occlusion = computeOcclusion(game, listener, remote, this.rules);
+      const occlusion = computeOcclusion(game, listener, source, this.rules);
       const gain = spectatorBlocked ? 0 : computeDistanceGain(distance, this.rules) * occlusion.gain;
-      const pan = computeStereoPan(listener, remote);
+      const pan = computeStereoPan(listener, source);
       remoteDebug.push({
         id: remote.id,
+        sourceId: source?.id || remote.id,
         distancePx: Math.round(distance),
         distanceTiles: Math.round((distance / (game.config?.map?.tile || 32)) * 10) / 10,
         gain: Math.round(gain * 1000) / 1000,
