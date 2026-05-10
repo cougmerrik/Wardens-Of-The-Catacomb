@@ -1,4 +1,4 @@
-import { getStoredMasterVolume, normalizeMasterVolume } from "../audio/audioSettings.js";
+import { getEffectiveMasterVolume, getStoredMasterVolume, normalizeMasterVolume } from "../audio/audioSettings.js";
 import { FLOOR_BOSS_OVERRIDE_AUTO, getForcedFloorBossVariant, normalizeFloorBossOverride } from "./floorBossDebugOverride.js";
 
 export const runtimeFloorBossMethods = {
@@ -361,7 +361,7 @@ export const runtimeFloorBossMethods = {
       ? this.feedbackAudioContext.createGain()
       : null;
     if (this.feedbackAudioMasterGain) {
-      this.feedbackAudioMasterGain.gain.value = normalizeMasterVolume(window.__WOTC_MASTER_VOLUME__, getStoredMasterVolume());
+      this.feedbackAudioMasterGain.gain.value = normalizeMasterVolume(window.__WOTC_MASTER_VOLUME__, getEffectiveMasterVolume(getStoredMasterVolume()));
       this.feedbackAudioMasterGain.connect(this.feedbackAudioContext.destination);
     }
     return this.feedbackAudioContext;
@@ -375,7 +375,7 @@ export const runtimeFloorBossMethods = {
       audio.resume().catch(() => {});
     }
     if (this.feedbackAudioMasterGain) {
-      this.feedbackAudioMasterGain.gain.value = normalizeMasterVolume(window.__WOTC_MASTER_VOLUME__, getStoredMasterVolume());
+      this.feedbackAudioMasterGain.gain.value = normalizeMasterVolume(window.__WOTC_MASTER_VOLUME__, getEffectiveMasterVolume(getStoredMasterVolume()));
     }
     const startAt = audio.currentTime + 0.01;
     for (const tone of sequence) {
