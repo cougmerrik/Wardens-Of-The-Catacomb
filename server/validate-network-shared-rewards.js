@@ -7,6 +7,8 @@ import { makeDefaultInput } from "./net/serverHelpers.js";
 import { getStableId, serializeMetaState, serializeState } from "./net/stateSerialization.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { getEffectiveMasterVolume, getStoredMasterVolume, normalizeMasterVolume } from "../src/audio/audioSettings.js";
+import { GameSim } from "../src/sim/GameSim.js";
+import { stepGame } from "../src/game/gameStep.js";
 
 function createFakeSocket() {
   return {
@@ -101,6 +103,62 @@ function validateSharedRewards() {
   assert.equal(peerState.gold, 11, "dead peer incorrectly received shared gold");
 }
 
+function makeRewardEnemy(game, overrides = {}) {
+  return {
+    id: overrides.id || `enemy_${Math.random().toString(36).slice(2)}`,
+    type: overrides.type || "mummy",
+    x: game.player.x + 96,
+    y: game.player.y,
+    size: 18,
+    hp: 0,
+    maxHp: 10,
+    ...overrides
+  };
+}
+
+function validateDeathRewardEligibility() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  const remote = {
+    id: "p_remote_alive",
+    classType: "fighter",
+    x: game.player.x + 64,
+    y: game.player.y,
+    size: game.player.size,
+    health: 100,
+    maxHealth: 100,
+    alive: true,
+    level: 1,
+    experience: 0,
+    expToNextLevel: 999,
+    skillPoints: 0,
+    levelWeaponDamageBonus: 0
+  };
+  game.remotePlayers = [remote];
+  game.activePlayerCount = 2;
+  game.player.health = 0;
+  game.player.alive = false;
+
+  game.enemies.push(makeRewardEnemy(game, { id: "ownerless" }));
+  stepGame(game, 0.016, { processUi: false });
+  assert.ok(remote.experience > 0, "ownerless enemy death should reward remaining active players");
+  assert.equal(game.experience, 0, "dead primary player should not receive shared XP");
+
+  const xpAfterOwnerless = remote.experience;
+  game.enemies.push(makeRewardEnemy(game, {
+    id: "friendly-pet",
+    type: "wolf",
+    isControlledUndead: true,
+    controllerPlayerId: remote.id,
+    summonedByPlayer: true
+  }));
+  stepGame(game, 0.016, { processUi: false });
+  assert.equal(remote.experience, xpAfterOwnerless, "player pet death should not award XP");
+
+  game.enemies.push(makeRewardEnemy(game, { id: "confused-kill", lastDamageOwnerId: remote.id }));
+  stepGame(game, 0.016, { processUi: false });
+  assert.ok(remote.experience > xpAfterOwnerless, "confused/allied enemy kill should award shared XP through owner id");
+}
+
 function validateAudioScaling() {
   const emptyStorage = { getItem: () => null };
   assert.equal(getStoredMasterVolume(emptyStorage), 0.5, "default master game volume should be 50%");
@@ -110,10 +168,12 @@ function validateAudioScaling() {
 }
 
 validateSharedRewards();
+validateDeathRewardEligibility();
 validateAudioScaling();
 
 console.log(JSON.stringify({
   sharedRewards: "ok",
+  deathRewardEligibility: "ok",
   defaultMasterVolume: getStoredMasterVolume({ getItem: () => null }),
   effectiveFullMasterVolume: getEffectiveMasterVolume(1),
   effectiveDefaultMasterVolume: getEffectiveMasterVolume(0.5)
