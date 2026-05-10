@@ -13,7 +13,7 @@ import { installRoomDevBossOverride } from "./net/installRoomDevBossOverride.js"
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
-import { buildAgoraVoiceUid, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
+import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
 const HOST = typeof process.env.HOST === "string" && process.env.HOST.trim() ? process.env.HOST.trim() : "";
@@ -111,7 +111,7 @@ wss.on("connection", (ws) => {
     playerId: client.id,
     voiceUid: buildAgoraVoiceUid(client.id),
     protocol: 2,
-    voice: buildVoiceRoomConfig(voiceConfig, ""),
+    voice: buildVoiceClientConfig(buildVoiceRoomConfig(voiceConfig, ""), client.id),
     note: "Server authoritative alpha. Multiplayer room scaffolding is in progress."
   });
 
@@ -161,5 +161,5 @@ server.listen(PORT, HOST || undefined, () => {
   console.log(`Authoritative server listening on ${boundHost}:${PORT}`);
   console.log(`WebSocket gameplay endpoint available on ws://${endpointHost}:${PORT}`);
   console.log(`Leaderboard REST endpoint available on http://${endpointHost}:${PORT}/api/leaderboard`);
-  console.log(`Agora voice ${voiceConfig.enabled ? "enabled" : "disabled"}${voiceConfig.enabled ? " for multiplayer rooms" : " (set AGORA_APP_ID or --agora-app-id to enable)"}`);
+  console.log(`Agora voice ${voiceConfig.enabled ? "enabled" : "disabled"}${voiceConfig.enabled ? ` for multiplayer rooms (${voiceConfig.appCertificate ? "server-generated RTC tokens" : voiceConfig.token ? "static RTC token" : "test App ID/no token"})` : " (set AGORA_APP_ID or --agora-app-id to enable)"}`);
 });

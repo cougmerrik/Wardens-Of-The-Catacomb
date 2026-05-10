@@ -253,7 +253,7 @@ export function handleClientMessage(raw, context) {
       voiceUid: typeof room.getVoiceUid === "function" ? room.getVoiceUid(client.id) : null,
       classType: room.sim.classType,
       voice: typeof room.getVoiceRoomConfig === "function"
-        ? room.getVoiceRoomConfig()
+        ? room.getVoiceRoomConfig(client.id)
         : room.voiceConfig || { enabled: false }
     });
     if (room.phase === "active") {

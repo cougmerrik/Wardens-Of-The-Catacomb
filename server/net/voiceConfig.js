@@ -1,4 +1,9 @@
+import agoraToken from "agora-token";
+
 const AGORA_CDN_URL = "https://download.agora.io/sdk/release/AgoraRTC_N.js";
+const DEFAULT_TOKEN_TTL_SECONDS = 60 * 60;
+const MAX_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+const { RtcRole, RtcTokenBuilder } = agoraToken;
 
 function readArgValue(args, key) {
   const eqPrefix = `${key}=`;
@@ -18,6 +23,18 @@ function sanitizeToken(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function sanitizeCertificate(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function readPositiveInteger(args, env, argKey, envKeys, fallback) {
+  const argValue = readArgValue(args, argKey);
+  const raw = argValue || envKeys.map((key) => env[key]).find((value) => typeof value === "string" && value.trim()) || "";
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(MAX_TOKEN_TTL_SECONDS, Math.floor(parsed));
+}
+
 export function resolveVoiceConfig({ env = process.env, argv = process.argv.slice(1) } = {}) {
   const appId = sanitizeAppId(
     readArgValue(argv, "--agora-app-id") ||
@@ -34,12 +51,28 @@ export function resolveVoiceConfig({ env = process.env, argv = process.argv.slic
       env.VOICE_AGORA_TOKEN ||
       ""
   );
+  const appCertificate = sanitizeCertificate(
+    readArgValue(argv, "--agora-app-certificate") ||
+      readArgValue(argv, "--voice-agora-app-certificate") ||
+      env.AGORA_APP_CERTIFICATE ||
+      env.VOICE_AGORA_APP_CERTIFICATE ||
+      ""
+  );
+  const tokenTtlSeconds = readPositiveInteger(
+    argv,
+    env,
+    "--agora-token-ttl-seconds",
+    ["AGORA_TOKEN_TTL_SECONDS", "VOICE_AGORA_TOKEN_TTL_SECONDS"],
+    DEFAULT_TOKEN_TTL_SECONDS
+  );
   const sdkUrl = sanitizeAppId(env.AGORA_SDK_URL || env.VOICE_AGORA_SDK_URL || AGORA_CDN_URL) || AGORA_CDN_URL;
   return {
     enabled: !!appId,
     provider: "agora",
     appId,
+    appCertificate,
     token,
+    tokenTtlSeconds,
     sdkUrl
   };
 }
@@ -52,9 +85,40 @@ export function buildVoiceRoomConfig(baseConfig, roomId) {
     enabled: true,
     provider: "agora",
     appId: baseConfig.appId,
+    appCertificate: baseConfig.appCertificate || "",
     token: baseConfig.token || null,
+    tokenTtlSeconds: baseConfig.tokenTtlSeconds || DEFAULT_TOKEN_TTL_SECONDS,
     sdkUrl: baseConfig.sdkUrl,
     channel
+  };
+}
+
+export function buildVoiceClientConfig(roomConfig, playerId, { nowSeconds = Math.floor(Date.now() / 1000) } = {}) {
+  if (!roomConfig || !roomConfig.enabled) return { enabled: false };
+  const hasPlayerId = typeof playerId === "string" && !!playerId;
+  const uid = hasPlayerId ? buildAgoraVoiceUid(playerId) : 0;
+  const tokenExpiresAt = nowSeconds + (roomConfig.tokenTtlSeconds || DEFAULT_TOKEN_TTL_SECONDS);
+  const generatedToken = roomConfig.appCertificate && hasPlayerId
+    ? RtcTokenBuilder.buildTokenWithUid(
+      roomConfig.appId,
+      roomConfig.appCertificate,
+      roomConfig.channel,
+      uid,
+      RtcRole.PUBLISHER,
+      tokenExpiresAt,
+      tokenExpiresAt
+    )
+    : null;
+  const token = generatedToken || roomConfig.token || null;
+  return {
+    enabled: true,
+    provider: "agora",
+    appId: roomConfig.appId,
+    token,
+    tokenExpiresAt: token ? tokenExpiresAt : 0,
+    sdkUrl: roomConfig.sdkUrl,
+    channel: roomConfig.channel,
+    tokenMode: roomConfig.appCertificate ? "server-generated" : roomConfig.token ? "static" : "none"
   };
 }
 

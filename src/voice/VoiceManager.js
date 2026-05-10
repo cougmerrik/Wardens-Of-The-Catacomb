@@ -49,7 +49,19 @@ export class VoiceManager {
   }
 
   configure(config = {}) {
-    this.config = config && config.enabled ? { ...config } : { enabled: false };
+    if (config && config.enabled) {
+      const sameRoom =
+        this.config?.enabled &&
+        this.config.appId === config.appId &&
+        this.config.channel === config.channel;
+      this.config = {
+        ...config,
+        token: config.token || (sameRoom ? this.config.token : null),
+        tokenExpiresAt: config.tokenExpiresAt || (sameRoom ? this.config.tokenExpiresAt : 0)
+      };
+    } else {
+      this.config = { enabled: false };
+    }
     if (!this.config.enabled || !this.userEnabled) {
       this.state = "disabled";
       this.lastError = "";
@@ -85,7 +97,7 @@ export class VoiceManager {
   describeJoinError(error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("CAN_NOT_GET_GATEWAY_SERVER") || message.includes("dynamic use static key")) {
-      return "Agora token required for this App ID. Use an unsecured test App ID or add per-channel RTC token generation.";
+      return "Agora token required for this App ID. Set AGORA_APP_CERTIFICATE on the server or use an unsecured test App ID.";
     }
     return message;
   }

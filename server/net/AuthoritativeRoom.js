@@ -4,7 +4,7 @@ import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/gam
 import { cloneNecromancerTalentState, createNecromancerTalentState } from "../../src/game/necromancerTalentTree.js";
 import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
 import { cloneNecromancerBeamState, cloneNecromancerRuntimeState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
-import { buildAgoraVoiceUid } from "./voiceConfig.js";
+import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -102,15 +102,13 @@ export class AuthoritativeRoom {
     this.pauseOwnerId = typeof value === "string" && value ? value : null;
   }
 
-  getVoiceRoomConfig() {
+  getVoiceRoomConfig(playerId = "") {
     if (!this.voiceConfig || !this.voiceConfig.enabled) return { enabled: false };
-    return {
-      ...this.voiceConfig,
-      channel:
-        typeof this.voiceConfig.channel === "string" && this.voiceConfig.channel
-          ? this.voiceConfig.channel
-          : `wardens-${this.id}`
-    };
+    const channel =
+      typeof this.voiceConfig.channel === "string" && this.voiceConfig.channel
+        ? this.voiceConfig.channel
+        : `wardens-${this.id}`;
+    return buildVoiceClientConfig({ ...this.voiceConfig, channel }, playerId);
   }
 
   getVoiceUid(playerId) {
