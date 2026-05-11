@@ -3,7 +3,8 @@ const VOICE_CHAT_ENABLED_STORAGE_KEY = "wardens.voiceChatEnabled";
 const VOICE_CHAT_VOLUME_STORAGE_KEY = "wardens.voiceChatVolume";
 const VOICE_CHAT_MODE_STORAGE_KEY = "wardens.voiceChatMode";
 const VOICE_CHAT_PUSH_TO_TALK_KEY_STORAGE_KEY = "wardens.voiceChatPushToTalkKey";
-const DEFAULT_MASTER_VOLUME = 0.25;
+const MASTER_VOLUME_OUTPUT_CAP = 0.1;
+const DEFAULT_MASTER_VOLUME = 0.5;
 const DEFAULT_VOICE_CHAT_ENABLED = false;
 const DEFAULT_VOICE_CHAT_VOLUME = 0.8;
 export const VOICE_CHAT_MODE_OPEN_MIC = "openMic";
@@ -16,6 +17,10 @@ export function normalizeMasterVolume(value, fallback = DEFAULT_MASTER_VOLUME) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(0, Math.min(1, numeric));
+}
+
+export function getEffectiveMasterVolume(value, fallback = DEFAULT_MASTER_VOLUME) {
+  return normalizeMasterVolume(value, fallback) * MASTER_VOLUME_OUTPUT_CAP;
 }
 
 export function getStoredMasterVolume(storage = globalThis?.localStorage) {
@@ -36,7 +41,7 @@ export function persistMasterVolume(volume, storage = globalThis?.localStorage) 
 
 export function syncGlobalMasterVolume(volume) {
   if (typeof window === "undefined") return;
-  window.__WOTC_MASTER_VOLUME__ = normalizeMasterVolume(volume);
+  window.__WOTC_MASTER_VOLUME__ = getEffectiveMasterVolume(volume);
 }
 
 export function getStoredVoiceChatEnabled(storage = globalThis?.localStorage) {
