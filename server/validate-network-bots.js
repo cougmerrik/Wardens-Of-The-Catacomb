@@ -14,6 +14,7 @@ const ROOM_ID = "validate-network-bots";
 const HOST_ROOM_ID = "validate-network-bot-host";
 const BOT_COUNT = 3;
 const RUN_SECONDS = 14;
+const WS_OPEN = 1;
 
 const children = [];
 
@@ -73,6 +74,34 @@ async function runHostModeScenario(url) {
   }
 }
 
+async function runReconnectScenario(url) {
+  const bot = new BotClient({
+    url,
+    roomId: `${ROOM_ID}-reconnect`,
+    name: "ReconnectBot-1",
+    classType: "archer"
+  });
+  let openCount = 0;
+  bot.on("open", () => {
+    openCount += 1;
+  });
+  try {
+    bot.connect();
+    await waitForCondition(() => openCount === 1 && bot.metrics.joined, "initial bot connection");
+    bot.ws.close();
+    await waitForCondition(() => bot.ws === null && bot.metrics.disconnectedAtMs > 0, "bot socket cleanup after close");
+    bot.connect();
+    await waitForCondition(() => openCount === 2 && bot.ws?.readyState === WS_OPEN, "bot reconnect");
+    return {
+      ...bot.metrics,
+      openCount,
+      hasSocket: !!bot.ws
+    };
+  } finally {
+    bot.close();
+  }
+}
+
 async function main() {
   await ensurePortAvailable(WS_PORT, "WS");
   startChild(children, projectRoot, "ws", process.execPath, ["server/networkServer.js"], { PORT: String(WS_PORT) });
@@ -90,10 +119,11 @@ async function main() {
     logLevel: "silent"
   });
   const hostResult = await runHostModeScenario(url);
+  const reconnectResult = await runReconnectScenario(url);
 
   mkdirSync(artifactsDir, { recursive: true });
   const successPath = resolve(artifactsDir, "validate-network-bots-success.json");
-  writeFileSync(successPath, JSON.stringify({ roomFill: result, hostMode: hostResult }, null, 2));
+  writeFileSync(successPath, JSON.stringify({ roomFill: result, hostMode: hostResult, reconnect: reconnectResult }, null, 2));
 
   assert(result.totals.joined === BOT_COUNT, `expected ${BOT_COUNT} joined bots, got ${result.totals.joined}`);
   assert(result.totals.readied === BOT_COUNT, `expected ${BOT_COUNT} readied bots, got ${result.totals.readied}`);
@@ -108,8 +138,10 @@ async function main() {
   assert(hostResult.host.started === true && hostResult.guest.started === true, "expected host-mode room to start");
   assert(hostResult.host.inputsSent > 0, "expected host bot to send gameplay inputs after host-mode start");
   assert(hostResult.host.errors.length === 0 && hostResult.guest.errors.length === 0, "expected no host-mode bot errors");
+  assert(reconnectResult.openCount === 2, `expected bot to reconnect once, got ${reconnectResult.openCount} opens`);
+  assert(reconnectResult.hasSocket === true, "expected bot to hold a live socket after reconnect");
 
-  console.log(JSON.stringify({ ...result.totals, hostModeStarted: hostResult.host.started && hostResult.guest.started, successPath }, null, 2));
+  console.log(JSON.stringify({ ...result.totals, hostModeStarted: hostResult.host.started && hostResult.guest.started, reconnected: reconnectResult.openCount === 2, successPath }, null, 2));
 }
 
 main()

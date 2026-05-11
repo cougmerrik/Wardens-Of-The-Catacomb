@@ -59,20 +59,23 @@ export class BotClient extends EventEmitter {
   }
 
   connect() {
-    if (this.ws) return;
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) return;
+    this.closed = false;
     this.metrics.connectedAtMs = Date.now();
-    this.ws = new WebSocket(this.url, { perMessageDeflate: false });
-    this.ws.on("open", () => {
+    const socket = new WebSocket(this.url, { perMessageDeflate: false });
+    this.ws = socket;
+    socket.on("open", () => {
       this.log("connected");
       this.emit("open");
     });
-    this.ws.on("message", (raw) => this.handleRawMessage(raw));
-    this.ws.on("close", () => {
+    socket.on("message", (raw) => this.handleRawMessage(raw));
+    socket.on("close", () => {
+      if (this.ws === socket) this.ws = null;
       this.metrics.disconnectedAtMs = Date.now();
       this.stopInputLoop();
       this.emit("close");
     });
-    this.ws.on("error", (error) => {
+    socket.on("error", (error) => {
       const message = error instanceof Error ? error.message : String(error);
       this.metrics.errors.push(message);
       this.emit("botError", error);
