@@ -1,4 +1,4 @@
-import { getStoredMasterVolume, normalizeMasterVolume, persistMasterVolume, syncGlobalMasterVolume } from "./audioSettings.js";
+import { getEffectiveMasterVolume, getStoredMasterVolume, normalizeMasterVolume, persistMasterVolume, syncGlobalMasterVolume } from "./audioSettings.js";
 import { crossfadeAudioVolumes, fadeAudioVolume } from "./audioTransitions.js";
 import { createMusicDebugState } from "./musicDebugState.js";
 import { ALL_MUSIC_TRACKS, GAMEPLAY_TRACKS, TITLE_TRACK, VICTORY_TRACK, getBossTrackDefinitionForBiome } from "./musicCatalog.js";
@@ -162,7 +162,7 @@ export class MusicController {
     return this.tracks.find((track) => (title && track.title === title) || (src && track.src === src)) || null;
   }
   scaleVolume(volume) {
-    return normalizeMasterVolume(volume, 1) * this.masterVolume;
+    return normalizeMasterVolume(volume, 1) * getEffectiveMasterVolume(this.masterVolume);
   }
 
   setAudioBaseVolume(audio, volume) {

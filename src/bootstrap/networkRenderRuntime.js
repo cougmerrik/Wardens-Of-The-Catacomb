@@ -51,6 +51,7 @@ export function startNetworkRenderLoopRuntime({
   updatePredictedProjectiles,
   updateNetworkProjectilePresentation,
   netPredictedProjectiles,
+  updateVoice,
   setNetRenderRaf
 }) {
   let lastFrameAt = performance.now();
@@ -128,6 +129,7 @@ export function startNetworkRenderLoopRuntime({
     if (typeof updatePredictedProjectiles === "function") updatePredictedProjectiles(game, netPredictedProjectiles, dt);
     if (typeof updateNetworkProjectilePresentation === "function") updateNetworkProjectilePresentation(game, dt);
     prunePredictedProjectiles(netPredictedProjectiles, performance.now(), 220, game);
+    if (typeof updateVoice === "function") updateVoice(game);
     game.renderer.draw(game);
     setNetRenderRaf(requestAnimationFrame(loop));
   };

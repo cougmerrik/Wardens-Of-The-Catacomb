@@ -28,12 +28,14 @@ assertHas(gatesFor(["server/net/AuthoritativeRoom.js"]), [
   "validate:network-combat",
   "validate:network-combat-hit",
   "validate:network-shop",
+  "validate:network-shared-rewards",
   "validate:network-two-client-damage",
   "validate:network-archer",
   "validate:network-audio",
   "validate:network-pause",
   "validate:network-ui",
-  "validate:network-refund"
+  "validate:network-refund",
+  "validate:network-bots"
 ]);
 
 assertHas(gatesFor(["scripts/prepare-capacitor-web.js", "src/runtime/runtimeConfig.js"]), ["validate:mobile-transport", "build:android:web"]);

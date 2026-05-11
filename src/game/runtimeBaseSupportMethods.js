@@ -246,6 +246,27 @@ export const runtimeBaseSupportMethods = {
     else if (entity) entity[key] = value;
   },
 
+  isSharedMultiplayerProgressActive() {
+    const activeCount = Number.isFinite(this.activePlayerCount)
+      ? this.activePlayerCount
+      : (Array.isArray(this.networkActivePlayers) ? this.networkActivePlayers.length : 1);
+    return activeCount > 1;
+  },
+
+  getSharedProgressRecipients(entity) {
+    if (!this.isLivingPlayerEntity(entity)) return [];
+    if (!this.isSharedMultiplayerProgressActive()) return [entity];
+    const recipients = [];
+    const seen = new Set();
+    for (const player of this.getLivingPlayerEntities()) {
+      if (!this.isLivingPlayerEntity(player) || seen.has(player)) continue;
+      seen.add(player);
+      recipients.push(player);
+    }
+    if (!seen.has(entity)) recipients.push(entity);
+    return recipients.length > 0 ? recipients : [entity];
+  },
+
   getPlayerEnemyCollisionRadiusFor(entity = this.player) {
     const size = Number.isFinite(entity?.size) ? entity.size : (this.player?.size || 20);
     return Math.max(4, size * 0.5);
@@ -344,52 +365,64 @@ export const runtimeBaseSupportMethods = {
 
   awardGoldToPlayerEntity(entity, amount, { spawnText = true } = {}) {
     if (!Number.isFinite(amount) || amount <= 0 || !this.isLivingPlayerEntity(entity)) return;
-    const currentGold = this.getPlayerProgressField(entity, "gold", 0);
-    this.setPlayerProgressField(entity, "gold", currentGold + amount);
-    this.awardScoreToPlayerEntity(entity, amount);
-    if (this.isPrimaryPlayerEntity(entity) && typeof this.recordRunGoldEarned === "function") this.recordRunGoldEarned(amount);
-    else entity.goldEarned = (Number.isFinite(entity.goldEarned) ? entity.goldEarned : 0) + amount;
-    if (spawnText) this.spawnFloatingText(entity.x, entity.y - 30, `+${amount}g`, "#f2d76b", 0.75, 14);
+    for (const recipient of this.getSharedProgressRecipients(entity)) {
+      const currentGold = this.getPlayerProgressField(recipient, "gold", 0);
+      this.setPlayerProgressField(recipient, "gold", currentGold + amount);
+      this.awardScoreToPlayerEntity(recipient, amount);
+      if (this.isPrimaryPlayerEntity(recipient) && typeof this.recordRunGoldEarned === "function") this.recordRunGoldEarned(amount);
+      else recipient.goldEarned = (Number.isFinite(recipient.goldEarned) ? recipient.goldEarned : 0) + amount;
+      if (spawnText) this.spawnFloatingText(recipient.x, recipient.y - 30, `+${amount}g`, "#f2d76b", 0.75, 14);
+    }
   },
 
   gainExperienceForPlayerEntity(entity, amount) {
     if (!this.isLivingPlayerEntity(entity) || !Number.isFinite(amount) || amount <= 0) return;
-    if (this.isPrimaryPlayerEntity(entity)) {
-      this.gainExperience(amount);
-      return;
-    }
     if (typeof this.isFloorBossActive === "function" && this.isFloorBossActive()) return;
-    const classSpec = this.getPlayerClassSpec(entity);
-    entity.experience = (Number.isFinite(entity.experience) ? entity.experience : 0) + amount;
-    entity.expToNextLevel = Number.isFinite(entity.expToNextLevel) ? entity.expToNextLevel : this.config.progression.baseXpToLevel;
-    entity.level = Number.isFinite(entity.level) ? entity.level : 1;
-    entity.skillPoints = Number.isFinite(entity.skillPoints) ? entity.skillPoints : 0;
-    entity.levelWeaponDamageBonus = Number.isFinite(entity.levelWeaponDamageBonus) ? entity.levelWeaponDamageBonus : 0;
-    while (entity.experience >= entity.expToNextLevel) {
-      entity.experience -= entity.expToNextLevel;
-      entity.level += 1;
-      entity.skillPoints += this.getSkillPointGainForLevel(entity.level, entity.classType);
-      const hpGain = Number.isFinite(classSpec.levelHpGain) ? classSpec.levelHpGain : 10;
-      let adjustedHpGain = hpGain;
-      if (entity.classType === "archer") adjustedHpGain = hpGain * (1 + getRangerMaxHealthBonusPct(entity));
-      if (entity.classType === "fighter") adjustedHpGain = hpGain * (1 + getWarriorIronGuardMaxHealthBonusPct(entity));
-      entity.maxHealth = (Number.isFinite(entity.maxHealth) ? entity.maxHealth : 0) + adjustedHpGain;
-      entity.health = Math.min(entity.maxHealth, (Number.isFinite(entity.health) ? entity.health : 0) + adjustedHpGain);
-      const baseMin = Number.isFinite(classSpec.primaryDamageMin)
-        ? classSpec.primaryDamageMin
-        : Number.isFinite(classSpec.primaryDamage)
-        ? classSpec.primaryDamage
-        : 1;
-      const baseMax = Number.isFinite(classSpec.primaryDamageMax)
-        ? classSpec.primaryDamageMax
-        : Number.isFinite(classSpec.primaryDamage)
-        ? classSpec.primaryDamage
-        : baseMin;
-      const baseAvg = (Math.min(baseMin, baseMax) + Math.max(baseMin, baseMax)) * 0.5;
-      const dmgPct = Number.isFinite(classSpec.levelWeaponDamagePct) ? classSpec.levelWeaponDamagePct : 0.05;
-      entity.levelWeaponDamageBonus += Math.max(1, baseAvg * Math.max(0, dmgPct));
-      entity.expToNextLevel = Math.floor(entity.expToNextLevel * this.config.progression.xpLevelScaling);
-      this.spawnFloatingText(entity.x, entity.y - 30, `Level ${entity.level}!`, "#9be18a", 1.0, 15);
+    let bossTriggered = false;
+    for (const recipient of this.getSharedProgressRecipients(entity)) {
+      if (this.isPrimaryPlayerEntity(recipient)) {
+        this.gainExperience(amount);
+        continue;
+      }
+      const classSpec = this.getPlayerClassSpec(recipient);
+      recipient.experience = (Number.isFinite(recipient.experience) ? recipient.experience : 0) + amount;
+      recipient.expToNextLevel = Number.isFinite(recipient.expToNextLevel) ? recipient.expToNextLevel : this.config.progression.baseXpToLevel;
+      recipient.level = Number.isFinite(recipient.level) ? recipient.level : 1;
+      recipient.skillPoints = Number.isFinite(recipient.skillPoints) ? recipient.skillPoints : 0;
+      recipient.levelWeaponDamageBonus = Number.isFinite(recipient.levelWeaponDamageBonus) ? recipient.levelWeaponDamageBonus : 0;
+      let leveled = false;
+      while (recipient.experience >= recipient.expToNextLevel) {
+        recipient.experience -= recipient.expToNextLevel;
+        recipient.level += 1;
+        leveled = true;
+        recipient.skillPoints += this.getSkillPointGainForLevel(recipient.level, recipient.classType);
+        const hpGain = Number.isFinite(classSpec.levelHpGain) ? classSpec.levelHpGain : 10;
+        let adjustedHpGain = hpGain;
+        if (recipient.classType === "archer") adjustedHpGain = hpGain * (1 + getRangerMaxHealthBonusPct(recipient));
+        if (recipient.classType === "fighter") adjustedHpGain = hpGain * (1 + getWarriorIronGuardMaxHealthBonusPct(recipient));
+        recipient.maxHealth = (Number.isFinite(recipient.maxHealth) ? recipient.maxHealth : 0) + adjustedHpGain;
+        recipient.health = Math.min(recipient.maxHealth, (Number.isFinite(recipient.health) ? recipient.health : 0) + adjustedHpGain);
+        const baseMin = Number.isFinite(classSpec.primaryDamageMin)
+          ? classSpec.primaryDamageMin
+          : Number.isFinite(classSpec.primaryDamage)
+          ? classSpec.primaryDamage
+          : 1;
+        const baseMax = Number.isFinite(classSpec.primaryDamageMax)
+          ? classSpec.primaryDamageMax
+          : Number.isFinite(classSpec.primaryDamage)
+          ? classSpec.primaryDamage
+          : baseMin;
+        const baseAvg = (Math.min(baseMin, baseMax) + Math.max(baseMin, baseMax)) * 0.5;
+        const dmgPct = Number.isFinite(classSpec.levelWeaponDamagePct) ? classSpec.levelWeaponDamagePct : 0.05;
+        recipient.levelWeaponDamageBonus += Math.max(1, baseAvg * Math.max(0, dmgPct));
+        recipient.expToNextLevel = Math.floor(recipient.expToNextLevel * this.config.progression.xpLevelScaling);
+        this.spawnFloatingText(recipient.x, recipient.y - 30, `Level ${recipient.level}!`, "#9be18a", 1.0, 15);
+      }
+      if (!bossTriggered && leveled && typeof this.updateFloorBossTrigger === "function" && this.updateFloorBossTrigger()) {
+        bossTriggered = true;
+        const target = this.floorBoss?.triggerLevel || this.getFloorBossTriggerLevel();
+        this.spawnFloatingText(recipient.x, recipient.y - 80, `Boss Ready: Lv ${target}`, "#c78bff", 1.4, 16);
+      }
     }
   },
 

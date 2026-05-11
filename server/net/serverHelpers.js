@@ -25,7 +25,8 @@ export function makeDefaultInput() {
     firePrimaryQueued: false,
     firePrimaryHeld: false,
     fireAltQueued: false,
-    modeSwapQueued: false
+    modeSwapQueued: false,
+    spectateTargetId: ""
   };
 }
 
@@ -46,6 +47,7 @@ export function sanitizeInput(raw, previous) {
     next.firePrimaryHeld = !!raw.firePrimaryHeld;
     next.fireAltQueued = !!raw.fireAltQueued || !!previous.fireAltQueued;
     next.modeSwapQueued = !!raw.modeSwapQueued || !!previous.modeSwapQueued;
+    next.spectateTargetId = typeof raw.spectateTargetId === "string" ? raw.spectateTargetId.slice(0, 32) : "";
   }
   return next;
 }

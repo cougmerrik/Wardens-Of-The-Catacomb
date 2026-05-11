@@ -119,6 +119,19 @@ This document summarizes the current high-level architecture and validation work
 - The network render/runtime path now reads the active `netClient` dynamically instead of capturing a stale pre-connect reference, which keeps multiplayer UI actions working after live room join.
 - The browser debug surface in `game.js` now exposes enough live state for Playwright-based network validation and perf harnesses.
 
+### Optional Agora Voice
+- Multiplayer voice is optional and server-gated. The authoritative server advertises Agora voice config only when started with `AGORA_APP_ID`, `VOICE_AGORA_APP_ID`, `--agora-app-id`, or `--voice-agora-app-id`.
+- When enabled, each multiplayer room receives a matching Agora channel name (`wardens-<roomId>`). The server derives a stable numeric Agora uid for each network player and includes it in lobby/room payloads so Agora tracks can still map back to Wardens player ids.
+- Agora handles microphone publishing and voice transport only. Client-side voice code under `src/voice/*` owns remote-track playback, distance volume, stereo panning, and lightweight door muffling from authoritative gameplay state.
+- Voice updates run from the network render loop and read `game.player`, `game.remotePlayers`, and `game.door`; they do not depend on camera or renderer state.
+- The browser loads the Agora Web SDK lazily from the configured SDK URL only after voice is enabled for a room. Multiplayer clients join voice after joining the network room, including while still in the lobby; normal local play and multiplayer without an app id do not load Agora or request microphone access.
+- Voice Chat defaults off. Players can enable it in Options; disabled clients do not join the Agora room or request microphone access. Voice Chat Volume is persisted separately from music/master volume and scales remote voice playback only. The Microphone option supports Open Mic, Push to Talk, and Mute; Push to Talk uses a configurable keyboard button and keeps the local published mic track disabled until that button is held.
+- Spatial voice fully fades out past 20 map tiles. Players in the same connected acoustic space stay unmuffled; closed doors and walls apply gain reduction plus low-pass filtering, with walls using the heavier attenuation.
+- Dead spectators publish their current spectate target through network input. Other clients suppress that spectator's voice unless the spectator is watching them.
+- `AGORA_APP_CERTIFICATE`, `VOICE_AGORA_APP_CERTIFICATE`, `--agora-app-certificate`, and `--voice-agora-app-certificate` enable secure token mode. In this mode the server keeps the App Certificate private and generates an Agora RTC token per joining player using the room channel and that player's stable numeric Agora uid. `AGORA_TOKEN_TTL_SECONDS`, `VOICE_AGORA_TOKEN_TTL_SECONDS`, or `--agora-token-ttl-seconds` can override the default one-hour token lifetime, capped at 24 hours.
+- `AGORA_TOKEN`, `AGORA_RTC_TOKEN`, `VOICE_AGORA_TOKEN`, `--agora-token`, and `--voice-agora-token` are still accepted for static token-backed rooms. If no certificate or static token is configured, the client joins with `null` token for Agora projects configured as unsecured/test App ID projects during development.
+- Agora projects with App Certificate/token security enabled require per-channel/per-uid RTC tokens. Without that token, Agora reports `CAN_NOT_GET_GATEWAY_SERVER: dynamic use static key`.
+
 ### Lobby And Session Flow
 - Network players enter Connection Setup, then join a dedicated shared lobby instead of going through the local character-select start path.
 - The lobby supports:
@@ -148,12 +161,13 @@ This document summarizes the current high-level architecture and validation work
   - movement
   - hostile targeting and damage intake
   - class primary/alt combat paths
-  - per-player XP/gold/score progression
+  - shared XP/gold rewards with per-player kill score/build progression
   - death/spectate flow
   - disconnect removal and room-owner / pause-owner transfer rules
 
 ### Spectating And Results
 - Dead players stay in the connected run roster, become read-only spectators, and can cycle living targets through keyboard and party-panel selection.
+- Spectator wisps are renderer-only effects derived from replicated `spectateTargetId` player state. They have no collision or control path and fade out/in when a spectator changes targets.
 - Final multiplayer results are serialized through room meta state and rendered client-side as a shared team summary rather than using the solo leaderboard path.
 - Multiplayer leaderboard submission is currently disabled by design.
 
@@ -172,7 +186,7 @@ This document summarizes the current high-level architecture and validation work
 - `npm run validate:gameplay`
   - boss, tactics, and minotaur gameplay regressions
 - `npm run validate:network`
-  - browser-driven network join, combat, hit-confirmation, archer, audio, and UI regressions
+  - browser-driven network join, combat, hit-confirmation, shared reward, archer, audio, and UI regressions
 - `npm run perf:all`
   - local+network perf plus browser perf
 - `npm run validate:pre-commit`
@@ -197,6 +211,8 @@ This document summarizes the current high-level architecture and validation work
 - `validate:network-combat-hit`
   - measures attack emission, enemy HP confirmation, and floating-text confirmation in browser play
   - now uses reliable target-selection and repositioning so misses on drifting enemies do not masquerade as combat-feedback regressions
+- `validate:network-shared-rewards`
+  - verifies authoritative two-player XP/gold reward sharing and master-volume output scaling
 - `validate:network-archer`
   - checks moving archer shots against live projectile direction/alignment
   - now retries moving-shot samples and records skipped attempts so authoritative-visibility timing noise does not make the suite flaky

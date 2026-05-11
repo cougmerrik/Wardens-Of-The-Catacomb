@@ -27,6 +27,7 @@ const SCRIPT_TARGETS = {
   "validate:network-combat": "server/validate-network-combat.js",
   "validate:network-combat-hit": "server/validate-network-combat-hit.js",
   "validate:network-shop": "server/validate-network-shop.js",
+  "validate:network-shared-rewards": "server/validate-network-shared-rewards.js",
   "validate:network-two-client-damage": "server/validate-network-two-client-damage.js",
   "validate:network-archer": "server/validate-network-archer.js",
   "validate:network-audio": "server/validate-network-audio.js",
@@ -41,6 +42,7 @@ const SCRIPT_TARGETS = {
   "validate:network-framework": "server/validate-network-framework-evaluation.js",
   "validate:selective-closeout-plan": "server/validate-selective-closeout-plan.js",
   "build:android:web": "scripts/prepare-capacitor-web.js",
+  "validate:network-bots": "server/validate-network-bots.js",
   "perf:test": "server/perfRunner.js",
   "perf:network-browser": "server/perfNetworkBrowser.js",
   "perf:floor-scaling": "server/perfFloorScaling.js"
@@ -63,12 +65,14 @@ const SUITES = {
     "validate:network-combat",
     "validate:network-combat-hit",
     "validate:network-shop",
+    "validate:network-shared-rewards",
     "validate:network-two-client-damage",
     "validate:network-archer",
     "validate:network-audio",
     "validate:network-pause",
     "validate:network-ui",
-    "validate:network-refund"
+    "validate:network-refund",
+    "validate:network-bots"
   ],
   "network-stability": [
     "validate:network-transport",
@@ -94,12 +98,14 @@ const SUITES = {
     "validate:network-combat",
     "validate:network-combat-hit",
     "validate:network-shop",
+    "validate:network-shared-rewards",
     "validate:network-two-client-damage",
     "validate:network-archer",
     "validate:network-audio",
     "validate:network-pause",
     "validate:network-ui",
     "validate:network-refund",
+    "validate:network-bots",
     "perf:test",
     "perf:network-browser",
     "perf:floor-scaling"
