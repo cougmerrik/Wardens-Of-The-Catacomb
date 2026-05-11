@@ -48,6 +48,8 @@ export function startNetworkRenderLoopRuntime({
   predictFromInput,
   canRunPredictedCollision,
   prunePredictedProjectiles,
+  updatePredictedProjectiles,
+  updateNetworkProjectilePresentation,
   netPredictedProjectiles,
   setNetRenderRaf
 }) {
@@ -123,7 +125,9 @@ export function startNetworkRenderLoopRuntime({
       }
     }
     game.floatingTexts = stepClientFloatingTexts(game.floatingTexts, dt);
-    prunePredictedProjectiles(netPredictedProjectiles);
+    if (typeof updatePredictedProjectiles === "function") updatePredictedProjectiles(game, netPredictedProjectiles, dt);
+    if (typeof updateNetworkProjectilePresentation === "function") updateNetworkProjectilePresentation(game, dt);
+    prunePredictedProjectiles(netPredictedProjectiles, performance.now(), 220, game);
     game.renderer.draw(game);
     setNetRenderRaf(requestAnimationFrame(loop));
   };

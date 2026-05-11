@@ -11,7 +11,13 @@ import {
   syncByIdLerp
 } from "./src/net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "./src/net/mapChunkReadiness.js";
-import { predictProjectileSpawn, prunePredictedProjectiles } from "./src/net/projectilePrediction.js";
+import {
+  discardPredictedProjectile,
+  predictProjectileSpawn,
+  prunePredictedProjectiles,
+  updateNetworkProjectilePresentation,
+  updatePredictedProjectiles
+} from "./src/net/projectilePrediction.js";
 import { canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, setSelectedClass, shouldSendNetworkInput, updateNetworkRole } from "./src/net/sessionInteraction.js";
 import {
   clearSplashRender as clearSplashCanvas,
@@ -172,6 +178,7 @@ let netPendingWsUrl = "", netPendingRoomId = "", netPendingHandle = "";
 let netInputSeq = 0, netLastAckSeq = 0;
 let netPendingInputs = [], netMapSignature = "", netPendingSnapshot = null;
 const NET_INPUT_DT = 1 / 60;
+const NET_INPUT_INTERVAL_MS = 16;
 const NET_CLOCK_OFFSET_SMOOTHING = 0.12;
 const netDelayParams = new URLSearchParams(window.location.search);
 function parseDelayParam(key, fallback) {
@@ -180,10 +187,10 @@ function parseDelayParam(key, fallback) {
   const value = Number.parseInt(raw, 10);
   return Number.isFinite(value) ? Math.max(0, value) : fallback;
 }
-const NET_RENDER_DELAY_MS_CONTROLLER = parseDelayParam("netDelayController", 36);
+const NET_RENDER_DELAY_MS_CONTROLLER = parseDelayParam("netDelayController", 12);
 const NET_RENDER_DELAY_MS_SPECTATOR = parseDelayParam("netDelaySpectator", 72);
 const NET_MAX_SNAPSHOT_BUFFER = 20;
-const NET_MIN_SEND_MS = 28;
+const NET_MIN_SEND_MS = 14;
 const NET_FORCE_SEND_IDLE_MS = 100;
 let netSnapshotBuffer = [], netLastInputSendAt = 0, netLastSentInput = null, netLastInputProcessAt = 0;
 let netMapChunksReceived = 0, netMapChunkSize = 24;
@@ -1421,6 +1428,10 @@ if (typeof window !== "undefined") {
           ? game.remotePlayers.map((player) => ({
               id: player?.id || null,
               handle: player?.handle || "",
+              x: Number.isFinite(player?.x) ? player.x : 0,
+              y: Number.isFinite(player?.y) ? player.y : 0,
+              screenX: (Number.isFinite(player?.x) ? player.x : 0) - camera.x,
+              screenY: (Number.isFinite(player?.y) ? player.y : 0) - camera.y,
               alive: !!player?.alive,
               health: player?.health || 0,
               maxHealth: player?.maxHealth || 0,
@@ -1716,6 +1727,8 @@ function startNetworkRenderLoop(game) {
     predictFromInput,
     canRunPredictedCollision: () => canRunPredictedCollision(game, isKnownMapTileAt),
     prunePredictedProjectiles,
+    updatePredictedProjectiles,
+    updateNetworkProjectilePresentation,
     netPredictedProjectiles,
     setNetRenderRaf: (value) => {
       netRenderRaf = value;
@@ -1837,6 +1850,7 @@ function startNetworkGameplay() {
     game.multiplayerNotificationCurrent = game.multiplayerNotificationQueue.shift() || null;
   };
   game.networkPredictedProjectiles = netPredictedProjectiles;
+  game.discardPredictedProjectile = (predicted) => discardPredictedProjectile(game, predicted);
   game.remotePlayers = [];
   game.map = [];
   game.mapWidth = 0;
@@ -2255,7 +2269,7 @@ function startNetworkGame() {
       }
     }
     netClient.sendInput(input);
-  }, 33);
+  }, NET_INPUT_INTERVAL_MS);
 }
 
 function handlePrimaryStartAction() {

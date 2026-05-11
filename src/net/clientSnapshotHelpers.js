@@ -263,11 +263,13 @@ export function createProjectileSpawnReconciler({
       game.networkPerf.projectileReconcileRejects = (game.networkPerf.projectileReconcileRejects || 0) + 1;
       bucket.splice(bestIdx, 1);
       if (bucket.length === 0) netPredictedProjectiles.delete(seq);
+      if (typeof game?.discardPredictedProjectile === "function") game.discardPredictedProjectile(rejectedMatch);
       recordAuthoritativeShot(rejectedMatch, true);
       return projectile;
     }
     const matched = bucket.splice(bestIdx, 1)[0];
     if (bucket.length === 0) netPredictedProjectiles.delete(seq);
+    if (typeof game?.discardPredictedProjectile === "function") game.discardPredictedProjectile(matched);
     recordAuthoritativeShot(matched, false);
     const blend = Number.isFinite(projectile.life) && projectile.life > 0.85 ? 0.86 : 0.62;
     const leadSeconds = Math.max(0, Math.min(0.06, frameGapMs / 1000));

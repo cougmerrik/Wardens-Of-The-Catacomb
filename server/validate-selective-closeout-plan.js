@@ -11,7 +11,16 @@ function assertHas(gates, expected) {
 
 assert.deepEqual(gatesFor(["docs/README.md"]), ["check", "validate:loc"]);
 
-assertHas(gatesFor(["src/net/NetClient.js"]), ["check", "validate:loc", "validate:network-transport", "validate:network-join", "validate:network-combat-hit"]);
+assertHas(gatesFor(["src/net/NetClient.js"]), [
+  "check",
+  "validate:loc",
+  "validate:network-transport",
+  "validate:network-controller",
+  "validate:network-projectiles",
+  "validate:network-smoothness",
+  "validate:network-join",
+  "validate:network-combat-hit"
+]);
 
 assertHas(gatesFor(["server/net/AuthoritativeRoom.js"]), [
   "validate:network-transport",

@@ -73,6 +73,19 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           lanternFuel: Number.isFinite(game.player?.lanternFuel) ? game.player.lanternFuel : null,
           lightRadius: typeof game.getPlayerLightRadius === "function" ? game.getPlayerLightRadius(game.player) : null
         },
+        remotePlayers: Array.isArray(game.remotePlayers)
+          ? game.remotePlayers.slice(0, 8).map((player) => ({
+              id: player?.id || null,
+              handle: player?.handle || player?.name || "",
+              x: Number.isFinite(player?.x) ? player.x : 0,
+              y: Number.isFinite(player?.y) ? player.y : 0,
+              screenX: (Number.isFinite(player?.x) ? player.x : 0) - camera.x,
+              screenY: (Number.isFinite(player?.y) ? player.y : 0) - camera.y,
+              health: Number.isFinite(player?.health) ? player.health : 0,
+              classType: player?.classType || "",
+              alive: player?.alive !== false
+            }))
+          : [],
         aim: {
           x: Number.isFinite(game.input?.mouse?.worldX) ? game.input.mouse.worldX : null,
           y: Number.isFinite(game.input?.mouse?.worldY) ? game.input.mouse.worldY : null,
@@ -139,7 +152,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               })
               .slice(-8)
               .map((projectile) => ({
-                source: "authoritative",
+                source: projectile.predicted ? "predictedRendered" : "authoritative",
                 kind: "bullet",
                 x: projectile.x,
                 y: projectile.y,

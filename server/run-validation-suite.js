@@ -34,6 +34,9 @@ const SCRIPT_TARGETS = {
   "validate:network-ui": "server/validate-network-ui.js",
   "validate:network-refund": "server/validate-network-refund.js",
   "validate:network-transport": "server/validate-network-transport.js",
+  "validate:network-controller": "server/validate-network-controller-responsiveness.js",
+  "validate:network-projectiles": "server/validate-network-projectile-prediction.js",
+  "validate:network-smoothness": "server/validate-network-smoothness.js",
   "validate:mobile-transport": "server/validate-mobile-transport-defaults.js",
   "validate:network-framework": "server/validate-network-framework-evaluation.js",
   "validate:selective-closeout-plan": "server/validate-selective-closeout-plan.js",
@@ -66,6 +69,15 @@ const SUITES = {
     "validate:network-pause",
     "validate:network-ui",
     "validate:network-refund"
+  ],
+  "network-stability": [
+    "validate:network-transport",
+    "validate:network-controller",
+    "validate:network-projectiles",
+    "validate:network-smoothness",
+    "validate:network-join",
+    "validate:network-combat-hit",
+    "validate:network-archer"
   ],
   perf: ["perf:test", "perf:network-browser", "perf:floor-scaling"],
   "pre-commit": ["check", "validate:loc", "validate:boss", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],

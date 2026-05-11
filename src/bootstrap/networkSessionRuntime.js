@@ -1,23 +1,8 @@
 import { NetClient } from "../net/NetClient.js";
-import {
-  applyMapStateToGame,
-  applyMapMetaToGame,
-  applyMapChunkToGame,
-  applyMetaStateToGame,
-  applySnapshotToGame,
-  isKnownMapTileAt,
-  syncByIdLerp
-} from "../net/clientStateSync.js";
+import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, syncByIdLerp } from "../net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "../net/mapChunkReadiness.js";
-import { predictProjectileSpawn, prunePredictedProjectiles } from "../net/projectilePrediction.js";
-import {
-  canRunPredictedCollision,
-  collectInput,
-  handleNetworkUiActions,
-  predictFromInput,
-  shouldSendNetworkInput,
-  updateNetworkRole
-} from "../net/sessionInteraction.js";
+import { discardPredictedProjectile, predictProjectileSpawn, prunePredictedProjectiles, updateNetworkProjectilePresentation, updatePredictedProjectiles } from "../net/projectilePrediction.js";
+import { canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, shouldSendNetworkInput, updateNetworkRole } from "../net/sessionInteraction.js";
 import {
   consumeSnapshotForRender,
   estimateServerNowMs as estimateServerNowMsFromState,
@@ -32,11 +17,14 @@ import { initializeNetworkGameState } from "./networkSessionGameInit.js";
 import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./networkRenderRuntime.js";
 import { persistSuccessfulServerUrlChoice, resolveActiveServerUrl } from "../runtime/runtimeConfig.js";
 
-const NET_INPUT_DT = 1 / 60;
+export const NET_INPUT_DT = 1 / 60;
 const NET_CLOCK_OFFSET_SMOOTHING = 0.12;
 const NET_MAX_SNAPSHOT_BUFFER = 20;
-const NET_MIN_SEND_MS = 28;
+export const NET_INPUT_INTERVAL_MS = 16;
+export const NET_MIN_SEND_MS = 14;
 const NET_FORCE_SEND_IDLE_MS = 100;
+export const NET_CONTROLLER_RENDER_DELAY_MS = 12;
+export const NET_SPECTATOR_RENDER_DELAY_MS = 72;
 
 export function createNetworkSessionController({
   Game,
@@ -53,8 +41,8 @@ export function createNetworkSessionController({
   cleanupCurrentGame,
   syncMusicForGame,
   createReturnToMenuHandler,
-  controllerRenderDelayMs = 36,
-  spectatorRenderDelayMs = 72
+  controllerRenderDelayMs = NET_CONTROLLER_RENDER_DELAY_MS,
+  spectatorRenderDelayMs = NET_SPECTATOR_RENDER_DELAY_MS
 }) {
   let netClient = null;
   let netInputTimer = 0;
@@ -181,6 +169,8 @@ export function createNetworkSessionController({
       predictFromInput,
       canRunPredictedCollision: () => canRunPredictedCollision(game, isKnownMapTileAt),
       prunePredictedProjectiles,
+      updatePredictedProjectiles,
+      updateNetworkProjectilePresentation,
       netPredictedProjectiles,
       setNetRenderRaf: (value) => {
         netRenderRaf = value;
@@ -211,6 +201,7 @@ export function createNetworkSessionController({
       onGameOverChanged: (_gameOver, nextGame) => syncMusicForGame(nextGame)
     });
     initializeNetworkGameState(game, netPredictedProjectiles);
+    game.discardPredictedProjectile = (predicted) => discardPredictedProjectile(game, predicted);
     setCurrentGame(game);
     syncMusicForGame(game);
     updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Connecting to ${wsUrl}...`);
@@ -258,8 +249,11 @@ export function createNetworkSessionController({
     });
     netClient.on("hello", (msg) => {
       netPlayerId = msg.playerId || null;
+      game.networkLocalPlayerId = netPlayerId;
     });
     netClient.on("join.ok", (msg) => {
+      netPlayerId = msg.playerId || netPlayerId;
+      game.networkLocalPlayerId = netPlayerId;
       netControllerId = msg.controllerId || null;
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Joined "${msg.roomId}" as ${game.networkRole}`);
@@ -480,7 +474,7 @@ export function createNetworkSessionController({
         }
       }
       netClient.sendInput(input);
-    }, 33);
+    }, NET_INPUT_INTERVAL_MS);
   };
 
   const takeControl = () => {

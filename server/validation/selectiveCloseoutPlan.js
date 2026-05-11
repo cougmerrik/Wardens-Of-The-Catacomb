@@ -10,6 +10,9 @@ export const FULL_CLOSEOUT_GATES = [
   "validate:skill-refund",
   "validate:dev-start",
   "validate:network-join",
+  "validate:network-controller",
+  "validate:network-projectiles",
+  "validate:network-smoothness",
   "validate:network-combat",
   "validate:network-combat-hit",
   "validate:network-shop",
@@ -26,7 +29,14 @@ export const FULL_CLOSEOUT_GATES = [
 
 const CORE_GATES = ["check", "validate:loc"];
 const GAMEPLAY_GATES = ["validate:boss", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"];
-const NETWORK_SMOKE_GATES = ["validate:network-transport", "validate:network-join", "validate:network-combat-hit"];
+const NETWORK_SMOKE_GATES = [
+  "validate:network-transport",
+  "validate:network-controller",
+  "validate:network-projectiles",
+  "validate:network-smoothness",
+  "validate:network-join",
+  "validate:network-combat-hit"
+];
 const NETWORK_FULL_GATES = [
   "validate:network-join",
   "validate:network-combat",
@@ -65,7 +75,7 @@ function isRuntimeJs(file) {
 }
 
 function isBrowserNetworkValidator(file) {
-  return /^server\/validate-network-(join|combat|combat-hit|shop|two-client-damage|archer|audio|pause|ui|refund|transport)\.js$/.test(file);
+  return /^server\/validate-network-(join|combat|combat-hit|shop|two-client-damage|archer|audio|pause|ui|refund|transport|controller-responsiveness|projectile-prediction|smoothness)\.js$/.test(file);
 }
 
 export function buildSelectiveCloseoutPlan(files, { broadChangeFileLimit = BROAD_CHANGE_FILE_LIMIT } = {}) {
