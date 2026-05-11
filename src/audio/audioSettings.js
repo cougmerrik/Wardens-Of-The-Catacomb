@@ -1,10 +1,15 @@
 const MASTER_VOLUME_STORAGE_KEY = "wardens.masterVolume";
-const DEFAULT_MASTER_VOLUME = 0.25;
+const MASTER_VOLUME_OUTPUT_CAP = 0.1;
+const DEFAULT_MASTER_VOLUME = 0.5;
 
 export function normalizeMasterVolume(value, fallback = DEFAULT_MASTER_VOLUME) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(0, Math.min(1, numeric));
+}
+
+export function getEffectiveMasterVolume(value, fallback = DEFAULT_MASTER_VOLUME) {
+  return normalizeMasterVolume(value, fallback) * MASTER_VOLUME_OUTPUT_CAP;
 }
 
 export function getStoredMasterVolume(storage = globalThis?.localStorage) {
@@ -25,5 +30,5 @@ export function persistMasterVolume(volume, storage = globalThis?.localStorage) 
 
 export function syncGlobalMasterVolume(volume) {
   if (typeof window === "undefined") return;
-  window.__WOTC_MASTER_VOLUME__ = normalizeMasterVolume(volume);
+  window.__WOTC_MASTER_VOLUME__ = getEffectiveMasterVolume(volume);
 }
