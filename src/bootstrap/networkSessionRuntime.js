@@ -1,23 +1,8 @@
 import { NetClient } from "../net/NetClient.js";
-import {
-  applyMapStateToGame,
-  applyMapMetaToGame,
-  applyMapChunkToGame,
-  applyMetaStateToGame,
-  applySnapshotToGame,
-  isKnownMapTileAt,
-  syncByIdLerp
-} from "../net/clientStateSync.js";
+import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, syncByIdLerp } from "../net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "../net/mapChunkReadiness.js";
 import { predictProjectileSpawn, prunePredictedProjectiles } from "../net/projectilePrediction.js";
-import {
-  canRunPredictedCollision,
-  collectInput,
-  handleNetworkUiActions,
-  predictFromInput,
-  shouldSendNetworkInput,
-  updateNetworkRole
-} from "../net/sessionInteraction.js";
+import { canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, shouldSendNetworkInput, updateNetworkRole } from "../net/sessionInteraction.js";
 import {
   consumeSnapshotForRender,
   estimateServerNowMs as estimateServerNowMsFromState,
@@ -31,6 +16,7 @@ import {
 import { initializeNetworkGameState } from "./networkSessionGameInit.js";
 import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./networkRenderRuntime.js";
 import { persistSuccessfulServerUrlChoice, resolveActiveServerUrl } from "../runtime/runtimeConfig.js";
+import { VoiceManager } from "../voice/VoiceManager.js";
 
 const NET_INPUT_DT = 1 / 60;
 const NET_CLOCK_OFFSET_SMOOTHING = 0.12;
@@ -60,6 +46,7 @@ export function createNetworkSessionController({
   let netInputTimer = 0;
   let netRenderRaf = 0;
   let netPlayerId = null;
+  let netVoiceUid = null;
   let netControllerId = null;
   let netInputSeq = 0;
   let netLastAckSeq = 0;
@@ -77,6 +64,7 @@ export function createNetworkSessionController({
   let netLastServerPlayer = null;
   const netClockState = { offsetMs: 0, ready: false };
   const netPredictedProjectiles = new Map();
+  const voiceManager = new VoiceManager();
   let netNextHeldPrimaryPredictAtMs = 0;
   let netLastSnapshotRecvAtMs = 0;
   let netSnapshotIntervalMeanMs = 33;
@@ -98,6 +86,7 @@ export function createNetworkSessionController({
 
   const resetNetworkState = () => {
     netPlayerId = null;
+    netVoiceUid = null;
     netControllerId = null;
     netInputSeq = 0;
     netLastAckSeq = 0;
@@ -137,6 +126,7 @@ export function createNetworkSessionController({
       netClient.disconnect();
       netClient = null;
     }
+    voiceManager.leave();
     resetNetworkState();
     const game = getCurrentGame();
     if (game) game.networkPredictedProjectiles = null;
@@ -182,6 +172,7 @@ export function createNetworkSessionController({
       canRunPredictedCollision: () => canRunPredictedCollision(game, isKnownMapTileAt),
       prunePredictedProjectiles,
       netPredictedProjectiles,
+      updateVoice: (currentGame) => voiceManager.update(currentGame),
       setNetRenderRaf: (value) => {
         netRenderRaf = value;
       }
@@ -258,14 +249,23 @@ export function createNetworkSessionController({
     });
     netClient.on("hello", (msg) => {
       netPlayerId = msg.playerId || null;
+      if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
+      game.networkLocalPlayerId = netPlayerId;
+      voiceManager.syncServerConfig(game, msg.voice);
     });
     netClient.on("join.ok", (msg) => {
+      if (msg.playerId) netPlayerId = game.networkLocalPlayerId = msg.playerId;
+      if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
       netControllerId = msg.controllerId || null;
+      voiceManager.joinServerRoom(game, msg.voice, netPlayerId, netVoiceUid);
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Joined "${msg.roomId}" as ${game.networkRole}`);
     });
     netClient.on("room.roster", (msg) => {
       netControllerId = msg.controllerId || null;
+      game.networkRosterPlayers = Array.isArray(msg.players) ? msg.players : [];
+      voiceManager.syncRoster(game.networkRosterPlayers);
+      voiceManager.syncServerConfig(game, msg.voice);
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       const players = Array.isArray(msg.players) ? msg.players.length : 0;
       updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Room: ${players} connected | Role: ${game.networkRole}`);

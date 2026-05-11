@@ -4,6 +4,8 @@ import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/gam
 import { cloneNecromancerTalentState, createNecromancerTalentState } from "../../src/game/necromancerTalentTree.js";
 import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
 import { cloneNecromancerBeamState, cloneNecromancerRuntimeState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
+import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
+import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -101,6 +103,19 @@ export class AuthoritativeRoom {
     this.pauseOwnerId = typeof value === "string" && value ? value : null;
   }
 
+  getVoiceRoomConfig(playerId = "") {
+    if (!this.voiceConfig || !this.voiceConfig.enabled) return { enabled: false };
+    const channel =
+      typeof this.voiceConfig.channel === "string" && this.voiceConfig.channel
+        ? this.voiceConfig.channel
+        : `wardens-${this.id}`;
+    return buildVoiceClientConfig({ ...this.voiceConfig, channel }, playerId);
+  }
+
+  getVoiceUid(playerId) {
+    return buildAgoraVoiceUid(playerId);
+  }
+
   mapSignature() {
     return typeof this.sim.getMapSignature === "function"
       ? this.sim.getMapSignature()
@@ -135,6 +150,7 @@ export class AuthoritativeRoom {
   getRosterEntry(client) {
     return {
       id: client.id,
+      voiceUid: buildAgoraVoiceUid(client.id),
       handle: client.name,
       name: client.name,
       classType: client.classType,
@@ -208,6 +224,7 @@ export class AuthoritativeRoom {
       facing: 0,
       moving: false,
       alive: true,
+      spectateTargetId: "",
       color: this.getClientRunColor(client)
     };
   }
@@ -261,23 +278,7 @@ export class AuthoritativeRoom {
   }
 
   initializeActivePlayers() {
-    this.activePlayers.clear();
-    const baseSpawn = { x: this.sim.player?.x || 0, y: this.sim.player?.y || 0 };
-    const tile = this.sim.config?.map?.tile || 32;
-    let slot = 0;
-    for (const client of this.clients.values()) {
-      const angle = slot * ((Math.PI * 2) / Math.max(1, this.clients.size));
-      const offsetX = Math.cos(angle) * tile * 0.85;
-      const offsetY = Math.sin(angle) * tile * 0.85;
-      const candidate =
-        slot === 0 || typeof this.sim.findNearestSafePoint !== "function"
-          ? baseSpawn
-          : this.sim.findNearestSafePoint(baseSpawn.x + offsetX, baseSpawn.y + offsetY, 8);
-      this.activePlayers.set(client.id, this.createActivePlayerState(client, candidate));
-      slot += 1;
-    }
-    this.syncSimPrimaryPlayerState();
-    this.syncPrimaryActivePlayerFromSim();
+    createRandomActivePlayerStates(this);
   }
 
   syncSimPrimaryPlayerState() {
@@ -384,6 +385,7 @@ export class AuthoritativeRoom {
     state.facing = this.sim.player.facing;
     state.moving = !!this.sim.player.moving;
     state.alive = this.sim.player.health > 0;
+    state.spectateTargetId = state.alive ? "" : (typeof client.input?.spectateTargetId === "string" ? client.input.spectateTargetId : "");
     state.consumableRuntime = {
       tempHp: Number.isFinite(this.sim.player?.consumableRuntime?.tempHp) ? this.sim.player.consumableRuntime.tempHp : 0
     };
@@ -693,6 +695,7 @@ export class AuthoritativeRoom {
       const alive = state.alive !== false && (state.health || 0) > 0;
       if (!alive) {
         state.moving = false;
+        state.spectateTargetId = typeof input.spectateTargetId === "string" ? input.spectateTargetId : "";
         input.moveX = 0;
         input.moveY = 0;
         input.swapAttackQueued = false;
@@ -709,6 +712,7 @@ export class AuthoritativeRoom {
         this.sim.moveWithCollisionSubsteps(state, (mx / len) * state.speed * dt, (my / len) * state.speed * dt);
       }
       state.moving = !!(mx || my);
+      state.spectateTargetId = "";
       if (input.hasAim) {
         if (Number.isFinite(input.aimDirX) && Number.isFinite(input.aimDirY)) {
           const alen = Math.hypot(input.aimDirX, input.aimDirY) || 1;
@@ -1098,9 +1102,12 @@ export class AuthoritativeRoom {
     const preFireArrowCount = this.sim.fireArrows.length;
     const dt = Math.min((nowMs - this.lastTickMs) / 1000, 0.05);
     this.lastTickMs = nowMs;
+    const previousFloor = Number.isFinite(this.sim.floor) ? this.sim.floor : null;
     this.sim.networkActivePlayers = this.getSimulationPlayerEntities();
     this.sim.tick(dt, this.getControllerInput());
-    this.updateRemoteActivePlayers(dt);
+    const floorAdvanced = previousFloor !== null && Number.isFinite(this.sim.floor) && this.sim.floor > previousFloor;
+    if (floorAdvanced) placeActivePlayersAtRandomFloorSpawns(this);
+    this.updateRemoteActivePlayers(floorAdvanced ? 0 : dt);
     this.syncPrimaryActivePlayerFromSim();
     if (this.sim.gameOver && !this.finalResults) {
       this.finalResults = this.buildFinalResults();
@@ -1162,6 +1169,7 @@ export class AuthoritativeRoom {
       lobbyCountdownEndsAt: this.lobbyCountdownEndsAt || 0,
       lobbyCountdownRemainingMs: this.getLobbyCountdownRemainingMs(),
       lobbyInlineMessage: this.lobbyInlineMessage,
+      voice: this.getVoiceRoomConfig(),
       players: this.getRosterEntries()
     });
   }

@@ -132,10 +132,15 @@ export const runtimeFloorBossMethods = {
   updateFloorBossTrigger() {
     const boss = this.syncFloorBossState();
     if (boss.phase !== "idle") return false;
-    if (!Number.isFinite(this.level) || this.level < boss.triggerLevel) return false;
+    const players = typeof this.getLivingPlayerEntities === "function" ? this.getLivingPlayerEntities() : [];
+    const highestPlayerLevel = players.reduce((highest, player) => {
+      const level = Number.isFinite(player?.level) ? player.level : player === this.player && Number.isFinite(this.level) ? this.level : 0;
+      return Math.max(highest, level);
+    }, Number.isFinite(this.level) ? this.level : 0);
+    if (highestPlayerLevel < boss.triggerLevel) return false;
     boss.phase = "queued";
     boss.spawnPending = true;
-    boss.spawnTriggeredAtLevel = this.level;
+    boss.spawnTriggeredAtLevel = highestPlayerLevel;
     return true;
   },
 
@@ -200,12 +205,28 @@ export const runtimeFloorBossMethods = {
     return true;
   },
 
-  isPlayerAtPortal() {
-    if (!this.portal?.active) return false;
-    const dx = this.player.x - this.portal.x;
-    const dy = this.player.y - this.portal.y;
-    const touchRadius = this.player.size * 0.5 + this.config.map.tile * 0.42;
+  isPlayerEntityAtPortal(player = this.player) {
+    if (!this.portal?.active || !player) return false;
+    const px = Number.isFinite(player.x) ? player.x : this.player?.x || 0;
+    const py = Number.isFinite(player.y) ? player.y : this.player?.y || 0;
+    const size = Number.isFinite(player.size) ? player.size : this.player?.size || 22;
+    const dx = px - this.portal.x;
+    const dy = py - this.portal.y;
+    const touchRadius = size * 0.5 + this.config.map.tile * 0.42;
     return dx * dx + dy * dy <= touchRadius * touchRadius;
+  },
+
+  getPortalTouchingPlayer() {
+    if (!this.portal?.active) return null;
+    const players =
+      typeof this.getLivingPlayerEntities === "function"
+        ? this.getLivingPlayerEntities()
+        : (this.player ? [this.player] : []);
+    return players.find((player) => this.isPlayerEntityAtPortal(player)) || null;
+  },
+
+  isPlayerAtPortal(player = null) {
+    return player ? this.isPlayerEntityAtPortal(player) : !!this.getPortalTouchingPlayer();
   },
 
   getActiveFloorBossEnemies() {

@@ -233,6 +233,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
 
     this.drawRemotePlayers(game, cameraX, cameraY);
     this.drawPlayer(game, cameraX, cameraY);
+    this.drawSpectatorWisps(game, cameraX, cameraY);
     this.drawProjectiles(game, cameraX, cameraY);
     this.drawPlayerHealthBar(game, cameraX, cameraY);
     this.drawLightingOverlay(game, cameraX, cameraY, layout);

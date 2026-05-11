@@ -44,6 +44,7 @@
     "validate:network-pause": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-pause.js')).href))\"",
     "validate:network-ui": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-ui.js')).href))\"",
     "validate:network-refund": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/validate-network-refund.js')).href))\"",
+    "validate:voice-config": "node server/validate-voice-config.js",
     "validate:network-bots": "node server/validate-network-bots.js",
     "validate:network": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/run-validation-suite.js')).href).then((module) => module)).then(() => {})\" network",
     "validate:pre-commit": "node -e \"Promise.all([import('node:path'), import('node:url')]).then(([{ resolve }, { pathToFileURL }]) => import(pathToFileURL(resolve(process.env.INIT_CWD || process.cwd(), 'server/run-validation-suite.js')).href).then((module) => module)).then(() => {})\" pre-commit",
@@ -55,6 +56,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.3.0",
+    "agora-token": "^2.0.5",
     "ws": "^8.18.0"
   },
   "devDependencies": {

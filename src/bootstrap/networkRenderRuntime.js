@@ -49,6 +49,7 @@ export function startNetworkRenderLoopRuntime({
   canRunPredictedCollision,
   prunePredictedProjectiles,
   netPredictedProjectiles,
+  updateVoice,
   setNetRenderRaf
 }) {
   let lastFrameAt = performance.now();
@@ -124,6 +125,7 @@ export function startNetworkRenderLoopRuntime({
     }
     game.floatingTexts = stepClientFloatingTexts(game.floatingTexts, dt);
     prunePredictedProjectiles(netPredictedProjectiles);
+    if (typeof updateVoice === "function") updateVoice(game);
     game.renderer.draw(game);
     setNetRenderRaf(requestAnimationFrame(loop));
   };

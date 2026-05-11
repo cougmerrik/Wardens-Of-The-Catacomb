@@ -53,6 +53,29 @@
               <output id="menu-volume-value" class="menu-volume-control__value" for="menu-volume">50%</output>
             </div>
           </label>
+          <label for="voice-chat-enabled" class="menu-toggle-control">
+            <span class="menu-toggle-control__label">Voice Chat</span>
+            <input id="voice-chat-enabled" class="menu-toggle-control__checkbox" type="checkbox" />
+          </label>
+          <label for="voice-chat-volume" id="voice-chat-volume-control" class="menu-volume-control" hidden>
+            <span class="menu-volume-control__label">Voice Chat Volume</span>
+            <div class="menu-volume-control__row">
+              <input id="voice-chat-volume" class="menu-volume-control__slider" type="range" min="0" max="100" step="1" value="80" />
+              <output id="voice-chat-volume-value" class="menu-volume-control__value" for="voice-chat-volume">80%</output>
+            </div>
+          </label>
+          <div id="voice-chat-mode-control" hidden>
+            <label class="field-label" for="voice-chat-mode">Microphone Settings</label>
+            <select id="voice-chat-mode" class="field-input">
+              <option value="openMic">Open Mic</option>
+              <option value="pushToTalk">Push to Talk</option>
+              <option value="muted">Mute</option>
+            </select>
+          </div>
+          <label for="voice-chat-push-key" id="voice-chat-push-key-control" class="menu-toggle-control" hidden>
+            <span class="menu-toggle-control__label">Push to Talk Button</span>
+            <button type="button" id="voice-chat-push-key" class="start-game ghost mini">V</button>
+          </label>
         </section>
         <section class="options-panel" aria-label="Display settings">
           <h3>Display</h3>

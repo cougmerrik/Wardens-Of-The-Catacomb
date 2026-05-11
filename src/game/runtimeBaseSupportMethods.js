@@ -378,6 +378,7 @@ export const runtimeBaseSupportMethods = {
   gainExperienceForPlayerEntity(entity, amount) {
     if (!this.isLivingPlayerEntity(entity) || !Number.isFinite(amount) || amount <= 0) return;
     if (typeof this.isFloorBossActive === "function" && this.isFloorBossActive()) return;
+    let bossTriggered = false;
     for (const recipient of this.getSharedProgressRecipients(entity)) {
       if (this.isPrimaryPlayerEntity(recipient)) {
         this.gainExperience(amount);
@@ -389,9 +390,11 @@ export const runtimeBaseSupportMethods = {
       recipient.level = Number.isFinite(recipient.level) ? recipient.level : 1;
       recipient.skillPoints = Number.isFinite(recipient.skillPoints) ? recipient.skillPoints : 0;
       recipient.levelWeaponDamageBonus = Number.isFinite(recipient.levelWeaponDamageBonus) ? recipient.levelWeaponDamageBonus : 0;
+      let leveled = false;
       while (recipient.experience >= recipient.expToNextLevel) {
         recipient.experience -= recipient.expToNextLevel;
         recipient.level += 1;
+        leveled = true;
         recipient.skillPoints += this.getSkillPointGainForLevel(recipient.level, recipient.classType);
         const hpGain = Number.isFinite(classSpec.levelHpGain) ? classSpec.levelHpGain : 10;
         let adjustedHpGain = hpGain;
@@ -414,6 +417,11 @@ export const runtimeBaseSupportMethods = {
         recipient.levelWeaponDamageBonus += Math.max(1, baseAvg * Math.max(0, dmgPct));
         recipient.expToNextLevel = Math.floor(recipient.expToNextLevel * this.config.progression.xpLevelScaling);
         this.spawnFloatingText(recipient.x, recipient.y - 30, `Level ${recipient.level}!`, "#9be18a", 1.0, 15);
+      }
+      if (!bossTriggered && leveled && typeof this.updateFloorBossTrigger === "function" && this.updateFloorBossTrigger()) {
+        bossTriggered = true;
+        const target = this.floorBoss?.triggerLevel || this.getFloorBossTriggerLevel();
+        this.spawnFloatingText(recipient.x, recipient.y - 80, `Boss Ready: Lv ${target}`, "#c78bff", 1.4, 16);
       }
     }
   },
