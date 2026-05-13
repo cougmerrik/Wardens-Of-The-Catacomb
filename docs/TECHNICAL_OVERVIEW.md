@@ -114,10 +114,33 @@ This document summarizes the current high-level architecture and validation work
   - local-player prediction/reconciliation
   - map chunk readiness
   - projectile reconciliation
+- Network presentation is tuned to keep multiplayer close to single-player feel:
+  - local controller movement remains predicted while authoritative snapshots reconcile position
+  - stale large startup corrections are separated from post-load gameplay correction metrics
+  - local ranger projectile prediction is cadence-limited to the real attack cooldown instead of rendering catch-up bursts
+  - predicted arrows render faintly and expire visually before their reconciliation records are discarded
+  - authoritative arrows are culled from the network presentation path after their lifetime expires
+  - delta snapshot merging skips reconciled predicted arrows so matched local projectiles are not reinserted as stale artifacts
 - The authoritative room still keeps one primary `sim.player` path for the pause owner, but snapshots now also serialize a `players` collection for all active participants.
 - The client runtime resolves the local player out of `state.players`, keeps remote players in `game.remotePlayers`, and renders/interpolates them separately from the local predicted avatar.
 - The network render/runtime path now reads the active `netClient` dynamically instead of capturing a stale pre-connect reference, which keeps multiplayer UI actions working after live room join.
 - The browser debug surface in `game.js` now exposes enough live state for Playwright-based network validation and perf harnesses.
+
+### Network Debug Telemetry
+- Dev-mode playtests expose a network stats overlay through `src/bootstrap/debugHudStats.js` and HUD rendering code:
+  - FPS and frame timing
+  - ping and approximate one-way latency
+  - snapshot jitter and snapshot-buffer depth
+  - pending/unacked input counts
+  - recent correction and projectile reconciliation state
+- Local `npm run dev` sessions can persist manual network telemetry through the dev telemetry API when dev mode is enabled.
+- Manual telemetry records bounded JSONL samples for:
+  - regular frame/network state
+  - frame spikes over the configured threshold
+  - projectile reconciliation rejects with reason, seq, owner, projectile type, predicted/authoritative positions, and distance
+  - render context such as viewport, canvas size, device pixel ratio, visibility/focus state, renderer mode, reduced-motion media flags, and observed frame cadence
+- Correction telemetry distinguishes lifetime floor-load synchronization from post-load gameplay corrections. This keeps unavoidable initial map/player adoption corrections from hiding actual in-play hard snaps or blocked corrections.
+- The network smoothness validator records matching browser/render context so manual 30 FPS reports can be compared against automated active-tab 60 FPS runs.
 
 ### Optional Agora Voice
 - Multiplayer voice is optional and server-gated. The authoritative server advertises Agora voice config only when started with `AGORA_APP_ID`, `VOICE_AGORA_APP_ID`, `--agora-app-id`, or `--voice-agora-app-id`.
@@ -216,6 +239,14 @@ This document summarizes the current high-level architecture and validation work
 - `validate:network-archer`
   - checks moving archer shots against live projectile direction/alignment
   - now retries moving-shot samples and records skipped attempts so authoritative-visibility timing noise does not make the suite flaky
+- `validate:network-projectiles`
+  - verifies local projectile prediction cadence, reconciliation, stale-prediction cleanup, and delta-merge behavior for networked ranged attacks
+- `validate:network-smoothness`
+  - verifies controller movement, peer-observed remote movement, active-tab frame cadence, post-load correction metrics, projectile visibility latency, held-primary shot cadence, and lingering projectile cleanup
+- `validate:network-floor-movement`
+  - verifies each class can load floor 1 in multiplayer, move after load, pause/resume, tick lantern fuel, see enemies, keep the canvas visible, and continue control after pause-owner death transfer
+- `validate:dev-network-telemetry`
+  - verifies dev telemetry payload normalization for frame samples, frame spikes, render context, correction metrics, input backlog, and projectile reconciliation reject details
 - `validate:network-audio`
   - records focused-tab music diagnostics during live network play
 - `validate:network-audio:focus`

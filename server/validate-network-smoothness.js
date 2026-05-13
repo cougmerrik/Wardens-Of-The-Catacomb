@@ -13,11 +13,19 @@ import {
   waitForHttpReady,
   waitForTcpReady
 } from "./validation/networkValidationShared.js";
+import {
+  captureRenderContext,
+  sampleHeldPrimaryCadence,
+  summarizeShotCadence,
+  summarizeShotReconciliation,
+  waitForPredictedProjectilesToClear,
+  waitForVisibleRangerProjectilesToClear
+} from "./validation/networkSmoothnessHelpers.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const artifactsDir = resolve(projectRoot, "artifacts", "network");
-const HTTP_PORT = 8190;
-const WS_PORT = 8200;
+const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT || "8190", 10);
+const WS_PORT = Number.parseInt(process.env.WS_PORT || "8200", 10);
 const ROOM_ID = "validate-network-smoothness";
 const GAME_URL = `http://127.0.0.1:${HTTP_PORT}`;
 
@@ -37,7 +45,12 @@ function percentile(values, pct) {
 function summarizeSamples(samples) {
   const frameGaps = [];
   const movementSteps = [];
+  const debugFrameWindowFps = [];
+  const debugFrameWindowP95Ms = [];
+  const debugFrameWindowMaxMs = [];
   let travelled = 0;
+  let firstMovementAtMs = null;
+  const start = samples[0] || null;
   for (let i = 1; i < samples.length; i += 1) {
     const prev = samples[i - 1];
     const next = samples[i];
@@ -45,15 +58,32 @@ function summarizeSamples(samples) {
     const dist = Math.hypot(next.x - prev.x, next.y - prev.y);
     movementSteps.push(dist);
     travelled += dist;
+    if (firstMovementAtMs === null && start && Math.hypot(next.x - start.x, next.y - start.y) >= 1.5) {
+      firstMovementAtMs = next.t;
+    }
+  }
+  for (const sample of samples) {
+    if (Number.isFinite(sample.frameWindowFps) && sample.frameWindowFps > 0) debugFrameWindowFps.push(sample.frameWindowFps);
+    if (Number.isFinite(sample.frameWindowP95Ms) && sample.frameWindowP95Ms > 0) debugFrameWindowP95Ms.push(sample.frameWindowP95Ms);
+    if (Number.isFinite(sample.frameWindowMaxMs) && sample.frameWindowMaxMs > 0) debugFrameWindowMaxMs.push(sample.frameWindowMaxMs);
   }
   return {
     frames: samples.length,
     travelled,
+    firstMovementAtMs,
     frameGapP95: percentile(frameGaps, 95),
     frameGapMax: Math.max(0, ...frameGaps),
+    debugFrameWindowFpsMin: debugFrameWindowFps.length > 0 ? Math.min(...debugFrameWindowFps) : 0,
+    debugFrameWindowFpsAvg: debugFrameWindowFps.length > 0 ? debugFrameWindowFps.reduce((sum, value) => sum + value, 0) / debugFrameWindowFps.length : 0,
+    debugFrameWindowP95MsMax: Math.max(0, ...debugFrameWindowP95Ms),
+    debugFrameWindowMaxMsMax: Math.max(0, ...debugFrameWindowMaxMs),
     movementStepP95: percentile(movementSteps, 95),
     movementStepMax: Math.max(0, ...movementSteps),
     correctionMax: Math.max(0, ...samples.map((sample) => sample.maxCorrectionPx || 0)),
+    postLoadCorrectionReady: samples.some((sample) => sample.postLoadCorrectionReady === true),
+    postLoadCorrectionMax: Math.max(0, ...samples.map((sample) => sample.postLoadMaxCorrectionPx || 0)),
+    postLoadHardSnapMax: Math.max(0, ...samples.map((sample) => sample.postLoadHardSnapCount || 0)),
+    postLoadBlockedSnapMax: Math.max(0, ...samples.map((sample) => sample.postLoadBlockedSnapCount || 0)),
     hardSnapMax: Math.max(0, ...samples.map((sample) => sample.hardSnapCount || 0)),
     blockedSnapMax: Math.max(0, ...samples.map((sample) => sample.blockedSnapCount || 0))
   };
@@ -111,8 +141,17 @@ async function samplePlayerFrames(page, durationMs) {
           x: state.player.x,
           y: state.player.y,
           snapshotCount: state.networkPerf?.appliedSnapshotCount || 0,
+          frameWindowFps: state.debugHud?.frameWindowFps || 0,
+          frameWindowP95Ms: state.debugHud?.frameWindowP95Ms || 0,
+          frameWindowMaxMs: state.debugHud?.frameWindowMaxMs || 0,
+          frameWindowSampleCount: state.debugHud?.frameWindowSampleCount || 0,
           lastCorrectionPx: state.networkPerf?.lastCorrectionPx || 0,
           maxCorrectionPx: state.networkPerf?.maxCorrectionPx || 0,
+          postLoadCorrectionReady: !!state.networkPerf?.postLoadCorrectionReady,
+          postLoadLastCorrectionPx: state.networkPerf?.postLoadLastCorrectionPx || 0,
+          postLoadMaxCorrectionPx: state.networkPerf?.postLoadMaxCorrectionPx || 0,
+          postLoadHardSnapCount: state.networkPerf?.postLoadHardSnapCount || 0,
+          postLoadBlockedSnapCount: state.networkPerf?.postLoadBlockedSnapCount || 0,
           hardSnapCount: state.networkPerf?.hardSnapCount || 0,
           blockedSnapCount: state.networkPerf?.blockedSnapCount || 0,
           pendingInputs: state.net?.pendingInputs || 0
@@ -148,9 +187,34 @@ async function sampleRemoteFrames(page, playerId, durationMs) {
 }
 
 async function sampleHeldMovement(page, key, durationMs) {
+  const baseline = await page.evaluate(() => {
+    const state = window.__WOTC_DEBUG__?.getState?.();
+    return state?.player
+      ? [{
+          t: 0,
+          x: state.player.x,
+          y: state.player.y,
+          snapshotCount: state.networkPerf?.appliedSnapshotCount || 0,
+          frameWindowFps: state.debugHud?.frameWindowFps || 0,
+          frameWindowP95Ms: state.debugHud?.frameWindowP95Ms || 0,
+          frameWindowMaxMs: state.debugHud?.frameWindowMaxMs || 0,
+          frameWindowSampleCount: state.debugHud?.frameWindowSampleCount || 0,
+          lastCorrectionPx: state.networkPerf?.lastCorrectionPx || 0,
+          maxCorrectionPx: state.networkPerf?.maxCorrectionPx || 0,
+          postLoadCorrectionReady: !!state.networkPerf?.postLoadCorrectionReady,
+          postLoadLastCorrectionPx: state.networkPerf?.postLoadLastCorrectionPx || 0,
+          postLoadMaxCorrectionPx: state.networkPerf?.postLoadMaxCorrectionPx || 0,
+          postLoadHardSnapCount: state.networkPerf?.postLoadHardSnapCount || 0,
+          postLoadBlockedSnapCount: state.networkPerf?.postLoadBlockedSnapCount || 0,
+          hardSnapCount: state.networkPerf?.hardSnapCount || 0,
+          blockedSnapCount: state.networkPerf?.blockedSnapCount || 0,
+          pendingInputs: state.net?.pendingInputs || 0
+        }]
+      : [];
+  });
   await page.keyboard.down(key);
   try {
-    return await samplePlayerFrames(page, durationMs);
+    return baseline.concat(await samplePlayerFrames(page, durationMs));
   } finally {
     await page.keyboard.up(key);
   }
@@ -271,6 +335,16 @@ async function main() {
     await waitForSnapshotWarmup(controllerPage);
     await waitForSnapshotWarmup(peerPage);
 
+    const renderContext = await captureRenderContext(controllerPage);
+    samples.controllerRenderContext = renderContext;
+    assert(renderContext.rendererMode === "canvas2d", `unexpected renderer mode: ${renderContext.rendererMode}`);
+    assert(Number.isFinite(renderContext.devicePixelRatio) && renderContext.devicePixelRatio > 0, "render context missing device pixel ratio");
+    assert(Number.isFinite(renderContext.visualViewportWidth) && renderContext.visualViewportWidth > 0, "render context missing visual viewport width");
+    assert(Number.isFinite(renderContext.visualViewportHeight) && renderContext.visualViewportHeight > 0, "render context missing visual viewport height");
+    assert(Number.isFinite(renderContext.canvasWidth) && renderContext.canvasWidth > 0, "render context missing canvas width");
+    assert(Number.isFinite(renderContext.canvasHeight) && renderContext.canvasHeight > 0, "render context missing canvas height");
+    assert(renderContext.documentHidden === false, "controller page is hidden during smoothness validation");
+
     const controllerAttempt = await sampleBestControllerMovement(controllerPage, 1400, 90);
     const controllerMovement = controllerAttempt.frames;
     const controllerSummary = controllerAttempt.summary;
@@ -283,11 +357,17 @@ async function main() {
 
     assert(controllerSummary.frames >= 45, `controller rendered too few frames: ${controllerSummary.frames}`);
     assert(controllerSummary.travelled >= 90, `controller movement did not advance enough: ${controllerSummary.travelled.toFixed(1)}px`);
+    assert(Number.isFinite(controllerSummary.firstMovementAtMs) && controllerSummary.firstMovementAtMs <= 70, `controller local movement started too late: ${controllerSummary.firstMovementAtMs}ms`);
     assert(controllerSummary.frameGapP95 <= 34, `controller frame p95 ${controllerSummary.frameGapP95.toFixed(1)}ms is too high`);
+    assert(controllerSummary.debugFrameWindowFpsAvg >= 50, `controller game-loop FPS average ${controllerSummary.debugFrameWindowFpsAvg.toFixed(1)} is too low`);
+    assert(controllerSummary.debugFrameWindowP95MsMax <= 34, `controller game-loop frame p95 ${controllerSummary.debugFrameWindowP95MsMax.toFixed(1)}ms is too high`);
     assert(controllerSummary.movementStepP95 <= 14, `controller movement step p95 ${controllerSummary.movementStepP95.toFixed(1)}px is too high`);
     assert(controllerSummary.movementStepMax <= 30, `controller movement max step ${controllerSummary.movementStepMax.toFixed(1)}px is too high`);
+    assert(controllerSummary.postLoadCorrectionReady === true, "controller post-load correction metrics never became ready");
     assert(controllerSummary.hardSnapMax <= 1, `controller hard snaps exceeded budget: ${controllerSummary.hardSnapMax}`);
+    assert(controllerSummary.postLoadHardSnapMax === 0, `controller post-load hard snaps exceeded budget: ${controllerSummary.postLoadHardSnapMax}`);
     assert(controllerSummary.blockedSnapMax === 0, `controller had blocked correction snaps: ${controllerSummary.blockedSnapMax}`);
+    assert(controllerSummary.postLoadBlockedSnapMax === 0, `controller had post-load blocked correction snaps: ${controllerSummary.postLoadBlockedSnapMax}`);
 
     const remoteAttempt = await sampleBestRemoteMovement(controllerPage, peerPage, controllerPlayerId, 1600, 70);
     const remoteMovement = remoteAttempt.frames;
@@ -323,6 +403,38 @@ async function main() {
       latencyMs: Math.max(0, localProjectile.t - startedAtMs)
     };
     assert(samples.projectile.latencyMs <= 120, `local projectile latency ${samples.projectile.latencyMs.toFixed(1)}ms is too high`);
+
+    await delay(650);
+    await controllerPage.mouse.move(box.x + box.width * 0.78, box.y + box.height * 0.45);
+    await controllerPage.mouse.down({ button: "left" });
+    let heldShots = [];
+    try {
+      heldShots = await sampleHeldPrimaryCadence(controllerPage, 2800);
+    } finally {
+      await controllerPage.mouse.up({ button: "left" });
+    }
+    const predictedCadence = summarizeShotCadence(heldShots, "predictedPrimary");
+    const reconciliation = summarizeShotReconciliation(heldShots);
+    samples.heldPrimaryCadence = {
+      predicted: predictedCadence,
+      reconciliation,
+      shots: heldShots
+        .filter((shot) => shot?.source === "predictedPrimary" || shot?.source === "authoritativeProjectile")
+        .slice(-12)
+    };
+    assert(predictedCadence.count >= 3, `held primary produced too few predicted shots: ${predictedCadence.count}`);
+    assert(predictedCadence.minIntervalMs >= predictedCadence.cooldownMs * 0.55, `held primary predicted burst interval ${predictedCadence.minIntervalMs.toFixed(1)}ms is too short for ${predictedCadence.cooldownMs.toFixed(1)}ms cooldown`);
+    assert(predictedCadence.maxIntervalMs <= predictedCadence.cooldownMs * 1.9, `held primary predicted gap ${predictedCadence.maxIntervalMs.toFixed(1)}ms is too long for ${predictedCadence.cooldownMs.toFixed(1)}ms cooldown`);
+    const predictedClear = await waitForPredictedProjectilesToClear(controllerPage, getDebugState);
+    samples.heldPrimaryPredictedCleanup = predictedClear;
+    assert(predictedClear.predictedStoreCount === 0 && predictedClear.predictedRenderedCount === 0, `predicted projectiles lingered after held primary release: ${JSON.stringify(predictedClear)}`);
+    const visibleClear = await waitForVisibleRangerProjectilesToClear(controllerPage, getDebugState);
+    samples.heldPrimaryVisibleProjectileCleanup = visibleClear;
+    assert(visibleClear.lingeringCount === 0, `visible ranger projectiles lingered after arrow lifetime: ${JSON.stringify(visibleClear)}`);
+    if (reconciliation.authoritativeCount > 0) {
+      assert(reconciliation.matched >= Math.max(1, Math.min(reconciliation.authoritativeCount, predictedCadence.count - 1)), `held primary reconciled too few predicted shots: ${reconciliation.matched}/${predictedCadence.count}`);
+      assert(reconciliation.maxLagMs <= 180, `held primary reconciliation lag ${reconciliation.maxLagMs.toFixed(1)}ms is too high`);
+    }
 
     lastState = await getDebugState(controllerPage);
     mkdirSync(artifactsDir, { recursive: true });

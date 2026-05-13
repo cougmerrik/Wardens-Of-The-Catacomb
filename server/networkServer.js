@@ -14,6 +14,7 @@ import { createWsClientTransport } from "./net/transports/WsClientTransport.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
+import { handleDevNetworkTelemetryRequest } from "./devNetworkTelemetryApi.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
@@ -33,6 +34,7 @@ const MAX_TELEMETRY_SAMPLES = Number.parseInt(process.env.MAX_TELEMETRY_SAMPLES 
 const TICK_DRIFT_EPSILON_MS = Number.parseFloat(process.env.TICK_DRIFT_EPSILON_MS || "0.5");
 const MAX_TICKS_PER_LOOP = Number.parseInt(process.env.MAX_TICKS_PER_LOOP || "6", 10);
 const MAX_SNAPSHOT_STEPS_PER_LOOP = Number.parseInt(process.env.MAX_SNAPSHOT_STEPS_PER_LOOP || "3", 10);
+const DEV_NETWORK_TELEMETRY = process.env.DEV_NETWORK_TELEMETRY === "1";
 
 const rooms = new Map();
 const pushTelemetrySample = makeSamplePusher(MAX_TELEMETRY_SAMPLES);
@@ -79,6 +81,10 @@ const server = http.createServer(async (req, res) => {
 
   if (requestUrl.pathname === "/api/leaderboard") {
     await handleLeaderboardApiRequest(req, res, leaderboardStore);
+    return;
+  }
+  if (DEV_NETWORK_TELEMETRY && requestUrl.pathname === "/api/dev-network-telemetry") {
+    await handleDevNetworkTelemetryRequest(req, res);
     return;
   }
   res.writeHead(404, {

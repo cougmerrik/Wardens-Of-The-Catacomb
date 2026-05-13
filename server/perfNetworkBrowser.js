@@ -215,6 +215,19 @@ async function measureMovementLatency(page, key) {
   }
 }
 
+async function measureAvailableMovementLatency(page, keys = ["d", "s", "a", "w"]) {
+  const failures = [];
+  for (const key of keys) {
+    try {
+      return await measureMovementLatency(page, key);
+    } catch (error) {
+      failures.push({ key, message: error instanceof Error ? error.message : String(error) });
+      await delay(150);
+    }
+  }
+  throw new Error(`movement latency probe could not move in any direction: ${JSON.stringify(failures)}`);
+}
+
 function summarizeBrowserPerf(perfData) {
   const frameDeltas = Array.isArray(perfData?.frameDeltas) ? perfData.frameDeltas : [];
   const longTasks = Array.isArray(perfData?.longTasks) ? perfData.longTasks.map((entry) => entry.duration) : [];
@@ -280,9 +293,9 @@ async function main() {
     }, { timeout: 15000 });
 
     const moveLatenciesMs = [];
-    moveLatenciesMs.push(await measureMovementLatency(page, "d"));
+    moveLatenciesMs.push(await measureAvailableMovementLatency(page));
     await delay(250);
-    moveLatenciesMs.push(await measureMovementLatency(page, "s"));
+    moveLatenciesMs.push(await measureAvailableMovementLatency(page, ["s", "d", "a", "w"]));
 
     await page.keyboard.down("d");
     const startedAt = Date.now();

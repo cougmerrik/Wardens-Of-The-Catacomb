@@ -1,4 +1,4 @@
-import { drawClassStatusPanel, drawGroupPanel, drawHud, drawPlayerStatsPanel, drawShopMenu, drawSkillTreeMenu, drawPausedOverlay } from "./hudPanels.js";
+import { drawClassStatusPanel, drawDebugStatsHud, drawGroupPanel, drawHud, drawPlayerStatsPanel, drawShopMenu, drawSkillTreeMenu, drawPausedOverlay } from "./hudPanels.js";
 import { RendererRuntimeEffects } from "./RendererRuntimeEffects.js";
 
 export class Renderer extends RendererRuntimeEffects {
@@ -28,5 +28,9 @@ export class Renderer extends RendererRuntimeEffects {
 
   drawPausedOverlay(layout) {
     drawPausedOverlay(this, layout);
+  }
+
+  drawDebugStatsHud(game, layout) {
+    drawDebugStatsHud(this, game, layout);
   }
 }

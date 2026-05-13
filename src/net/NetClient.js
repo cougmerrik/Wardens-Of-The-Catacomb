@@ -56,6 +56,10 @@ export class NetClient {
     return this.send("room.lobbyUpdate", payload);
   }
 
+  sendPing(clientTime) {
+    return this.send("net.ping", { clientTime });
+  }
+
   takeControl() {
     return this.send("room.takeControl", {});
   }

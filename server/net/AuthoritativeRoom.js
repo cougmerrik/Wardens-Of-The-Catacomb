@@ -194,6 +194,7 @@ export class AuthoritativeRoom {
       skillPoints: 0,
       refundCount: 0,
       levelWeaponDamageBonus: 0,
+      lanternFuel: Number.isFinite(spawn?.lanternFuel) ? spawn.lanternFuel : this.sim.config?.lighting?.lanternInitialFuel,
       kills: 0,
       damageDealt: 0,
       goldEarned: 0,
@@ -299,6 +300,7 @@ export class AuthoritativeRoom {
     this.sim.player.speed = Number.isFinite(state.speed) ? state.speed : this.sim.player.speed;
     this.sim.player.health = Number.isFinite(state.health) ? state.health : this.sim.player.health;
     this.sim.player.maxHealth = Number.isFinite(state.maxHealth) ? state.maxHealth : this.sim.player.maxHealth;
+    this.sim.player.alive = this.sim.player.health > 0;
     this.sim.player.fireCooldown = Number.isFinite(state.fireCooldown) ? state.fireCooldown : 0;
     this.sim.player.fireArrowCooldown = Number.isFinite(state.fireArrowCooldown) ? state.fireArrowCooldown : 0;
     this.sim.player.deathBoltCooldown = Number.isFinite(state.deathBoltCooldown) ? state.deathBoltCooldown : 0;
@@ -367,6 +369,7 @@ export class AuthoritativeRoom {
     state.skillPoints = this.sim.skillPoints;
     state.refundCount = Number.isFinite(this.sim.refundCount) ? this.sim.refundCount : 0;
     state.levelWeaponDamageBonus = this.sim.levelWeaponDamageBonus;
+    state.lanternFuel = this.sim.player.lanternFuel;
     state.kills = this.sim.runStats?.totalKills || 0;
     state.damageDealt = this.sim.runStats?.damageDealt || 0;
     state.goldEarned = this.sim.runStats?.goldEarned || 0;
@@ -809,6 +812,31 @@ export class AuthoritativeRoom {
     return Array.from(this.activePlayers.values());
   }
 
+  getLivingActivePlayerStates() {
+    return this.getActivePlayerStates().filter((state) =>
+      state &&
+      state.alive !== false &&
+      (Number.isFinite(state.health) ? state.health > 0 : true) &&
+      this.clients.has(state.id)
+    );
+  }
+
+  transferPauseOwnerToLivingPlayer(nowMs = Date.now()) {
+    const next = this.getLivingActivePlayerStates().find((state) => state.id !== this.pauseOwnerId)
+      || this.getLivingActivePlayerStates()[0]
+      || null;
+    if (!next?.id || next.id === this.pauseOwnerId) return false;
+    this.pauseOwnerId = next.id;
+    this.sim.gameOver = false;
+    this.sim.gameOverTitle = "GAME OVER";
+    this.sim.paused = false;
+    this.finalResults = null;
+    this.syncSimPrimaryPlayerState();
+    this.broadcastRoster();
+    this.maybeBroadcastMeta(nowMs, true);
+    return true;
+  }
+
   getLastInputSeqByPlayer() {
     const out = {};
     for (const client of this.clients.values()) {
@@ -982,6 +1010,9 @@ export class AuthoritativeRoom {
     if (!this.roomOwnerId) this.roomOwnerId = client.id;
     if (!this.pauseOwnerId) this.pauseOwnerId = client.id;
     if (this.phase === "active") this.activePlayers.set(client.id, this.createActivePlayerState(client, this.sim.player));
+    if (this.phase === "active" && this.sim.gameOver && this.getLivingActivePlayerStates().length > 0) {
+      this.transferPauseOwnerToLivingPlayer(Date.now());
+    }
     if (this.phase === "lobby") this.refreshLobbyState(Date.now());
   }
 
@@ -1109,6 +1140,9 @@ export class AuthoritativeRoom {
     if (floorAdvanced) placeActivePlayersAtRandomFloorSpawns(this);
     this.updateRemoteActivePlayers(floorAdvanced ? 0 : dt);
     this.syncPrimaryActivePlayerFromSim();
+    if (this.sim.gameOver && this.getLivingActivePlayerStates().length > 0) {
+      this.transferPauseOwnerToLivingPlayer(nowMs);
+    }
     if (this.sim.gameOver && !this.finalResults) {
       this.finalResults = this.buildFinalResults();
     }

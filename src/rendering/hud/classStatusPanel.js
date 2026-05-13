@@ -20,6 +20,22 @@ function getPanelRect(renderer, layout) {
   return { x, y, w, h: layout.isAndroid ? 82 : 88 };
 }
 
+function formatMetric(value, suffix = "") {
+  if (!Number.isFinite(value)) return "-";
+  return `${Math.round(value)}${suffix}`;
+}
+
+function getNetworkStatusLines(game) {
+  if (!game?.debugHudEnabled || !game.networkEnabled) return [];
+  const stats = game.debugHudStats && typeof game.debugHudStats === "object" ? game.debugHudStats : {};
+  const net = stats.network && typeof stats.network === "object" ? stats.network : {};
+  return [
+    `NET ${formatMetric(stats.fps)}fps  Ping ${formatMetric(net.pingMs, "ms")}`,
+    `Lat ${formatMetric(net.latencyMs, "ms")}  Jit ${formatMetric(net.jitterMs, "ms")}`,
+    `Buf ${formatMetric(net.snapshotBuffer)}  In ${formatMetric(net.pendingInputs)}`
+  ];
+}
+
 function drawPanelBase(ctx, rect, accent) {
   ctx.fillStyle = "rgba(8, 12, 20, 0.94)";
   ctx.fillRect(rect.x - 6, rect.y - 6, rect.w + 12, rect.h + 12);
@@ -142,6 +158,8 @@ export function drawClassStatusPanel(renderer, game, layout) {
   if (!status) return layout.topHudH;
   const ctx = renderer.ctx;
   const rect = getPanelRect(renderer, layout);
+  const networkLines = getNetworkStatusLines(game);
+  if (networkLines.length > 0 && !layout.isAndroid) rect.h += 42;
   drawPanelBase(ctx, rect, status.accent);
 
   ctx.fillStyle = status.accent;
@@ -157,6 +175,23 @@ export function drawClassStatusPanel(renderer, game, layout) {
     ctx.font = "11px Trebuchet MS";
     ctx.fillText(status.barLabel, rect.x, rect.y + 65);
     drawSegmentedBar(ctx, { x: rect.x, y: rect.y + 70, w: rect.w, h: 8 }, status.barRatio, status.barColor, status.sections);
+  }
+
+  if (networkLines.length > 0 && !layout.isAndroid) {
+    const netY = rect.y + 92;
+    ctx.strokeStyle = "rgba(126, 139, 171, 0.35)";
+    ctx.beginPath();
+    ctx.moveTo(rect.x, netY - 10.5);
+    ctx.lineTo(rect.x + rect.w, netY - 10.5);
+    ctx.stroke();
+    ctx.fillStyle = "#bfe8ff";
+    ctx.font = "11px Trebuchet MS";
+    for (let i = 0; i < networkLines.length; i += 1) {
+      ctx.fillText(networkLines[i], rect.x, netY + i * 13);
+    }
+    game.networkStatsPanelRect = { x: rect.x, y: netY - 12, w: rect.w, h: 42 };
+  } else {
+    game.networkStatsPanelRect = null;
   }
 
   return rect.y + rect.h + 6;

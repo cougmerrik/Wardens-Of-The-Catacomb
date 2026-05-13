@@ -10,7 +10,12 @@ import {
   syncRemotePlayers,
   synthesizeEnemyDamageFloatingTexts
 } from "./clientSnapshotHelpers.js";
-
+import {
+  ensureNetworkPerf,
+  isPostLoadCorrectionActive,
+  recordCorrection,
+  recordPostLoadCorrection
+} from "./clientCorrectionMetrics.js";
 export { applyMetaStateToGame } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
@@ -166,13 +171,13 @@ export function syncByIdLerp(target, source, positionAlpha = 1, decorate) {
   return target;
 }
 
-function applyDeltaCollection(target, delta, { keyframe = false, positionAlpha = 1, decorate, mapSpawn } = {}) {
+function applyDeltaCollection(target, delta, { keyframe = false, positionAlpha = 1, decorate, mapSpawn, keepExisting } = {}) {
   if (!Array.isArray(target)) target = [];
   const d = delta && typeof delta === "object" ? delta : null;
   if (!d) return target;
   const existing = new Map();
   for (const item of target) {
-    if (item && item.id != null) existing.set(item.id, item);
+    if (item && item.id != null && (typeof keepExisting !== "function" || keepExisting(item))) existing.set(item.id, item);
   }
 
   const spawnList = Array.isArray(d.spawn) ? d.spawn : [];
@@ -216,7 +221,6 @@ function applyDeltaCollection(target, delta, { keyframe = false, positionAlpha =
   for (const item of existing.values()) target.push(item);
   return target;
 }
-
 export function applySnapshotToGame({
   game,
   state,
@@ -237,33 +241,7 @@ export function applySnapshotToGame({
   for (const player of Array.isArray(game?.remotePlayers) ? game.remotePlayers : []) {
     if (player?.id) previousAliveById.set(player.id, (player.alive !== false) && (player.health || 0) > 0);
   }
-  if (!game.networkPerf || typeof game.networkPerf !== "object") {
-    game.networkPerf = {
-      appliedSnapshotCount: 0,
-      lastCorrectionPx: 0,
-      maxCorrectionPx: 0,
-      hardSnapCount: 0,
-      softCorrectionCount: 0,
-      settleCorrectionCount: 0,
-      blockedSnapCount: 0,
-      projectileReconcileRejects: 0,
-      recentCorrections: []
-    };
-  }
-  const recordCorrection = (kind, errorDist, extra = {}) => {
-    if (!Array.isArray(game.networkPerf.recentCorrections)) game.networkPerf.recentCorrections = [];
-    game.networkPerf.recentCorrections.push({
-      atMs: Math.round(performance.now()),
-      kind,
-      errorPx: Math.round(errorDist),
-      ackSeq: Number.isFinite(ackSeq) ? ackSeq : 0,
-      pendingInputs: Array.isArray(netPendingInputs) ? netPendingInputs.length : 0,
-      ...extra
-    });
-    if (game.networkPerf.recentCorrections.length > 24) {
-      game.networkPerf.recentCorrections.splice(0, game.networkPerf.recentCorrections.length - 24);
-    }
-  };
+  ensureNetworkPerf(game);
   game.networkPerf.appliedSnapshotCount += 1;
   const isInitialControllerSync = !!controller && ackSeq <= 0 && !!state?.delta?.keyframe;
   const snapshotLocalPlayer = findSnapshotLocalPlayer(state, localPlayerId);
@@ -327,20 +305,43 @@ export function applySnapshotToGame({
         typeof game.isPositionWalkable === "function"
           ? !game.isPositionWalkable(game.player.x, game.player.y, localPlayerRadius, true)
           : false;
+      const postLoadCorrectionActive = isPostLoadCorrectionActive(game, { controller, ackSeq, isInitialControllerSync });
+      if (postLoadCorrectionActive) {
+        game.networkPerf.postLoadLastCorrectionPx = errorDist;
+        if (errorDist > (game.networkPerf.postLoadMaxCorrectionPx || 0)) {
+          game.networkPerf.postLoadMaxCorrectionPx = errorDist;
+        }
+      }
       game.networkPerf.lastCorrectionPx = errorDist;
       if (errorDist > game.networkPerf.maxCorrectionPx) game.networkPerf.maxCorrectionPx = errorDist;
       if (isInitialControllerSync || localPlayerBlocked || errorDist > hardSnapDist) {
         game.networkPerf.hardSnapCount += 1;
+        if (postLoadCorrectionActive) game.networkPerf.postLoadHardSnapCount += 1;
         if (localPlayerBlocked) game.networkPerf.blockedSnapCount += 1;
-        recordCorrection(localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+        if (postLoadCorrectionActive && localPlayerBlocked) game.networkPerf.postLoadBlockedSnapCount += 1;
+        recordCorrection(game, localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+          ackSeq,
+          pendingInputs: netPendingInputs,
+          extra: {
           correctedX: Math.round(correctedX),
           correctedY: Math.round(correctedY)
+          }
+        });
+        recordPostLoadCorrection(game, postLoadCorrectionActive, localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+          ackSeq,
+          pendingDepth,
+          extra: {
+          correctedX: Math.round(correctedX),
+          correctedY: Math.round(correctedY)
+          }
         });
         game.player.x = correctedX;
         game.player.y = correctedY;
       } else if (ackSeq > 0 && errorDist > softSnapDist) {
         game.networkPerf.softCorrectionCount += 1;
-        recordCorrection("softCorrection", errorDist);
+        if (postLoadCorrectionActive) game.networkPerf.postLoadSoftCorrectionCount += 1;
+        recordCorrection(game, "softCorrection", errorDist, { ackSeq, pendingInputs: netPendingInputs });
+        recordPostLoadCorrection(game, postLoadCorrectionActive, "softCorrection", errorDist, { ackSeq, pendingDepth });
         const denom = Math.max(1, hardSnapDist - softSnapDist);
         const errorNorm = Math.max(0, Math.min(1, (errorDist - softSnapDist) / denom));
         const jitterDamping = Math.max(0.5, 1 - jitterMs / 26);
@@ -356,7 +357,9 @@ export function applySnapshotToGame({
         }
       } else if (ackSeq > 0 && errorDist > settleDist) {
         game.networkPerf.settleCorrectionCount += 1;
-        recordCorrection("settleCorrection", errorDist);
+        if (postLoadCorrectionActive) game.networkPerf.postLoadSettleCorrectionCount += 1;
+        recordCorrection(game, "settleCorrection", errorDist, { ackSeq, pendingInputs: netPendingInputs });
+        recordPostLoadCorrection(game, postLoadCorrectionActive, "settleCorrection", errorDist, { ackSeq, pendingDepth });
         game.player.x += dx * 0.05;
         game.player.y += dy * 0.05;
       }
@@ -466,11 +469,13 @@ export function applySnapshotToGame({
     game.bullets = applyDeltaCollection(game.bullets, state.delta.bullets, {
       keyframe,
       positionAlpha: 1,
+      keepExisting: (projectile) => !projectile?.predicted,
       mapSpawn: (p) => reconcileProjectileSpawn(p, "bullet")
     });
     game.fireArrows = applyDeltaCollection(game.fireArrows, state.delta.fireArrows, {
       keyframe,
       positionAlpha: 1,
+      keepExisting: (projectile) => !projectile?.predicted,
       mapSpawn: (p) => reconcileProjectileSpawn(p, "fireArrow")
     });
     game.fireZones = applyDeltaCollection(game.fireZones, state.delta.fireZones, { keyframe, positionAlpha: 1 });

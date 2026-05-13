@@ -632,6 +632,56 @@ body {
   flex-wrap: wrap;
 }
 
+.net-debug-stats {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  width: 300px;
+  border: 1px solid rgba(143, 227, 162, 0.8);
+  border-radius: 6px;
+  background: rgba(4, 8, 14, 0.94);
+  color: #d9f6df;
+  padding: 10px 12px;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
+  pointer-events: none;
+}
+
+.net-debug-stats[hidden] {
+  display: none !important;
+}
+
+.net-debug-stats__title {
+  display: block;
+  margin-bottom: 8px;
+  color: #8fe3a2;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.net-debug-stats__row {
+  display: grid;
+  grid-template-columns: minmax(112px, 1fr) max-content;
+  align-items: baseline;
+  gap: 18px;
+  padding: 2px 0;
+  white-space: nowrap;
+}
+
+.net-debug-stats__label {
+  color: #a9b9c9;
+}
+
+.net-debug-stats__value {
+  color: #f2fff4;
+  font-family: "Consolas", "Menlo", monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .screen-actions {
   display: flex;
   gap: 10px;

@@ -1,3 +1,5 @@
+import { updateDebugHudFrameStats, updateDebugHudNetworkStats } from "./debugHudStats.js";
+
 export function applyNetworkSnapshot({
   game,
   state,
@@ -54,6 +56,8 @@ export function startNetworkRenderLoopRuntime({
   updateVoice,
   setNetRenderRaf
 }) {
+  const predictedProjectileTtlMs = 220;
+  const predictedProjectileRenderTtlMs = 120;
   let lastFrameAt = performance.now();
   const stepClientFloatingTexts = (texts, dt) => {
     if (!Array.isArray(texts) || texts.length === 0) return texts;
@@ -72,8 +76,10 @@ export function startNetworkRenderLoopRuntime({
       setNetRenderRaf(requestAnimationFrame(loop));
       return;
     }
-    const dt = Math.min((now - lastFrameAt) / 1000, 0.05);
+    const frameMs = now - lastFrameAt;
+    const dt = Math.min(frameMs / 1000, 0.05);
     lastFrameAt = now;
+    updateDebugHudFrameStats(game, frameMs);
     handleNetworkUiActions(game, typeof getNetClient === "function" ? getNetClient() : null, isNetworkController());
     const renderDelay = getRenderDelayMs();
     const targetRecvTime = performance.now() - renderDelay;
@@ -81,6 +87,13 @@ export function startNetworkRenderLoopRuntime({
     const targetServerTime = Number.isFinite(estimatedServerNow) ? estimatedServerNow - renderDelay : NaN;
     const pkt = consumeSnapshotForRender(netSnapshotBuffer, targetServerTime, targetRecvTime, maxSnapshotBuffer);
     if (pkt) {
+      updateDebugHudNetworkStats(game, {
+        role: isNetworkController() ? "Controller" : "Spectator",
+        renderDelayMs: renderDelay,
+        latencyMs: Number.isFinite(estimatedServerNow) && Number.isFinite(pkt.serverTime) ? Math.max(0, estimatedServerNow - pkt.serverTime) : NaN,
+        snapshotAgeMs: Number.isFinite(pkt.recvTime) ? Math.max(0, performance.now() - pkt.recvTime) : NaN,
+        snapshotBuffer: netSnapshotBuffer.length
+      });
       const stateWithServerTime =
         pkt?.state && typeof pkt.state === "object" && Number.isFinite(pkt.serverTime)
           ? { ...pkt.state, serverTime: pkt.serverTime }
@@ -128,7 +141,7 @@ export function startNetworkRenderLoopRuntime({
     game.floatingTexts = stepClientFloatingTexts(game.floatingTexts, dt);
     if (typeof updatePredictedProjectiles === "function") updatePredictedProjectiles(game, netPredictedProjectiles, dt);
     if (typeof updateNetworkProjectilePresentation === "function") updateNetworkProjectilePresentation(game, dt);
-    prunePredictedProjectiles(netPredictedProjectiles, performance.now(), 220, game);
+    prunePredictedProjectiles(netPredictedProjectiles, performance.now(), predictedProjectileTtlMs, game, predictedProjectileRenderTtlMs);
     if (typeof updateVoice === "function") updateVoice(game);
     game.renderer.draw(game);
     setNetRenderRaf(requestAnimationFrame(loop));

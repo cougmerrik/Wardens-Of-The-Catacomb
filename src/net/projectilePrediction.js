@@ -132,13 +132,16 @@ function enqueuePredictedPrimarySpread(game, store, seq, dirX, dirY, nowMs) {
   }
 }
 
-export function prunePredictedProjectiles(store, nowMs = performance.now(), ttlMs = 220, game = null) {
+export function prunePredictedProjectiles(store, nowMs = performance.now(), ttlMs = 220, game = null, renderTtlMs = ttlMs) {
   if (!(store instanceof Map)) return;
   for (const [seq, list] of store.entries()) {
     const next = list.filter((p) => nowMs - p.createdAt <= ttlMs);
     if (game) {
       for (const entry of list) {
-        if (!next.includes(entry)) removeRenderedPredictedProjectile(game, entry.renderId);
+        if (!next.includes(entry) || nowMs - entry.createdAt > renderTtlMs) {
+          entry.renderExpired = true;
+          removeRenderedPredictedProjectile(game, entry.renderId);
+        }
       }
     }
     if (next.length === 0) store.delete(seq);
@@ -164,6 +167,7 @@ export function updatePredictedProjectiles(game, store, dt) {
       if (Number.isFinite(predicted.life)) predicted.life = Math.max(0, predicted.life - dt);
       const render = rendered.get(predicted.renderId);
       if (!render) {
+        if (predicted.renderExpired) continue;
         if (predicted.type === "bullet" && Array.isArray(game.bullets)) {
           game.bullets.push({
             id: predicted.renderId,
@@ -204,6 +208,11 @@ export function updateNetworkProjectilePresentation(game, dt) {
       projectile.y += vy * dt;
       if (Number.isFinite(projectile.life)) projectile.life = Math.max(0, projectile.life - dt);
     }
+    for (let i = collection.length - 1; i >= 0; i -= 1) {
+      const projectile = collection[i];
+      if (projectile?.predicted) continue;
+      if (Number.isFinite(projectile?.life) && projectile.life <= 0) collection.splice(i, 1);
+    }
   }
 }
 
@@ -241,14 +250,9 @@ export function predictProjectileSpawn(game, input, nowMs, isNetworkController, 
     nextHeldPrimaryPredictAtMs = nowMs + primaryCadenceMs;
   } else if (input.firePrimaryHeld && input.hasAim) {
     if (nextHeldPrimaryPredictAtMs <= 0) nextHeldPrimaryPredictAtMs = nowMs;
-    let predictedBursts = 0;
-    while (nowMs + 2 >= nextHeldPrimaryPredictAtMs && predictedBursts < 2) {
+    if (nowMs + 2 >= nextHeldPrimaryPredictAtMs) {
       if (usesRanged) enqueuePredictedPrimarySpread(game, store, input.seq, dirX, dirY, nowMs);
       else enqueuePredictedMeleeSwing(game, dirX, dirY, nowMs, input.seq);
-      nextHeldPrimaryPredictAtMs += primaryCadenceMs;
-      predictedBursts += 1;
-    }
-    if (nextHeldPrimaryPredictAtMs < nowMs - primaryCadenceMs) {
       nextHeldPrimaryPredictAtMs = nowMs + primaryCadenceMs;
     }
   } else {

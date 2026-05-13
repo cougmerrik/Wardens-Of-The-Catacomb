@@ -51,13 +51,66 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
         ...pointLevels(game.warriorTalents),
         ...pointLevels(game.necromancerTalents)
       };
+      const projectileDebug = [
+        ...((Array.isArray(game.bullets) ? game.bullets : []).map((projectile) => ({ projectile, kind: "bullet" }))),
+        ...((Array.isArray(game.fireArrows) ? game.fireArrows : []).map((projectile) => ({ projectile, kind: "fireArrow" })))
+      ].filter(({ projectile }) => projectile).map(({ projectile, kind }) => {
+        const screenX = (projectile.x || 0) - camera.x;
+        const screenY = (projectile.y || 0) - camera.y;
+        return {
+          source: projectile.predicted ? "predictedRendered" : "authoritative",
+          kind,
+          x: projectile.x,
+          y: projectile.y,
+          screenX,
+          screenY,
+          onScreen: screenX >= -32 && screenY >= -32 && screenX <= 992 && screenY <= 672,
+          vx: projectile.vx || 0,
+          vy: projectile.vy || 0,
+          angle: projectile.angle,
+          life: projectile.life,
+          ownerId: projectile.ownerId || "",
+          faction: projectile.faction || "player",
+          spawnSeq: projectile.spawnSeq || 0,
+          projectileType: projectile.projectileType || "bullet"
+        };
+      });
       const spentSkillPoints = typeof game.getSpentSkillPointCount === "function" ? game.getSpentSkillPointCount() : 0;
       const refundCost = typeof game.getSkillRefundCost === "function" ? game.getSkillRefundCost(spentSkillPoints, game.refundCount) : 0;
       return {
+        gameOver: !!game.gameOver,
         networkReady: !!game.networkReady,
         networkHasMap: !!game.networkHasMap,
         networkHasChunks: !!game.networkHasChunks,
         networkRole: game.networkRole || "",
+        debugHud: game.debugHudStats && typeof game.debugHudStats === "object"
+          ? {
+              enabled: !!game.debugHudEnabled,
+              fps: Number.isFinite(game.debugHudStats.fps) ? game.debugHudStats.fps : 0,
+              frameMs: Number.isFinite(game.debugHudStats.frameMs) ? game.debugHudStats.frameMs : 0,
+              rawFps: Number.isFinite(game.debugHudStats.rawFps) ? game.debugHudStats.rawFps : 0,
+              rawFrameMs: Number.isFinite(game.debugHudStats.rawFrameMs) ? game.debugHudStats.rawFrameMs : 0,
+              frameCount: Number.isFinite(game.debugHudStats.frameCount) ? game.debugHudStats.frameCount : 0,
+              frameWindowFps: Number.isFinite(game.debugHudStats.frameWindowFps) ? game.debugHudStats.frameWindowFps : 0,
+              frameWindowAvgMs: Number.isFinite(game.debugHudStats.frameWindowAvgMs) ? game.debugHudStats.frameWindowAvgMs : 0,
+              frameWindowP95Ms: Number.isFinite(game.debugHudStats.frameWindowP95Ms) ? game.debugHudStats.frameWindowP95Ms : 0,
+              frameWindowMaxMs: Number.isFinite(game.debugHudStats.frameWindowMaxMs) ? game.debugHudStats.frameWindowMaxMs : 0,
+              frameWindowSampleCount: Number.isFinite(game.debugHudStats.frameWindowSampleCount) ? game.debugHudStats.frameWindowSampleCount : 0,
+              frameSpikeCount: Number.isFinite(game.debugHudStats.frameSpikeCount) ? game.debugHudStats.frameSpikeCount : 0,
+              recentFrameSpikes: Array.isArray(game.debugHudStats.recentFrameSpikes)
+                ? game.debugHudStats.recentFrameSpikes.slice(-8).map((entry) => ({ ...entry }))
+                : [],
+              network: game.debugHudStats.network && typeof game.debugHudStats.network === "object"
+                ? { ...game.debugHudStats.network }
+                : null,
+              rect: game.debugHudStatsRect && typeof game.debugHudStatsRect === "object"
+                ? { ...game.debugHudStatsRect }
+                : null,
+              uiRect: game.networkStatsPanelRect && typeof game.networkStatsPanelRect === "object"
+                ? { ...game.networkStatsPanelRect }
+                : null
+            }
+          : null,
         floor: game.floor,
         player: {
           x: playerX,
@@ -134,6 +187,18 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           meleeSwingCount: Array.isArray(game.meleeSwings) ? game.meleeSwings.length : 0,
           bulletCount: Array.isArray(game.bullets) ? game.bullets.length : 0,
           fireArrowCount: Array.isArray(game.fireArrows) ? game.fireArrows.length : 0,
+          predictedRenderedProjectileCount: Array.isArray(game.bullets)
+            ? game.bullets.filter((projectile) => projectile?.predicted).length
+            : 0,
+          predictedProjectileCount: game.networkPredictedProjectiles instanceof Map
+            ? Array.from(game.networkPredictedProjectiles.values()).reduce((count, list) => count + (Array.isArray(list) ? list.length : 0), 0)
+            : 0,
+          visibleRangerProjectileCount: projectileDebug.filter((projectile) =>
+            projectile.onScreen &&
+            projectile.faction !== "enemy" &&
+            (projectile.kind === "fireArrow" || String(projectile.projectileType || "").startsWith("ranger_"))
+          ).length,
+          visibleProjectiles: projectileDebug.filter((projectile) => projectile.onScreen).slice(-24),
           floatingTextCount: Array.isArray(game.floatingTexts) ? game.floatingTexts.length : 0,
           recentFloatingTexts: Array.isArray(game.floatingTexts)
             ? game.floatingTexts.slice(-6).map((entry) => ({
@@ -159,6 +224,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
                 vx: projectile.vx || 0,
                 vy: projectile.vy || 0,
                 angle: projectile.angle,
+                life: projectile.life,
                 spawnSeq: projectile.spawnSeq || 0,
                 projectileType: projectile.projectileType || "bullet"
               }))),
@@ -175,6 +241,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
                 vx: projectile.vx || 0,
                 vy: projectile.vy || 0,
                 angle: projectile.angle,
+                life: projectile.life,
                 spawnSeq: projectile.seq || 0,
                 projectileType: projectile.type || "bullet",
                 createdAt: projectile.createdAt || 0
@@ -207,10 +274,28 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               hardSnapCount: game.networkPerf.hardSnapCount || 0,
               softCorrectionCount: game.networkPerf.softCorrectionCount || 0,
               settleCorrectionCount: game.networkPerf.settleCorrectionCount || 0,
-              blockedSnapCount: game.networkPerf.blockedSnapCount || 0
+              blockedSnapCount: game.networkPerf.blockedSnapCount || 0,
+              postLoadCorrectionReady: !!game.networkPerf.postLoadCorrectionReady,
+              postLoadCorrectionFloor: Number.isFinite(game.networkPerf.postLoadCorrectionFloor) ? game.networkPerf.postLoadCorrectionFloor : null,
+              postLoadCorrectionStartedAtMs: game.networkPerf.postLoadCorrectionStartedAtMs || 0,
+              postLoadCorrectionSnapshotStart: game.networkPerf.postLoadCorrectionSnapshotStart || 0,
+              postLoadLastCorrectionPx: game.networkPerf.postLoadLastCorrectionPx || 0,
+              postLoadMaxCorrectionPx: game.networkPerf.postLoadMaxCorrectionPx || 0,
+              postLoadHardSnapCount: game.networkPerf.postLoadHardSnapCount || 0,
+              postLoadSoftCorrectionCount: game.networkPerf.postLoadSoftCorrectionCount || 0,
+              postLoadSettleCorrectionCount: game.networkPerf.postLoadSettleCorrectionCount || 0,
+              postLoadBlockedSnapCount: game.networkPerf.postLoadBlockedSnapCount || 0,
+              recentPostLoadCorrections: Array.isArray(game.networkPerf.recentPostLoadCorrections)
+                ? game.networkPerf.recentPostLoadCorrections.slice(-8).map((entry) => ({ ...entry }))
+                : [],
+              projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
+              recentProjectileReconcileRejects: Array.isArray(game.networkPerf.recentProjectileReconcileRejects)
+                ? game.networkPerf.recentProjectileReconcileRejects.slice(-8).map((entry) => ({ ...entry }))
+                : []
             }
           : null,
         ui: {
+          paused: !!game.paused,
           shopOpen: !!game.shopOpen,
           skillTreeOpen: !!game.skillTreeOpen,
           statsPanelOpen: !!game.statsPanelOpen,

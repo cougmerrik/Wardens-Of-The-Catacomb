@@ -55,6 +55,8 @@ export class GameRuntimeBase {
     this.onPauseChanged = typeof options.onPauseChanged === "function" ? options.onPauseChanged : null;
     this.onFloorChanged = typeof options.onFloorChanged === "function" ? options.onFloorChanged : null;
     this.onGameOverChanged = typeof options.onGameOverChanged === "function" ? options.onGameOverChanged : null;
+    this.debugHudEnabled = !!options.debugHudEnabled;
+    this.debugHudStats = {};
     initializeRuntimeBaseState(this, {
       classType: this.classType,
       classSpec: this.classSpec,

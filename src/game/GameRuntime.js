@@ -1,5 +1,6 @@
 import { GameRuntimeSystems } from "./GameRuntimeSystems.js";
 import { stepGame } from "./gameStep.js";
+import { updateDebugHudFrameStats } from "../bootstrap/debugHudStats.js";
 
 export class Game extends GameRuntimeSystems {
   constructor(canvas, options = {}) {
@@ -29,8 +30,10 @@ export class Game extends GameRuntimeSystems {
     const loop = (now) => {
       if (!this.running) return;
       const dt = Math.min((now - this.last) / 1000, 0.033);
+      const frameMs = now - this.last;
       this.last = now;
       try {
+        updateDebugHudFrameStats(this, frameMs);
         this.update(dt);
         this.renderer.draw(this);
       } catch (err) {
