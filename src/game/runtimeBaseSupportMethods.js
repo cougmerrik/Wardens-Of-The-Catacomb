@@ -25,8 +25,13 @@ import {
 } from "./warriorTalentTree.js";
 import { getNecromancerRotTouchedRetaliationDamage, getNecromancerSkillPointGainForLevel, getNecromancerVigorMoveSpeedBonusPct } from "./necromancerTalentTree.js";
 import { runtimeActivePlayerTickMethods } from "./runtimeActivePlayerTickMethods.js";
+import { getXpToNextLevelForLevel as resolveXpToNextLevelForLevel } from "./xpProgression.js";
 
 export const runtimeBaseSupportMethods = {
+  getXpToNextLevelForLevel(level = this.level) {
+    return resolveXpToNextLevelForLevel(this.config, level);
+  },
+
   getActiveWarriorStanceModifierForEntity(entity) {
     if (!entity || entity.classType !== "fighter" || !isWarriorTalentGame(entity)) return "";
     const activeMode = entity?.warriorRuntime?.activeAttackMode === "secondary" ? "secondary" : "primary";
@@ -388,7 +393,7 @@ export const runtimeBaseSupportMethods = {
       const baseAvg = (Math.min(baseMin, baseMax) + Math.max(baseMin, baseMax)) * 0.5;
       const dmgPct = Number.isFinite(classSpec.levelWeaponDamagePct) ? classSpec.levelWeaponDamagePct : 0.05;
       entity.levelWeaponDamageBonus += Math.max(1, baseAvg * Math.max(0, dmgPct));
-      entity.expToNextLevel = Math.floor(entity.expToNextLevel * this.config.progression.xpLevelScaling);
+      entity.expToNextLevel = this.getXpToNextLevelForLevel(entity.level);
       this.spawnFloatingText(entity.x, entity.y - 30, `Level ${entity.level}!`, "#9be18a", 1.0, 15);
     }
   },

@@ -32,6 +32,7 @@ import { runtimePlayerAttackMethods } from "./runtimePlayerAttackMethods.js";
 import { runtimePlayerCombatMethods } from "./runtimePlayerCombatMethods.js";
 import { getRangerMaxHealthBonusPct } from "./rangerTalentTree.js";
 import { getWarriorIronGuardMaxHealthBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
+import { getXpToNextLevelForLevel } from "./xpProgression.js";
 
 export class GameRuntimeSystems extends GameRuntimeWorld {
   getControlledUndeadFormationPoint(enemy) {
@@ -302,7 +303,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       const dmgGain = Math.max(1, baseAvg * Math.max(0, dmgPct));
       this.levelWeaponDamageBonus += dmgGain;
       this.spawnFloatingText(this.player.x, this.player.y - 62, `+${dmgGain.toFixed(1)} Weapon Dmg`, "#f3d18b", 0.95, 13);
-      this.expToNextLevel = Math.floor(this.expToNextLevel * this.config.progression.xpLevelScaling);
+      this.expToNextLevel = getXpToNextLevelForLevel(this.config, this.level);
       this.spawnFloatingText(
         this.player.x,
         this.player.y - 30,

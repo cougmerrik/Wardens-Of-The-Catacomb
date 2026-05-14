@@ -75,11 +75,38 @@ export const runtimeBaseDifficultyMethods = {
 
   getEnemySpawnRateScale() {
     const c = this.config.enemy;
-    const levelPart = Math.max(0, (Number.isFinite(this.level) ? this.level : 1) - 1);
+    const safeLevel = Number.isFinite(this.level) ? Math.max(1, Math.floor(this.level)) : 1;
+    const safeFloor = Number.isFinite(this.floor) ? Math.max(1, Math.floor(this.floor)) : 1;
+    const floorStartLevel = typeof this.getMinimumLevelForFloorStart === "function" ? this.getMinimumLevelForFloorStart(safeFloor) : 1;
+    const floorTriggerLevel = typeof this.getFloorBossTriggerLevel === "function" ? this.getFloorBossTriggerLevel(safeFloor) : floorStartLevel;
+    const floorLevelSpan = Math.max(0, floorTriggerLevel - floorStartLevel - 1);
+    const floorLevelPart = Math.max(0, Math.min(floorLevelSpan, safeLevel - floorStartLevel));
+    const floorPart = Math.max(0, safeFloor - 1);
     const base = Number.isFinite(c.levelSpawnRateBase) ? c.levelSpawnRateBase : 1.0;
     const per = Number.isFinite(c.levelSpawnRatePerLevel) ? c.levelSpawnRatePerLevel : 0.10;
+    const latePer = Number.isFinite(c.levelSpawnRateLatePerLevel) ? Math.max(0, c.levelSpawnRateLatePerLevel) : 0;
+    const floorStep = Number.isFinite(c.levelSpawnRateFloorStep) ? c.levelSpawnRateFloorStep : per * 3;
+    const floorStepMax = Number.isFinite(c.levelSpawnRateFloorStepMax) ? Math.max(0, c.levelSpawnRateFloorStepMax) : floorStep * 4;
+    const floorStepValue = Math.min(floorStepMax, floorPart * floorStep);
+    const catchupStep = Number.isFinite(c.levelSpawnRateFloorCatchupStep) ? Math.max(0, c.levelSpawnRateFloorCatchupStep) : 0;
+    const catchupMax = Number.isFinite(c.levelSpawnRateFloorCatchupMax) ? Math.max(0, c.levelSpawnRateFloorCatchupMax) : catchupStep * 3;
+    const floorCatchup = Math.min(catchupMax, Math.max(0, floorPart - 1) * catchupStep);
+    const lateFloorLevelPart = floorPart > 0 ? Math.max(0, floorLevelPart - 1) : 0;
     const cap = Number.isFinite(c.levelSpawnRateCap) ? c.levelSpawnRateCap : 2.4;
-    return Math.max(0.1, Math.min(cap, base + levelPart * per));
+    const rawScale = base + floorStepValue + floorCatchup + floorLevelPart * per + lateFloorLevelPart * latePer;
+    const postFloorCapStart = Number.isFinite(c.levelSpawnRatePostFloorCapStart) ? Math.max(1, Math.floor(c.levelSpawnRatePostFloorCapStart)) : 5;
+    if (safeFloor >= postFloorCapStart) {
+      const floorThreePart = 2;
+      const floorThreeStepValue = Math.min(floorStepMax, floorThreePart * floorStep);
+      const floorThreeCatchup = Math.min(catchupMax, Math.max(0, floorThreePart - 1) * catchupStep);
+      const floorThreeLevelPart = Math.max(0, this.getFloorBossTriggerLevel(3) - this.getMinimumLevelForFloorStart(3) - 1);
+      const floorThreeLateLevelPart = Math.max(0, floorThreeLevelPart - 1);
+      const floorThreePeak = base + floorThreeStepValue + floorThreeCatchup + floorThreeLevelPart * per + floorThreeLateLevelPart * latePer;
+      const capGrowthPct = Number.isFinite(c.levelSpawnRatePostFloorCapGrowthPct) ? Math.max(0, c.levelSpawnRatePostFloorCapGrowthPct) : 0.05;
+      const postFloorCap = floorThreePeak * (1 + Math.max(0, safeFloor - postFloorCapStart + 1) * capGrowthPct);
+      return Math.max(0.1, Math.min(cap, postFloorCap, rawScale));
+    }
+    return Math.max(0.1, Math.min(cap, rawScale));
   },
 
   getDifficultyTier() {
