@@ -40,6 +40,13 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 ## Progression
 - XP is granted directly on enemy kills.
 - XP gain is blocked while the floor boss is active.
+- XP-to-next-level uses the original exponential curve through level `19`.
+- Starting at level `20`, XP requirements use a bounded late-game curve:
+  - level `20-24`: `5500` XP per level
+  - level `25-29`: `6300` XP per level
+  - level `30-34`: `7100` XP per level
+  - level `35+`: capped at `7500` XP per level
+- This keeps floors after floor `4` near a five-minute ambient-spawn clear target instead of letting exponential XP requirements outpace capped spawn pressure.
 - Each level grants:
   - `+1` skill point
   - class-based max-health growth
@@ -164,9 +171,15 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 ## Difficulty Scaling
 
 ### Spawn Rate
-- Spawn rate is now a function of player level only.
+- Spawn rate uses a floor-local stair-step curve instead of a single global level ramp.
 - Current spawn scale:
-  - `1 + (level - 1) * 0.10`
+  - `0.90 + floorStep + floorCatchup + floorLevelProgress * 0.09 + lateFloorProgress * 0.065`
+  - `floorStep` adds `0.17` per floor after floor `1` and caps at `0.68`.
+  - `floorCatchup` starts after floor `2`, adds `0.38` per floor, and caps at `0.48`.
+  - `floorLevelProgress` resets to `0` at the start of a new floor and caps at the last normal spawning level before that floor's boss trigger.
+  - `lateFloorProgress` starts after the first level of floors `2+`, preserving the floor `2` opening reset while letting later levels recover pressure.
+- Floors `5+` also apply a floor-specific cap based on the floor `3` pre-boss peak, allowing `+5%` more per floor until the global spawn cap is reached.
+- This makes the final spawning level of a floor the local spawn-pressure peak, then lowers pressure after the player takes the portal.
 - Spawn interval is clamped by config minimums.
 
 ### Enemy Cap
