@@ -1,10 +1,10 @@
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { buildAndroidRuntimeConfigEnv } from "./mobileTransportDefaults.js";
 
 const rootDir = process.cwd();
 const webDir = resolve(rootDir, "www");
-const androidDefaultWsUrl = "wss://wardens-of-the-catacomb-production.up.railway.app";
 const copyTargets = ["index.html", "style.css", "game.js", "assets", "src"];
 
 rmSync(webDir, { recursive: true, force: true });
@@ -21,10 +21,7 @@ const build = spawnSync(process.execPath, [resolve(rootDir, "scripts/build-runti
   stdio: "inherit",
   env: {
     ...process.env,
-    GAME_PLATFORM: process.env.GAME_PLATFORM || "android",
-    GAME_WS_URL: process.env.GAME_WS_URL || androidDefaultWsUrl,
-    GAME_SHOW_GAMEPLAY_ADS: process.env.GAME_SHOW_GAMEPLAY_ADS || "false",
-    GAME_ALLOW_SERVER_URL_OVERRIDE: process.env.GAME_ALLOW_SERVER_URL_OVERRIDE || "true",
+    ...buildAndroidRuntimeConfigEnv(process.env),
     GAME_RUNTIME_CONFIG_OUTPUT: "www/config.js"
   }
 });

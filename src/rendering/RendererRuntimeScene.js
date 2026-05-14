@@ -256,7 +256,6 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     if (game.shopOpen) this.drawShopMenu(game, layout);
     if (game.skillTreeOpen) this.drawSkillTreeMenu(game, layout);
     if (game.paused && !game.shopOpen && !game.skillTreeOpen && !game.statsPanelOpen && !game.gameOver) this.drawPausedOverlay(layout);
-
     if (game.gameOver && !game.statsPanelOpen) {
       const progress = typeof game.getDeathTransitionProgress === "function" ? game.getDeathTransitionProgress() : 1;
       const fadeAlpha = Math.min(1, progress / 0.45);

@@ -260,9 +260,13 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 ## Network Combat Feedback
 - Network mode synthesizes enemy damage floating text client-side from authoritative enemy HP changes instead of replicating full floating-text state.
 - Local-player health in multiplayer is driven from authoritative snapshot health plus replicated player HP-bar visibility timers.
+- Local controller movement is predicted in multiplayer and reconciled against authoritative snapshots so movement should remain responsive during normal play.
+- Ranger arrows in multiplayer use local prediction for immediate feedback, then reconcile against authoritative projectiles. Predicted arrows are intentionally drawn faintly and expire quickly so missed reconciliation does not leave full-strength stale arrow artifacts on screen.
+- Network projectile cadence follows the same attack cooldown as single-player. Held ranger primary fire should produce evenly spaced arrows rather than bursty catch-up shots.
 - Torch state is synchronized through map meta/state, snapshots, and deltas so relit or snuffed torches stay aligned between network clients.
 - Optional Agora voice chat can be enabled by server startup config. Voice chat defaults off and can be enabled from Options; when active, remote player voices are attenuated by distance, panned left/right from player positions, muffled through closed doors and walls, and scaled by a separate voice volume. Microphone modes include Open Mic, Push to Talk with a configurable button, and Mute. Allies fade out fully beyond 20 tiles.
 - Dead spectators can only be heard by the living player they are currently spectating.
+- Dev-mode multiplayer sessions can show a compact network stats panel for local playtesting. The debug panel reports FPS/frame timing, ping, approximate latency, snapshot jitter, snapshot buffer depth, and pending inputs.
 - Browser/network validation now covers:
   - join safety
   - multiplayer combat input
@@ -270,6 +274,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - refund spend/reset sync
   - shared XP/gold reward sync
   - archer projectile alignment
+  - network floor-load movement and pause control
+  - ranged projectile cadence and cleanup
+  - smoothness, correction, and frame timing telemetry
   - focused-tab audio stability
 
 ## Notable Balance Changes

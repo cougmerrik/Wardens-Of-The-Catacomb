@@ -231,18 +231,61 @@ export function createProjectileSpawnReconciler({
     };
     const seq = Number.isFinite(projectile.spawnSeq) ? Math.floor(projectile.spawnSeq) : 0;
     if (seq <= 0) return projectile;
-    const bucket = netPredictedProjectiles.get(seq);
-    if (!Array.isArray(bucket) || bucket.length === 0) return projectile;
+    const recordReconcileReject = (candidate, ref, reason, extra = {}) => {
+      if (!game.networkPerf || typeof game.networkPerf !== "object") game.networkPerf = {};
+      game.networkPerf.projectileReconcileRejects = (game.networkPerf.projectileReconcileRejects || 0) + 1;
+      if (!Array.isArray(game.networkPerf.recentProjectileReconcileRejects)) {
+        game.networkPerf.recentProjectileReconcileRejects = [];
+      }
+      const eventId = (game.networkPerf.projectileReconcileRejectEventId || 0) + 1;
+      game.networkPerf.projectileReconcileRejectEventId = eventId;
+      game.networkPerf.recentProjectileReconcileRejects.push({
+        id: eventId,
+        atMs: typeof performance !== "undefined" && typeof performance.now === "function" ? Math.round(performance.now()) : Date.now(),
+        reason,
+        source: "clientProjectileReconcile",
+        projectileType: type,
+        ownerId: typeof projectile.ownerId === "string" ? projectile.ownerId : "",
+        spawnSeq: seq,
+        bucketSeq: Number.isFinite(ref?.bucketSeq) ? ref.bucketSeq : null,
+        exactSeq: !!ref?.exactSeq,
+        renderId: typeof candidate?.renderId === "string" ? candidate.renderId : "",
+        authoritativeX: Number.isFinite(projectile.x) ? Number(projectile.x.toFixed(2)) : null,
+        authoritativeY: Number.isFinite(projectile.y) ? Number(projectile.y.toFixed(2)) : null,
+        predictedX: Number.isFinite(candidate?.x) ? Number(candidate.x.toFixed(2)) : null,
+        predictedY: Number.isFinite(candidate?.y) ? Number(candidate.y.toFixed(2)) : null,
+        predictedType: typeof candidate?.type === "string" ? candidate.type : "",
+        ...extra
+      });
+      if (game.networkPerf.recentProjectileReconcileRejects.length > 24) {
+        game.networkPerf.recentProjectileReconcileRejects.splice(0, game.networkPerf.recentProjectileReconcileRejects.length - 24);
+      }
+    };
+    const exactBucket = netPredictedProjectiles.get(seq);
+    const candidates = [];
+    if (Array.isArray(exactBucket)) {
+      for (let i = 0; i < exactBucket.length; i++) candidates.push({ bucketSeq: seq, bucket: exactBucket, index: i, exactSeq: true });
+    }
+    if (candidates.length === 0) {
+      for (const [bucketSeq, bucket] of netPredictedProjectiles.entries()) {
+        if (!Array.isArray(bucket) || Math.abs(bucketSeq - seq) > 45) continue;
+        for (let i = 0; i < bucket.length; i++) candidates.push({ bucketSeq, bucket, index: i, exactSeq: false });
+      }
+    }
+    if (candidates.length === 0) return projectile;
     let bestIdx = -1;
+    let bestRef = null;
     let bestScore = Infinity;
     let bestPosDistSq = Infinity;
-    for (let i = 0; i < bucket.length; i++) {
-      const candidate = bucket[i];
+    for (let i = 0; i < candidates.length; i++) {
+      const ref = candidates[i];
+      const candidate = ref.bucket[ref.index];
       if (!candidate || candidate.type !== type) continue;
       const dx = (Number.isFinite(candidate.x) ? candidate.x : 0) - (Number.isFinite(projectile.x) ? projectile.x : 0);
       const dy = (Number.isFinite(candidate.y) ? candidate.y : 0) - (Number.isFinite(projectile.y) ? projectile.y : 0);
       const d2 = dx * dx + dy * dy;
       let score = d2;
+      if (!ref.exactSeq) score += Math.abs(ref.bucketSeq - seq) * 2;
       if (Number.isFinite(candidate.angle) && Number.isFinite(projectile.angle)) {
         let angleDiff = candidate.angle - projectile.angle;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -254,20 +297,27 @@ export function createProjectileSpawnReconciler({
         bestScore = score;
         bestPosDistSq = d2;
         bestIdx = i;
+        bestRef = ref;
       }
     }
-    if (bestIdx < 0) return projectile;
+    if (bestIdx < 0 || !bestRef) return projectile;
     const maxPosError = type === "fireArrow" ? 56 : 48;
     if (bestPosDistSq > maxPosError * maxPosError) {
-      const rejectedMatch = bucket[bestIdx];
-      game.networkPerf.projectileReconcileRejects = (game.networkPerf.projectileReconcileRejects || 0) + 1;
-      bucket.splice(bestIdx, 1);
-      if (bucket.length === 0) netPredictedProjectiles.delete(seq);
+      const rejectedMatch = bestRef.bucket[bestRef.index];
+      recordReconcileReject(rejectedMatch, bestRef, "positionMismatch", {
+        distancePx: Number(Math.sqrt(bestPosDistSq).toFixed(2)),
+        maxDistancePx: maxPosError,
+        score: Number.isFinite(bestScore) ? Number(bestScore.toFixed(2)) : null
+      });
+      bestRef.bucket.splice(bestRef.index, 1);
+      if (bestRef.bucket.length === 0) netPredictedProjectiles.delete(bestRef.bucketSeq);
+      if (typeof game?.discardPredictedProjectile === "function") game.discardPredictedProjectile(rejectedMatch);
       recordAuthoritativeShot(rejectedMatch, true);
       return projectile;
     }
-    const matched = bucket.splice(bestIdx, 1)[0];
-    if (bucket.length === 0) netPredictedProjectiles.delete(seq);
+    const matched = bestRef.bucket.splice(bestRef.index, 1)[0];
+    if (bestRef.bucket.length === 0) netPredictedProjectiles.delete(bestRef.bucketSeq);
+    if (typeof game?.discardPredictedProjectile === "function") game.discardPredictedProjectile(matched);
     recordAuthoritativeShot(matched, false);
     const blend = Number.isFinite(projectile.life) && projectile.life > 0.85 ? 0.86 : 0.62;
     const leadSeconds = Math.max(0, Math.min(0.06, frameGapMs / 1000));

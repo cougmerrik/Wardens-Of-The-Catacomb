@@ -1,7 +1,10 @@
+import { createWebSocketTransport } from "./transports/WebSocketTransport.js";
+
 export class NetClient {
-  constructor(url) {
+  constructor(url, { transportFactory = createWebSocketTransport } = {}) {
     this.url = url;
-    this.ws = null;
+    this.transportFactory = transportFactory;
+    this.transport = null;
     this.handlers = new Map();
   }
 
@@ -16,12 +19,12 @@ export class NetClient {
   }
 
   connect() {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
-    this.ws = new WebSocket(this.url);
-    this.ws.addEventListener("open", () => this.emit("open", {}));
-    this.ws.addEventListener("close", () => this.emit("close", {}));
-    this.ws.addEventListener("error", (err) => this.emit("error", { err }));
-    this.ws.addEventListener("message", (evt) => {
+    if (this.transport && (this.transport.isOpen() || this.transport.isConnecting())) return;
+    this.transport = this.transportFactory(this.url);
+    this.transport.on("open", () => this.emit("open", {}));
+    this.transport.on("close", () => this.emit("close", {}));
+    this.transport.on("error", (err) => this.emit("error", err));
+    this.transport.on("message", (evt) => {
       let msg = null;
       try {
         msg = JSON.parse(evt.data);
@@ -33,12 +36,12 @@ export class NetClient {
       this.emit(msg.type, msg);
       this.emit("message", msg);
     });
+    this.transport.connect();
   }
 
   send(type, payload = {}) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
-    this.ws.send(JSON.stringify({ type, ...payload }));
-    return true;
+    if (!this.transport) return false;
+    return this.transport.send(JSON.stringify({ type, ...payload }));
   }
 
   join(roomId, name, classType, protocolVersion = 2) {
@@ -51,6 +54,10 @@ export class NetClient {
 
   sendLobbyUpdate(payload = {}) {
     return this.send("room.lobbyUpdate", payload);
+  }
+
+  sendPing(clientTime) {
+    return this.send("net.ping", { clientTime });
   }
 
   takeControl() {
@@ -66,7 +73,7 @@ export class NetClient {
   }
 
   disconnect() {
-    if (this.ws) this.ws.close();
-    this.ws = null;
+    if (this.transport) this.transport.close();
+    this.transport = null;
   }
 }

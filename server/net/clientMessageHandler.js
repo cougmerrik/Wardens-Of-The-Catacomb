@@ -152,6 +152,22 @@ export function handleActionMessage(room, clientId, action) {
       if (context.player) context.player.level = context.level;
       return true;
     });
+    return;
+  }
+  if (kind === "debugSetPlayerHealth") {
+    const nextHealth = Number.isFinite(action.health) ? Math.max(0, action.health) : NaN;
+    if (!Number.isFinite(nextHealth)) return;
+    if (isPauseOwner) {
+      sim.player.health = Math.min(sim.player.maxHealth || nextHealth, nextHealth);
+      if (sim.player.health <= 0 && typeof sim.triggerGameOver === "function") sim.triggerGameOver();
+      syncPauseOwnerActiveState();
+      return;
+    }
+    const activeState = room.activePlayers instanceof Map ? room.activePlayers.get(clientId) : null;
+    if (!activeState) return;
+    activeState.health = Math.min(activeState.maxHealth || nextHealth, nextHealth);
+    activeState.alive = activeState.health > 0;
+    return;
   }
 }
 
@@ -332,6 +348,15 @@ export function handleClientMessage(raw, context) {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const seq = Number.isFinite(msg.snapshotSeq) ? Math.max(0, Math.floor(msg.snapshotSeq)) : 0;
     client.lastSnapshotAckSeq = Math.max(Number.isFinite(client.lastSnapshotAckSeq) ? client.lastSnapshotAckSeq : 0, seq);
+    return;
+  }
+
+  if (msg.type === "net.ping") {
+    safeSend(ws, {
+      type: "net.pong",
+      clientTime: Number.isFinite(msg.clientTime) ? msg.clientTime : null,
+      serverTime: Date.now()
+    });
     return;
   }
 

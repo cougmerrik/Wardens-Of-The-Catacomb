@@ -202,6 +202,7 @@ export const rendererEffectsProjectileMethods = {
     };
 
     for (const b of game.bullets) {
+      if (Number.isFinite(b.life) && b.life <= 0) continue;
       if (b.kind === "necroticBolt") {
         this.drawNecroticBolt(b, cameraX, cameraY, game.time);
         continue;
@@ -230,9 +231,10 @@ export const rendererEffectsProjectileMethods = {
         this.drawMageProjectile(b, cameraX, cameraY, game.time);
         continue;
       }
-      drawArrowLikeProjectile(b, 1);
+      drawArrowLikeProjectile(b, b.predicted ? 0.45 : 1);
     }
     for (const arrow of game.fireArrows) {
+      if (Number.isFinite(arrow.life) && arrow.life <= 0) continue;
       const x = arrow.x - cameraX;
       const y = arrow.y - cameraY;
       ctx.save();

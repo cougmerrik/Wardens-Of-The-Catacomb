@@ -10,9 +10,11 @@ import { average, makeSamplePusher, monotonicNowMs, percentile } from "./net/tel
 import { buildDeltaCollection } from "./net/deltaProtocol.js";
 import { buildMapChunkRows } from "./net/mapChunkStreaming.js";
 import { installRoomDevBossOverride } from "./net/installRoomDevBossOverride.js";
+import { createWsClientTransport } from "./net/transports/WsClientTransport.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
+import { handleDevNetworkTelemetryRequest } from "./devNetworkTelemetryApi.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
@@ -32,6 +34,7 @@ const MAX_TELEMETRY_SAMPLES = Number.parseInt(process.env.MAX_TELEMETRY_SAMPLES 
 const TICK_DRIFT_EPSILON_MS = Number.parseFloat(process.env.TICK_DRIFT_EPSILON_MS || "0.5");
 const MAX_TICKS_PER_LOOP = Number.parseInt(process.env.MAX_TICKS_PER_LOOP || "6", 10);
 const MAX_SNAPSHOT_STEPS_PER_LOOP = Number.parseInt(process.env.MAX_SNAPSHOT_STEPS_PER_LOOP || "3", 10);
+const DEV_NETWORK_TELEMETRY = process.env.DEV_NETWORK_TELEMETRY === "1";
 
 const rooms = new Map();
 const pushTelemetrySample = makeSamplePusher(MAX_TELEMETRY_SAMPLES);
@@ -80,6 +83,10 @@ const server = http.createServer(async (req, res) => {
     await handleLeaderboardApiRequest(req, res, leaderboardStore);
     return;
   }
+  if (DEV_NETWORK_TELEMETRY && requestUrl.pathname === "/api/dev-network-telemetry") {
+    await handleDevNetworkTelemetryRequest(req, res);
+    return;
+  }
   res.writeHead(404, {
     "Content-Type": "application/json; charset=utf-8"
   });
@@ -95,9 +102,10 @@ wss.on("connection", (ws) => {
   if (ws._socket && typeof ws._socket.setNoDelay === "function") {
     ws._socket.setNoDelay(true);
   }
+  const transport = createWsClientTransport(ws);
   const client = {
     id: uid("p"),
-    ws,
+    transport,
     roomId: null,
     name: "Player",
     classType: "archer",
@@ -106,7 +114,7 @@ wss.on("connection", (ws) => {
     lastInputSeq: 0
   };
 
-  safeSend(ws, {
+  safeSend(transport, {
     type: "hello",
     playerId: client.id,
     voiceUid: buildAgoraVoiceUid(client.id),
@@ -115,9 +123,9 @@ wss.on("connection", (ws) => {
     note: "Server authoritative alpha. Multiplayer room scaffolding is in progress."
   });
 
-  ws.on("message", (raw) => {
+  transport.onMessage((raw) => {
     handleClientMessage(raw, {
-      ws,
+      ws: transport,
       client,
       rooms,
       getOrCreateRoom,
@@ -132,7 +140,7 @@ wss.on("connection", (ws) => {
     });
   });
 
-  ws.on("close", () => {
+  transport.onClose(() => {
     handleClientClose(client, rooms);
   });
 });

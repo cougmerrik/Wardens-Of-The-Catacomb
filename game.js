@@ -11,7 +11,13 @@ import {
   syncByIdLerp
 } from "./src/net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "./src/net/mapChunkReadiness.js";
-import { predictProjectileSpawn, prunePredictedProjectiles } from "./src/net/projectilePrediction.js";
+import {
+  discardPredictedProjectile,
+  predictProjectileSpawn,
+  prunePredictedProjectiles,
+  updateNetworkProjectilePresentation,
+  updatePredictedProjectiles
+} from "./src/net/projectilePrediction.js";
 import { canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, setSelectedClass, shouldSendNetworkInput, updateNetworkRole } from "./src/net/sessionInteraction.js";
 import {
   clearSplashRender as clearSplashCanvas,
@@ -22,6 +28,8 @@ import {
   syncIdleSoundState as syncIdleMusicState,
   syncMusicForGame as syncMusicControllerForGame
 } from "./src/bootstrap/gameUiRuntime.js";
+import { syncDebugHudStatsDom, updateDebugHudNetworkStats } from "./src/bootstrap/debugHudStats.js";
+import { startDevNetworkTelemetryRecorder } from "./src/bootstrap/devNetworkTelemetryRecorder.js";
 import {
   cleanupCurrentGame as cleanupCurrentGameRuntime,
   dismissSplash as dismissSplashRuntime,
@@ -170,7 +178,7 @@ const MENU_MODE_SINGLE = "single";
 const MENU_MODE_NETWORK = "network";
 let selectedClass = "archer";
 let currentGame = null, netClient = null;
-let netInputTimer = 0, netRenderRaf = 0;
+let netInputTimer = 0, netRenderRaf = 0, netPingTimer = 0;
 let netPlayerId = null, netControllerId = null;
 let netRoomOwnerId = null, netPauseOwnerId = null, netRoomPhase = "active", netRosterPlayers = [];
 let netJoinedRoomId = "";
@@ -184,6 +192,7 @@ let netPendingWsUrl = "", netPendingRoomId = "", netPendingHandle = "";
 let netInputSeq = 0, netLastAckSeq = 0;
 let netPendingInputs = [], netMapSignature = "", netPendingSnapshot = null;
 const NET_INPUT_DT = 1 / 60;
+const NET_INPUT_INTERVAL_MS = 16;
 const NET_CLOCK_OFFSET_SMOOTHING = 0.12;
 const netDelayParams = new URLSearchParams(window.location.search);
 function parseDelayParam(key, fallback) {
@@ -192,10 +201,10 @@ function parseDelayParam(key, fallback) {
   const value = Number.parseInt(raw, 10);
   return Number.isFinite(value) ? Math.max(0, value) : fallback;
 }
-const NET_RENDER_DELAY_MS_CONTROLLER = parseDelayParam("netDelayController", 36);
+const NET_RENDER_DELAY_MS_CONTROLLER = parseDelayParam("netDelayController", 12);
 const NET_RENDER_DELAY_MS_SPECTATOR = parseDelayParam("netDelaySpectator", 72);
 const NET_MAX_SNAPSHOT_BUFFER = 20;
-const NET_MIN_SEND_MS = 28;
+const NET_MIN_SEND_MS = 14;
 const NET_FORCE_SEND_IDLE_MS = 100;
 let netSnapshotBuffer = [], netLastInputSendAt = 0, netLastSentInput = null, netLastInputProcessAt = 0;
 let netMapChunksReceived = 0, netMapChunkSize = 24;
@@ -1174,6 +1183,17 @@ if (typeof window !== "undefined") {
         level: game.level
       };
     }
+    if (action === "setPlayerHealth") {
+      const health = Number.isFinite(payload.health) ? Math.max(0, payload.health) : NaN;
+      if (!Number.isFinite(health)) return { ok: false, error: "health must be numeric" };
+      if (game.networkEnabled && netClient && typeof netClient.sendAction === "function") {
+        netClient.sendAction({ kind: "debugSetPlayerHealth", health });
+        return { ok: true, sent: true, health };
+      }
+      game.player.health = Math.min(game.player.maxHealth || health, health);
+      if (game.player.health <= 0 && typeof game.triggerGameOver === "function") game.triggerGameOver();
+      return { ok: true, health: game.player.health };
+    }
     return { ok: false, error: `unknown action: ${action}` };
   }
 
@@ -1217,11 +1237,64 @@ if (typeof window !== "undefined") {
       const lightSources = Array.isArray(game.lightSources) ? game.lightSources : [];
       const activeLightSources = typeof game.getActiveLightSources === "function" ? game.getActiveLightSources() : [];
       const torchLightSources = lightSources.filter((source) => source && source.type === "torch");
+      const projectileDebug = [
+        ...((Array.isArray(game.bullets) ? game.bullets : []).map((projectile) => ({ projectile, kind: "bullet" }))),
+        ...((Array.isArray(game.fireArrows) ? game.fireArrows : []).map((projectile) => ({ projectile, kind: "fireArrow" })))
+      ].filter(({ projectile }) => projectile).map(({ projectile, kind }) => {
+        const screenX = (projectile.x || 0) - camera.x;
+        const screenY = (projectile.y || 0) - camera.y;
+        return {
+          source: projectile.predicted ? "predictedRendered" : "authoritative",
+          kind,
+          x: projectile.x,
+          y: projectile.y,
+          screenX,
+          screenY,
+          onScreen: screenX >= -32 && screenY >= -32 && screenX <= 992 && screenY <= 672,
+          vx: projectile.vx || 0,
+          vy: projectile.vy || 0,
+          angle: projectile.angle,
+          life: projectile.life,
+          ownerId: projectile.ownerId || "",
+          faction: projectile.faction || "player",
+          spawnSeq: projectile.spawnSeq || 0,
+          projectileType: projectile.projectileType || "bullet"
+        };
+      });
       return {
         networkReady: !!game.networkReady,
         networkHasMap: !!game.networkHasMap,
         networkHasChunks: !!game.networkHasChunks,
         networkRole: game.networkRole || "",
+        gameOver: !!game.gameOver,
+        debugHud: game.debugHudStats && typeof game.debugHudStats === "object"
+          ? {
+              enabled: !!game.debugHudEnabled,
+              fps: Number.isFinite(game.debugHudStats.fps) ? game.debugHudStats.fps : 0,
+              frameMs: Number.isFinite(game.debugHudStats.frameMs) ? game.debugHudStats.frameMs : 0,
+              rawFps: Number.isFinite(game.debugHudStats.rawFps) ? game.debugHudStats.rawFps : 0,
+              rawFrameMs: Number.isFinite(game.debugHudStats.rawFrameMs) ? game.debugHudStats.rawFrameMs : 0,
+              frameCount: Number.isFinite(game.debugHudStats.frameCount) ? game.debugHudStats.frameCount : 0,
+              frameWindowFps: Number.isFinite(game.debugHudStats.frameWindowFps) ? game.debugHudStats.frameWindowFps : 0,
+              frameWindowAvgMs: Number.isFinite(game.debugHudStats.frameWindowAvgMs) ? game.debugHudStats.frameWindowAvgMs : 0,
+              frameWindowP95Ms: Number.isFinite(game.debugHudStats.frameWindowP95Ms) ? game.debugHudStats.frameWindowP95Ms : 0,
+              frameWindowMaxMs: Number.isFinite(game.debugHudStats.frameWindowMaxMs) ? game.debugHudStats.frameWindowMaxMs : 0,
+              frameWindowSampleCount: Number.isFinite(game.debugHudStats.frameWindowSampleCount) ? game.debugHudStats.frameWindowSampleCount : 0,
+              frameSpikeCount: Number.isFinite(game.debugHudStats.frameSpikeCount) ? game.debugHudStats.frameSpikeCount : 0,
+              recentFrameSpikes: Array.isArray(game.debugHudStats.recentFrameSpikes)
+                ? game.debugHudStats.recentFrameSpikes.slice(-8)
+                : [],
+              network: game.debugHudStats.network && typeof game.debugHudStats.network === "object"
+                ? { ...game.debugHudStats.network }
+                : null,
+              rect: game.debugHudStatsRect && typeof game.debugHudStatsRect === "object"
+                ? { ...game.debugHudStatsRect }
+                : null,
+              uiRect: game.networkStatsPanelRect && typeof game.networkStatsPanelRect === "object"
+                ? { ...game.networkStatsPanelRect }
+                : null
+            }
+          : null,
         floor: game.floor,
         player: {
           x: playerX,
@@ -1248,6 +1321,18 @@ if (typeof window !== "undefined") {
           x: Number.isFinite(game.input?.mouse?.worldX) ? game.input.mouse.worldX : null,
           y: Number.isFinite(game.input?.mouse?.worldY) ? game.input.mouse.worldY : null,
           hasAim: !!game.input?.mouse?.hasAim
+        },
+        input: {
+          queuedKeys: game.input?.keyQueued instanceof Set ? Array.from(game.input.keyQueued).slice(-12) : [],
+          heldKeys: game.input?.keys instanceof Set ? Array.from(game.input.keys).slice(-12) : [],
+          activeElement:
+            document.activeElement && typeof document.activeElement.tagName === "string"
+              ? {
+                  tagName: document.activeElement.tagName,
+                  id: document.activeElement.id || "",
+                  className: typeof document.activeElement.className === "string" ? document.activeElement.className : ""
+                }
+              : null
         },
         camera,
         tile: {
@@ -1292,6 +1377,12 @@ if (typeof window !== "undefined") {
           meleeSwingCount: Array.isArray(game.meleeSwings) ? game.meleeSwings.length : 0,
           bulletCount: Array.isArray(game.bullets) ? game.bullets.length : 0,
           fireArrowCount: Array.isArray(game.fireArrows) ? game.fireArrows.length : 0,
+          visibleRangerProjectileCount: projectileDebug.filter((projectile) =>
+            projectile.onScreen &&
+            projectile.faction !== "enemy" &&
+            (projectile.kind === "fireArrow" || String(projectile.projectileType || "").startsWith("ranger_"))
+          ).length,
+          visibleProjectiles: projectileDebug.filter((projectile) => projectile.onScreen).slice(-24),
           floatingTextCount: Array.isArray(game.floatingTexts) ? game.floatingTexts.length : 0,
           recentFloatingTexts: Array.isArray(game.floatingTexts)
             ? game.floatingTexts.slice(-6).map((entry) => ({
@@ -1314,6 +1405,7 @@ if (typeof window !== "undefined") {
                 vx: projectile.vx || 0,
                 vy: projectile.vy || 0,
                 angle: projectile.angle,
+                life: projectile.life,
                 spawnSeq: projectile.spawnSeq || 0,
                 projectileType: projectile.projectileType || "bullet"
               }))),
@@ -1330,6 +1422,7 @@ if (typeof window !== "undefined") {
                 vx: projectile.vx || 0,
                 vy: projectile.vy || 0,
                 angle: projectile.angle,
+                life: projectile.life,
                 spawnSeq: projectile.seq || 0,
                 projectileType: projectile.type || "bullet",
                 createdAt: projectile.createdAt || 0
@@ -1385,9 +1478,25 @@ if (typeof window !== "undefined") {
               softCorrectionCount: game.networkPerf.softCorrectionCount || 0,
               settleCorrectionCount: game.networkPerf.settleCorrectionCount || 0,
               blockedSnapCount: game.networkPerf.blockedSnapCount || 0,
+              postLoadCorrectionReady: !!game.networkPerf.postLoadCorrectionReady,
+              postLoadCorrectionFloor: Number.isFinite(game.networkPerf.postLoadCorrectionFloor) ? game.networkPerf.postLoadCorrectionFloor : null,
+              postLoadCorrectionStartedAtMs: game.networkPerf.postLoadCorrectionStartedAtMs || 0,
+              postLoadCorrectionSnapshotStart: game.networkPerf.postLoadCorrectionSnapshotStart || 0,
+              postLoadLastCorrectionPx: game.networkPerf.postLoadLastCorrectionPx || 0,
+              postLoadMaxCorrectionPx: game.networkPerf.postLoadMaxCorrectionPx || 0,
+              postLoadHardSnapCount: game.networkPerf.postLoadHardSnapCount || 0,
+              postLoadSoftCorrectionCount: game.networkPerf.postLoadSoftCorrectionCount || 0,
+              postLoadSettleCorrectionCount: game.networkPerf.postLoadSettleCorrectionCount || 0,
+              postLoadBlockedSnapCount: game.networkPerf.postLoadBlockedSnapCount || 0,
+              recentPostLoadCorrections: Array.isArray(game.networkPerf.recentPostLoadCorrections)
+                ? game.networkPerf.recentPostLoadCorrections.slice(-8)
+                : [],
               lastReplayMode: game.networkPerf.lastReplayMode || "",
               lastPredictionPressure: game.networkPerf.lastPredictionPressure || null,
               projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
+              recentProjectileReconcileRejects: Array.isArray(game.networkPerf.recentProjectileReconcileRejects)
+                ? game.networkPerf.recentProjectileReconcileRejects.slice(-8)
+                : [],
               recentCorrections: Array.isArray(game.networkPerf.recentCorrections)
                 ? game.networkPerf.recentCorrections.slice(-8)
                 : []
@@ -1464,6 +1573,10 @@ if (typeof window !== "undefined") {
           ? game.remotePlayers.map((player) => ({
               id: player?.id || null,
               handle: player?.handle || "",
+              x: Number.isFinite(player?.x) ? player.x : 0,
+              y: Number.isFinite(player?.y) ? player.y : 0,
+              screenX: (Number.isFinite(player?.x) ? player.x : 0) - camera.x,
+              screenY: (Number.isFinite(player?.y) ? player.y : 0) - camera.y,
               alive: !!player?.alive,
               health: player?.health || 0,
               maxHealth: player?.maxHealth || 0,
@@ -1483,6 +1596,11 @@ if (typeof window !== "undefined") {
     }
   };
 }
+
+startDevNetworkTelemetryRecorder({
+  enabled: isDevMode,
+  getState: () => window.__WOTC_DEBUG__?.getState?.() || null
+});
 
 splashLogo.addEventListener("load", () => { splashReady = true; });
 splashLogo.addEventListener("error", () => { splashReady = false; });
@@ -1514,6 +1632,10 @@ function stopNetworkSession() {
     clearInterval(netInputTimer);
     netInputTimer = 0;
   }
+  if (netPingTimer) {
+    clearInterval(netPingTimer);
+    netPingTimer = 0;
+  }
   if (netClient) {
     netClient.disconnect();
     netClient = null;
@@ -1533,6 +1655,7 @@ function stopNetworkSession() {
   netLastSnapshotRecvAtMs = 0; netSnapshotIntervalMeanMs = 33; netSnapshotJitterMs = 0; netLastSnapshotGapMs = 33;
   netInitialSnapshotApplied = false;
   if (currentGame) currentGame.networkPredictedProjectiles = null;
+  syncDebugHudStatsDom(null);
   if (networkSession) networkSession.hidden = true;
 }
 
@@ -1631,6 +1754,7 @@ const dismissSplash = () => {
           returnToMenu,
           syncMusicForGame,
           startingFloor: 1,
+          debugHudEnabled: isDevMode,
           onGameOverChanged: (gameOver, nextGame) => {
             if (gameOver) submitCompletedLocalRun(nextGame);
           }
@@ -1762,6 +1886,8 @@ function startNetworkRenderLoop(game) {
     predictFromInput,
     canRunPredictedCollision: () => canRunPredictedCollision(game, isKnownMapTileAt),
     prunePredictedProjectiles,
+    updatePredictedProjectiles,
+    updateNetworkProjectilePresentation,
     netPredictedProjectiles,
     updateVoice: (networkGame) => {
       voiceManager.update(networkGame);
@@ -1811,6 +1937,7 @@ function startLocalGame() {
     syncMusicForGame,
     startingFloor: requestedStartFloor,
     bossOverride: selectedBossOverride,
+    debugHudEnabled: isDevMode,
     onGameOverChanged: (gameOver, nextGame) => {
       if (gameOver) submitCompletedLocalRun(nextGame);
     }
@@ -1833,6 +1960,7 @@ function startNetworkGameplay() {
   const game = new Game(canvas, {
     platform: runtimePlatform,
     classType: selectedClass,
+    debugHudEnabled: isDevMode,
     onReturnToMenu: returnToMenu,
     onPauseChanged: (_paused, nextGame) => syncMusicForGame(nextGame),
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),
@@ -1896,6 +2024,7 @@ function startNetworkGameplay() {
     game.multiplayerNotificationCurrent = game.multiplayerNotificationQueue.shift() || null;
   };
   game.networkPredictedProjectiles = netPredictedProjectiles;
+  game.discardPredictedProjectile = (predicted) => discardPredictedProjectile(game, predicted);
   game.remotePlayers = [];
   game.map = [];
   game.mapWidth = 0;
@@ -2173,6 +2302,15 @@ function startNetworkGame() {
       netSnapshotJitterMs += (Math.abs(gap - netSnapshotIntervalMeanMs) - netSnapshotJitterMs) * 0.18;
     }
     netLastSnapshotRecvAtMs = recvAt;
+    updateDebugHudNetworkStats(game, {
+      role: isNetworkController() ? "Controller" : "Spectator",
+      gapMs: netLastSnapshotGapMs,
+      jitterMs: netSnapshotJitterMs,
+      snapshotBuffer: netSnapshotBuffer.length,
+      pendingInputs: netPendingInputs.length,
+      unackedInputs: Math.max(0, netInputSeq - netLastAckSeq),
+      lastSnapshotMsAgo: 0
+    });
     netRoomPhase = typeof msg.phase === "string" ? msg.phase : netRoomPhase;
     netRoomOwnerId = msg.ownerId || netRoomOwnerId;
     netPauseOwnerId = msg.pauseOwnerId || netPauseOwnerId;
@@ -2271,6 +2409,16 @@ function startNetworkGame() {
   });
   netClient.on("warn", (msg) => updateNetworkStatusRuntime(networkStatus, currentGame, `Warning: ${msg.message || "Server warning"}`));
   netClient.on("error", (msg) => updateNetworkStatusRuntime(networkStatus, currentGame, `Error: ${msg.message || "Connection error"}`));
+  netClient.on("net.pong", (msg) => {
+    const game = currentGame;
+    const clientTime = Number.isFinite(msg.clientTime) ? msg.clientTime : NaN;
+    const pingMs = Number.isFinite(clientTime) ? Math.max(0, performance.now() - clientTime) : NaN;
+    updateDebugHudNetworkStats(game, {
+      pingMs,
+      latencyMs: Number.isFinite(pingMs) ? pingMs * 0.5 : NaN,
+      serverTime: Number.isFinite(msg.serverTime) ? msg.serverTime : null
+    });
+  });
   netClient.on("close", () => {
     if (currentGame) {
       currentGame.networkReady = false;
@@ -2280,6 +2428,11 @@ function startNetworkGame() {
     updateNetworkStatusRuntime(networkStatus, currentGame, "Disconnected from server");
   });
   netClient.connect();
+  if (netPingTimer) clearInterval(netPingTimer);
+  netPingTimer = setInterval(() => {
+    if (!netClient || !currentGame?.networkEnabled) return;
+    netClient.sendPing(performance.now());
+  }, 1000);
 
   netInputTimer = setInterval(() => {
     const game = currentGame;
@@ -2333,7 +2486,7 @@ function startNetworkGame() {
       }
     }
     netClient.sendInput(input);
-  }, 33);
+  }, NET_INPUT_INTERVAL_MS);
 }
 
 function handlePrimaryStartAction() {
@@ -2682,6 +2835,7 @@ if (networkLobbyLeaveTop) {
 
 renderLeaderboardModal();
 renderMenuScreen();
+syncDebugHudStatsDom(currentGame);
 window.addEventListener("resize", syncMenuScrollIndicator);
 window.addEventListener("scroll", syncMenuScrollIndicator, { passive: true });
 warmStartupAudio();

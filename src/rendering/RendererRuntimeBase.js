@@ -1,3 +1,5 @@
+import { drawDebugStatsHud } from "./hud/index.js";
+
 export class RendererRuntimeBase {
   constructor(canvas, ctx, config) {
     this.canvas = canvas;
@@ -11,6 +13,10 @@ export class RendererRuntimeBase {
     this.keySprite = this.createKeySprite();
     this.goldBagSprite = this.createGoldBagSprite();
     this.potionSprite = this.createPotionSprite();
+  }
+
+  drawDebugStatsHud(game, layout) {
+    drawDebugStatsHud(this, game, layout);
   }
 
   createPlayerSpriteSheet() {

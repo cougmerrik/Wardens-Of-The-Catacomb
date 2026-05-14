@@ -9,7 +9,7 @@ process.chdir(projectRoot);
 
 const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT || "8080", 10);
 const WS_PORT = Number.parseInt(process.env.WS_PORT || "8090", 10);
-const GAME_URL = `http://localhost:${HTTP_PORT}/?dev=1`;
+const GAME_URL = `http://localhost:${HTTP_PORT}/?dev=1&telemetryPort=${WS_PORT}`;
 
 const children = [];
 let shuttingDown = false;
@@ -119,7 +119,10 @@ async function main() {
   console.log(`Starting HTTP server on http://localhost:${HTTP_PORT}`);
   startProcess("http", pythonCmd, pyArgs);
   console.log(`Starting network server on ws://localhost:${WS_PORT}`);
-  startProcess("network", process.execPath, ["server/networkServer.js"], { PORT: String(WS_PORT) });
+  startProcess("network", process.execPath, ["server/networkServer.js"], {
+    DEV_NETWORK_TELEMETRY: "1",
+    PORT: String(WS_PORT)
+  });
 
   setTimeout(() => {
     console.log(`Opening browser: ${GAME_URL}`);
