@@ -237,6 +237,21 @@ async function main() {
         shot.volleyAngles.length > 1
           ? Math.abs(normalizeAngleDiff(shot.volleyAngles[shot.volleyAngles.length - 1], shot.volleyAngles[0])) * (180 / Math.PI)
           : 0;
+      const immediateReadyHandle = await page.waitForFunction(({ seq }) => {
+        const state = window.__WOTC_DEBUG__?.getState?.();
+        if (!state) return null;
+        const owned = Array.isArray(state.combat?.ownedProjectiles) ? state.combat.ownedProjectiles : [];
+        const matched = owned.find((projectile) =>
+          projectile &&
+          (projectile.source === "predictedRendered" || projectile.source === "authoritative") &&
+          projectile.spawnSeq === seq
+        );
+        return matched ? { state, projectile: matched, visibleAtMs: performance.now() } : null;
+      }, { seq: shot.seq || 0 }, { timeout: 160 }).catch(() => null);
+      assert(immediateReadyHandle, `no local projectile appeared quickly for seq ${shot.seq || 0}`);
+      const immediateReady = await immediateReadyHandle.jsonValue();
+      const immediateLatencyMs = Math.max(0, (immediateReady?.visibleAtMs || performance.now()) - clickStartedAt);
+      assert(immediateLatencyMs <= 120, `local projectile visibility latency ${immediateLatencyMs.toFixed(1)}ms is too high`);
       const projectileReadyHandle = await page.waitForFunction(({ seq, baselineCount }) => {
         const state = window.__WOTC_DEBUG__?.getState?.();
         if (!state) return null;
@@ -296,6 +311,8 @@ async function main() {
         meanVolleyErrorDeg: meanVolleyError * (180 / Math.PI),
         visibleProjectileAngleErrorDeg: bestProjectileError * (180 / Math.PI),
         visibleProjectileSource: bestProjectile.source,
+        immediateProjectileSource: immediateReady?.projectile?.source || "",
+        immediateLatencyMs,
         visibleLatencyMs,
         spreadWidthDeg,
         projectileSpeed: shot.projectileSpeed,

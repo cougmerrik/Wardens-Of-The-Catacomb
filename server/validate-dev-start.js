@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const artifactsDir = resolve(projectRoot, "artifacts", "network");
 const HTTP_PORT = 8184;
-const GAME_URL = `http://127.0.0.1:${HTTP_PORT}/?dev=1`;
+const GAME_URL = `http://127.0.0.1:${HTTP_PORT}/?dev=1&networkTelemetry=0`;
 const classes = ["archer", "warrior", "necromancer"];
 const floors = [2, 3, 4, 5];
 
@@ -18,6 +18,13 @@ const children = [];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function isOptionalLocalRequest(url) {
+  return /^https?:\/\/127\.0\.0\.1:8090\/api\/(dev-network-telemetry|leaderboard)\b/.test(url) ||
+    /^https?:\/\/localhost:8090\/api\/(dev-network-telemetry|leaderboard)\b/.test(url) ||
+    /^https?:\/\/127\.0\.0\.1:\d+\/assets\/music\//.test(url) ||
+    /^https?:\/\/localhost:\d+\/assets\/music\//.test(url);
 }
 
 function hasCommand(cmd, args = ["--version"]) {
@@ -109,10 +116,18 @@ async function runScenario(page, classKey, floor) {
   const errors = [];
   page.removeAllListeners("console");
   page.removeAllListeners("pageerror");
+  page.removeAllListeners("requestfailed");
   page.on("console", (msg) => {
+    if (msg.text() === "Failed to load resource: net::ERR_CONNECTION_REFUSED") return;
     if (msg.type() === "error") errors.push(msg.text());
   });
   page.on("pageerror", (err) => errors.push(err.message));
+  page.on("requestfailed", (request) => {
+    const url = request.url();
+    const failure = request.failure()?.errorText || "request failed";
+    if ((failure === "net::ERR_CONNECTION_REFUSED" || failure === "net::ERR_ABORTED") && isOptionalLocalRequest(url)) return;
+    errors.push(`${failure}: ${url}`);
+  });
 
   await page.goto(GAME_URL, { waitUntil: "networkidle" });
   await page.keyboard.press("Space");

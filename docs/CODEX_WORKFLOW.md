@@ -61,6 +61,8 @@ node server/run-validation-suite.js closeout --list
 node server/run-validation-suite.js closeout --only validate:network-combat-hit
 node server/run-validation-suite.js closeout --from validate:network-combat-hit
 node server/run-validation-suite.js closeout --from validate:network-combat-hit --until validate:network-two-client-damage
+npm run validate:closeout:selective -- --list
+npm run validate:closeout:selective
 ```
 
 ### Example Targeted Iteration Loop
@@ -91,7 +93,8 @@ rg --files -g "*.js" -g "*.md" -g "*.css" -g "*.html" | ForEach-Object {
 ```bash
 git status -u
 git diff --stat
-npm run validate:closeout
+npm run validate:closeout:selective -- --list
+npm run validate:closeout:selective
 git add README.md docs/TASK_BOARD.md docs/CODEX_WORKFLOW.md src
 git diff --cached
 git commit -m "Complete feature and document results"
@@ -173,7 +176,7 @@ git push
 4. Confirm `docs/TASK_BOARD.md` reflects completed work and no stale in-progress items remain.
 5. Run the relevant validation commands for the scope of the change.
    Recommended grouping:
-   `validate:core` during iteration, `validate:pre-commit` before commit, `validate:closeout` before PR finalization.
+   `validate:core` during iteration, `validate:pre-commit` before commit, `validate:closeout:selective` for changed-file-aware closeout, and `validate:closeout` when the branch is broad or release-critical.
 6. Perform the 500 LOC file audit and refactor oversized files when needed.
 7. Update the relevant sections of `README.md` with durable feature outcomes.
 8. Review changed binary assets intentionally before final merge or PR closeout.

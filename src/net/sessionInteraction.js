@@ -1,7 +1,7 @@
 export function collectInput(game, consumeQueued = true) {
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
   const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen;
-  return game.input.getGameplayIntent({
+  const input = game.input.getGameplayIntent({
     playerX: Number.isFinite(game?.player?.x) ? game.player.x : 0,
     playerY: Number.isFinite(game?.player?.y) ? game.player.y : 0,
     gameplayBlocked,
@@ -9,6 +9,8 @@ export function collectInput(game, consumeQueued = true) {
     fallbackAimDirX: 0,
     fallbackAimDirY: 0
   });
+  input.spectateTargetId = !playerAlive && typeof game?.spectateTargetId === "string" ? game.spectateTargetId : "";
+  return input;
 }
 
 export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, forceSendIdleMs) {
@@ -24,9 +26,10 @@ export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, 
     previous.hasAim &&
     (Math.abs((input.aimDirX || 0) - (previous.aimDirX || 0)) > 0.01 || Math.abs((input.aimDirY || 0) - (previous.aimDirY || 0)) > 0.01);
   const changedPrimaryHold = !!input.firePrimaryHeld !== !!previous.firePrimaryHeld;
+  const changedSpectateTarget = (input.spectateTargetId || "") !== (previous.spectateTargetId || "");
   const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued || !!input.swapAttackQueued || !!input.modeSwapQueued;
   const hasContinuousInput = !!input.firePrimaryHeld || !!input.moveX || !!input.moveY;
-  if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || hasQueuedAction || hasContinuousInput) return true;
+  if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || changedSpectateTarget || hasQueuedAction || hasContinuousInput) return true;
   return nowMs - lastInputSendAt >= forceSendIdleMs;
 }
 
@@ -95,6 +98,21 @@ export function handleNetworkUiActions(game, netClient, isController) {
       recentActions: []
     };
   }
+  const recordAction = (click, hitName, actionKind, actionKey = "") => {
+    game.networkUiDebug.lastClick = click ? { x: click.x, y: click.y } : null;
+    game.networkUiDebug.lastHit = hitName || "";
+    game.networkUiDebug.lastActionKind = actionKind || "";
+    game.networkUiDebug.recentActions.push({
+      atMs: Math.round(performance.now()),
+      click: click ? { x: click.x, y: click.y } : null,
+      hit: hitName || "",
+      actionKind: actionKind || "",
+      actionKey
+    });
+    if (game.networkUiDebug.recentActions.length > 16) {
+      game.networkUiDebug.recentActions.splice(0, game.networkUiDebug.recentActions.length - 16);
+    }
+  };
   if (!netClient) {
     const handledSpectateUi = handleSpectateUi();
     const droppedClicks = handledSpectateUi ? [] : game.input.consumeUiLeftClicks();
@@ -136,21 +154,38 @@ export function handleNetworkUiActions(game, netClient, isController) {
       if (game.shopOpen) toggleLocalShop(false);
       else if (game.skillTreeOpen) toggleLocalSkillTree(false);
       else if (game.statsPanelOpen) toggleLocalStats(false);
+      recordAction(null, "key:escape", "localClose", "escape");
     } else if (canSendRoomAction) {
+      recordAction(null, "key:escape", "escape", "escape");
       netClient.sendAction({ kind: "escape" });
     }
   }
   if (playerAlive && game.input.consumeKeyQueued("b") && !game.gameOver) {
-    if (isActiveMultiplayer && !isPauseOwner) toggleLocalShop();
-    else if (canSendRoomAction) netClient.sendAction({ kind: "toggleShop" });
+    if (isActiveMultiplayer && !isPauseOwner) {
+      recordAction(null, "key:b", "toggleLocalShop", "b");
+      toggleLocalShop();
+    } else if (canSendRoomAction) {
+      recordAction(null, "key:b", "toggleShop", "b");
+      netClient.sendAction({ kind: "toggleShop" });
+    }
   }
   if (playerAlive && game.input.consumeKeyQueued("k") && !game.gameOver) {
-    if (isActiveMultiplayer && !isPauseOwner) toggleLocalSkillTree();
-    else if (canSendRoomAction) netClient.sendAction({ kind: "toggleSkillTree" });
+    if (isActiveMultiplayer && !isPauseOwner) {
+      recordAction(null, "key:k", "toggleLocalSkillTree", "k");
+      toggleLocalSkillTree();
+    } else if (canSendRoomAction) {
+      recordAction(null, "key:k", "toggleSkillTree", "k");
+      netClient.sendAction({ kind: "toggleSkillTree" });
+    }
   }
   if (game.input.consumeKeyQueued("c")) {
-    if (canUseLocalPanels) toggleLocalStats();
-    else if (canSendRoomAction) netClient.sendAction({ kind: "toggleStats" });
+    if (canUseLocalPanels) {
+      recordAction(null, "key:c", "toggleLocalStats", "c");
+      toggleLocalStats();
+    } else if (canSendRoomAction) {
+      recordAction(null, "key:c", "toggleStats", "c");
+      netClient.sendAction({ kind: "toggleStats" });
+    }
   }
   if (playerAlive && !game.gameOver && !game.shopOpen && !game.skillTreeOpen && !game.statsPanelOpen) {
     for (let i = 0; i < 5; i++) {
@@ -162,21 +197,6 @@ export function handleNetworkUiActions(game, netClient, isController) {
   if (clicks.length === 0) return;
 
   const hit = (x, y, rect) => game.pointInRect(x, y, rect);
-  const recordAction = (click, hitName, actionKind, actionKey = "") => {
-    game.networkUiDebug.lastClick = click ? { x: click.x, y: click.y } : null;
-    game.networkUiDebug.lastHit = hitName || "";
-    game.networkUiDebug.lastActionKind = actionKind || "";
-    game.networkUiDebug.recentActions.push({
-      atMs: Math.round(performance.now()),
-      click: click ? { x: click.x, y: click.y } : null,
-      hit: hitName || "",
-      actionKind: actionKind || "",
-      actionKey
-    });
-    if (game.networkUiDebug.recentActions.length > 16) {
-      game.networkUiDebug.recentActions.splice(0, game.networkUiDebug.recentActions.length - 16);
-    }
-  };
   for (const click of clicks) {
     const consumableSlots = Array.isArray(game.uiRects?.consumableSlots) ? game.uiRects.consumableSlots : [];
     if (playerAlive && !game.gameOver && !game.shopOpen && !game.skillTreeOpen) {
@@ -366,13 +386,17 @@ export function predictFromInput(game, input, dt, canRunPredictedCollision) {
   }
 }
 
-function hasRecentCorrectionPressure(game) {
+export function hasRecentCorrectionPressure(game, nowMs = performance.now()) {
   const perf = game?.networkPerf;
   if (!perf || typeof perf !== "object") return false;
-  if (Number.isFinite(perf.lastCorrectionPx) && perf.lastCorrectionPx >= 56) return true;
   const recent = Array.isArray(perf.recentCorrections) ? perf.recentCorrections : [];
-  const last = recent[recent.length - 1];
-  return !!last && Number.isFinite(last.errorPx) && last.errorPx >= 56;
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const entry = recent[i];
+    const atMs = Number.isFinite(entry?.atMs) ? entry.atMs : 0;
+    if (nowMs - atMs > 180) break;
+    if (Number.isFinite(entry?.errorPx) && entry.errorPx >= 56) return true;
+  }
+  return false;
 }
 
 export function canRunPredictedCollision(game, isKnownMapTileAt) {

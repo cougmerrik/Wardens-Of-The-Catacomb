@@ -1,23 +1,8 @@
 import { NetClient } from "../net/NetClient.js";
-import {
-  applyMapStateToGame,
-  applyMapMetaToGame,
-  applyMapChunkToGame,
-  applyMetaStateToGame,
-  applySnapshotToGame,
-  isKnownMapTileAt,
-  syncByIdLerp
-} from "../net/clientStateSync.js";
+import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, syncByIdLerp } from "../net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "../net/mapChunkReadiness.js";
-import { predictProjectileSpawn, prunePredictedProjectiles } from "../net/projectilePrediction.js";
-import {
-  canRunPredictedCollision,
-  collectInput,
-  handleNetworkUiActions,
-  predictFromInput,
-  shouldSendNetworkInput,
-  updateNetworkRole
-} from "../net/sessionInteraction.js";
+import { discardPredictedProjectile, predictProjectileSpawn, prunePredictedProjectiles, updateNetworkProjectilePresentation, updatePredictedProjectiles } from "../net/projectilePrediction.js";
+import { canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, shouldSendNetworkInput, updateNetworkRole } from "../net/sessionInteraction.js";
 import {
   consumeSnapshotForRender,
   estimateServerNowMs as estimateServerNowMsFromState,
@@ -31,12 +16,16 @@ import {
 import { initializeNetworkGameState } from "./networkSessionGameInit.js";
 import { applyNetworkSnapshot, startNetworkRenderLoopRuntime } from "./networkRenderRuntime.js";
 import { persistSuccessfulServerUrlChoice, resolveActiveServerUrl } from "../runtime/runtimeConfig.js";
+import { VoiceManager } from "../voice/VoiceManager.js";
 
-const NET_INPUT_DT = 1 / 60;
+export const NET_INPUT_DT = 1 / 60;
 const NET_CLOCK_OFFSET_SMOOTHING = 0.12;
 const NET_MAX_SNAPSHOT_BUFFER = 20;
-const NET_MIN_SEND_MS = 28;
+export const NET_INPUT_INTERVAL_MS = 16;
+export const NET_MIN_SEND_MS = 14;
 const NET_FORCE_SEND_IDLE_MS = 100;
+export const NET_CONTROLLER_RENDER_DELAY_MS = 12;
+export const NET_SPECTATOR_RENDER_DELAY_MS = 72;
 
 export function createNetworkSessionController({
   Game,
@@ -53,13 +42,14 @@ export function createNetworkSessionController({
   cleanupCurrentGame,
   syncMusicForGame,
   createReturnToMenuHandler,
-  controllerRenderDelayMs = 36,
-  spectatorRenderDelayMs = 72
+  controllerRenderDelayMs = NET_CONTROLLER_RENDER_DELAY_MS,
+  spectatorRenderDelayMs = NET_SPECTATOR_RENDER_DELAY_MS
 }) {
   let netClient = null;
   let netInputTimer = 0;
   let netRenderRaf = 0;
   let netPlayerId = null;
+  let netVoiceUid = null;
   let netControllerId = null;
   let netInputSeq = 0;
   let netLastAckSeq = 0;
@@ -77,6 +67,7 @@ export function createNetworkSessionController({
   let netLastServerPlayer = null;
   const netClockState = { offsetMs: 0, ready: false };
   const netPredictedProjectiles = new Map();
+  const voiceManager = new VoiceManager();
   let netNextHeldPrimaryPredictAtMs = 0;
   let netLastSnapshotRecvAtMs = 0;
   let netSnapshotIntervalMeanMs = 33;
@@ -98,6 +89,7 @@ export function createNetworkSessionController({
 
   const resetNetworkState = () => {
     netPlayerId = null;
+    netVoiceUid = null;
     netControllerId = null;
     netInputSeq = 0;
     netLastAckSeq = 0;
@@ -137,6 +129,7 @@ export function createNetworkSessionController({
       netClient.disconnect();
       netClient = null;
     }
+    voiceManager.leave();
     resetNetworkState();
     const game = getCurrentGame();
     if (game) game.networkPredictedProjectiles = null;
@@ -181,10 +174,11 @@ export function createNetworkSessionController({
       predictFromInput,
       canRunPredictedCollision: () => canRunPredictedCollision(game, isKnownMapTileAt),
       prunePredictedProjectiles,
+      updatePredictedProjectiles,
+      updateNetworkProjectilePresentation,
       netPredictedProjectiles,
-      setNetRenderRaf: (value) => {
-        netRenderRaf = value;
-      }
+      updateVoice: (currentGame) => voiceManager.update(currentGame),
+      setNetRenderRaf: (value) => { netRenderRaf = value; }
     });
   };
 
@@ -211,6 +205,7 @@ export function createNetworkSessionController({
       onGameOverChanged: (_gameOver, nextGame) => syncMusicForGame(nextGame)
     });
     initializeNetworkGameState(game, netPredictedProjectiles);
+    game.discardPredictedProjectile = (predicted) => discardPredictedProjectile(game, predicted);
     setCurrentGame(game);
     syncMusicForGame(game);
     updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Connecting to ${wsUrl}...`);
@@ -258,14 +253,23 @@ export function createNetworkSessionController({
     });
     netClient.on("hello", (msg) => {
       netPlayerId = msg.playerId || null;
+      if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
+      game.networkLocalPlayerId = netPlayerId;
+      voiceManager.syncServerConfig(game, msg.voice);
     });
     netClient.on("join.ok", (msg) => {
+      if (msg.playerId) netPlayerId = game.networkLocalPlayerId = msg.playerId;
+      if (Number.isFinite(msg.voiceUid)) netVoiceUid = Math.max(1, Math.floor(msg.voiceUid));
       netControllerId = msg.controllerId || null;
+      voiceManager.joinServerRoom(game, msg.voice, netPlayerId, netVoiceUid);
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Joined "${msg.roomId}" as ${game.networkRole}`);
     });
     netClient.on("room.roster", (msg) => {
       netControllerId = msg.controllerId || null;
+      game.networkRosterPlayers = Array.isArray(msg.players) ? msg.players : [];
+      voiceManager.syncRoster(game.networkRosterPlayers);
+      voiceManager.syncServerConfig(game, msg.voice);
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
       const players = Array.isArray(msg.players) ? msg.players.length : 0;
       updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Room: ${players} connected | Role: ${game.networkRole}`);
@@ -352,9 +356,7 @@ export function createNetworkSessionController({
       netLastSnapshotRecvAtMs = recvAt;
       netControllerId = msg.controllerId || netControllerId;
       observeServerTimeIntoState(netClockState, msg.serverTime, NET_CLOCK_OFFSET_SMOOTHING);
-      if (Number.isFinite(msg.snapshotSeq)) {
-        netClient.send("state.snapshotAck", { snapshotSeq: Math.floor(msg.snapshotSeq) });
-      }
+      if (Number.isFinite(msg.snapshotSeq)) netClient.send("state.snapshotAck", { snapshotSeq: Math.floor(msg.snapshotSeq) });
       const snapshotSig = typeof msg.mapSignature === "string" ? msg.mapSignature : "";
       if (snapshotSig && netMapSignature && snapshotSig !== netMapSignature) {
         netPendingSnapshot = msg;
@@ -410,9 +412,7 @@ export function createNetworkSessionController({
         );
       }
       netSnapshotBuffer.push({ recvTime: recvAt, ...msg });
-      if (netSnapshotBuffer.length > NET_MAX_SNAPSHOT_BUFFER * 2) {
-        netSnapshotBuffer.splice(0, netSnapshotBuffer.length - NET_MAX_SNAPSHOT_BUFFER);
-      }
+      if (netSnapshotBuffer.length > NET_MAX_SNAPSHOT_BUFFER * 2) netSnapshotBuffer.splice(0, netSnapshotBuffer.length - NET_MAX_SNAPSHOT_BUFFER);
       if (game.networkHasMap && game.networkHasChunks) handleMapReady();
       updateNetworkRole(game, isNetworkController(), networkTakeControl);
     });
@@ -475,12 +475,10 @@ export function createNetworkSessionController({
           aimDirX: input.aimDirX,
           aimDirY: input.aimDirY
         });
-        if (netPendingInputs.length > 120) {
-          netPendingInputs.splice(0, netPendingInputs.length - 120);
-        }
+        if (netPendingInputs.length > 120) netPendingInputs.splice(0, netPendingInputs.length - 120);
       }
       netClient.sendInput(input);
-    }, 33);
+    }, NET_INPUT_INTERVAL_MS);
   };
 
   const takeControl = () => {

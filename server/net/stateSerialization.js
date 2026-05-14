@@ -84,6 +84,7 @@ function shallowActivePlayerState(player) {
     facing: player.facing,
     moving: !!player.moving,
     alive: player.alive !== false,
+    spectateTargetId: typeof player.spectateTargetId === "string" ? player.spectateTargetId : "",
     color: player.color
   };
 }

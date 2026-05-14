@@ -77,6 +77,37 @@ function validateTriggerLevels() {
   return floors;
 }
 
+function validateRemotePlayerBossTrigger() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  const remote = {
+    id: "p_remote",
+    classType: "fighter",
+    x: game.player.x + 32,
+    y: game.player.y,
+    size: game.player.size,
+    health: 100,
+    maxHealth: 100,
+    alive: true,
+    level: 4,
+    experience: 0,
+    expToNextLevel: game.config.progression.baseXpToLevel,
+    skillPoints: 0,
+    levelWeaponDamageBonus: 0
+  };
+  game.remotePlayers = [remote];
+  game.level = 1;
+  assert(game.floorBoss.phase === "idle", "boss should start idle");
+  game.gainExperienceForPlayerEntity(remote, remote.expToNextLevel);
+  assert(remote.level === 5, `remote player expected level 5, got ${remote.level}`);
+  assert(game.floorBoss.phase === "queued", `remote player level-up should queue boss, got ${game.floorBoss.phase}`);
+  assert(game.floorBoss.spawnTriggeredAtLevel === 5, `remote trigger level expected 5, got ${game.floorBoss.spawnTriggeredAtLevel}`);
+  return {
+    localLevel: game.level,
+    remoteLevel: remote.level,
+    bossPhase: game.floorBoss.phase
+  };
+}
+
 function validateSonyaBirthdayVariant() {
   const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   game.isHaleyBirthday = () => true;
@@ -151,6 +182,45 @@ function validateLocalProgression() {
   return {
     startingFloor,
     nextFloor: game.floor
+  };
+}
+
+function validateRemotePortalProgression() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  const startingFloor = game.floor;
+  const remote = {
+    id: "p_remote_portal",
+    classType: "fighter",
+    x: game.player.x + 64,
+    y: game.player.y,
+    size: game.player.size,
+    health: 100,
+    maxHealth: 100,
+    alive: true,
+    level: 5,
+    experience: 0,
+    expToNextLevel: game.config.progression.baseXpToLevel,
+    skillPoints: 0
+  };
+  game.remotePlayers = [remote];
+  game.level = game.getFloorBossTriggerLevel();
+  assert(game.updateFloorBossTrigger() === true, "boss did not queue before remote portal validation");
+  const boss = spawnBossForCurrentFloor(game, game.player.x + 96, game.player.y);
+  game.enemies.push(boss);
+  game.markFloorBossActive();
+  killFloorBoss(game);
+  assert(game.portal.active, "portal did not spawn before remote portal validation");
+
+  remote.x = game.portal.x;
+  remote.y = game.portal.y;
+  stepGame(game, 0.016, { processUi: false });
+  assert(game.floor === startingFloor + 1, `remote portal entrant expected floor ${startingFloor + 1}, got ${game.floor}`);
+  assert(game.portal.active === false, "portal remained active after remote player transition");
+
+  return {
+    startingFloor,
+    nextFloor: game.floor,
+    remoteId: remote.id
   };
 }
 
@@ -302,9 +372,11 @@ function main() {
   const results = {
     triggerLevels: validateTriggerLevels(),
     sonyaBirthdayVariant: validateSonyaBirthdayVariant(),
+    remotePlayerBossTrigger: validateRemotePlayerBossTrigger(),
     floorThreeGolemVariant: validateFloorThreeGolemVariant(),
     safePlayerSpawn: validateSafePlayerSpawn(),
     localProgression: validateLocalProgression(),
+    remotePortalProgression: validateRemotePortalProgression(),
     networkReconciliation: validateNetworkReconciliation(),
     controllerJoinSpawnSync: validateControllerJoinSpawnSync(),
     bossSpawnLockout: validateBossLocksAmbientSpawns(),

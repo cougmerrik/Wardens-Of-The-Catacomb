@@ -13,7 +13,18 @@ export function initializeNetworkGameState(game, predictedProjectiles) {
     hardSnapCount: 0,
     softCorrectionCount: 0,
     settleCorrectionCount: 0,
-    blockedSnapCount: 0
+    blockedSnapCount: 0,
+    postLoadCorrectionReady: false,
+    postLoadCorrectionFloor: null,
+    postLoadCorrectionStartedAtMs: 0,
+    postLoadCorrectionSnapshotStart: 0,
+    postLoadLastCorrectionPx: 0,
+    postLoadMaxCorrectionPx: 0,
+    postLoadHardSnapCount: 0,
+    postLoadSoftCorrectionCount: 0,
+    postLoadSettleCorrectionCount: 0,
+    postLoadBlockedSnapCount: 0,
+    recentPostLoadCorrections: []
   };
   game.networkPredictedProjectiles = predictedProjectiles;
   game.map = [];

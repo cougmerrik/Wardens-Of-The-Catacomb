@@ -10,9 +10,12 @@ import { average, makeSamplePusher, monotonicNowMs, percentile } from "./net/tel
 import { buildDeltaCollection } from "./net/deltaProtocol.js";
 import { buildMapChunkRows } from "./net/mapChunkStreaming.js";
 import { installRoomDevBossOverride } from "./net/installRoomDevBossOverride.js";
+import { createWsClientTransport } from "./net/transports/WsClientTransport.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
+import { handleDevNetworkTelemetryRequest } from "./devNetworkTelemetryApi.js";
+import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
 const HOST = typeof process.env.HOST === "string" && process.env.HOST.trim() ? process.env.HOST.trim() : "";
@@ -31,10 +34,12 @@ const MAX_TELEMETRY_SAMPLES = Number.parseInt(process.env.MAX_TELEMETRY_SAMPLES 
 const TICK_DRIFT_EPSILON_MS = Number.parseFloat(process.env.TICK_DRIFT_EPSILON_MS || "0.5");
 const MAX_TICKS_PER_LOOP = Number.parseInt(process.env.MAX_TICKS_PER_LOOP || "6", 10);
 const MAX_SNAPSHOT_STEPS_PER_LOOP = Number.parseInt(process.env.MAX_SNAPSHOT_STEPS_PER_LOOP || "3", 10);
+const DEV_NETWORK_TELEMETRY = process.env.DEV_NETWORK_TELEMETRY === "1";
 
 const rooms = new Map();
 const pushTelemetrySample = makeSamplePusher(MAX_TELEMETRY_SAMPLES);
 const leaderboardStore = new LeaderboardStore();
+const voiceConfig = resolveVoiceConfig();
 
 const roomOptions = {
   average,
@@ -63,6 +68,7 @@ function getOrCreateRoom(roomId, classType) {
   if (!room) {
     if (rooms.size >= MAX_ROOMS) return null;
     room = new AuthoritativeRoom(roomId, classType, roomOptions);
+    room.voiceConfig = buildVoiceRoomConfig(voiceConfig, room.id);
     installRoomDevBossOverride(room);
     rooms.set(roomId, room);
   }
@@ -75,6 +81,10 @@ const server = http.createServer(async (req, res) => {
 
   if (requestUrl.pathname === "/api/leaderboard") {
     await handleLeaderboardApiRequest(req, res, leaderboardStore);
+    return;
+  }
+  if (DEV_NETWORK_TELEMETRY && requestUrl.pathname === "/api/dev-network-telemetry") {
+    await handleDevNetworkTelemetryRequest(req, res);
     return;
   }
   res.writeHead(404, {
@@ -92,9 +102,10 @@ wss.on("connection", (ws) => {
   if (ws._socket && typeof ws._socket.setNoDelay === "function") {
     ws._socket.setNoDelay(true);
   }
+  const transport = createWsClientTransport(ws);
   const client = {
     id: uid("p"),
-    ws,
+    transport,
     roomId: null,
     name: "Player",
     classType: "archer",
@@ -103,16 +114,18 @@ wss.on("connection", (ws) => {
     lastInputSeq: 0
   };
 
-  safeSend(ws, {
+  safeSend(transport, {
     type: "hello",
     playerId: client.id,
+    voiceUid: buildAgoraVoiceUid(client.id),
     protocol: 2,
+    voice: buildVoiceClientConfig(buildVoiceRoomConfig(voiceConfig, ""), client.id),
     note: "Server authoritative alpha. Multiplayer room scaffolding is in progress."
   });
 
-  ws.on("message", (raw) => {
+  transport.onMessage((raw) => {
     handleClientMessage(raw, {
-      ws,
+      ws: transport,
       client,
       rooms,
       getOrCreateRoom,
@@ -127,7 +140,7 @@ wss.on("connection", (ws) => {
     });
   });
 
-  ws.on("close", () => {
+  transport.onClose(() => {
     handleClientClose(client, rooms);
   });
 });
@@ -156,4 +169,5 @@ server.listen(PORT, HOST || undefined, () => {
   console.log(`Authoritative server listening on ${boundHost}:${PORT}`);
   console.log(`WebSocket gameplay endpoint available on ws://${endpointHost}:${PORT}`);
   console.log(`Leaderboard REST endpoint available on http://${endpointHost}:${PORT}/api/leaderboard`);
+  console.log(`Agora voice ${voiceConfig.enabled ? "enabled" : "disabled"}${voiceConfig.enabled ? ` for multiplayer rooms (${voiceConfig.appCertificate ? "server-generated RTC tokens" : voiceConfig.token ? "static RTC token" : "test App ID/no token"})` : " (set AGORA_APP_ID or --agora-app-id to enable)"}`);
 });

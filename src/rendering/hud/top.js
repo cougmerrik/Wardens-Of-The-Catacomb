@@ -42,6 +42,80 @@ function drawPauseOwnerBanner(ctx, game, layout) {
   ctx.textAlign = "left";
 }
 
+function formatDebugNumber(value, suffix = "", digits = 0) {
+  if (!Number.isFinite(value)) return "-";
+  return `${value.toFixed(digits)}${suffix}`;
+}
+
+function getDebugStats(game) {
+  const stats = game?.debugHudStats && typeof game.debugHudStats === "object" ? game.debugHudStats : {};
+  const net = stats.network && typeof stats.network === "object" ? stats.network : {};
+  return { stats, net };
+}
+
+function formatNetworkDebugSummary(game) {
+  if (!game?.debugHudEnabled || !game.networkEnabled) return "";
+  const { stats, net } = getDebugStats(game);
+  return [
+    `${formatDebugNumber(stats.fps)}fps`,
+    `ping ${formatDebugNumber(net.pingMs, "ms")}`,
+    `lat ${formatDebugNumber(net.latencyMs, "ms")}`,
+    `jit ${formatDebugNumber(net.jitterMs, "ms")}`,
+    `buf ${formatDebugNumber(net.snapshotBuffer)}`,
+    `in ${formatDebugNumber(net.pendingInputs)}`
+  ].join(" | ");
+}
+
+function getDebugStatsHudRect(renderer, game, layout, lines) {
+  const ctx = renderer.ctx;
+  const padding = 8;
+  const lineH = 14;
+  const measuredW = Math.ceil(lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0));
+  const boxW = Math.min(layout.playW - 24, Math.max(game.networkEnabled ? 220 : 104, measuredW + padding * 2));
+  const boxH = padding * 2 + lines.length * lineH;
+  return {
+    x: Math.max(12, Math.floor((layout.playW - boxW) * 0.5)),
+    y: layout.topHudH + 8,
+    w: boxW,
+    h: boxH,
+    padding,
+    lineH
+  };
+}
+
+export function drawDebugStatsHud(renderer, game, layout) {
+  if (!game?.debugHudEnabled) return;
+  const ctx = renderer.ctx;
+  const { stats, net } = getDebugStats(game);
+  const lines = [
+    game.networkEnabled ? "NET DEBUG" : "DEBUG",
+    `FPS ${formatDebugNumber(stats.fps)}`,
+    `Frame ${formatDebugNumber(stats.frameMs, "ms", 1)}`
+  ];
+  if (game.networkEnabled) {
+    lines.push(
+      `Ping ${formatDebugNumber(net.pingMs, "ms")}`,
+      `Latency ${formatDebugNumber(net.latencyMs, "ms")}`,
+      `Jitter ${formatDebugNumber(net.jitterMs, "ms")}`,
+      `Buf ${formatDebugNumber(net.snapshotBuffer)}  In ${formatDebugNumber(net.pendingInputs)}`
+    );
+  }
+  ctx.save();
+  ctx.font = "12px Trebuchet MS";
+  const rect = getDebugStatsHudRect(renderer, game, layout, lines);
+  game.debugHudStatsRect = { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+  ctx.fillStyle = "rgba(4, 8, 14, 0.78)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = "rgba(143, 227, 162, 0.45)";
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  ctx.fillStyle = "#d9f6df";
+  ctx.textAlign = "left";
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], rect.x + rect.padding, rect.y + rect.padding + 10 + i * rect.lineH);
+  }
+  ctx.restore();
+}
+
 export function drawHud(renderer, game, layout) {
   const ctx = renderer.ctx;
   ctx.fillStyle = "rgba(5, 8, 14, 0.9)";
@@ -53,7 +127,16 @@ export function drawHud(renderer, game, layout) {
   ctx.fillText(`Floor: ${game.floor}`, 340, 24);
   if (game.networkEnabled) {
     ctx.fillStyle = game.networkRole === "Controller" ? "#8fe3a2" : "#dfc670";
-    ctx.fillText(`Net: ${game.networkRole || "Connected"}`, 470, 24);
+    const netLabel = `Net: ${game.networkRole || "Connected"}`;
+    ctx.fillText(netLabel, 470, 24);
+    const debugSummary = formatNetworkDebugSummary(game);
+    if (debugSummary) {
+      ctx.fillStyle = "#bfe8ff";
+      ctx.font = "13px Trebuchet MS";
+      const debugX = Math.min(layout.playW - 12, 470 + ctx.measureText(netLabel).width + 18);
+      if (debugX < layout.playW - 180) ctx.fillText(debugSummary, debugX, 24);
+      ctx.font = "16px Trebuchet MS";
+    }
   }
   const objective = typeof game.getFloorObjectiveText === "function" ? game.getFloorObjectiveText() : "";
   const detail = typeof game.getFloorObjectiveDetail === "function" ? game.getFloorObjectiveDetail() : "";

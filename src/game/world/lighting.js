@@ -317,6 +317,26 @@ export function getActiveLightSources(game) {
     addSource(enemy, "burningEnemy", getBurningEnemyLightRadius(game, enemy), getFireLightOptions(game));
   }
 
+  const wispState = game.spectatorWispRenderState && typeof game.spectatorWispRenderState === "object" ? game.spectatorWispRenderState : null;
+  if (wispState) {
+    const tile = getTileSize(game);
+    for (const [id, wisp] of Object.entries(wispState)) {
+      if (!wisp || !Number.isFinite(wisp.x) || !Number.isFinite(wisp.y) || !Number.isFinite(wisp.alpha) || wisp.alpha <= 0.01) continue;
+      addSource(
+        {
+          id: `spectatorWisp:${id}`,
+          type: "spectatorWisp",
+          x: wisp.x,
+          y: wisp.y,
+          lightIntensity: 0.1 * Math.max(0, Math.min(1, wisp.alpha))
+        },
+        "spectatorWisp",
+        tile * 2.4,
+        { lightDecay: 3.8, brightRadiusRatio: 0.22, dimRadiusRatio: 0.72 }
+      );
+    }
+  }
+
   return sources;
 }
 

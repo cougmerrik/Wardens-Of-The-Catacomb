@@ -4,6 +4,8 @@ import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/gam
 import { cloneNecromancerTalentState, createNecromancerTalentState } from "../../src/game/necromancerTalentTree.js";
 import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
 import { cloneNecromancerBeamState, cloneNecromancerRuntimeState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
+import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
+import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -101,6 +103,19 @@ export class AuthoritativeRoom {
     this.pauseOwnerId = typeof value === "string" && value ? value : null;
   }
 
+  getVoiceRoomConfig(playerId = "") {
+    if (!this.voiceConfig || !this.voiceConfig.enabled) return { enabled: false };
+    const channel =
+      typeof this.voiceConfig.channel === "string" && this.voiceConfig.channel
+        ? this.voiceConfig.channel
+        : `wardens-${this.id}`;
+    return buildVoiceClientConfig({ ...this.voiceConfig, channel }, playerId);
+  }
+
+  getVoiceUid(playerId) {
+    return buildAgoraVoiceUid(playerId);
+  }
+
   mapSignature() {
     return typeof this.sim.getMapSignature === "function"
       ? this.sim.getMapSignature()
@@ -135,6 +150,7 @@ export class AuthoritativeRoom {
   getRosterEntry(client) {
     return {
       id: client.id,
+      voiceUid: buildAgoraVoiceUid(client.id),
       handle: client.name,
       name: client.name,
       classType: client.classType,
@@ -178,6 +194,7 @@ export class AuthoritativeRoom {
       skillPoints: 0,
       refundCount: 0,
       levelWeaponDamageBonus: 0,
+      lanternFuel: Number.isFinite(spawn?.lanternFuel) ? spawn.lanternFuel : this.sim.config?.lighting?.lanternInitialFuel,
       kills: 0,
       damageDealt: 0,
       goldEarned: 0,
@@ -208,6 +225,7 @@ export class AuthoritativeRoom {
       facing: 0,
       moving: false,
       alive: true,
+      spectateTargetId: "",
       color: this.getClientRunColor(client)
     };
   }
@@ -261,23 +279,7 @@ export class AuthoritativeRoom {
   }
 
   initializeActivePlayers() {
-    this.activePlayers.clear();
-    const baseSpawn = { x: this.sim.player?.x || 0, y: this.sim.player?.y || 0 };
-    const tile = this.sim.config?.map?.tile || 32;
-    let slot = 0;
-    for (const client of this.clients.values()) {
-      const angle = slot * ((Math.PI * 2) / Math.max(1, this.clients.size));
-      const offsetX = Math.cos(angle) * tile * 0.85;
-      const offsetY = Math.sin(angle) * tile * 0.85;
-      const candidate =
-        slot === 0 || typeof this.sim.findNearestSafePoint !== "function"
-          ? baseSpawn
-          : this.sim.findNearestSafePoint(baseSpawn.x + offsetX, baseSpawn.y + offsetY, 8);
-      this.activePlayers.set(client.id, this.createActivePlayerState(client, candidate));
-      slot += 1;
-    }
-    this.syncSimPrimaryPlayerState();
-    this.syncPrimaryActivePlayerFromSim();
+    createRandomActivePlayerStates(this);
   }
 
   syncSimPrimaryPlayerState() {
@@ -298,6 +300,7 @@ export class AuthoritativeRoom {
     this.sim.player.speed = Number.isFinite(state.speed) ? state.speed : this.sim.player.speed;
     this.sim.player.health = Number.isFinite(state.health) ? state.health : this.sim.player.health;
     this.sim.player.maxHealth = Number.isFinite(state.maxHealth) ? state.maxHealth : this.sim.player.maxHealth;
+    this.sim.player.alive = this.sim.player.health > 0;
     this.sim.player.fireCooldown = Number.isFinite(state.fireCooldown) ? state.fireCooldown : 0;
     this.sim.player.fireArrowCooldown = Number.isFinite(state.fireArrowCooldown) ? state.fireArrowCooldown : 0;
     this.sim.player.deathBoltCooldown = Number.isFinite(state.deathBoltCooldown) ? state.deathBoltCooldown : 0;
@@ -366,6 +369,7 @@ export class AuthoritativeRoom {
     state.skillPoints = this.sim.skillPoints;
     state.refundCount = Number.isFinite(this.sim.refundCount) ? this.sim.refundCount : 0;
     state.levelWeaponDamageBonus = this.sim.levelWeaponDamageBonus;
+    state.lanternFuel = this.sim.player.lanternFuel;
     state.kills = this.sim.runStats?.totalKills || 0;
     state.damageDealt = this.sim.runStats?.damageDealt || 0;
     state.goldEarned = this.sim.runStats?.goldEarned || 0;
@@ -384,6 +388,7 @@ export class AuthoritativeRoom {
     state.facing = this.sim.player.facing;
     state.moving = !!this.sim.player.moving;
     state.alive = this.sim.player.health > 0;
+    state.spectateTargetId = state.alive ? "" : (typeof client.input?.spectateTargetId === "string" ? client.input.spectateTargetId : "");
     state.consumableRuntime = {
       tempHp: Number.isFinite(this.sim.player?.consumableRuntime?.tempHp) ? this.sim.player.consumableRuntime.tempHp : 0
     };
@@ -693,6 +698,7 @@ export class AuthoritativeRoom {
       const alive = state.alive !== false && (state.health || 0) > 0;
       if (!alive) {
         state.moving = false;
+        state.spectateTargetId = typeof input.spectateTargetId === "string" ? input.spectateTargetId : "";
         input.moveX = 0;
         input.moveY = 0;
         input.swapAttackQueued = false;
@@ -709,6 +715,7 @@ export class AuthoritativeRoom {
         this.sim.moveWithCollisionSubsteps(state, (mx / len) * state.speed * dt, (my / len) * state.speed * dt);
       }
       state.moving = !!(mx || my);
+      state.spectateTargetId = "";
       if (input.hasAim) {
         if (Number.isFinite(input.aimDirX) && Number.isFinite(input.aimDirY)) {
           const alen = Math.hypot(input.aimDirX, input.aimDirY) || 1;
@@ -803,6 +810,31 @@ export class AuthoritativeRoom {
 
   getActivePlayerStates() {
     return Array.from(this.activePlayers.values());
+  }
+
+  getLivingActivePlayerStates() {
+    return this.getActivePlayerStates().filter((state) =>
+      state &&
+      state.alive !== false &&
+      (Number.isFinite(state.health) ? state.health > 0 : true) &&
+      this.clients.has(state.id)
+    );
+  }
+
+  transferPauseOwnerToLivingPlayer(nowMs = Date.now()) {
+    const next = this.getLivingActivePlayerStates().find((state) => state.id !== this.pauseOwnerId)
+      || this.getLivingActivePlayerStates()[0]
+      || null;
+    if (!next?.id || next.id === this.pauseOwnerId) return false;
+    this.pauseOwnerId = next.id;
+    this.sim.gameOver = false;
+    this.sim.gameOverTitle = "GAME OVER";
+    this.sim.paused = false;
+    this.finalResults = null;
+    this.syncSimPrimaryPlayerState();
+    this.broadcastRoster();
+    this.maybeBroadcastMeta(nowMs, true);
+    return true;
   }
 
   getLastInputSeqByPlayer() {
@@ -978,6 +1010,9 @@ export class AuthoritativeRoom {
     if (!this.roomOwnerId) this.roomOwnerId = client.id;
     if (!this.pauseOwnerId) this.pauseOwnerId = client.id;
     if (this.phase === "active") this.activePlayers.set(client.id, this.createActivePlayerState(client, this.sim.player));
+    if (this.phase === "active" && this.sim.gameOver && this.getLivingActivePlayerStates().length > 0) {
+      this.transferPauseOwnerToLivingPlayer(Date.now());
+    }
     if (this.phase === "lobby") this.refreshLobbyState(Date.now());
   }
 
@@ -1098,10 +1133,16 @@ export class AuthoritativeRoom {
     const preFireArrowCount = this.sim.fireArrows.length;
     const dt = Math.min((nowMs - this.lastTickMs) / 1000, 0.05);
     this.lastTickMs = nowMs;
+    const previousFloor = Number.isFinite(this.sim.floor) ? this.sim.floor : null;
     this.sim.networkActivePlayers = this.getSimulationPlayerEntities();
     this.sim.tick(dt, this.getControllerInput());
-    this.updateRemoteActivePlayers(dt);
+    const floorAdvanced = previousFloor !== null && Number.isFinite(this.sim.floor) && this.sim.floor > previousFloor;
+    if (floorAdvanced) placeActivePlayersAtRandomFloorSpawns(this);
+    this.updateRemoteActivePlayers(floorAdvanced ? 0 : dt);
     this.syncPrimaryActivePlayerFromSim();
+    if (this.sim.gameOver && this.getLivingActivePlayerStates().length > 0) {
+      this.transferPauseOwnerToLivingPlayer(nowMs);
+    }
     if (this.sim.gameOver && !this.finalResults) {
       this.finalResults = this.buildFinalResults();
     }
@@ -1136,12 +1177,12 @@ export class AuthoritativeRoom {
     const msg = JSON.stringify({ type, roomId: this.id, ...payload });
     let dropped = 0;
     for (const client of this.clients.values()) {
-      if (client.ws.readyState !== client.ws.OPEN) continue;
-      if (type === "state.snapshot" && client.ws.bufferedAmount > this.options.maxWsBufferedBytes) {
+      if (!client.transport?.isOpen()) continue;
+      if (type === "state.snapshot" && client.transport.bufferedAmount > this.options.maxWsBufferedBytes) {
         dropped += 1;
         continue;
       }
-      client.ws.send(msg);
+      client.transport.send(msg);
     }
     const elapsed = this.options.monotonicNowMs() - t0;
     if (type === "state.snapshot") {
@@ -1162,6 +1203,7 @@ export class AuthoritativeRoom {
       lobbyCountdownEndsAt: this.lobbyCountdownEndsAt || 0,
       lobbyCountdownRemainingMs: this.getLobbyCountdownRemainingMs(),
       lobbyInlineMessage: this.lobbyInlineMessage,
+      voice: this.getVoiceRoomConfig(),
       players: this.getRosterEntries()
     });
   }
@@ -1195,9 +1237,7 @@ export class AuthoritativeRoom {
       }))
     };
     if (toClient) {
-      if (toClient.ws.readyState === toClient.ws.OPEN) {
-        toClient.ws.send(JSON.stringify({ type: "state.mapMeta", roomId: this.id, ...payload }));
-      }
+      toClient.transport?.sendJson({ type: "state.mapMeta", roomId: this.id, ...payload });
       return;
     }
     this.broadcast("state.mapMeta", payload);
@@ -1230,16 +1270,14 @@ export class AuthoritativeRoom {
       }))
     };
     if (toClient) {
-      if (toClient.ws.readyState === toClient.ws.OPEN) {
-        toClient.ws.send(JSON.stringify({ type: "state.map", roomId: this.id, ...payload }));
-      }
+      toClient.transport?.sendJson({ type: "state.map", roomId: this.id, ...payload });
       return;
     }
     this.broadcast("state.map", payload);
   }
 
   sendMapChunksToClient(client, nowMs = Date.now()) {
-    if (!client || client.ws.readyState !== client.ws.OPEN) return;
+    if (!client?.transport?.isOpen()) return;
     const chunkState = this.clientChunkState.get(client.id);
     if (!chunkState) return;
     const tile = this.sim.config.map.tile || 32;
@@ -1257,17 +1295,15 @@ export class AuthoritativeRoom {
         if (chunkState.sent.has(key) && nowMs - this.lastChunkPushMs < this.options.mapChunkPushMs) continue;
         const chunk = this.options.buildMapChunkRows(this.sim, cx, cy, this.options.mapChunkSize);
         if (!chunk) continue;
-        client.ws.send(
-          JSON.stringify({
-            type: "state.mapChunk",
-            roomId: this.id,
-            mapSignature: sig,
-            cx,
-            cy,
-            chunkSize: this.options.mapChunkSize,
-            rows: chunk.rows
-          })
-        );
+        client.transport.sendJson({
+          type: "state.mapChunk",
+          roomId: this.id,
+          mapSignature: sig,
+          cx,
+          cy,
+          chunkSize: this.options.mapChunkSize,
+          rows: chunk.rows
+        });
         chunkState.sent.add(key);
       }
     }
@@ -1386,7 +1422,7 @@ export class AuthoritativeRoom {
   }
 
   sendMeta(toClient, nowMs = Date.now(), force = true) {
-    if (!toClient || toClient.ws.readyState !== toClient.ws.OPEN) return;
+    if (!toClient?.transport?.isOpen()) return;
     const meta = this.options.serializeMetaState(this);
     const payloadJson = JSON.stringify(meta);
     const changed = payloadJson !== this.lastMetaPayloadJson;
@@ -1394,15 +1430,13 @@ export class AuthoritativeRoom {
       this.lastMetaPayloadJson = payloadJson;
       this.lastMetaBroadcastMs = nowMs;
     }
-    toClient.ws.send(
-      JSON.stringify({
-        type: "state.meta",
-        roomId: this.id,
-        serverTime: nowMs,
-        mapSignature: this.mapSignature(),
-        meta
-      })
-    );
+    toClient.transport.sendJson({
+      type: "state.meta",
+      roomId: this.id,
+      serverTime: nowMs,
+      mapSignature: this.mapSignature(),
+      meta
+    });
   }
 
   getTelemetrySnapshot() {

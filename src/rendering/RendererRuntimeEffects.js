@@ -1,7 +1,8 @@
 import { RendererRuntimeScene } from "./RendererRuntimeScene.js";
 import { rendererEffectsPlayerMethods } from "./rendererEffectsPlayerMethods.js";
 import { rendererEffectsProjectileMethods } from "./rendererEffectsProjectileMethods.js";
+import { rendererEffectsSpectatorWispMethods } from "./rendererEffectsSpectatorWispMethods.js";
 
 export class RendererRuntimeEffects extends RendererRuntimeScene {}
 
-Object.assign(RendererRuntimeEffects.prototype, rendererEffectsPlayerMethods, rendererEffectsProjectileMethods);
+Object.assign(RendererRuntimeEffects.prototype, rendererEffectsPlayerMethods, rendererEffectsProjectileMethods, rendererEffectsSpectatorWispMethods);

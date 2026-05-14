@@ -15,12 +15,12 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Performance artifacts: keep baseline files, ignore generated runs
+# Generated validation artifacts: keep checked-in perf baselines only
+artifacts/*
+!artifacts/perf/
 artifacts/perf/*
 !artifacts/perf/baseline.json
 !artifacts/perf/baseline_previous.json
-artifacts/gameplay/*
-artifacts/network/*
 
 # Runtime data
 data/leaderboard.json
@@ -28,6 +28,7 @@ data/leaderboard.json
 # Local Codex workspace state
 .agents/
 .codex
+.playwright-mcp/
 
 # Temporary local scratch files seen in this repo
 =500{print}

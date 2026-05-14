@@ -1,25 +1,25 @@
 # Task Board
 
-Branch: `<feature-branch>`
+Branch: `feature/network-transport-abstraction`
 
-Use this file as the working board for the current branch. Keep tasks finite, testable, and tied to concrete validation steps. When the feature is complete, roll durable summaries into the long-lived docs and reset this file to a clean state.
+Use this file as the temporary working board for the current branch. Keep tasks finite, testable, and tied to concrete validation steps. When branch work is ready for closeout, roll durable summaries into long-lived docs and reset this file to this clean state.
 
 ## Active Tasks
 
-- None.
+None.
 
 ## Completed Tasks
 
-- None.
+None.
 
 ## Follow-Ups
 
-- None.
+None.
 
 ## Validation Commands
 
-Add feature-specific validation commands here as tasks are defined.
+None.
 
 ## Validation Results
 
-- None.
+None.
