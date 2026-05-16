@@ -28,6 +28,24 @@ export function getStableId(room, domain, prefix, obj) {
   return id;
 }
 
+function copyFiniteFields(payload, source, fields) {
+  for (const field of fields) {
+    if (Number.isFinite(source?.[field])) payload[field] = source[field];
+  }
+}
+
+function copyStringFields(payload, source, fields) {
+  for (const field of fields) {
+    if (typeof source?.[field] === "string" && source[field]) payload[field] = source[field];
+  }
+}
+
+function copyBooleanFields(payload, source, fields) {
+  for (const field of fields) {
+    if (typeof source?.[field] === "boolean") payload[field] = source[field];
+  }
+}
+
 function serializeBullet(room, b, domain = "bullet", prefix = "b") {
   const payload = {
     id: getStableId(room, domain, prefix, b),
@@ -47,6 +65,45 @@ function serializeBullet(room, b, domain = "bullet", prefix = "b") {
   if (Number.isFinite(b.lightRadius)) payload.lightRadius = b.lightRadius;
   if (Number.isFinite(b.lightIntensity)) payload.lightIntensity = b.lightIntensity;
   if (typeof b.projectileType === "string" && b.projectileType !== "bullet") payload.projectileType = b.projectileType;
+  copyStringFields(payload, b, ["damageType"]);
+  copyFiniteFields(payload, b, ["critMultiplier", "visualLife", "deathBoltRadius"]);
+  return payload;
+}
+
+function serializeFireZone(room, z) {
+  const payload = {
+    id: getStableId(room, "fireZone", "fz", z),
+    x: z.x,
+    y: z.y,
+    targetX: z.targetX,
+    targetY: z.targetY,
+    radius: z.radius,
+    lightRadius: z.lightRadius,
+    lightIntensity: z.lightIntensity,
+    life: z.life,
+    totalLife: z.totalLife,
+    zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire",
+    damageType: typeof z.damageType === "string" ? z.damageType : ""
+  };
+  copyStringFields(payload, z, ["doctrine", "ownerId"]);
+  copyFiniteFields(payload, z, ["size", "strikeAt", "visualLife"]);
+  copyBooleanFields(payload, z, ["followOwner"]);
+  return payload;
+}
+
+function serializeMeleeSwing(room, s) {
+  const payload = {
+    id: getStableId(room, "meleeSwing", "ms", s),
+    x: s.x,
+    y: s.y,
+    angle: s.angle,
+    arc: s.arc,
+    range: s.range,
+    life: s.life
+  };
+  copyStringFields(payload, s, ["style", "modifier", "doctrine", "ownerId"]);
+  copyFiniteFields(payload, s, ["maxLife"]);
+  copyBooleanFields(payload, s, ["executeProc"]);
   return payload;
 }
 
@@ -294,28 +351,7 @@ export function serializeState(room) {
     wallTraps: activeWallTraps.map((t) => serializeWallTrap(room, t)),
     bullets: activeBullets.map((b) => serializeBullet(room, b, "bullet", "b")),
     fireArrows: activeFireArrows.map((a) => serializeBullet(room, a, "fireArrow", "fa")),
-    fireZones: activeFireZones.map((z) => ({
-      id: getStableId(room, "fireZone", "fz", z),
-      x: z.x,
-      y: z.y,
-      targetX: z.targetX,
-      targetY: z.targetY,
-      radius: z.radius,
-      lightRadius: z.lightRadius,
-      lightIntensity: z.lightIntensity,
-      life: z.life,
-      totalLife: z.totalLife,
-      zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire",
-      damageType: typeof z.damageType === "string" ? z.damageType : ""
-    })),
-    meleeSwings: activeMeleeSwings.map((s) => ({
-      id: getStableId(room, "meleeSwing", "ms", s),
-      x: s.x,
-      y: s.y,
-      angle: s.angle,
-      arc: s.arc,
-      range: s.range,
-      life: s.life
-    }))
+    fireZones: activeFireZones.map((z) => serializeFireZone(room, z)),
+    meleeSwings: activeMeleeSwings.map((s) => serializeMeleeSwing(room, s))
   };
 }

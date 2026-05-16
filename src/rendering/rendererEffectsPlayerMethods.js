@@ -48,6 +48,12 @@ export const rendererEffectsPlayerMethods = {
     return this.config.classes[classType] || this.config.classes.archer;
   },
 
+  getReplicatedPlayerFirePulse(player) {
+    const fireCooldown = Number.isFinite(player?.fireCooldown) ? player.fireCooldown : 0;
+    const baseCd = Number.isFinite(this.config?.player?.baseFireCooldown) ? this.config.player.baseFireCooldown : 0;
+    return baseCd > 0 ? Math.max(0, Math.min(1, fireCooldown / baseCd)) : 0;
+  },
+
   drawReplicatedPlayerSprite(player, screenX, screenY, renderSize, frameSize) {
     const prevRenderX = Number.isFinite(player._renderPrevX) ? player._renderPrevX : player.x;
     const prevRenderY = Number.isFinite(player._renderPrevY) ? player._renderPrevY : player.y;
@@ -101,18 +107,19 @@ export const rendererEffectsPlayerMethods = {
     const usesRanged = !!classSpec?.usesRanged;
     const doctrine = getWarriorDoctrine(player);
     const doctrineVisual = this.getWarriorDoctrinePresentation(player);
+    const firePulse = this.getReplicatedPlayerFirePulse(player);
     if (player.classType === "necromancer") {
-      this.drawPlayerNecromancerRig(player, screenX, screenY, walkPhase, 0);
+      this.drawPlayerNecromancerRig(player, screenX, screenY, walkPhase, firePulse);
       return;
     }
     if (!usesRanged) {
       if ((player?.warriorRageActiveTimer || 0) > 0) this.ctx.save();
       if ((player?.warriorRageActiveTimer || 0) > 0) this.ctx.filter = doctrineVisual.filter;
-      this.drawPlayerFighterRig(player, screenX, screenY, walkPhase, 0);
+      this.drawPlayerFighterRig(player, screenX, screenY, walkPhase, firePulse);
       if ((player?.warriorRageActiveTimer || 0) > 0) this.ctx.restore();
       return;
     }
-    this.drawPlayerAimingRig(player, screenX, screenY, walkPhase, 0, this.getRangerWeaponPresentation(player));
+    this.drawPlayerAimingRig(player, screenX, screenY, walkPhase, firePulse, this.getRangerWeaponPresentation(player));
   },
 
   drawRemotePlayerHandle(player, screenX, screenY) {
