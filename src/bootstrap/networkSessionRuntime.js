@@ -87,6 +87,8 @@ export function createNetworkSessionController({
     gapMs: netLastSnapshotGapMs
   });
 
+  const getAckSeqForPacket = (pkt) => Number.isFinite(pkt?.lastInputSeqByPlayer?.[netPlayerId]) ? pkt.lastInputSeqByPlayer[netPlayerId] : Number.isFinite(pkt?.lastInputSeq) ? pkt.lastInputSeq : 0;
+
   const resetNetworkState = () => {
     netPlayerId = null;
     netVoiceUid = null;
@@ -166,6 +168,7 @@ export function createNetworkSessionController({
       isNetworkController,
       getRenderDelayMs: () => getRenderDelayForRole(isNetworkController, controllerRenderDelayMs, spectatorRenderDelayMs),
       estimateServerNowMs: () => estimateServerNowMsFromState(netClockState),
+      getAckSeqForPacket,
       consumeSnapshotForRender,
       netSnapshotBuffer,
       maxSnapshotBuffer: NET_MAX_SNAPSHOT_BUFFER,
@@ -230,7 +233,7 @@ export function createNetworkSessionController({
           game,
           initialPending.state,
           isNetworkController(),
-          Number.isFinite(initialPending.lastInputSeq) ? initialPending.lastInputSeq : 0
+          getAckSeqForPacket(initialPending)
         );
         netPendingSnapshot = null;
       }
@@ -387,7 +390,7 @@ export function createNetworkSessionController({
         return;
       }
       if (game.networkHasMap && game.networkHasChunks && !game.networkReady && netSnapshotBuffer.length === 0) {
-        applySnapshot(game, msg.state, isNetworkController(), Number.isFinite(msg.lastInputSeq) ? msg.lastInputSeq : 0);
+        applySnapshot(game, msg.state, isNetworkController(), getAckSeqForPacket(msg));
         if (netInitialSnapshotApplied) {
           updateNetworkRole(game, isNetworkController(), networkTakeControl);
           updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Room synced | Role: ${game.networkRole}`);

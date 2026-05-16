@@ -1,4 +1,5 @@
 import { normalizeBoardType, sanitizeHandle } from "../leaderboardStore.js";
+import { enqueueClientInput, getProcessedInputSeq } from "./clientInputQueue.js";
 
 export function handleActionMessage(room, clientId, action) {
   if (!action || typeof action !== "object" || typeof action.kind !== "string") return;
@@ -180,6 +181,7 @@ export function handleClientMessage(raw, context) {
     normClassType,
     maxPeersPerRoom,
     makeDefaultInput,
+    resetClientInputState,
     sanitizeInput,
     serializeState,
     buildJoinKeyframeState,
@@ -255,7 +257,8 @@ export function handleClientMessage(raw, context) {
     client.classType = classType;
     client.protocolVersion =
       Number.isFinite(msg.protocolVersion) && msg.protocolVersion >= 1 ? Math.floor(msg.protocolVersion) : client.protocolVersion;
-    client.input = makeDefaultInput();
+    if (typeof resetClientInputState === "function") resetClientInputState(client, makeDefaultInput);
+    else client.input = makeDefaultInput();
     room.addClient(client);
 
     safeSend(ws, {
@@ -285,8 +288,10 @@ export function handleClientMessage(raw, context) {
         ownerId: room.roomOwnerId,
         pauseOwnerId: room.pauseOwnerId,
         controllerId: room.controllerId,
-        lastInputSeq: room.clients.get(room.controllerId)?.lastInputSeq || 0,
+        lastInputSeq: getProcessedInputSeq(room.clients.get(room.controllerId)),
         lastInputSeqByPlayer: room.getLastInputSeqByPlayer(),
+        lastReceivedInputSeqByPlayer: room.getLastReceivedInputSeqByPlayer(),
+        inputQueueDepthByPlayer: room.getInputQueueDepthByPlayer(),
         mapSignature: room.mapSignature(),
         state: joinState
       });
@@ -300,8 +305,7 @@ export function handleClientMessage(raw, context) {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const room = rooms.get(client.roomId);
     if (room.phase !== "active") return;
-    client.input = sanitizeInput(msg.input, client.input);
-    client.lastInputSeq = client.input.seq || client.lastInputSeq;
+    enqueueClientInput(client, msg.input, { sanitizeInput });
     return;
   }
 

@@ -98,6 +98,8 @@ function main() {
   assert.equal(room.sim.gold, 123, "primary sim gold did not sync from active state");
   assert.equal(room.sim.skills.deathBolt.points, 3, "primary sim skills did not sync from active state");
   assert.equal(room.sim.necromancerTalents.fireBoltCantrip.points, 1, "primary sim talents did not sync from active state");
+  assert.equal(room.sim.necromancerRuntime.activeMode, "spell", "primary sim necromancer runtime did not sync from active state");
+  assert.equal(room.sim.necromancerRuntime.mana, 3, "primary sim necromancer mana did not sync from active state");
 
   room.sim.gold = 456;
   room.sim.level = 5;
@@ -105,6 +107,8 @@ function main() {
   room.sim.player.fireCooldown = 0.125;
   room.sim.skills.deathBolt.points = 4;
   room.sim.necromancerRuntime.activeMode = "cantrip";
+  room.sim.necromancerRuntime.mimicTimer = 0;
+  room.sim.necromancerRuntime.mimicHealth = 0;
   room.sim.necromancerBeam.progress = 0.6;
   const syncedOwner = room.syncPrimaryActivePlayerFromSim();
   assert.equal(syncedOwner.gold, 456, "active state gold did not sync from primary sim");
@@ -112,6 +116,8 @@ function main() {
   assert.equal(syncedOwner.health, 44, "active state health did not sync from primary sim");
   assert.equal(syncedOwner.fireCooldown, 0.125, "active state cooldown did not sync from primary sim");
   assert.equal(syncedOwner.skills.deathBolt.points, 4, "active state skills did not sync from primary sim");
+  assert.equal(syncedOwner.necromancerRuntime.activeMode, "cantrip", "active state necromancer runtime mode did not sync from primary sim");
+  assert.equal(syncedOwner.necromancerRuntime.mimicTimer, 0, "active state necromancer mimic timer stayed stale after primary sim sync");
   assert.equal(syncedOwner.necromancerBeam.progress, 0.6, "active state beam did not sync from primary sim");
 
   const state = serializeState(room);
@@ -120,6 +126,7 @@ function main() {
   assertSnapshotFields(ownerSnapshot);
   assert.equal(ownerSnapshot.gold, 456, "serialized owner snapshot did not include active gold");
   assert.equal(ownerSnapshot.fireCooldown, 0.125, "serialized owner snapshot did not include cooldown");
+  assert.equal(ownerSnapshot.necromancerRuntime.mimicTimer, 0, "serialized owner snapshot kept stale mimic timer");
   assert.equal(ownerSnapshot.necromancerBeam.progress, 0.6, "serialized owner snapshot did not include beam state");
 
   const clientGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
@@ -129,6 +136,7 @@ function main() {
   assert.equal(clientGame.player.health, 44, "client health did not apply from player snapshot");
   assert.equal(clientGame.player.fireCooldown, 0.125, "client cooldown did not apply from player snapshot");
   assert.equal(clientGame.skills.deathBolt.points, 4, "client skills did not apply from player snapshot");
+  assert.equal(clientGame.necromancerRuntime.mimicTimer, 0, "client mimic timer did not clear from player snapshot");
   assert.equal(clientGame.necromancerBeam.progress, 0.6, "client beam did not apply from player snapshot");
 
   console.log(JSON.stringify({

@@ -1236,6 +1236,12 @@ if (typeof window !== "undefined") {
               y: enemy.y,
               hp: enemy.hp,
               maxHp: enemy.maxHp,
+              hpBarTimer: Number.isFinite(enemy.hpBarTimer) ? enemy.hpBarTimer : 0,
+              burningTimer: Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0,
+              curseTimer: Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0,
+              rotTimer: Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0,
+              burningDps: Number.isFinite(enemy.burningDps) ? enemy.burningDps : 0,
+              rotDps: Number.isFinite(enemy.rotDps) ? enemy.rotDps : 0,
               size: enemy.size || 0,
               distToPlayer: Math.hypot((enemy.x || 0) - playerX, (enemy.y || 0) - playerY),
               screenX: (enemy.x || 0) - camera.x,
@@ -1510,6 +1516,14 @@ if (typeof window !== "undefined") {
               projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
               recentProjectileReconcileRejects: Array.isArray(game.networkPerf.recentProjectileReconcileRejects)
                 ? game.networkPerf.recentProjectileReconcileRejects.slice(-8)
+                : [],
+              networkStateAnomalyEventId: game.networkPerf.networkStateAnomalyEventId || 0,
+              recentStateAnomalies: Array.isArray(game.networkPerf.recentStateAnomalies)
+                ? game.networkPerf.recentStateAnomalies.slice(-12).map((entry) => ({ ...entry }))
+                : [],
+              serverStateAnomalyEventId: game.networkPerf.serverStateAnomalyEventId || 0,
+              recentServerStateAnomalies: Array.isArray(game.networkPerf.recentServerStateAnomalies)
+                ? game.networkPerf.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry }))
                 : [],
               recentCorrections: Array.isArray(game.networkPerf.recentCorrections)
                 ? game.networkPerf.recentCorrections.slice(-8)
@@ -1892,6 +1906,7 @@ function startNetworkRenderLoop(game) {
     isNetworkController: () => hasLocalPrediction(game),
     getRenderDelayMs: () => getRenderDelayForRole(() => hasLocalPrediction(game), NET_RENDER_DELAY_MS_CONTROLLER, NET_RENDER_DELAY_MS_SPECTATOR),
     estimateServerNowMs: () => estimateServerNowMsFromState(netClockState),
+    getAckSeqForPacket: getAckSeqForMessage,
     consumeSnapshotForRender,
     netSnapshotBuffer,
     maxSnapshotBuffer: NET_MAX_SNAPSHOT_BUFFER,

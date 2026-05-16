@@ -16,6 +16,7 @@ import { handleLeaderboardApiRequest } from "./leaderboardApi.js";
 import { LeaderboardStore } from "./leaderboardStore.js";
 import { handleDevNetworkTelemetryRequest } from "./devNetworkTelemetryApi.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig, buildVoiceRoomConfig, resolveVoiceConfig } from "./net/voiceConfig.js";
+import { resetClientInputState } from "./net/clientInputQueue.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8090", 10);
 const HOST = typeof process.env.HOST === "string" && process.env.HOST.trim() ? process.env.HOST.trim() : "";
@@ -111,8 +112,13 @@ wss.on("connection", (ws) => {
     classType: "archer",
     protocolVersion: 1,
     input: makeDefaultInput(),
-    lastInputSeq: 0
+    inputQueue: [],
+    lastInputSeq: 0,
+    lastReceivedInputSeq: 0,
+    lastProcessedInputSeq: 0,
+    droppedInputCount: 0
   };
+  resetClientInputState(client, makeDefaultInput);
 
   safeSend(transport, {
     type: "hello",
@@ -132,6 +138,7 @@ wss.on("connection", (ws) => {
       normClassType,
       maxPeersPerRoom: MAX_PEERS_PER_ROOM,
       makeDefaultInput,
+      resetClientInputState,
       sanitizeInput,
       serializeState,
       buildJoinKeyframeState,

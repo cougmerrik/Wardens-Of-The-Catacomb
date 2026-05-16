@@ -1,5 +1,18 @@
 import { updateDebugHudFrameStats, updateDebugHudNetworkStats } from "./debugHudStats.js";
 
+export function stepNetworkEnemyPresentation(enemies, dt) {
+  if (!Array.isArray(enemies) || !Number.isFinite(dt) || dt <= 0) return;
+  for (const enemy of enemies) {
+    if (!enemy) continue;
+    enemy.hpBarTimer = Math.max(0, (Number.isFinite(enemy.hpBarTimer) ? enemy.hpBarTimer : 0) - dt);
+    enemy.burningTimer = Math.max(0, (Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0) - dt);
+    enemy.curseTimer = Math.max(0, (Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0) - dt);
+    enemy.rotTimer = Math.max(0, (Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0) - dt);
+    if (enemy.burningTimer <= 0) enemy.burningDps = 0;
+    if (enemy.rotTimer <= 0) enemy.rotDps = 0;
+  }
+}
+
 export function applyNetworkSnapshot({
   game,
   state,
@@ -42,6 +55,7 @@ export function startNetworkRenderLoopRuntime({
   isNetworkController,
   getRenderDelayMs,
   estimateServerNowMs,
+  getAckSeqForPacket,
   consumeSnapshotForRender,
   netSnapshotBuffer,
   maxSnapshotBuffer,
@@ -98,7 +112,10 @@ export function startNetworkRenderLoopRuntime({
         pkt?.state && typeof pkt.state === "object" && Number.isFinite(pkt.serverTime)
           ? { ...pkt.state, serverTime: pkt.serverTime }
           : pkt.state;
-      applySnapshot(game, stateWithServerTime, isNetworkController(), Number.isFinite(pkt.lastInputSeq) ? pkt.lastInputSeq : 0);
+      const ackSeq = typeof getAckSeqForPacket === "function"
+        ? getAckSeqForPacket(pkt)
+        : Number.isFinite(pkt.lastInputSeq) ? pkt.lastInputSeq : 0;
+      applySnapshot(game, stateWithServerTime, isNetworkController(), ackSeq);
     }
     if (isNetworkController()) {
       const input = collectInput(game, false);
@@ -139,6 +156,7 @@ export function startNetworkRenderLoopRuntime({
       }
     }
     game.floatingTexts = stepClientFloatingTexts(game.floatingTexts, dt);
+    if (!game.paused) stepNetworkEnemyPresentation(game.enemies, dt);
     if (typeof updatePredictedProjectiles === "function") updatePredictedProjectiles(game, netPredictedProjectiles, dt);
     if (typeof updateNetworkProjectilePresentation === "function") updateNetworkProjectilePresentation(game, dt);
     prunePredictedProjectiles(netPredictedProjectiles, performance.now(), predictedProjectileTtlMs, game, predictedProjectileRenderTtlMs);

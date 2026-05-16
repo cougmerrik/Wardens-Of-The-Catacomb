@@ -227,6 +227,36 @@ function buildSample(state, startedAtMs, previousPerf = {}) {
         afterY: numberOrNull(entry.afterY)
       }))
     : [];
+  const recentStateAnomalies = Array.isArray(perf.recentStateAnomalies)
+    ? perf.recentStateAnomalies.slice(-8).map((entry) => ({
+        id: numberOrNull(entry.id),
+        atMs: numberOrNull(entry.atMs),
+        kind: typeof entry.kind === "string" ? entry.kind : "",
+        keyframe: booleanOrNull(entry.keyframe),
+        ackSeq: numberOrNull(entry.ackSeq),
+        enemyCount: numberOrNull(entry.enemyCount),
+        tripleStatusCount: numberOrNull(entry.tripleStatusCount),
+        fullHpBarCount: numberOrNull(entry.fullHpBarCount),
+        localMimicTimer: numberOrNull(entry.localMimicTimer),
+        remoteMimicCount: numberOrNull(entry.remoteMimicCount),
+        remotePlayerIds: Array.isArray(entry.remotePlayerIds) ? entry.remotePlayerIds.slice(0, 6) : []
+      }))
+    : [];
+  const recentServerStateAnomalies = Array.isArray(perf.recentServerStateAnomalies)
+    ? perf.recentServerStateAnomalies.slice(-8).map((entry) => ({
+        id: numberOrNull(entry.id),
+        atMs: numberOrNull(entry.atMs),
+        snapshotSeq: numberOrNull(entry.snapshotSeq),
+        kind: typeof entry.kind === "string" ? entry.kind : "",
+        paused: booleanOrNull(entry.paused),
+        context: entry.context && typeof entry.context === "object" ? { ...entry.context } : null,
+        enemyCount: numberOrNull(entry.enemyCount),
+        tripleStatusCount: numberOrNull(entry.tripleStatusCount),
+        tripleStatusEnemies: Array.isArray(entry.tripleStatusEnemies) ? entry.tripleStatusEnemies.slice(0, 4) : [],
+        mimicPlayers: Array.isArray(entry.mimicPlayers) ? entry.mimicPlayers.slice(0, 4) : [],
+        classMismatches: Array.isArray(entry.classMismatches) ? entry.classMismatches.slice(0, 4) : []
+      }))
+    : [];
   return {
     kind: "sample",
     at: new Date().toISOString(),
@@ -275,6 +305,10 @@ function buildSample(state, startedAtMs, previousPerf = {}) {
     recentPostLoadCorrections,
     networkFlightEventId: numberOrNull(perf.networkFlightEventId),
     recentFlightEvents,
+    networkStateAnomalyEventId: numberOrNull(perf.networkStateAnomalyEventId),
+    recentStateAnomalies,
+    serverStateAnomalyEventId: numberOrNull(perf.serverStateAnomalyEventId),
+    recentServerStateAnomalies,
     hardSnapCount: numberOrNull(perf.hardSnapCount),
     softCorrectionCount: numberOrNull(perf.softCorrectionCount),
     settleCorrectionCount: numberOrNull(perf.settleCorrectionCount),

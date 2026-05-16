@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { GameSim } from "../src/sim/GameSim.js";
 import { applySnapshotToGame } from "../src/net/clientStateSync.js";
+import { rendererEffectsProjectileMethods } from "../src/rendering/rendererEffectsProjectileMethods.js";
 import { buildDeltaCollection } from "./net/deltaProtocol.js";
 import { serializeState } from "./net/stateSerialization.js";
 
@@ -22,6 +23,25 @@ function requireEntry(collection, predicate, label) {
   const entry = (Array.isArray(collection) ? collection : []).find(predicate);
   assert.ok(entry, `${label} missing`);
   return entry;
+}
+
+function createCaptureContext() {
+  const calls = [];
+  const gradient = { addColorStop() {} };
+  return {
+    calls,
+    save() { calls.push(["save"]); },
+    restore() { calls.push(["restore"]); },
+    beginPath() { calls.push(["beginPath"]); },
+    closePath() { calls.push(["closePath"]); },
+    moveTo(...args) { calls.push(["moveTo", ...args]); },
+    lineTo(...args) { calls.push(["lineTo", ...args]); },
+    arc(...args) { calls.push(["arc", ...args]); },
+    fill() { calls.push(["fill"]); },
+    stroke() { calls.push(["stroke"]); },
+    createRadialGradient() { return gradient; },
+    createLinearGradient() { return gradient; }
+  };
 }
 
 function main() {
@@ -79,8 +99,26 @@ function main() {
     executeProc: true,
     ownerId: "local-vfx"
   });
+  sim.enemies.push({
+    id: "mimic-vfx",
+    type: "mimic",
+    x: 300,
+    y: 260,
+    size: 20,
+    hp: 10,
+    maxHp: 10,
+    dormant: true,
+    revealed: false,
+    tongueDirX: -1,
+    tongueDirY: 0,
+    tongueLength: 12
+  });
 
   const state = serializeState(createRoom(sim));
+  const mimic = requireEntry(state.enemies, (entry) => entry.type === "mimic", "serialized mimic");
+  assert.equal(mimic.dormant, true, "mimic dormant state should survive serialization");
+  assert.equal(mimic.tongueDirX, -1, "mimic tongue direction should survive serialization");
+  assert.equal(mimic.tongueLength, 12, "mimic tongue length should survive serialization");
   const bullet = requireEntry(state.bullets, (entry) => entry.projectileType === "mage_fireBolt", "serialized mage projectile");
   assert.equal(bullet.damageType, "fire", "projectile damageType should survive serialization for renderer palette");
   assert.equal(bullet.critMultiplier, 1.5, "projectile critMultiplier should survive serialization");
@@ -110,8 +148,51 @@ function main() {
   assert.equal(swingDelta.spawn[0].style, "warWhip", "keyframe delta should preserve melee style");
   assert.equal(swingDelta.spawn[0].executeProc, true, "keyframe delta should preserve melee executeProc");
 
+  const enemyDeltaCache = new Map();
+  const enemyWithStatuses = {
+    id: "e_status",
+    type: "ghost",
+    x: 120,
+    y: 140,
+    size: 20,
+    hp: 6,
+    maxHp: 6,
+    burningTimer: 1.2,
+    burningDps: 3,
+    curseTimer: 2.5,
+    rotTimer: 4,
+    rotDps: 2
+  };
+  buildDeltaCollection(enemyDeltaCache, [enemyWithStatuses], true);
+  const statusClearDelta = buildDeltaCollection(enemyDeltaCache, [{
+    id: "e_status",
+    type: "ghost",
+    x: 122,
+    y: 140,
+    size: 20,
+    hp: 6,
+    maxHp: 6
+  }], false);
+  const clearPatch = statusClearDelta.update.find((entry) => entry.id === "e_status");
+  assert.equal(clearPatch.burningTimer, null, "enemy delta should explicitly clear expired burningTimer");
+  assert.equal(clearPatch.burningDps, null, "enemy delta should explicitly clear expired burningDps");
+  assert.equal(clearPatch.curseTimer, null, "enemy delta should explicitly clear expired curseTimer");
+  assert.equal(clearPatch.rotTimer, null, "enemy delta should explicitly clear expired rotTimer");
+  assert.equal(clearPatch.rotDps, null, "enemy delta should explicitly clear expired rotDps");
+
   const client = new GameSim({ classType: "fighter", viewportWidth: 960, viewportHeight: 640 });
   client.player.id = "local-vfx";
+  client.enemies = [{ ...enemyWithStatuses }];
+  applySnapshotToGame({
+    game: client,
+    state: { delta: { keyframe: false, enemies: statusClearDelta } },
+    controller: false,
+    localPlayerId: "local-vfx"
+  });
+  assert.equal(client.enemies[0]?.burningTimer, null, "client enemy should clear expired burningTimer from delta");
+  assert.equal(client.enemies[0]?.curseTimer, null, "client enemy should clear expired curseTimer from delta");
+  assert.equal(client.enemies[0]?.rotTimer, null, "client enemy should clear expired rotTimer from delta");
+
   applySnapshotToGame({
     game: client,
     state,
@@ -124,6 +205,40 @@ function main() {
   assert.equal(client.fireZones[0]?.size, 96, "client fire-zone should keep size after snapshot application");
   assert.equal(client.meleeSwings[0]?.style, "warWhip", "client melee swing should keep style after snapshot application");
   assert.equal(client.meleeSwings[0]?.executeProc, true, "client melee swing should keep executeProc after snapshot application");
+
+  const captureCtx = createCaptureContext();
+  const renderer = {
+    ctx: captureCtx,
+    config: { effects: { meleeSwingLife: 0.17 } },
+    drawMeleeSwing: rendererEffectsProjectileMethods.drawMeleeSwing
+  };
+  rendererEffectsProjectileMethods.drawProjectiles.call(renderer, {
+    player: { x: 900, y: 500 },
+    bullets: [],
+    fireArrows: [],
+    fireZones: [],
+    necromancerRuntime: { souls: [] },
+    time: 0,
+    meleeSwings: [{
+      x: 240,
+      y: 220,
+      angle: 0,
+      arc: Math.PI * 0.7,
+      range: 64,
+      life: 0.17,
+      maxLife: 0.17,
+      style: "broadswing"
+    }]
+  }, 0, 0);
+  assert.ok(
+    captureCtx.calls.some((call) => call[0] === "moveTo" && call[1] === 252 && call[2] === 220),
+    "melee swing handle should be anchored to swing origin, not local player"
+  );
+  assert.equal(
+    captureCtx.calls.some((call) => call[0] === "moveTo" && call[1] === 912 && call[2] === 500),
+    false,
+    "remote melee swing handle incorrectly anchored to local player"
+  );
 
   console.log(JSON.stringify({
     networkVfxSnapshots: "ok",

@@ -37,27 +37,32 @@ function percentile(values, pct) {
   return sorted[idx];
 }
 
-function summarizeSamples(samples) {
+function summarizeSampleGroups(groups) {
   const frameGaps = [];
   const movementSteps = [];
   const pendingInputs = [];
   const flightEvents = new Map();
   let travelled = 0;
   let firstMovementAtMs = null;
-  const start = samples[0] || null;
-  for (let i = 1; i < samples.length; i++) {
-    const prev = samples[i - 1];
-    const next = samples[i];
-    frameGaps.push(next.t - prev.t);
-    const dist = Math.hypot(next.x - prev.x, next.y - prev.y);
-    movementSteps.push(dist);
-    travelled += dist;
-    if (firstMovementAtMs === null && start && Math.hypot(next.x - start.x, next.y - start.y) >= 1.5) firstMovementAtMs = next.t;
-  }
-  for (const sample of samples) {
-    if (Number.isFinite(sample.pendingInputs)) pendingInputs.push(sample.pendingInputs);
-    for (const event of sample.flightEvents || []) {
-      if (event?.id != null) flightEvents.set(event.id, event);
+  const samples = [];
+  for (const group of groups) {
+    const list = Array.isArray(group) ? group : [];
+    samples.push(...list);
+    const start = list[0] || null;
+    for (let i = 1; i < list.length; i++) {
+      const prev = list[i - 1];
+      const next = list[i];
+      frameGaps.push(next.t - prev.t);
+      const dist = Math.hypot(next.x - prev.x, next.y - prev.y);
+      movementSteps.push(dist);
+      travelled += dist;
+      if (firstMovementAtMs === null && start && Math.hypot(next.x - start.x, next.y - start.y) >= 1.5) firstMovementAtMs = next.t;
+    }
+    for (const sample of list) {
+      if (Number.isFinite(sample.pendingInputs)) pendingInputs.push(sample.pendingInputs);
+      for (const event of sample.flightEvents || []) {
+        if (event?.id != null) flightEvents.set(event.id, event);
+      }
     }
   }
   const events = Array.from(flightEvents.values());
@@ -84,6 +89,10 @@ function summarizeSamples(samples) {
     flightPendingMax: Math.max(0, ...postLoadEvents.map((event) => event.pendingInputs || 0)),
     lastEvents: events.slice(-12)
   };
+}
+
+function summarizeSamples(samples) {
+  return summarizeSampleGroups([samples]);
 }
 
 async function openLobby(page, { wsUrl, roomId, playerName, classType }) {
@@ -228,7 +237,7 @@ async function main() {
     details.flightDump = flightDump;
     details.botTotals = botResult.totals;
 
-    const combined = summarizeSamples([...first.frames, ...second.frames]);
+    const combined = summarizeSampleGroups([first.frames, second.frames]);
     assert(botResult.totals.joined === BOT_COUNT, `expected ${BOT_COUNT} bots joined, got ${botResult.totals.joined}`);
     assert(botResult.totals.started === BOT_COUNT, `expected ${BOT_COUNT} bots started, got ${botResult.totals.started}`);
     assert(botResult.totals.errors === 0, `bot/server protocol errors: ${botResult.totals.errors}`);

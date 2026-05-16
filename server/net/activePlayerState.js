@@ -115,6 +115,8 @@ export function syncSimPrimaryPlayerStateForRoom(room) {
   room.sim.consumables = cloneConsumableInventoryState(state.consumables);
   room.sim.rangerRuntime = cloneRangerRuntimeState(state.rangerRuntime);
   room.sim.warriorRuntime = cloneWarriorRuntimeState(state.warriorRuntime);
+  room.sim.necromancerRuntime = cloneNecromancerRuntimeState(state.necromancerRuntime);
+  room.sim.player.necromancerRuntime = room.sim.necromancerRuntime;
   room.sim.player.consumableRuntime = {
     tempHp: Number.isFinite(state?.consumableRuntime?.tempHp) ? state.consumableRuntime.tempHp : 0
   };
@@ -150,6 +152,7 @@ export function syncPrimaryActivePlayerFromSimForRoom(room) {
   state.consumables = cloneConsumableInventoryState(room.sim.consumables);
   state.rangerRuntime = cloneRangerRuntimeState(room.sim.rangerRuntime);
   state.warriorRuntime = cloneWarriorRuntimeState(room.sim.warriorRuntime);
+  state.necromancerRuntime = cloneNecromancerRuntimeState(room.sim.necromancerRuntime);
   state.score = room.sim.score;
   state.gold = room.sim.gold;
   state.experience = room.sim.experience;

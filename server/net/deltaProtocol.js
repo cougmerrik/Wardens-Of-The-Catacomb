@@ -6,10 +6,11 @@ function shallowCloneEntry(entry) {
 function pickChangedFields(prev, next) {
   const patch = {};
   let changed = false;
-  for (const key of Object.keys(next)) {
+  const keys = new Set([...Object.keys(prev || {}), ...Object.keys(next || {})]);
+  for (const key of keys) {
     if (key === "id") continue;
     if (prev[key] !== next[key]) {
-      patch[key] = next[key];
+      patch[key] = Object.prototype.hasOwnProperty.call(next, key) ? next[key] : null;
       changed = true;
     }
   }

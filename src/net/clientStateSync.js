@@ -13,9 +13,11 @@ import {
 import {
   ensureNetworkPerf,
   isPostLoadCorrectionActive,
+  applyServerStateAnomalies,
   recordCorrection,
   recordNetworkFlightEvent,
-  recordPostLoadCorrection
+  recordPostLoadCorrection,
+  recordSuspiciousNetworkState
 } from "./clientCorrectionMetrics.js";
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
 export { applyMetaStateToGame } from "./clientSnapshotHelpers.js";
@@ -223,6 +225,7 @@ function applyDeltaCollection(target, delta, { keyframe = false, positionAlpha =
   for (const item of existing.values()) target.push(item);
   return target;
 }
+
 export function applySnapshotToGame({
   game,
   state,
@@ -238,6 +241,7 @@ export function applySnapshotToGame({
 }) {
   if (!state || typeof state !== "object") return { netPendingInputs, netLastAckSeq };
   applyMetaStateToGame(game, state);
+  applyServerStateAnomalies(game, state.serverStateAnomalies);
   const previousAliveById = new Map();
   if (game?.player?.id) previousAliveById.set(game.player.id, (game.player.alive !== false) && (game.player.health || 0) > 0);
   for (const player of Array.isArray(game?.remotePlayers) ? game.remotePlayers : []) {
@@ -448,6 +452,7 @@ export function applySnapshotToGame({
     game.fireZones = applyDeltaCollection(game.fireZones, state.delta.fireZones, { keyframe, positionAlpha: 1 });
     game.meleeSwings = applyDeltaCollection(game.meleeSwings, state.delta.meleeSwings, { keyframe, positionAlpha: 1 });
     synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: keyframe });
+    recordSuspiciousNetworkState(game, { keyframe, ackSeq });
   } else {
     game.armorStands = syncByIdLerp(game.armorStands, state.armorStands, 1);
     game.enemies = syncByIdLerp(game.enemies, state.enemies, snapAlpha);
@@ -460,6 +465,7 @@ export function applySnapshotToGame({
     game.fireZones = syncByIdLerp(game.fireZones, state.fireZones, 1);
     game.meleeSwings = syncByIdLerp(game.meleeSwings, state.meleeSwings, 1);
     synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: false });
+    recordSuspiciousNetworkState(game, { keyframe: false, ackSeq });
   }
 
   return { netPendingInputs, netLastAckSeq };

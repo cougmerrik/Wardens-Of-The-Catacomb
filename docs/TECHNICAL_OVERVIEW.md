@@ -114,6 +114,9 @@ This document summarizes the current high-level architecture and validation work
   - local-player prediction/reconciliation
   - map chunk readiness
   - projectile reconciliation
+- Server-side input handling queues incoming client inputs and promotes them into the authoritative simulation tick before snapshotting. Snapshot `lastInputSeqByPlayer` values mean "processed by the sim", not merely "received by the socket", so clients only discard predicted inputs after the authoritative state has actually consumed them.
+- Snapshot payloads also include per-player received-input sequence and server queue depth for diagnostics.
+- Delta snapshots send explicit `null` values when previously serialized optional fields disappear. This prevents stale client-side presentation state such as expired enemy burn/curse/rot timers from surviving until the next keyframe and creating false status icons or burning-enemy lights.
 - Network presentation is tuned to keep multiplayer close to single-player feel:
   - local controller movement remains predicted while authoritative snapshots reconcile position
   - stale large startup corrections are separated from post-load gameplay correction metrics
@@ -142,6 +145,7 @@ This document summarizes the current high-level architecture and validation work
   - regular frame/network state
   - frame spikes over the configured threshold
   - projectile reconciliation rejects with reason, seq, owner, projectile type, predicted/authoritative positions, and distance
+  - suspicious state markers such as enemy status fanout and visible player mimic runtime
   - render context such as viewport, canvas size, device pixel ratio, visibility/focus state, renderer mode, reduced-motion media flags, and observed frame cadence
 - Correction telemetry distinguishes lifetime floor-load synchronization from post-load gameplay corrections. This keeps unavoidable initial map/player adoption corrections from hiding actual in-play hard snaps or blocked corrections.
 - The network flight recorder keeps a bounded snapshot-application trail for multiplayer movement debugging. Each event records controller/local-controller state, ack sequence, pending input depth, jitter, frame gap, correction kind, total correction debt, applied correction step, and before/server/after positions.
@@ -251,6 +255,8 @@ This document summarizes the current high-level architecture and validation work
   - verifies local projectile prediction cadence, reconciliation, stale-prediction cleanup, and delta-merge behavior for networked ranged attacks
 - `validate:network-vfx-snapshots`
   - verifies multiplayer projectile, fire-zone, and melee-swing snapshots preserve renderer-facing VFX metadata through server serialization, keyframe deltas, and client snapshot application
+- `validate:network-state-corruption`
+  - reproduces stale player mimic runtime, enemy status fanout, mimic enemy presentation state, and render-stall status aging so multiplayer state corruption remains visible in validation and telemetry
 - `validate:network-smoothness`
   - verifies controller movement, peer-observed remote movement, active-tab frame cadence, post-load correction metrics, projectile visibility latency, held-primary shot cadence, and lingering projectile cleanup
 - `validate:network-rubberband-soak`

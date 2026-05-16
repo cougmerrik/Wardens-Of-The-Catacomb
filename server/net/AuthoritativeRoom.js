@@ -3,6 +3,13 @@ import { cloneNecromancerBeamState } from "./playerStateCloneHelpers.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
 import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
 import {
+  getInputQueueDepth,
+  getProcessedInputSeq,
+  getReceivedInputSeq,
+  promoteQueuedClientInput,
+  resetClientInputState
+} from "./clientInputQueue.js";
+import {
   createActivePlayerStateForRoom,
   createPlayerSimulationContextForRoom,
   syncActivePlayerStateFromContextForRoom,
@@ -45,6 +52,9 @@ export class AuthoritativeRoom {
     this.currentMusicTrack = this.options.chooseGameplayTrack();
     this.snapshotCounter = 0;
     this.snapshotSeq = 0;
+    this.serverStateAnomalyEventId = 0;
+    this.recentServerStateAnomalies = [];
+    this.lastServerStateAnomalySignature = "";
     this.telemetry = {
       tickDurationsMs: [],
       serializeDurationsMs: [],
@@ -246,6 +256,130 @@ export class AuthoritativeRoom {
     syncActivePlayerStateFromContextForRoom(state, context);
   }
 
+  trimServerStateAnomalies(limit = 48) {
+    if (this.recentServerStateAnomalies.length > limit) {
+      this.recentServerStateAnomalies.splice(0, this.recentServerStateAnomalies.length - limit);
+    }
+  }
+
+  getPlayerAuditRecords() {
+    const records = [];
+    const pushRecord = (source, player) => {
+      if (!player) return;
+      const id = typeof player.id === "string" ? player.id : "";
+      const client = id ? this.clients.get(id) : null;
+      records.push({
+        source,
+        id,
+        classType: typeof player.classType === "string" ? player.classType : "",
+        clientClassType: typeof client?.classType === "string" ? client.classType : "",
+        health: Number.isFinite(player.health) ? player.health : null,
+        alive: player.alive !== false && (!Number.isFinite(player.health) || player.health > 0),
+        mimicTimer: Number.isFinite(player.necromancerRuntime?.mimicTimer) ? player.necromancerRuntime.mimicTimer : 0,
+        mimicHealth: Number.isFinite(player.necromancerRuntime?.mimicHealth) ? player.necromancerRuntime.mimicHealth : 0
+      });
+    };
+    pushRecord("simPrimary", this.sim.player);
+    for (const state of this.activePlayers.values()) pushRecord("activePlayer", state);
+    return records;
+  }
+
+  collectServerStateAudit() {
+    const tripleStatusEnemies = [];
+    for (const enemy of Array.isArray(this.sim.enemies) ? this.sim.enemies : []) {
+      if (!enemy || (enemy.hp || 0) <= 0) continue;
+      const burningTimer = Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0;
+      const curseTimer = Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0;
+      const rotTimer = Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0;
+      if (!(burningTimer > 0 && curseTimer > 0 && rotTimer > 0)) continue;
+      tripleStatusEnemies.push({
+        id: this.options.getStableId(this, "enemy", "e", enemy),
+        type: typeof enemy.type === "string" ? enemy.type : "",
+        hp: Number.isFinite(enemy.hp) ? enemy.hp : null,
+        maxHp: Number.isFinite(enemy.maxHp) ? enemy.maxHp : null,
+        burningTimer,
+        curseTimer,
+        rotTimer,
+        burningDps: Number.isFinite(enemy.burningDps) ? enemy.burningDps : 0,
+        rotDps: Number.isFinite(enemy.rotDps) ? enemy.rotDps : 0
+      });
+    }
+
+    const players = this.getPlayerAuditRecords();
+    const mimicPlayers = players.filter((player) => player.mimicTimer > 0 || player.mimicHealth > 0);
+    const classMismatches = players.filter((player) =>
+      player.id &&
+      player.clientClassType &&
+      player.classType &&
+      player.classType !== player.clientClassType
+    );
+    const parts = [];
+    if (tripleStatusEnemies.length >= 3) {
+      parts.push(`enemyStatusFanout:${tripleStatusEnemies.map((enemy) => enemy.id).join(",")}`);
+    }
+    if (mimicPlayers.length > 0) {
+      parts.push(`playerMimicRuntimeVisible:${mimicPlayers.map((player) => `${player.source}:${player.id}:${Math.round(player.mimicTimer * 10)}`).join(",")}`);
+    }
+    if (classMismatches.length > 0) {
+      parts.push(`playerClassMismatch:${classMismatches.map((player) => `${player.source}:${player.id}:${player.classType}->${player.clientClassType}`).join(",")}`);
+    }
+    return {
+      signature: parts.join("|"),
+      tripleStatusEnemies,
+      mimicPlayers,
+      classMismatches
+    };
+  }
+
+  recordServerStateAnomaly(kind, details = {}) {
+    this.serverStateAnomalyEventId += 1;
+    const event = {
+      id: this.serverStateAnomalyEventId,
+      atMs: Date.now(),
+      snapshotSeq: this.snapshotSeq,
+      phase: this.phase,
+      paused: !!this.sim.paused,
+      kind,
+      controllerId: this.pauseOwnerId || null,
+      lastInputSeqByPlayer: this.getLastInputSeqByPlayer(),
+      inputQueueDepthByPlayer: this.getInputQueueDepthByPlayer(),
+      ...details
+    };
+    this.recentServerStateAnomalies.push(event);
+    this.trimServerStateAnomalies();
+    return event;
+  }
+
+  auditServerState(context = {}) {
+    const audit = this.collectServerStateAudit();
+    if (!audit.signature || audit.signature === this.lastServerStateAnomalySignature) return null;
+    this.lastServerStateAnomalySignature = audit.signature;
+    const kind = audit.tripleStatusEnemies.length >= 3
+      ? "enemyStatusFanout"
+      : audit.mimicPlayers.length > 0
+      ? "playerMimicRuntimeVisible"
+      : "playerClassMismatch";
+    return this.recordServerStateAnomaly(kind, {
+      context,
+      signature: audit.signature,
+      enemyCount: Array.isArray(this.sim.enemies) ? this.sim.enemies.length : 0,
+      tripleStatusCount: audit.tripleStatusEnemies.length,
+      tripleStatusEnemies: audit.tripleStatusEnemies.slice(0, 8),
+      mimicPlayers: audit.mimicPlayers.slice(0, 8),
+      classMismatches: audit.classMismatches.slice(0, 8)
+    });
+  }
+
+  clearQueuedCombatInputFlags(clients = this.clients.values()) {
+    for (const client of clients) {
+      if (!client?.input) continue;
+      client.input.swapAttackQueued = false;
+      client.input.firePrimaryQueued = false;
+      client.input.fireAltQueued = false;
+      client.input.modeSwapQueued = false;
+    }
+  }
+
   beamHasLineOfSight(x0, y0, x1, y1) {
     const dx = x1 - x0;
     const dy = y1 - y0;
@@ -440,7 +574,13 @@ export class AuthoritativeRoom {
     };
     const result = fn(context, state);
     this.syncActivePlayerStateFromContext(state, context);
-    this.tagNewProjectilesForPlayer(beforeCounts, clientId, this.clients.get(clientId)?.lastInputSeq || 0);
+    this.tagNewProjectilesForPlayer(beforeCounts, clientId, getProcessedInputSeq(this.clients.get(clientId)));
+    this.auditServerState({
+      source: "activePlayerAction",
+      playerId: clientId,
+      classType: state.classType,
+      processedInputSeq: getProcessedInputSeq(this.clients.get(clientId))
+    });
     return result;
   }
 
@@ -616,7 +756,23 @@ export class AuthoritativeRoom {
   getLastInputSeqByPlayer() {
     const out = {};
     for (const client of this.clients.values()) {
-      out[client.id] = Number.isFinite(client.lastInputSeq) ? client.lastInputSeq : 0;
+      out[client.id] = getProcessedInputSeq(client);
+    }
+    return out;
+  }
+
+  getLastReceivedInputSeqByPlayer() {
+    const out = {};
+    for (const client of this.clients.values()) {
+      out[client.id] = getReceivedInputSeq(client);
+    }
+    return out;
+  }
+
+  getInputQueueDepthByPlayer() {
+    const out = {};
+    for (const client of this.clients.values()) {
+      out[client.id] = getInputQueueDepth(client);
     }
     return out;
   }
@@ -682,6 +838,7 @@ export class AuthoritativeRoom {
     if (this.requestedStartFloor > 1 && typeof this.sim.applyDebugStartingFloor === "function") {
       this.sim.applyDebugStartingFloor(this.requestedStartFloor);
     }
+    for (const client of this.clients.values()) resetClientInputState(client, this.options.makeDefaultInput);
     this.initializeActivePlayers();
     this.completedRunPlayers.clear();
     this.finalResults = null;
@@ -726,6 +883,9 @@ export class AuthoritativeRoom {
     this.lastSnapshotPortalActive = null;
     this.snapshotCounter = 0;
     this.snapshotSeq = 0;
+    this.serverStateAnomalyEventId = 0;
+    this.recentServerStateAnomalies = [];
+    this.lastServerStateAnomalySignature = "";
     this.deltaCache = {
       enemies: new Map(),
       drops: new Map(),
@@ -762,8 +922,7 @@ export class AuthoritativeRoom {
       wallTrap: new WeakMap()
     };
     for (const client of this.clients.values()) {
-      client.input = this.options.makeDefaultInput();
-      client.lastInputSeq = 0;
+      resetClientInputState(client, this.options.makeDefaultInput);
       client.lastSnapshotAckSeq = 0;
       client.classLocked = false;
     }
@@ -844,6 +1003,10 @@ export class AuthoritativeRoom {
     return client.input;
   }
 
+  promoteQueuedClientInputs() {
+    for (const client of this.clients.values()) promoteQueuedClientInput(client);
+  }
+
   updateClientLobbyState(clientId, { classType, locked } = {}) {
     const client = this.clients.get(clientId);
     if (!client) return false;
@@ -889,7 +1052,6 @@ export class AuthoritativeRoom {
       return;
     }
     this.sim.activePlayerCount = Math.max(1, this.clients.size);
-    if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     this.tickDriftSampleCounter += 1;
     if (Number.isFinite(scheduleDriftMs)) {
       if (scheduleDriftMs > this.options.tickDriftEpsilonMs) {
@@ -905,10 +1067,30 @@ export class AuthoritativeRoom {
       }
     }
     const t0 = this.options.monotonicNowMs();
+    const rawDt = Number.isFinite(nowMs) && Number.isFinite(this.lastTickMs)
+      ? (nowMs - this.lastTickMs) / 1000
+      : 0;
+    const dt = Math.min(Math.max(rawDt, 0), 0.05);
+    if (rawDt < -0.001) {
+      this.recordServerStateAnomaly("negativeTickDelta", {
+        context: {
+          source: "tickClock",
+          rawDtMs: Math.round(rawDt * 1000),
+          previousTickMs: this.lastTickMs,
+          nowMs
+        }
+      });
+    }
+    this.lastTickMs = nowMs;
+    this.promoteQueuedClientInputs();
+    if (this.sim.paused && !this.sim.gameOver) {
+      this.clearQueuedCombatInputFlags();
+      this.options.pushTelemetrySample(this.telemetry.tickDurationsMs, this.options.monotonicNowMs() - t0);
+      return;
+    }
+    if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     const preBulletCount = this.sim.bullets.length;
     const preFireArrowCount = this.sim.fireArrows.length;
-    const dt = Math.min((nowMs - this.lastTickMs) / 1000, 0.05);
-    this.lastTickMs = nowMs;
     const previousFloor = Number.isFinite(this.sim.floor) ? this.sim.floor : null;
     this.sim.networkActivePlayers = this.getSimulationPlayerEntities();
     this.sim.tick(dt, this.getControllerInput());
@@ -924,7 +1106,7 @@ export class AuthoritativeRoom {
     }
     if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     const controllerClient = this.clients.get(this.pauseOwnerId);
-    const taggedSeq = controllerClient ? controllerClient.input?.seq || controllerClient.lastInputSeq || 0 : 0;
+    const taggedSeq = getProcessedInputSeq(controllerClient);
     const ownerId = this.pauseOwnerId || null;
     for (let i = preBulletCount; i < this.sim.bullets.length; i++) {
       const bullet = this.sim.bullets[i];
@@ -939,12 +1121,14 @@ export class AuthoritativeRoom {
       if (!(Number.isFinite(fireArrow.spawnSeq) && fireArrow.spawnSeq > 0)) fireArrow.spawnSeq = taggedSeq;
       if (!(typeof fireArrow.ownerId === "string" && fireArrow.ownerId)) fireArrow.ownerId = ownerId;
     }
-    if (controllerClient) {
-      controllerClient.input.swapAttackQueued = false;
-      controllerClient.input.firePrimaryQueued = false;
-      controllerClient.input.fireAltQueued = false;
-      controllerClient.input.modeSwapQueued = false;
-    }
+    if (controllerClient) this.clearQueuedCombatInputFlags([controllerClient]);
+    this.auditServerState({
+      source: "tick",
+      dtMs: Math.round(dt * 1000),
+      rawDtMs: Math.round(rawDt * 1000),
+      controllerId: this.pauseOwnerId || null,
+      processedInputSeq: getProcessedInputSeq(controllerClient)
+    });
     this.options.pushTelemetrySample(this.telemetry.tickDurationsMs, this.options.monotonicNowMs() - t0);
   }
 
@@ -1111,6 +1295,10 @@ export class AuthoritativeRoom {
     const controllerClient = this.clients.get(this.pauseOwnerId);
     const serializeStart = this.options.monotonicNowMs();
     const fullState = this.options.serializeState(this);
+    this.auditServerState({
+      source: "snapshot",
+      force: !!force
+    });
     this.options.pushTelemetrySample(this.telemetry.serializeDurationsMs, this.options.monotonicNowMs() - serializeStart);
     this.snapshotCounter += 1;
     this.snapshotSeq += 1;
@@ -1154,6 +1342,7 @@ export class AuthoritativeRoom {
       time: fullState.time,
       player: fullState.player,
       players: fullState.players,
+      serverStateAnomalies: this.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry })),
       delta
     };
     if (keyframe || floorStateChanged) state.floor = fullState.floor;
@@ -1173,8 +1362,10 @@ export class AuthoritativeRoom {
       ownerId: this.roomOwnerId,
       pauseOwnerId: this.pauseOwnerId,
       controllerId: this.pauseOwnerId,
-      lastInputSeq: controllerClient ? controllerClient.lastInputSeq : 0,
+      lastInputSeq: getProcessedInputSeq(controllerClient),
       lastInputSeqByPlayer: this.getLastInputSeqByPlayer(),
+      lastReceivedInputSeqByPlayer: this.getLastReceivedInputSeqByPlayer(),
+      inputQueueDepthByPlayer: this.getInputQueueDepthByPlayer(),
       mapSignature: sig,
       state
     });

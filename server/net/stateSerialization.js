@@ -153,6 +153,13 @@ function serializeEnemy(room, e) {
     case "treasure_goblin":
       base.goldEaten = e.goldEaten || 0;
       break;
+    case "mimic":
+      base.dormant = !!e.dormant;
+      base.revealed = !!e.revealed;
+      base.tongueDirX = e.tongueDirX;
+      base.tongueDirY = e.tongueDirY;
+      base.tongueLength = e.tongueLength || 0;
+      break;
     default:
       break;
   }

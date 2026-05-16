@@ -29,6 +29,12 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               y: enemy.y,
               hp: enemy.hp,
               maxHp: enemy.maxHp,
+              hpBarTimer: Number.isFinite(enemy.hpBarTimer) ? enemy.hpBarTimer : 0,
+              burningTimer: Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0,
+              curseTimer: Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0,
+              rotTimer: Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0,
+              burningDps: Number.isFinite(enemy.burningDps) ? enemy.burningDps : 0,
+              rotDps: Number.isFinite(enemy.rotDps) ? enemy.rotDps : 0,
               size: enemy.size || 0,
               distToPlayer: Math.hypot((enemy.x || 0) - playerX, (enemy.y || 0) - playerY),
               screenX: (enemy.x || 0) - camera.x,
@@ -295,6 +301,14 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
               recentProjectileReconcileRejects: Array.isArray(game.networkPerf.recentProjectileReconcileRejects)
                 ? game.networkPerf.recentProjectileReconcileRejects.slice(-8).map((entry) => ({ ...entry }))
+                : [],
+              networkStateAnomalyEventId: game.networkPerf.networkStateAnomalyEventId || 0,
+              recentStateAnomalies: Array.isArray(game.networkPerf.recentStateAnomalies)
+                ? game.networkPerf.recentStateAnomalies.slice(-12).map((entry) => ({ ...entry }))
+                : [],
+              serverStateAnomalyEventId: game.networkPerf.serverStateAnomalyEventId || 0,
+              recentServerStateAnomalies: Array.isArray(game.networkPerf.recentServerStateAnomalies)
+                ? game.networkPerf.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry }))
                 : []
             }
           : null,
