@@ -16,6 +16,7 @@ import {
   recordCorrection,
   recordPostLoadCorrection
 } from "./clientCorrectionMetrics.js";
+import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
 export { applyMetaStateToGame } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
@@ -363,84 +364,8 @@ export function applySnapshotToGame({
         game.player.x += dx * 0.05;
         game.player.y += dy * 0.05;
       }
-      game.player.health = snapshotPlayer.health;
-      game.player.maxHealth = snapshotPlayer.maxHealth;
-      if (Number.isFinite(snapshotPlayer.fireCooldown)) game.player.fireCooldown = snapshotPlayer.fireCooldown;
-      if (Number.isFinite(snapshotPlayer.fireArrowCooldown)) game.player.fireArrowCooldown = snapshotPlayer.fireArrowCooldown;
-      if (Number.isFinite(snapshotPlayer.deathBoltCooldown)) game.player.deathBoltCooldown = snapshotPlayer.deathBoltCooldown;
-      if (Number.isFinite(snapshotPlayer.hitCooldown)) game.player.hitCooldown = snapshotPlayer.hitCooldown;
-      if (Number.isFinite(snapshotPlayer.hpBarTimer)) game.player.hpBarTimer = snapshotPlayer.hpBarTimer;
-      game.player.classType = snapshotPlayer.classType;
-      if (typeof snapshotPlayer.classType === "string" && game.config?.classes?.[snapshotPlayer.classType]) {
-        game.classType = snapshotPlayer.classType;
-        game.classSpec = game.config.classes[snapshotPlayer.classType];
-      }
-      if (!isNetworkController) {
-        if (Number.isFinite(snapshotPlayer.dirX)) game.player.dirX = snapshotPlayer.dirX;
-        if (Number.isFinite(snapshotPlayer.dirY)) game.player.dirY = snapshotPlayer.dirY;
-        if (Number.isFinite(snapshotPlayer.facing)) game.player.facing = snapshotPlayer.facing;
-      }
     }
-    if (Number.isFinite(snapshotPlayer.level)) game.level = snapshotPlayer.level;
-    if (Number.isFinite(snapshotPlayer.score)) game.score = snapshotPlayer.score;
-    if (Number.isFinite(snapshotPlayer.gold)) game.gold = snapshotPlayer.gold;
-    if (Number.isFinite(snapshotPlayer.experience)) game.experience = snapshotPlayer.experience;
-    if (Number.isFinite(snapshotPlayer.expToNextLevel)) game.expToNextLevel = snapshotPlayer.expToNextLevel;
-    if (Number.isFinite(snapshotPlayer.skillPoints)) game.skillPoints = snapshotPlayer.skillPoints;
-    if (Number.isFinite(snapshotPlayer.refundCount)) game.refundCount = snapshotPlayer.refundCount;
-    if (Number.isFinite(snapshotPlayer.levelWeaponDamageBonus)) game.levelWeaponDamageBonus = snapshotPlayer.levelWeaponDamageBonus;
-    if (Number.isFinite(snapshotPlayer.lanternFuel)) game.player.lanternFuel = snapshotPlayer.lanternFuel;
-    if (Number.isFinite(snapshotPlayer.warriorMomentumTimer)) game.warriorMomentumTimer = snapshotPlayer.warriorMomentumTimer;
-    if (Number.isFinite(snapshotPlayer.warriorRageActiveTimer)) game.warriorRageActiveTimer = snapshotPlayer.warriorRageActiveTimer;
-    if (Number.isFinite(snapshotPlayer.warriorRageCooldownTimer)) game.warriorRageCooldownTimer = snapshotPlayer.warriorRageCooldownTimer;
-    if (Number.isFinite(snapshotPlayer.warriorRageVictoryRushPool)) game.warriorRageVictoryRushPool = snapshotPlayer.warriorRageVictoryRushPool;
-    if (Number.isFinite(snapshotPlayer.warriorRageVictoryRushTimer)) game.warriorRageVictoryRushTimer = snapshotPlayer.warriorRageVictoryRushTimer;
-    if (snapshotPlayer.necromancerBeam && typeof snapshotPlayer.necromancerBeam === "object") {
-      game.necromancerBeam = {
-        ...(game.necromancerBeam && typeof game.necromancerBeam === "object" ? game.necromancerBeam : {}),
-        ...snapshotPlayer.necromancerBeam
-      };
-    } else if (game.necromancerBeam && typeof game.necromancerBeam === "object") {
-      game.necromancerBeam.active = false;
-      game.necromancerBeam.targetId = null;
-      game.necromancerBeam.progress = 0;
-    }
-    if (snapshotPlayer.skills && typeof snapshotPlayer.skills === "object") game.skills = syncNamedObject(game.skills, snapshotPlayer.skills);
-    if (snapshotPlayer.rangerTalents && typeof snapshotPlayer.rangerTalents === "object") {
-      game.rangerTalents = syncNamedObject(game.rangerTalents, snapshotPlayer.rangerTalents);
-      if (game.player) game.player.rangerTalents = game.rangerTalents;
-    }
-    if (snapshotPlayer.warriorTalents && typeof snapshotPlayer.warriorTalents === "object") {
-      game.warriorTalents = syncNamedObject(game.warriorTalents, snapshotPlayer.warriorTalents);
-      if (game.player) game.player.warriorTalents = game.warriorTalents;
-    }
-    if (snapshotPlayer.necromancerTalents && typeof snapshotPlayer.necromancerTalents === "object") {
-      game.necromancerTalents = syncNamedObject(game.necromancerTalents, snapshotPlayer.necromancerTalents);
-      if (game.player) game.player.necromancerTalents = game.necromancerTalents;
-    }
-    if (snapshotPlayer.rangerRuntime && typeof snapshotPlayer.rangerRuntime === "object") {
-      game.rangerRuntime = syncNamedObject(game.rangerRuntime, snapshotPlayer.rangerRuntime);
-      if (game.player) game.player.rangerRuntime = game.rangerRuntime;
-    }
-    if (snapshotPlayer.warriorRuntime && typeof snapshotPlayer.warriorRuntime === "object") {
-      game.warriorRuntime = syncNamedObject(game.warriorRuntime, snapshotPlayer.warriorRuntime);
-      if (game.player) game.player.warriorRuntime = game.warriorRuntime;
-    }
-    if (snapshotPlayer.necromancerRuntime && typeof snapshotPlayer.necromancerRuntime === "object") {
-      game.necromancerRuntime = syncNamedObject(game.necromancerRuntime, snapshotPlayer.necromancerRuntime);
-      if (game.player) game.player.necromancerRuntime = game.necromancerRuntime;
-    }
-    if (snapshotPlayer.upgrades && typeof snapshotPlayer.upgrades === "object") game.upgrades = syncNamedObject(game.upgrades, snapshotPlayer.upgrades);
-    if (snapshotPlayer.consumableRuntime && typeof snapshotPlayer.consumableRuntime === "object") {
-      game.player.consumableRuntime = syncNamedObject(game.player.consumableRuntime, snapshotPlayer.consumableRuntime);
-    }
-    if (snapshotPlayer.consumables && typeof snapshotPlayer.consumables === "object") {
-      game.consumables = syncNamedObject(game.consumables, snapshotPlayer.consumables);
-    }
-    if (typeof snapshotPlayer.classType === "string" && game.config?.classes?.[snapshotPlayer.classType]) {
-      game.classType = snapshotPlayer.classType;
-      game.classSpec = game.config.classes[snapshotPlayer.classType];
-    }
+    applyPlayerSnapshotToGameState(game, snapshotPlayer, { isNetworkController, syncNamedObject });
   }
   syncRemotePlayers(game, state, localPlayerId, 0.72, syncByIdLerp);
   queuePlayerDeathNotifications(game, previousAliveById, snapshotPlayer, game.remotePlayers);

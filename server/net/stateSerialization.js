@@ -1,93 +1,4 @@
-function shallowPlayerState(simPlayer) {
-  return {
-    x: simPlayer.x,
-    y: simPlayer.y,
-    size: simPlayer.size,
-    health: simPlayer.health,
-    maxHealth: simPlayer.maxHealth,
-    hpBarTimer: simPlayer.hpBarTimer || 0,
-    level: simPlayer.level,
-    score: simPlayer.score,
-    gold: simPlayer.gold,
-    experience: simPlayer.experience,
-    expToNextLevel: simPlayer.expToNextLevel,
-    skillPoints: simPlayer.skillPoints,
-    refundCount: simPlayer.refundCount,
-    levelWeaponDamageBonus: simPlayer.levelWeaponDamageBonus,
-    lanternFuel: simPlayer.lanternFuel,
-    skills: simPlayer.skills,
-    rangerTalents: simPlayer.rangerTalents,
-    warriorTalents: simPlayer.warriorTalents,
-    necromancerTalents: simPlayer.necromancerTalents,
-    rangerRuntime: simPlayer.rangerRuntime,
-    warriorRuntime: simPlayer.warriorRuntime,
-    necromancerRuntime: simPlayer.necromancerRuntime,
-    consumableRuntime: simPlayer.consumableRuntime,
-    consumables: simPlayer.consumables,
-    upgrades: simPlayer.upgrades,
-    dirX: simPlayer.dirX,
-    dirY: simPlayer.dirY,
-    facing: simPlayer.facing,
-    classType: simPlayer.classType
-  };
-}
-
-function shallowActivePlayerState(player) {
-  return {
-    id: player.id,
-    handle: player.handle,
-    classType: player.classType,
-    x: player.x,
-    y: player.y,
-    size: player.size,
-    health: player.health,
-    maxHealth: player.maxHealth,
-    hpBarTimer: player.hpBarTimer || 0,
-    level: player.level,
-    score: player.score,
-    gold: player.gold,
-    experience: player.experience,
-    expToNextLevel: player.expToNextLevel,
-    skillPoints: player.skillPoints,
-    refundCount: player.refundCount,
-    levelWeaponDamageBonus: player.levelWeaponDamageBonus,
-    lanternFuel: player.lanternFuel,
-    fireCooldown: player.fireCooldown,
-    fireArrowCooldown: player.fireArrowCooldown,
-    deathBoltCooldown: player.deathBoltCooldown,
-    warriorMomentumTimer: player.warriorMomentumTimer,
-    warriorRageActiveTimer: player.warriorRageActiveTimer,
-    warriorRageCooldownTimer: player.warriorRageCooldownTimer,
-    warriorRageVictoryRushPool: player.warriorRageVictoryRushPool,
-    warriorRageVictoryRushTimer: player.warriorRageVictoryRushTimer,
-    necromancerBeam: player.necromancerBeam
-      ? {
-          active: !!player.necromancerBeam.active,
-          targetId: typeof player.necromancerBeam.targetId === "string" ? player.necromancerBeam.targetId : null,
-          targetX: Number.isFinite(player.necromancerBeam.targetX) ? player.necromancerBeam.targetX : 0,
-          targetY: Number.isFinite(player.necromancerBeam.targetY) ? player.necromancerBeam.targetY : 0,
-          progress: Number.isFinite(player.necromancerBeam.progress) ? player.necromancerBeam.progress : 0
-        }
-      : null,
-    skills: player.skills,
-    rangerTalents: player.rangerTalents,
-    warriorTalents: player.warriorTalents,
-    necromancerTalents: player.necromancerTalents,
-    upgrades: player.upgrades,
-    consumableRuntime: player.consumableRuntime,
-    consumables: player.consumables,
-    rangerRuntime: player.rangerRuntime,
-    warriorRuntime: player.warriorRuntime,
-    necromancerRuntime: player.necromancerRuntime,
-    dirX: player.dirX,
-    dirY: player.dirY,
-    facing: player.facing,
-    moving: !!player.moving,
-    alive: player.alive !== false,
-    spectateTargetId: typeof player.spectateTargetId === "string" ? player.spectateTargetId : "",
-    color: player.color
-  };
-}
+import { createActivePlayerSnapshot, createPlayerSnapshot } from "../../src/net/playerSnapshotSchema.js";
 
 function resolveControlledEnemyColor(room, enemy) {
   const ownerId = typeof enemy?.controllerPlayerId === "string" && enemy.controllerPlayerId ? enemy.controllerPlayerId : null;
@@ -371,8 +282,8 @@ export function serializeState(room) {
     floor: sim.floor,
     biomeKey: sim.biomeKey,
     floorBoss,
-    player: shallowPlayerState(primaryPlayer),
-    players: activePlayers.map((player) => shallowActivePlayerState(player)),
+    player: createPlayerSnapshot(primaryPlayer),
+    players: activePlayers.map((player) => createActivePlayerSnapshot(player)),
     door: { ...sim.door },
     pickup: { ...sim.pickup },
     portal: sim.portal ? { ...sim.portal } : null,
