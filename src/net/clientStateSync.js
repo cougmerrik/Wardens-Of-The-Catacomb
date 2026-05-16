@@ -14,6 +14,7 @@ import {
   ensureNetworkPerf,
   isPostLoadCorrectionActive,
   recordCorrection,
+  recordNetworkFlightEvent,
   recordPostLoadCorrection
 } from "./clientCorrectionMetrics.js";
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
@@ -249,6 +250,17 @@ export function applySnapshotToGame({
   const snapshotPlayer = snapshotLocalPlayer || state.player;
 
   if (snapshotPlayer && typeof snapshotPlayer === "object") {
+    const beforeFlightX = Number.isFinite(game.player?.x) ? game.player.x : null;
+    const beforeFlightY = Number.isFinite(game.player?.y) ? game.player.y : null;
+    const serverFlightX = Number.isFinite(snapshotPlayer.x) ? snapshotPlayer.x : null;
+    const serverFlightY = Number.isFinite(snapshotPlayer.y) ? snapshotPlayer.y : null;
+    let flightCorrectionKind = "none";
+    let flightCorrectionPx = serverFlightX !== null && serverFlightY !== null && beforeFlightX !== null && beforeFlightY !== null
+      ? Math.hypot(serverFlightX - beforeFlightX, serverFlightY - beforeFlightY)
+      : 0;
+    let flightAppliedPx = 0;
+    let flightPendingDepth = Array.isArray(netPendingInputs) ? netPendingInputs.length : 0;
+    let flightPostLoadActive = false;
     if (!controller) {
       Object.assign(game.player, snapshotPlayer);
     } else {
@@ -294,6 +306,7 @@ export function applySnapshotToGame({
       const jitterMs = Number.isFinite(snapshotJitterMs) ? Math.max(0, snapshotJitterMs) : 0;
       const frameGap = Number.isFinite(frameGapMs) ? Math.max(0, frameGapMs) : 16.67;
       const pendingDepth = Array.isArray(netPendingInputs) ? netPendingInputs.length : 0;
+      flightPendingDepth = pendingDepth;
       const jitterFactor = Math.max(0, Math.min(2.5, jitterMs / 8));
       const gapFactor = Math.max(0, Math.min(2, (frameGap - 16.67) / 20));
       const pendingFactor = Math.max(0, Math.min(1.5, pendingDepth / 60));
@@ -307,6 +320,7 @@ export function applySnapshotToGame({
           ? !game.isPositionWalkable(game.player.x, game.player.y, localPlayerRadius, true)
           : false;
       const postLoadCorrectionActive = isPostLoadCorrectionActive(game, { controller, ackSeq, isInitialControllerSync });
+      flightPostLoadActive = postLoadCorrectionActive;
       if (postLoadCorrectionActive) {
         game.networkPerf.postLoadLastCorrectionPx = errorDist;
         if (errorDist > (game.networkPerf.postLoadMaxCorrectionPx || 0)) {
@@ -315,7 +329,10 @@ export function applySnapshotToGame({
       }
       game.networkPerf.lastCorrectionPx = errorDist;
       if (errorDist > game.networkPerf.maxCorrectionPx) game.networkPerf.maxCorrectionPx = errorDist;
+      flightCorrectionPx = errorDist;
       if (isInitialControllerSync || localPlayerBlocked || errorDist > hardSnapDist) {
+        flightCorrectionKind = localPlayerBlocked ? "blockedHardSnap" : "hardSnap";
+        flightAppliedPx = errorDist;
         game.networkPerf.hardSnapCount += 1;
         if (postLoadCorrectionActive) game.networkPerf.postLoadHardSnapCount += 1;
         if (localPlayerBlocked) game.networkPerf.blockedSnapCount += 1;
@@ -324,21 +341,22 @@ export function applySnapshotToGame({
           ackSeq,
           pendingInputs: netPendingInputs,
           extra: {
-          correctedX: Math.round(correctedX),
-          correctedY: Math.round(correctedY)
+            correctedX: Math.round(correctedX),
+            correctedY: Math.round(correctedY)
           }
         });
         recordPostLoadCorrection(game, postLoadCorrectionActive, localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
           ackSeq,
           pendingDepth,
           extra: {
-          correctedX: Math.round(correctedX),
-          correctedY: Math.round(correctedY)
+            correctedX: Math.round(correctedX),
+            correctedY: Math.round(correctedY)
           }
         });
         game.player.x = correctedX;
         game.player.y = correctedY;
       } else if (ackSeq > 0 && errorDist > softSnapDist) {
+        flightCorrectionKind = "softCorrection";
         game.networkPerf.softCorrectionCount += 1;
         if (postLoadCorrectionActive) game.networkPerf.postLoadSoftCorrectionCount += 1;
         recordCorrection(game, "softCorrection", errorDist, { ackSeq, pendingInputs: netPendingInputs });
@@ -351,12 +369,15 @@ export function applySnapshotToGame({
         const blend = (baseBlend + (maxBlend - baseBlend) * errorNorm) * jitterDamping;
         const maxStep = Math.max(settleDist, errorDist * 0.34);
         const step = Math.min(maxStep, errorDist * blend);
+        flightAppliedPx = step;
         if (errorDist > 0.0001) {
           const inv = 1 / errorDist;
           game.player.x += dx * inv * step;
           game.player.y += dy * inv * step;
         }
       } else if (ackSeq > 0 && errorDist > settleDist) {
+        flightCorrectionKind = "settleCorrection";
+        flightAppliedPx = errorDist * 0.05;
         game.networkPerf.settleCorrectionCount += 1;
         if (postLoadCorrectionActive) game.networkPerf.postLoadSettleCorrectionCount += 1;
         recordCorrection(game, "settleCorrection", errorDist, { ackSeq, pendingInputs: netPendingInputs });
@@ -366,6 +387,27 @@ export function applySnapshotToGame({
       }
     }
     applyPlayerSnapshotToGameState(game, snapshotPlayer, { isNetworkController, syncNamedObject });
+    recordNetworkFlightEvent(game, "snapshotApply", {
+      snapshotCount: game.networkPerf.appliedSnapshotCount || 0,
+      controller: !!controller,
+      localController: !!isNetworkController,
+      initialSync: isInitialControllerSync,
+      postLoadActive: flightPostLoadActive,
+      keyframe: !!state?.delta?.keyframe,
+      ackSeq: Number.isFinite(ackSeq) ? ackSeq : 0,
+      pendingInputs: flightPendingDepth,
+      jitterMs: Number.isFinite(snapshotJitterMs) ? Math.round(snapshotJitterMs) : 0,
+      frameGapMs: Number.isFinite(frameGapMs) ? Math.round(frameGapMs) : 0,
+      correctionKind: flightCorrectionKind,
+      correctionPx: Math.round(flightCorrectionPx),
+      appliedPx: Math.round(flightAppliedPx),
+      beforeX: beforeFlightX === null ? null : Math.round(beforeFlightX),
+      beforeY: beforeFlightY === null ? null : Math.round(beforeFlightY),
+      serverX: serverFlightX === null ? null : Math.round(serverFlightX),
+      serverY: serverFlightY === null ? null : Math.round(serverFlightY),
+      afterX: Number.isFinite(game.player?.x) ? Math.round(game.player.x) : null,
+      afterY: Number.isFinite(game.player?.y) ? Math.round(game.player.y) : null
+    });
   }
   syncRemotePlayers(game, state, localPlayerId, 0.72, syncByIdLerp);
   queuePlayerDeathNotifications(game, previousAliveById, snapshotPlayer, game.remotePlayers);

@@ -121,7 +121,11 @@ This document summarizes the current high-level architecture and validation work
   - predicted arrows render faintly and expire visually before their reconciliation records are discarded
   - authoritative arrows are culled from the network presentation path after their lifetime expires
   - delta snapshot merging skips reconciled predicted arrows so matched local projectiles are not reinserted as stale artifacts
+  - projectile, fire-zone, and melee-swing snapshots preserve renderer metadata such as damage type, doctrine, style, modifier, execute state, and visual timing fields so multiplayer effects use the same renderer branches as local play
+  - replicated player rigs use serialized cooldown state for attack/cast pulse instead of rendering remote players with a static rig pose
 - The authoritative room still keeps one primary `sim.player` path for the pause owner, but snapshots now also serialize a `players` collection for all active participants.
+- Authoritative player-state copying lives in `server/net/activePlayerState.js`; keep new multiplayer player fields there instead of duplicating mappings inside `AuthoritativeRoom`.
+- Player snapshot DTO fields live in `src/net/playerSnapshotSchema.js`; server serialization and client snapshot application both use this schema to reduce single-player/multiplayer state drift.
 - The client runtime resolves the local player out of `state.players`, keeps remote players in `game.remotePlayers`, and renders/interpolates them separately from the local predicted avatar.
 - The network render/runtime path now reads the active `netClient` dynamically instead of capturing a stale pre-connect reference, which keeps multiplayer UI actions working after live room join.
 - The browser debug surface in `game.js` now exposes enough live state for Playwright-based network validation and perf harnesses.
@@ -140,6 +144,8 @@ This document summarizes the current high-level architecture and validation work
   - projectile reconciliation rejects with reason, seq, owner, projectile type, predicted/authoritative positions, and distance
   - render context such as viewport, canvas size, device pixel ratio, visibility/focus state, renderer mode, reduced-motion media flags, and observed frame cadence
 - Correction telemetry distinguishes lifetime floor-load synchronization from post-load gameplay corrections. This keeps unavoidable initial map/player adoption corrections from hiding actual in-play hard snaps or blocked corrections.
+- The network flight recorder keeps a bounded snapshot-application trail for multiplayer movement debugging. Each event records controller/local-controller state, ack sequence, pending input depth, jitter, frame gap, correction kind, total correction debt, applied correction step, and before/server/after positions.
+- `window.__WOTC_DEBUG__.run("dumpNetworkFlightRecorder")` returns recent flight events plus correction tails so Playwright harnesses and manual captures can inspect the same data.
 - The network smoothness validator records matching browser/render context so manual 30 FPS reports can be compared against automated active-tab 60 FPS runs.
 
 ### Optional Agora Voice
@@ -234,6 +240,8 @@ This document summarizes the current high-level architecture and validation work
 - `validate:network-combat-hit`
   - measures attack emission, enemy HP confirmation, and floating-text confirmation in browser play
   - now uses reliable target-selection and repositioning so misses on drifting enemies do not masquerade as combat-feedback regressions
+- `validate:player-state-sync`
+  - verifies authoritative active-player adapter round trips, serialized active-player snapshot fields, and client snapshot application for player build/runtime state
 - `validate:network-shared-rewards`
   - verifies authoritative two-player XP/gold reward sharing and master-volume output scaling
 - `validate:network-archer`
@@ -241,8 +249,13 @@ This document summarizes the current high-level architecture and validation work
   - now retries moving-shot samples and records skipped attempts so authoritative-visibility timing noise does not make the suite flaky
 - `validate:network-projectiles`
   - verifies local projectile prediction cadence, reconciliation, stale-prediction cleanup, and delta-merge behavior for networked ranged attacks
+- `validate:network-vfx-snapshots`
+  - verifies multiplayer projectile, fire-zone, and melee-swing snapshots preserve renderer-facing VFX metadata through server serialization, keyframe deltas, and client snapshot application
 - `validate:network-smoothness`
   - verifies controller movement, peer-observed remote movement, active-tab frame cadence, post-load correction metrics, projectile visibility latency, held-primary shot cadence, and lingering projectile cleanup
+- `validate:network-rubberband-soak`
+  - runs one browser-controlled player plus five WebSocket bots against a loopback server, then fails on post-load hard snaps, correction debt, applied correction step, movement discontinuity, and pending-input backlog budgets
+  - writes success/failure artifacts under `artifacts/network/` with flight-recorder events, movement summaries, bot totals, debug state, and a screenshot on failure
 - `validate:network-floor-movement`
   - verifies each class can load floor 1 in multiplayer, move after load, pause/resume, tick lantern fuel, see enemies, keep the canvas visible, and continue control after pause-owner death transfer
 - `validate:dev-network-telemetry`

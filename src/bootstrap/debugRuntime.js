@@ -288,6 +288,10 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               recentPostLoadCorrections: Array.isArray(game.networkPerf.recentPostLoadCorrections)
                 ? game.networkPerf.recentPostLoadCorrections.slice(-8).map((entry) => ({ ...entry }))
                 : [],
+              networkFlightEventId: game.networkPerf.networkFlightEventId || 0,
+              recentFlightEvents: Array.isArray(game.networkPerf.recentFlightEvents)
+                ? game.networkPerf.recentFlightEvents.slice(-24).map((entry) => ({ ...entry }))
+                : [],
               projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
               recentProjectileReconcileRejects: Array.isArray(game.networkPerf.recentProjectileReconcileRejects)
                 ? game.networkPerf.recentProjectileReconcileRejects.slice(-8).map((entry) => ({ ...entry }))
@@ -379,6 +383,16 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
         torch.lit = data?.lit !== false;
         if (torch.lit) torch.snuffCooldown = 0;
         return { ok: true, id: torch.id || null, lit: torch.lit };
+      }
+      if (command === "dumpNetworkFlightRecorder") {
+        const perf = game.networkPerf && typeof game.networkPerf === "object" ? game.networkPerf : {};
+        return {
+          ok: true,
+          eventId: Number.isFinite(perf.networkFlightEventId) ? perf.networkFlightEventId : 0,
+          events: Array.isArray(perf.recentFlightEvents) ? perf.recentFlightEvents.map((entry) => ({ ...entry })) : [],
+          corrections: Array.isArray(perf.recentCorrections) ? perf.recentCorrections.map((entry) => ({ ...entry })) : [],
+          postLoadCorrections: Array.isArray(perf.recentPostLoadCorrections) ? perf.recentPostLoadCorrections.map((entry) => ({ ...entry })) : []
+        };
       }
       return { ok: false, error: "unknownCommand" };
     }

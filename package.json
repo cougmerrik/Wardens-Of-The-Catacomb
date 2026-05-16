@@ -51,6 +51,7 @@
     "validate:network-floor-movement": "node server/validate-network-floor-movement.js",
     "validate:network-projectiles": "node server/validate-network-projectile-prediction.js",
     "validate:network-smoothness": "node server/validate-network-smoothness.js",
+    "validate:network-rubberband-soak": "node server/validate-network-rubberband-soak.js",
     "validate:dev-network-telemetry": "node server/validate-dev-network-telemetry.js",
     "validate:mobile-transport": "node server/validate-mobile-transport-defaults.js",
     "validate:network-framework": "node server/validate-network-framework-evaluation.js",

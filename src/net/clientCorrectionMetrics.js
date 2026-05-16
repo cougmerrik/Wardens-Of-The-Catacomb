@@ -22,7 +22,9 @@ export function ensureNetworkPerf(game) {
     postLoadSettleCorrectionCount: 0,
     postLoadBlockedSnapCount: 0,
     recentPostLoadCorrections: [],
-    recentCorrections: []
+    recentCorrections: [],
+    networkFlightEventId: 0,
+    recentFlightEvents: []
   };
   return game.networkPerf;
 }
@@ -71,6 +73,21 @@ export function recordCorrection(game, kind, errorDist, { ackSeq, pendingInputs,
     ...extra
   });
   trimRecent(perf.recentCorrections);
+}
+
+export function recordNetworkFlightEvent(game, kind, details = {}) {
+  const perf = ensureNetworkPerf(game);
+  if (!Array.isArray(perf.recentFlightEvents)) perf.recentFlightEvents = [];
+  perf.networkFlightEventId = Math.max(0, Number.isFinite(perf.networkFlightEventId) ? Math.floor(perf.networkFlightEventId) : 0) + 1;
+  const event = {
+    id: perf.networkFlightEventId,
+    atMs: nowMs(),
+    kind,
+    ...details
+  };
+  perf.recentFlightEvents.push(event);
+  trimRecent(perf.recentFlightEvents, 96);
+  return event;
 }
 
 export function recordPostLoadCorrection(game, active, kind, errorPx, { ackSeq, pendingDepth, extra = {} } = {}) {

@@ -201,6 +201,32 @@ function buildSample(state, startedAtMs, previousPerf = {}) {
         correctedY: numberOrNull(entry.correctedY)
       }))
     : [];
+  const recentFlightEvents = Array.isArray(perf.recentFlightEvents)
+    ? perf.recentFlightEvents.slice(-8).map((entry) => ({
+        id: numberOrNull(entry.id),
+        atMs: numberOrNull(entry.atMs),
+        kind: typeof entry.kind === "string" ? entry.kind : "",
+        snapshotCount: numberOrNull(entry.snapshotCount),
+        controller: booleanOrNull(entry.controller),
+        localController: booleanOrNull(entry.localController),
+        initialSync: booleanOrNull(entry.initialSync),
+        postLoadActive: booleanOrNull(entry.postLoadActive),
+        keyframe: booleanOrNull(entry.keyframe),
+        ackSeq: numberOrNull(entry.ackSeq),
+        pendingInputs: numberOrNull(entry.pendingInputs),
+        jitterMs: numberOrNull(entry.jitterMs),
+        frameGapMs: numberOrNull(entry.frameGapMs),
+        correctionKind: typeof entry.correctionKind === "string" ? entry.correctionKind : "",
+        correctionPx: numberOrNull(entry.correctionPx),
+        appliedPx: numberOrNull(entry.appliedPx),
+        beforeX: numberOrNull(entry.beforeX),
+        beforeY: numberOrNull(entry.beforeY),
+        serverX: numberOrNull(entry.serverX),
+        serverY: numberOrNull(entry.serverY),
+        afterX: numberOrNull(entry.afterX),
+        afterY: numberOrNull(entry.afterY)
+      }))
+    : [];
   return {
     kind: "sample",
     at: new Date().toISOString(),
@@ -247,6 +273,8 @@ function buildSample(state, startedAtMs, previousPerf = {}) {
     postLoadSettleCorrectionCount: numberOrNull(perf.postLoadSettleCorrectionCount),
     postLoadBlockedSnapCount: numberOrNull(perf.postLoadBlockedSnapCount),
     recentPostLoadCorrections,
+    networkFlightEventId: numberOrNull(perf.networkFlightEventId),
+    recentFlightEvents,
     hardSnapCount: numberOrNull(perf.hardSnapCount),
     softCorrectionCount: numberOrNull(perf.softCorrectionCount),
     settleCorrectionCount: numberOrNull(perf.settleCorrectionCount),

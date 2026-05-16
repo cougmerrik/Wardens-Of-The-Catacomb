@@ -1133,6 +1133,16 @@ if (typeof window !== "undefined") {
       if (torch.lit) torch.snuffCooldown = 0;
       return { ok: true, id: torch.id || null, lit: torch.lit };
     }
+    if (action === "dumpNetworkFlightRecorder") {
+      const perf = game.networkPerf && typeof game.networkPerf === "object" ? game.networkPerf : {};
+      return {
+        ok: true,
+        eventId: Number.isFinite(perf.networkFlightEventId) ? perf.networkFlightEventId : 0,
+        events: Array.isArray(perf.recentFlightEvents) ? perf.recentFlightEvents.map((entry) => ({ ...entry })) : [],
+        corrections: Array.isArray(perf.recentCorrections) ? perf.recentCorrections.map((entry) => ({ ...entry })) : [],
+        postLoadCorrections: Array.isArray(perf.recentPostLoadCorrections) ? perf.recentPostLoadCorrections.map((entry) => ({ ...entry })) : []
+      };
+    }
     if (action === "setPaused") {
       game.paused = payload.paused === true;
       if (!game.paused && game.input) {
@@ -1490,6 +1500,10 @@ if (typeof window !== "undefined") {
               postLoadBlockedSnapCount: game.networkPerf.postLoadBlockedSnapCount || 0,
               recentPostLoadCorrections: Array.isArray(game.networkPerf.recentPostLoadCorrections)
                 ? game.networkPerf.recentPostLoadCorrections.slice(-8)
+                : [],
+              networkFlightEventId: game.networkPerf.networkFlightEventId || 0,
+              recentFlightEvents: Array.isArray(game.networkPerf.recentFlightEvents)
+                ? game.networkPerf.recentFlightEvents.slice(-24).map((entry) => ({ ...entry }))
                 : [],
               lastReplayMode: game.networkPerf.lastReplayMode || "",
               lastPredictionPressure: game.networkPerf.lastPredictionPressure || null,
