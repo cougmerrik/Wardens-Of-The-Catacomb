@@ -52,6 +52,7 @@ These instructions apply to the whole repository.
 - Prefer focused validation first, then broader validation before staging or commit.
 - Run `npm run validate:core` for quick syntax and LOC checks.
 - Run feature-specific validators when touching gameplay, networking, rendering, or validation harnesses.
+- When adding or changing gameplay statuses, progression effects, floating text, damage indicators, summons, class procs, or other player-visible combat feedback, update targeted validation so local and multiplayer presentation remain in sync.
 - Add or update unit-style validation when behavior changes. If a suitable test does not exist, create the smallest appropriate validator.
 - Rerun failed validations after fixes. If a test appears flaky, improve the logging or assertions before treating it as flaky.
 - Run `node server/run-validation-suite.js closeout` before staging large branch work or preparing a PR.
@@ -95,6 +96,7 @@ These instructions apply to the whole repository.
 - Keep lantern fuel bounded in the `0..1` range and synchronized through network state.
 - Keep gameplay state changes separate from renderer-only presentation when feasible.
 - Keep networked gameplay state serializable and validated when adding mechanics that affect multiplayer.
+- Keep local and multiplayer presentation parity for gameplay feedback. Status icons, floating text, damage/kill indicators, progression notifications, and class-effect notifications should share behavior unless a local-only exception is intentional and documented.
 
 ## Code Review
 
