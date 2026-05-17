@@ -1,4 +1,15 @@
 import { GameSim } from "../../src/sim/GameSim.js";
+import {
+  getNecromancerBlackCandleCursedBeamBonus,
+  getNecromancerBeamDamageMultiplier,
+  getNecromancerBeamPulseRateMultiplier,
+  getNecromancerCurseDuration,
+  getNecromancerDeathBoltMasteryTempHpOnKill,
+  getNecromancerTempHpCap,
+  getNecromancerVigorBeamDamageMultiplier,
+  hasNecromancerBlightstorm,
+  isNecromancerTalentGame
+} from "../../src/game/necromancerTalentTree.js";
 import { cloneNecromancerBeamState } from "./playerStateCloneHelpers.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
 import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
@@ -16,6 +27,7 @@ import {
   syncPrimaryActivePlayerFromSimForRoom,
   syncSimPrimaryPlayerStateForRoom
 } from "./activePlayerState.js";
+import { applyRemoteActionAimToContext, getRemoteActionAimVector } from "./remoteActionAim.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -417,6 +429,8 @@ export class AuthoritativeRoom {
     const held = !!input.firePrimaryHeld && !!input.hasAim;
     const beamRange = (this.sim.config?.necromancer?.controlRangeTiles || 10) * (this.sim.config?.map?.tile || 32);
     const beamWidth = Number.isFinite(this.sim.config?.necromancer?.beamWidth) ? this.sim.config.necromancer.beamWidth : 11;
+    const offensiveBeamEnabled = isNecromancerTalentGame(context);
+    const beamDamagePeriod = 1.0 / getNecromancerBeamPulseRateMultiplier(context);
     beam.active = held;
     beam.targetId = null;
     beam.targetEnemy = null;
@@ -474,7 +488,9 @@ export class AuthoritativeRoom {
         invalidTarget = enemy;
         invalidTargetDist = distToAim;
       }
-      if (!context.isUndeadEnemy(enemy)) continue;
+      const validCharmTarget = context.isUndeadEnemy(enemy) && !(enemy.isBoss || enemy.isFloorBoss);
+      const validBeamTarget = validCharmTarget || offensiveBeamEnabled;
+      if (!validBeamTarget) continue;
       if (distToAim < bestTargetDist) {
         bestTarget = enemy;
         bestTargetDist = distToAim;
@@ -484,7 +500,8 @@ export class AuthoritativeRoom {
     if (
       !hitBreakable &&
       invalidTarget &&
-      (!context.isUndeadEnemy(invalidTarget) || (!context.isControlledUndead(invalidTarget) && !context.canControlMoreUndead(state)))
+      (!context.isUndeadEnemy(invalidTarget) || (!context.isControlledUndead(invalidTarget) && !context.canControlMoreUndead(state))) &&
+      !offensiveBeamEnabled
     ) {
       beam.active = false;
       beam.progress = 0;
@@ -497,11 +514,20 @@ export class AuthoritativeRoom {
     const canTarget =
       !!bestTarget &&
       context.isUndeadEnemy(bestTarget) &&
+      !(bestTarget.isBoss || bestTarget.isFloorBoss) &&
       (context.isControlledUndead(bestTarget)
         ? context.getControlledUndeadOwnerId(bestTarget) === state.id
         : context.canControlMoreUndead(state));
 
-    if (!canTarget) {
+    if (!bestTarget) {
+      beam.progress = 0;
+      beam.healTickTimer = 0;
+      beam.mode = "idle";
+      this.syncActivePlayerStateFromContext(state, context);
+      return beam.active;
+    }
+
+    if (!canTarget && !offensiveBeamEnabled) {
       beam.progress = 0;
       beam.healTickTimer = 0;
       beam.mode = "idle";
@@ -522,15 +548,59 @@ export class AuthoritativeRoom {
         beam.healTickTimer -= healPeriod;
         context.healControlledUndead(bestTarget, context.getNecroticBeamHealAmount());
       }
-    } else {
+    } else if (canTarget) {
       beam.mode = "charm";
       beam.healTickTimer = 0;
       bestTarget.charmLocked = true;
       beam.progress += Math.max(0, Number.isFinite(dt) ? dt : 0);
       if (beam.progress >= context.getNecromancerCharmDurationForPlayer(state)) {
         if (context.markUndeadAsControlled(bestTarget, state)) {
+          if (!(state.necromancerTalents?.necromancerPath?.points || 0)) {
+            bestTarget.tempMageCharmTimer = 5;
+            bestTarget.dieWhenCharmEnds = true;
+          }
           beam.progress = 0;
           context.spawnFloatingText(bestTarget.x, bestTarget.y - bestTarget.size * 0.7, "Charmed", "#8eb8ff", 0.9, 14);
+        }
+      }
+    } else if (offensiveBeamEnabled) {
+      const firstDamageDelay = 0.2;
+      if (beam.mode !== "offense") beam.healTickTimer = Math.max(0, beamDamagePeriod - firstDamageDelay);
+      beam.mode = "offense";
+      beam.progress = 0;
+      beam.healTickTimer = (beam.healTickTimer || 0) + Math.max(0, Number.isFinite(dt) ? dt : 0);
+      while (beam.healTickTimer >= beamDamagePeriod) {
+        beam.healTickTimer -= beamDamagePeriod;
+        const damage =
+          context.getDeathBoltBaseDamage() *
+          0.27 *
+          getNecromancerBeamDamageMultiplier(context) *
+          (1 + getNecromancerBlackCandleCursedBeamBonus(context, bestTarget)) *
+          getNecromancerVigorBeamDamageMultiplier(context);
+        const hpBefore = Number.isFinite(bestTarget.hp) ? bestTarget.hp : 0;
+        context.applyEnemyDamage(bestTarget, damage, "necrotic", state.id || null);
+        const dealt = Math.max(0, hpBefore - Math.max(0, Number.isFinite(bestTarget.hp) ? bestTarget.hp : 0));
+        if (dealt > 0) {
+          const runtime = context.necromancerRuntime || (context.necromancerRuntime = {});
+          const cap = Math.max(0, (state.maxHealth || 0) * 0.15);
+          const gain = Math.max(0.25, dealt * 0.2);
+          runtime.tempHp = Math.min(cap, Math.max(0, Number.isFinite(runtime.tempHp) ? runtime.tempHp : 0) + gain);
+          if (typeof context.markPlayerHealthBarVisible === "function") context.markPlayerHealthBarVisible();
+        }
+        if (hasNecromancerBlightstorm(context)) {
+          bestTarget.curseTimer = Math.max(bestTarget.curseTimer || 0, getNecromancerCurseDuration(context));
+        }
+        if (hpBefore > 0 && (bestTarget.hp || 0) <= 0) {
+          const tempHpGain = getNecromancerDeathBoltMasteryTempHpOnKill(context);
+          if (tempHpGain > 0) {
+            const runtime = context.necromancerRuntime || (context.necromancerRuntime = {});
+            const cap = getNecromancerTempHpCap(context, state);
+            runtime.tempHp = Math.min(cap, Math.max(0, Number.isFinite(runtime.tempHp) ? runtime.tempHp : 0) + tempHpGain);
+            if (typeof context.markPlayerHealthBarVisible === "function") context.markPlayerHealthBarVisible();
+            if (typeof context.spawnFloatingText === "function") {
+              context.spawnFloatingText(state.x, state.y - 34, `+${tempHpGain} THP`, "#9edcff", 0.7, 13);
+            }
+          }
         }
       }
     }
@@ -561,12 +631,13 @@ export class AuthoritativeRoom {
     }
   }
 
-  performActionForActivePlayer(clientId, fn) {
+  performActionForActivePlayer(clientId, fn, input = null) {
     if (!clientId || typeof fn !== "function") return false;
     const state = this.activePlayers.get(clientId);
     if (!state || state.alive === false || (state.health || 0) <= 0) return false;
     const context = this.createPlayerSimulationContext(state);
     if (!context) return false;
+    applyRemoteActionAimToContext(context, state, input);
     const beforeCounts = {
       bullets: this.sim.bullets.length,
       fireArrows: this.sim.fireArrows.length,
@@ -687,26 +758,23 @@ export class AuthoritativeRoom {
       const mode = state.necromancerRuntime?.activeMode === "spell" ? "spell" : "cantrip";
       if (mode === "cantrip" && cantrip === "necroticBeamCantrip") this.processRemoteNecromancerBeam(state, input, dt);
       else if (wantsPrimary) {
+        const aim = getRemoteActionAimVector(state, input);
         this.performActionForActivePlayer(client.id, (context) => {
-          if (typeof context.fire !== "function") return false;
-          context.fire(state.dirX || 1, state.dirY || 0);
-          return true;
-        });
+          return typeof context.fire === "function" && (context.fire(aim.dx, aim.dy), true);
+        }, input);
       }
     } else if (wantsPrimary) {
+      const aim = getRemoteActionAimVector(state, input);
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.fire !== "function") return false;
-        context.fire(state.dirX || 1, state.dirY || 0);
-        return true;
-      });
+        return typeof context.fire === "function" && (context.fire(aim.dx, aim.dy), true);
+      }, input);
     }
     if (!input.fireAltQueued) return;
     if (state.classType === "archer") {
+      const aim = getRemoteActionAimVector(state, input);
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.fireFireArrow !== "function") return false;
-        context.fireFireArrow(state.dirX || 1, state.dirY || 0);
-        return true;
-      });
+        return typeof context.fireFireArrow === "function" && (context.fireFireArrow(aim.dx, aim.dy), true);
+      }, input);
       return;
     }
     if (state.classType === "fighter") {
@@ -717,10 +785,10 @@ export class AuthoritativeRoom {
       return;
     }
     if (state.classType === "necromancer") {
+      const aim = getRemoteActionAimVector(state, input);
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.activateMageClassSkill !== "function") return false;
-        return context.activateMageClassSkill(state.dirX || 1, state.dirY || 0);
-      });
+        return typeof context.activateMageClassSkill === "function" && context.activateMageClassSkill(aim.dx, aim.dy);
+      }, input);
     }
   }
 
@@ -1345,6 +1413,7 @@ export class AuthoritativeRoom {
       serverStateAnomalies: this.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry })),
       delta
     };
+    if (Array.isArray(fullState.floatingTexts) && fullState.floatingTexts.length > 0) state.floatingTexts = fullState.floatingTexts;
     if (keyframe || floorStateChanged) state.floor = fullState.floor;
     if (keyframe || bossPhaseChanged) state.floorBoss = fullState.floorBoss;
     if (keyframe || doorStateChanged) state.door = fullState.door;
@@ -1369,6 +1438,7 @@ export class AuthoritativeRoom {
       mapSignature: sig,
       state
     });
+    if (Array.isArray(this.sim.networkFloatingTextEvents)) this.sim.networkFloatingTextEvents.length = 0;
     this.lastSnapshotMs = nowMs;
     this.maybeBroadcastMeta(nowMs);
     return true;

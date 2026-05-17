@@ -1,6 +1,8 @@
 import {
   applyMetaStateToGame,
+  applyNetworkFloatingTextEvents,
   captureEnemyStateById,
+  capturePlayerProgressById,
   createProjectileSpawnReconciler,
   findSnapshotLocalPlayer,
   getPredictionPressure,
@@ -8,7 +10,9 @@ import {
   syncFloorBossState,
   syncNamedObject,
   syncRemotePlayers,
-  synthesizeEnemyDamageFloatingTexts
+  synthesizeDespawnDamageFloatingTexts,
+  synthesizeEnemyDamageFloatingTexts,
+  synthesizePlayerProgressionFloatingTexts
 } from "./clientSnapshotHelpers.js";
 import {
   ensureNetworkPerf,
@@ -247,6 +251,7 @@ export function applySnapshotToGame({
   for (const player of Array.isArray(game?.remotePlayers) ? game.remotePlayers : []) {
     if (player?.id) previousAliveById.set(player.id, (player.alive !== false) && (player.health || 0) > 0);
   }
+  const previousProgressById = capturePlayerProgressById(game);
   ensureNetworkPerf(game);
   game.networkPerf.appliedSnapshotCount += 1;
   const isInitialControllerSync = !!controller && ackSeq <= 0 && !!state?.delta?.keyframe;
@@ -414,7 +419,9 @@ export function applySnapshotToGame({
     });
   }
   syncRemotePlayers(game, state, localPlayerId, 0.72, syncByIdLerp);
+  applyNetworkFloatingTextEvents(game, state.floatingTexts);
   queuePlayerDeathNotifications(game, previousAliveById, snapshotPlayer, game.remotePlayers);
+  synthesizePlayerProgressionFloatingTexts(game, previousProgressById, snapshotPlayer, game.remotePlayers);
   if (typeof game.updateSpectateTarget === "function") game.updateSpectateTarget();
 
   if (state.door && typeof state.door === "object") game.door = { ...state.door };
@@ -432,6 +439,7 @@ export function applySnapshotToGame({
   });
   if (state.delta && typeof state.delta === "object") {
     const keyframe = !!state.delta.keyframe;
+    const enemyDespawns = Array.isArray(state.delta.enemies?.despawn) ? state.delta.enemies.despawn.slice() : [];
     game.enemies = applyDeltaCollection(game.enemies, state.delta.enemies, { keyframe, positionAlpha: snapAlpha });
     game.drops = applyDeltaCollection(game.drops, state.delta.drops, { keyframe, positionAlpha: snapAlpha });
     game.lightSources = applyDeltaCollection(game.lightSources, state.delta.lightSources, { keyframe, positionAlpha: 1 });
@@ -451,7 +459,8 @@ export function applySnapshotToGame({
     });
     game.fireZones = applyDeltaCollection(game.fireZones, state.delta.fireZones, { keyframe, positionAlpha: 1 });
     game.meleeSwings = applyDeltaCollection(game.meleeSwings, state.delta.meleeSwings, { keyframe, positionAlpha: 1 });
-    synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: keyframe });
+    synthesizeDespawnDamageFloatingTexts(game, previousEnemyStateById, enemyDespawns, { skip: keyframe });
+    synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: false });
     recordSuspiciousNetworkState(game, { keyframe, ackSeq });
   } else {
     game.armorStands = syncByIdLerp(game.armorStands, state.armorStands, 1);

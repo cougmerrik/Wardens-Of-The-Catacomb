@@ -107,6 +107,23 @@ function serializeMeleeSwing(room, s) {
   return payload;
 }
 
+function serializeFloatingTextEvent(event) {
+  if (!event || typeof event !== "object" || typeof event.id !== "string" || !event.id) return null;
+  const x = Number.isFinite(event.x) ? event.x : null;
+  const y = Number.isFinite(event.y) ? event.y : null;
+  if (x === null || y === null) return null;
+  return {
+    id: event.id,
+    x,
+    y,
+    text: String(event.text ?? ""),
+    color: typeof event.color === "string" && event.color ? event.color : "#ffffff",
+    life: Number.isFinite(event.life) ? event.life : 0.75,
+    size: Number.isFinite(event.size) ? event.size : 14,
+    vy: Number.isFinite(event.vy) ? event.vy : 22
+  };
+}
+
 function serializeEnemy(room, e) {
   const base = {
     id: getStableId(room, "enemy", "e", e),
@@ -133,6 +150,18 @@ function serializeEnemy(room, e) {
   if (Number.isFinite(e.rotDps) && e.rotDps > 0) base.rotDps = e.rotDps;
   if (Number.isFinite(e.burningTimer) && e.burningTimer > 0) base.burningTimer = e.burningTimer;
   if (Number.isFinite(e.burningDps) && e.burningDps > 0) base.burningDps = e.burningDps;
+  if (Number.isFinite(e.slowTimer) && e.slowTimer > 0) base.slowTimer = e.slowTimer;
+  if (Number.isFinite(e.slowPct) && e.slowPct > 0) base.slowPct = e.slowPct;
+  if (Number.isFinite(e.poisonSlowTimer) && e.poisonSlowTimer > 0) base.poisonSlowTimer = e.poisonSlowTimer;
+  if (Number.isFinite(e.confusionTimer) && e.confusionTimer > 0) base.confusionTimer = e.confusionTimer;
+  if (Number.isFinite(e.confusionImmunityTimer) && e.confusionImmunityTimer > 0) base.confusionImmunityTimer = e.confusionImmunityTimer;
+  if (Number.isFinite(e.weakenedTimer) && e.weakenedTimer > 0) base.weakenedTimer = e.weakenedTimer;
+  if (Number.isFinite(e.bleedTimer) && e.bleedTimer > 0) base.bleedTimer = e.bleedTimer;
+  if (Number.isFinite(e.bleedDps) && e.bleedDps > 0) base.bleedDps = e.bleedDps;
+  if (Number.isFinite(e.rangerMarkedTimer) && e.rangerMarkedTimer > 0) base.rangerMarkedTimer = e.rangerMarkedTimer;
+  if (typeof e.rangerMarkedBy === "string" && e.rangerMarkedBy) base.rangerMarkedBy = e.rangerMarkedBy;
+  if (Number.isFinite(e.tempMageCharmTimer) && e.tempMageCharmTimer > 0) base.tempMageCharmTimer = e.tempMageCharmTimer;
+  if (e.dieWhenCharmEnds) base.dieWhenCharmEnds = true;
   if (Number.isFinite(e.burningLightRadius) && e.burningLightRadius > 0) base.burningLightRadius = e.burningLightRadius;
   if (Number.isFinite(e.lightRadius) && e.lightRadius > 0) base.lightRadius = e.lightRadius;
   if (Number.isFinite(e.lightIntensity) && e.lightIntensity > 0) base.lightIntensity = e.lightIntensity;
@@ -335,6 +364,9 @@ export function serializeState(room) {
   const activeFireArrows = sim.fireArrows.filter((a) => isInsideBounds(a, activeBounds, 144));
   const activeFireZones = sim.fireZones.filter((z) => isInsideBounds(z, activeBounds, Math.max(Number.isFinite(z.radius) ? z.radius : 0, Number.isFinite(z.lightRadius) ? z.lightRadius : 0) + 28));
   const activeMeleeSwings = sim.meleeSwings.filter((s) => isInsideBounds(s, activeBounds, (Number.isFinite(s.range) ? s.range : 0) + 24));
+  const floatingTexts = (Array.isArray(sim.networkFloatingTextEvents) ? sim.networkFloatingTextEvents : [])
+    .map((event) => serializeFloatingTextEvent(event))
+    .filter(Boolean);
   const activePlayers = typeof room.getActivePlayerStates === "function" ? room.getActivePlayerStates() : [];
   const primaryPlayer =
     (typeof room.syncPrimaryActivePlayerFromSim === "function" ? room.syncPrimaryActivePlayerFromSim() : null) ||
@@ -359,6 +391,7 @@ export function serializeState(room) {
     bullets: activeBullets.map((b) => serializeBullet(room, b, "bullet", "b")),
     fireArrows: activeFireArrows.map((a) => serializeBullet(room, a, "fireArrow", "fa")),
     fireZones: activeFireZones.map((z) => serializeFireZone(room, z)),
-    meleeSwings: activeMeleeSwings.map((s) => serializeMeleeSwing(room, s))
+    meleeSwings: activeMeleeSwings.map((s) => serializeMeleeSwing(room, s)),
+    floatingTexts
   };
 }

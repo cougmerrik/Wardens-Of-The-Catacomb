@@ -1,7 +1,10 @@
 import { strict as assert } from "node:assert";
 import { GameSim } from "../src/sim/GameSim.js";
 import { applySnapshotToGame } from "../src/net/clientStateSync.js";
+import { synthesizeDespawnDamageFloatingTexts, synthesizeEnemyDamageFloatingTexts } from "../src/net/clientSnapshotHelpers.js";
 import { rendererEffectsProjectileMethods } from "../src/rendering/rendererEffectsProjectileMethods.js";
+import { runtimeSceneDrawMethods } from "../src/rendering/runtimeSceneDrawMethods.js";
+import { stepNetworkEnemyPresentation } from "../src/bootstrap/networkRenderRuntime.js";
 import { buildDeltaCollection } from "./net/deltaProtocol.js";
 import { serializeState } from "./net/stateSerialization.js";
 
@@ -37,6 +40,10 @@ function createCaptureContext() {
     moveTo(...args) { calls.push(["moveTo", ...args]); },
     lineTo(...args) { calls.push(["lineTo", ...args]); },
     arc(...args) { calls.push(["arc", ...args]); },
+    fillRect(...args) { calls.push(["fillRect", ...args]); },
+    strokeRect(...args) { calls.push(["strokeRect", ...args]); },
+    bezierCurveTo(...args) { calls.push(["bezierCurveTo", ...args]); },
+    quadraticCurveTo(...args) { calls.push(["quadraticCurveTo", ...args]); },
     fill() { calls.push(["fill"]); },
     stroke() { calls.push(["stroke"]); },
     createRadialGradient() { return gradient; },
@@ -99,6 +106,7 @@ function main() {
     executeProc: true,
     ownerId: "local-vfx"
   });
+  sim.spawnFloatingText(sim.player.x, sim.player.y - 32, "Victory Rush", "#ffb3b3", 0.8, 13);
   sim.enemies.push({
     id: "mimic-vfx",
     type: "mimic",
@@ -115,6 +123,7 @@ function main() {
   });
 
   const state = serializeState(createRoom(sim));
+  assert.ok(state.floatingTexts.some((entry) => entry.text === "Victory Rush"), "serialized state should include authoritative floating text events");
   const mimic = requireEntry(state.enemies, (entry) => entry.type === "mimic", "serialized mimic");
   assert.equal(mimic.dormant, true, "mimic dormant state should survive serialization");
   assert.equal(mimic.tongueDirX, -1, "mimic tongue direction should survive serialization");
@@ -161,7 +170,17 @@ function main() {
     burningDps: 3,
     curseTimer: 2.5,
     rotTimer: 4,
-    rotDps: 2
+    rotDps: 2,
+    slowTimer: 1.5,
+    slowPct: 0.3,
+    poisonSlowTimer: 1.6,
+    confusionTimer: 1.7,
+    weakenedTimer: 1.8,
+    bleedTimer: 1.9,
+    bleedDps: 4,
+    rangerMarkedTimer: 2,
+    rangerMarkedBy: "local-vfx",
+    tempMageCharmTimer: 2.1
   };
   buildDeltaCollection(enemyDeltaCache, [enemyWithStatuses], true);
   const statusClearDelta = buildDeltaCollection(enemyDeltaCache, [{
@@ -179,6 +198,10 @@ function main() {
   assert.equal(clearPatch.curseTimer, null, "enemy delta should explicitly clear expired curseTimer");
   assert.equal(clearPatch.rotTimer, null, "enemy delta should explicitly clear expired rotTimer");
   assert.equal(clearPatch.rotDps, null, "enemy delta should explicitly clear expired rotDps");
+  assert.equal(clearPatch.bleedTimer, null, "enemy delta should explicitly clear expired bleedTimer");
+  assert.equal(clearPatch.bleedDps, null, "enemy delta should explicitly clear expired bleedDps");
+  assert.equal(clearPatch.rangerMarkedTimer, null, "enemy delta should explicitly clear expired rangerMarkedTimer");
+  assert.equal(clearPatch.rangerMarkedBy, null, "enemy delta should explicitly clear expired rangerMarkedBy");
 
   const client = new GameSim({ classType: "fighter", viewportWidth: 960, viewportHeight: 640 });
   client.player.id = "local-vfx";
@@ -192,6 +215,15 @@ function main() {
   assert.equal(client.enemies[0]?.burningTimer, null, "client enemy should clear expired burningTimer from delta");
   assert.equal(client.enemies[0]?.curseTimer, null, "client enemy should clear expired curseTimer from delta");
   assert.equal(client.enemies[0]?.rotTimer, null, "client enemy should clear expired rotTimer from delta");
+  assert.equal(client.enemies[0]?.bleedTimer, null, "client enemy should clear expired bleedTimer from delta");
+  assert.equal(client.enemies[0]?.rangerMarkedBy, null, "client enemy should clear expired rangerMarkedBy from delta");
+
+  client.enemies = [{ ...enemyWithStatuses }];
+  stepNetworkEnemyPresentation(client.enemies, 2.2);
+  assert.equal(client.enemies[0].bleedTimer, 0, "network presentation should age bleed timer");
+  assert.equal(client.enemies[0].bleedDps, 0, "network presentation should clear expired bleed dps");
+  assert.equal(client.enemies[0].rangerMarkedTimer, 0, "network presentation should age ranger mark timer");
+  assert.equal(client.enemies[0].rangerMarkedBy, null, "network presentation should clear expired ranger mark owner");
 
   applySnapshotToGame({
     game: client,
@@ -205,6 +237,7 @@ function main() {
   assert.equal(client.fireZones[0]?.size, 96, "client fire-zone should keep size after snapshot application");
   assert.equal(client.meleeSwings[0]?.style, "warWhip", "client melee swing should keep style after snapshot application");
   assert.equal(client.meleeSwings[0]?.executeProc, true, "client melee swing should keep executeProc after snapshot application");
+  assert.ok(client.floatingTexts.some((entry) => entry.text === "Victory Rush"), "client should apply authoritative warrior floating text events");
 
   const captureCtx = createCaptureContext();
   const renderer = {
@@ -239,6 +272,203 @@ function main() {
     false,
     "remote melee swing handle incorrectly anchored to local player"
   );
+
+  const statusCtx = createCaptureContext();
+  const statusRenderer = {
+    ctx: statusCtx,
+    drawEnemyStatusBadge: runtimeSceneDrawMethods.drawEnemyStatusBadge,
+    drawEnemyAdditionalStatusIcons: runtimeSceneDrawMethods.drawEnemyAdditionalStatusIcons,
+    drawEnemyHealthBar: runtimeSceneDrawMethods.drawEnemyHealthBar
+  };
+  runtimeSceneDrawMethods.drawEnemyHealthBar.call(statusRenderer, {
+    size: 22,
+    hp: 8,
+    maxHp: 12,
+    hpBarTimer: 1,
+    bleedTimer: 1.5,
+    rangerMarkedTimer: 1.5,
+    slowTimer: 1.5,
+    poisonSlowTimer: 1.5,
+    weakenedTimer: 1.5,
+    tempMageCharmTimer: 1.5
+  }, 160, 180);
+  assert.ok(statusCtx.calls.filter((call) => call[0] === "save").length >= 4, "active auxiliary status effects should draw visible status badges");
+  assert.ok(
+    statusCtx.calls.some((call) => call[0] === "moveTo" && call[1] === 140 && call[2] === 183),
+    "bleed status icon should render in the same compact enemy status row as burn/curse/rot"
+  );
+  assert.ok(
+    statusCtx.calls.some((call) => call[0] === "moveTo" && call[1] === 179 && call[2] === 195),
+    "poison status icon should render in the same compact enemy status row as burn/curse/rot"
+  );
+  assert.equal(
+    statusCtx.calls.some((call) => call[0] === "bezierCurveTo" && call[1] === 136 && call[2] === 188 && call[3] === 135 && call[4] === 196 && call[5] === 130 && call[6] === 197),
+    false,
+    "bleed status icon should not use the larger auxiliary badge row"
+  );
+  assert.equal(
+    statusCtx.calls.some((call) => call[0] === "arc" && call[1] === 157 && call[2] === 183 && call[3] === 4),
+    false,
+    "poison status icon should not use the larger auxiliary badge row"
+  );
+
+  const textGame = {
+    config: { enemy: { hpBarDuration: 0.9 } },
+    enemies: [{ id: "damage-target", x: 100, y: 100, size: 20, hp: 6, maxHp: 12 }],
+    floatingTexts: [],
+    spawnFloatingText(x, y, text, color) {
+      this.floatingTexts.push({ x, y, text, color });
+    }
+  };
+  const previous = new Map([["damage-target", { hp: 12, x: 100, y: 100, size: 20 }]]);
+  synthesizeEnemyDamageFloatingTexts(textGame, previous, { skip: false });
+  assert.ok(textGame.floatingTexts.some((entry) => entry.text === "-6"), "network hp delta should synthesize damage text");
+
+  const despawnTextGame = {
+    config: { enemy: { hpBarDuration: 0.9 } },
+    enemies: [],
+    floatingTexts: [],
+    spawnFloatingText(x, y, text, color) {
+      this.floatingTexts.push({ x, y, text, color });
+    }
+  };
+  synthesizeDespawnDamageFloatingTexts(
+    despawnTextGame,
+    new Map([["dead-target", { hp: 7, x: 120, y: 120, size: 20 }]]),
+    ["dead-target"],
+    { skip: false }
+  );
+  assert.ok(despawnTextGame.floatingTexts.some((entry) => entry.text === "-7"), "network despawn kill should still synthesize damage text");
+
+  const floatingEventClient = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  applySnapshotToGame({
+    game: floatingEventClient,
+    state: {
+      floatingTexts: [
+        { id: "ft-ranger", x: 150, y: 180, text: "Nature's Ally", color: "#d0f09d", life: 0.7, size: 13 },
+        { id: "ft-mage", x: 180, y: 180, text: "Spirit Guardians", color: "#b7f0d0", life: 0.75, size: 13 }
+      ]
+    },
+    controller: false,
+    localPlayerId: "floating-local"
+  });
+  applySnapshotToGame({
+    game: floatingEventClient,
+    state: {
+      floatingTexts: [
+        { id: "ft-ranger", x: 150, y: 180, text: "Nature's Ally", color: "#d0f09d", life: 0.7, size: 13 }
+      ]
+    },
+    controller: false,
+    localPlayerId: "floating-local"
+  });
+  assert.equal(floatingEventClient.floatingTexts.filter((entry) => entry.text === "Nature's Ally").length, 1, "network floating text events should apply once by id");
+  assert.equal(floatingEventClient.floatingTexts.filter((entry) => entry.text === "Spirit Guardians").length, 1, "network floating text events should carry mage action text");
+
+  const duplicateDamageClient = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  duplicateDamageClient.enemies = [{ id: "damage-target", x: 100, y: 100, size: 20, hp: 12, maxHp: 12 }];
+  duplicateDamageClient.floatingTexts = [];
+  applySnapshotToGame({
+    game: duplicateDamageClient,
+    state: {
+      floatingTexts: [{ id: "ft-damage", x: 100, y: 87, text: "-6", color: "#e85c5c", life: 0.75, size: 14 }],
+      delta: {
+        keyframe: false,
+        enemies: {
+          update: [{ id: "damage-target", x: 100, y: 100, size: 20, hp: 6, maxHp: 12 }]
+        }
+      }
+    },
+    controller: false,
+    localPlayerId: "floating-local"
+  });
+  assert.equal(duplicateDamageClient.floatingTexts.filter((entry) => entry.text === "-6").length, 1, "network damage event should suppress fallback hp-delta duplicate text");
+
+  const progressionClient = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  progressionClient.player.id = "progress-local";
+  progressionClient.player.x = 200;
+  progressionClient.player.y = 220;
+  progressionClient.level = 1;
+  progressionClient.skillPoints = 0;
+  progressionClient.gold = 4;
+  progressionClient.floatingTexts = [];
+  applySnapshotToGame({
+    game: progressionClient,
+    state: {
+      floatingTexts: [{ id: "ft-level-local", x: 200, y: 172, text: "Level 2! +1 SP", color: "#9be18a", life: 1, size: 15 }],
+      player: {
+        id: "progress-local",
+        classType: "archer",
+        x: 200,
+        y: 220,
+        size: 22,
+        health: 100,
+        maxHealth: 100,
+        level: 2,
+        gold: 15,
+        experience: 0,
+        expToNextLevel: 40,
+        skillPoints: 1,
+        alive: true
+      }
+    },
+    controller: false,
+    localPlayerId: "progress-local"
+  });
+  assert.equal(progressionClient.floatingTexts.filter((entry) => entry.text === "Level 2! +1 SP").length, 1, "network local level-up should show level and skill point text once");
+  assert.ok(progressionClient.floatingTexts.some((entry) => entry.text === "+11g"), "network local gold gain should show pickup text");
+
+  progressionClient.remotePlayers = [{
+    id: "progress-remote",
+    handle: "Remote",
+    classType: "fighter",
+    x: 260,
+    y: 220,
+    size: 22,
+    health: 100,
+    maxHealth: 100,
+    gold: 2,
+    level: 1,
+    skillPoints: 0,
+    alive: true
+  }];
+  progressionClient.floatingTexts = [];
+  applySnapshotToGame({
+    game: progressionClient,
+    state: {
+      player: {
+        id: "progress-local",
+        classType: "archer",
+        x: 200,
+        y: 220,
+        size: 22,
+        health: 100,
+        maxHealth: 100,
+        gold: 15,
+        level: 2,
+        skillPoints: 1,
+        alive: true
+      },
+      players: [{
+        id: "progress-remote",
+        handle: "Remote",
+        classType: "fighter",
+        x: 260,
+        y: 220,
+        size: 22,
+        health: 100,
+        maxHealth: 100,
+        gold: 8,
+        level: 3,
+        skillPoints: 1,
+        alive: true
+      }]
+    },
+    controller: false,
+    localPlayerId: "progress-local"
+  });
+  assert.ok(progressionClient.floatingTexts.some((entry) => entry.text === "Level 3! +1 SP"), "network remote level-up should show level and skill point text");
+  assert.ok(progressionClient.floatingTexts.some((entry) => entry.text === "+6g"), "network remote gold gain should show pickup text");
 
   console.log(JSON.stringify({
     networkVfxSnapshots: "ok",

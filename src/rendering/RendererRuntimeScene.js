@@ -154,7 +154,6 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     const screenX = enemy.x - cameraX;
     const screenY = enemy.y - cameraY;
     drawArcaneMarkSigil(ctx, enemy, screenX, screenY, game.time);
-    if ((enemy.poisonSlowTimer || 0) > 0) this.drawPoisonSlowIcon(enemy, screenX, screenY);
     this.drawEnemyHealthBar(enemy, screenX, screenY);
   }
 

@@ -28,6 +28,37 @@ export function resolveCombatAndDrops({
     if (typeof game.applyHealingToPlayerEntity === "function") game.applyHealingToPlayerEntity(player, amount);
     else if (player === game.player) game.applyPlayerHealing(amount);
   };
+  const getPlayerCombatContext = (playerId) => {
+    const owner = typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(playerId || null) : null;
+    if (!owner || owner === game.player) return game;
+    const context = Object.create(game);
+    context.player = owner;
+    context.classType = owner.classType || game.classType;
+    context.classSpec = game.config?.classes?.[context.classType] || game.classSpec;
+    context.level = Number.isFinite(owner.level) ? owner.level : game.level;
+    context.levelWeaponDamageBonus = Number.isFinite(owner.levelWeaponDamageBonus) ? owner.levelWeaponDamageBonus : 0;
+    context.skills = owner.skills || {};
+    context.rangerTalents = owner.rangerTalents || {};
+    context.rangerRuntime = owner.rangerRuntime && typeof owner.rangerRuntime === "object" ? owner.rangerRuntime : {};
+    owner.rangerRuntime = context.rangerRuntime;
+    context.warriorTalents = owner.warriorTalents || {};
+    context.warriorRuntime = owner.warriorRuntime && typeof owner.warriorRuntime === "object" ? owner.warriorRuntime : {};
+    owner.warriorRuntime = context.warriorRuntime;
+    context.necromancerTalents = owner.necromancerTalents || {};
+    context.necromancerRuntime = owner.necromancerRuntime && typeof owner.necromancerRuntime === "object" ? owner.necromancerRuntime : {};
+    owner.necromancerRuntime = context.necromancerRuntime;
+    return context;
+  };
+  const getProjectileOwnerContext = (projectile) => {
+    if (
+      !projectile ||
+      typeof projectile.projectileType !== "string" ||
+      (!projectile.projectileType.startsWith("ranger_") && !projectile.projectileType.startsWith("mage_"))
+    ) {
+      return game;
+    }
+    return getPlayerCombatContext(projectile.ownerId || null);
+  };
   const getRewardOwner = (enemy) => {
     const ownerId = typeof enemy?.lastDamageOwnerId === "string" && enemy.lastDamageOwnerId ? enemy.lastDamageOwnerId : null;
     const owner = typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(ownerId) : null;
@@ -251,13 +282,14 @@ export function resolveCombatAndDrops({
           b.life = 0;
           break;
         }
+        const projectileOwnerContext = getProjectileOwnerContext(b);
         const isMageProjectile = typeof b.projectileType === "string" && b.projectileType.startsWith("mage_");
         const projectileDamage = isMageProjectile
           ? (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1) * Math.max(0.01, Number.isFinite(b.critMultiplier) ? b.critMultiplier : 1)
           : b.projectileType === "holyWave"
           ? (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1)
-          : typeof game.getRangerArrowDamageAgainst === "function"
-          ? game.getRangerArrowDamageAgainst(enemy, b)
+          : typeof projectileOwnerContext.getRangerArrowDamageAgainst === "function"
+          ? projectileOwnerContext.getRangerArrowDamageAgainst(enemy, b)
           : (Number.isFinite(b.damage) ? b.damage : game.rollPrimaryDamage()) * Math.max(0.01, Number.isFinite(b.damageMult) ? b.damageMult : 1);
         const damageType = typeof b.damageType === "string" && b.damageType ? b.damageType : (b.projectileType === "holyWave" ? "holy" : "arrow");
         game.applyEnemyDamage(enemy, projectileDamage, damageType, b.ownerId || null, { critical: (b.critMultiplier || 1) > 1 });
@@ -294,8 +326,8 @@ export function resolveCombatAndDrops({
         }
         if (typeof game.applyConsumableOnHitEffects === "function") game.applyConsumableOnHitEffects(enemy, b.ownerId || null);
         if (b.projectileType && String(b.projectileType).startsWith("mage_")) {
-          if (b.mageCantrip && (game.necromancerTalents?.battlemage?.points || 0) > 0) {
-            const owner = typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(b.ownerId || null) : game.player;
+          if (b.mageCantrip && (projectileOwnerContext.necromancerTalents?.battlemage?.points || 0) > 0) {
+            const owner = projectileOwnerContext.player || (typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(b.ownerId || null) : game.player);
             const tile = game.config?.map?.tile || 32;
             if (owner && vecLength((enemy.x || 0) - owner.x, (enemy.y || 0) - owner.y) <= tile * 2) {
               game.applyEnemyDamage(enemy, projectileDamage * 0.25, b.damageType || "arcane", b.ownerId || null);
@@ -376,7 +408,9 @@ export function resolveCombatAndDrops({
               });
             });
           }
-          if (typeof game.applyMageOnHitEffects === "function") game.applyMageOnHitEffects(enemy, { status: b.wildInfusion || b.damageType || "", runesConsumed: b.runesConsumed || 0 });
+          if (typeof projectileOwnerContext.applyMageOnHitEffects === "function") {
+            projectileOwnerContext.applyMageOnHitEffects(enemy, { status: b.wildInfusion || b.damageType || "", runesConsumed: b.runesConsumed || 0 });
+          }
         }
         if (b.projectileType === "mage_frostShard" && !b.frostShardSplinter) {
           const baseAngle = Number.isFinite(b.angle) ? b.angle : Math.atan2(b.vy || 0, b.vx || 1);
@@ -403,7 +437,7 @@ export function resolveCombatAndDrops({
             });
           }
         }
-        if (b.projectileType !== "holyWave" && typeof game.applyRangerOnHitEffects === "function") game.applyRangerOnHitEffects(enemy, b.x, b.y);
+        if (b.projectileType !== "holyWave" && typeof projectileOwnerContext.applyRangerOnHitEffects === "function") projectileOwnerContext.applyRangerOnHitEffects(enemy, b.x, b.y);
         if (Number.isFinite(b.knockback) && b.knockback > 0) {
           const len = vecLength((enemy.x || 0) - (b.x || 0), (enemy.y || 0) - (b.y || 0)) || 1;
           enemy.vx = (enemy.vx || 0) + (((enemy.x || 0) - (b.x || 0)) / len) * b.knockback;

@@ -115,6 +115,7 @@ export class GameRuntimeBase {
 
   applyPlayerHealing(amount, options = {}) {
     if (amount <= 0) return;
+    if (!options.allowRevive && (this.player.alive === false || (Number.isFinite(this.player.health) && this.player.health <= 0))) return;
     const suppressText = !!options.suppressText;
     const before = this.player.health;
     this.player.health = Math.min(this.player.maxHealth, this.player.health + amount);
@@ -182,7 +183,24 @@ export class GameRuntimeBase {
   }
 
   spawnFloatingText(x, y, text, color, life = 0.75, size = 14) {
-    this.floatingTexts.push({ x, y, text, color, life, maxLife: life, vy: 22, size });
+    const entry = { x, y, text, color, life, maxLife: life, vy: 22, size };
+    this.floatingTexts.push(entry);
+    if (!Array.isArray(this.networkFloatingTextEvents)) this.networkFloatingTextEvents = [];
+    if (!Number.isFinite(this.networkFloatingTextEventSeq)) this.networkFloatingTextEventSeq = 0;
+    this.networkFloatingTextEventSeq += 1;
+    this.networkFloatingTextEvents.push({
+      id: `ft_${this.networkFloatingTextEventSeq}`,
+      x,
+      y,
+      text: String(text ?? ""),
+      color: typeof color === "string" && color ? color : "#ffffff",
+      life: Number.isFinite(life) ? life : 0.75,
+      size: Number.isFinite(size) ? size : 14,
+      vy: 22
+    });
+    if (this.networkFloatingTextEvents.length > 128) {
+      this.networkFloatingTextEvents.splice(0, this.networkFloatingTextEvents.length - 128);
+    }
   }
 
   advanceToNextFloor() {

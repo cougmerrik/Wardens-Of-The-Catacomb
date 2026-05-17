@@ -8,8 +8,17 @@ export function stepNetworkEnemyPresentation(enemies, dt) {
     enemy.burningTimer = Math.max(0, (Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0) - dt);
     enemy.curseTimer = Math.max(0, (Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0) - dt);
     enemy.rotTimer = Math.max(0, (Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0) - dt);
+    enemy.slowTimer = Math.max(0, (Number.isFinite(enemy.slowTimer) ? enemy.slowTimer : 0) - dt);
+    enemy.poisonSlowTimer = Math.max(0, (Number.isFinite(enemy.poisonSlowTimer) ? enemy.poisonSlowTimer : 0) - dt);
+    enemy.confusionTimer = Math.max(0, (Number.isFinite(enemy.confusionTimer) ? enemy.confusionTimer : 0) - dt);
+    enemy.weakenedTimer = Math.max(0, (Number.isFinite(enemy.weakenedTimer) ? enemy.weakenedTimer : 0) - dt);
+    enemy.bleedTimer = Math.max(0, (Number.isFinite(enemy.bleedTimer) ? enemy.bleedTimer : 0) - dt);
+    enemy.rangerMarkedTimer = Math.max(0, (Number.isFinite(enemy.rangerMarkedTimer) ? enemy.rangerMarkedTimer : 0) - dt);
+    enemy.tempMageCharmTimer = Math.max(0, (Number.isFinite(enemy.tempMageCharmTimer) ? enemy.tempMageCharmTimer : 0) - dt);
     if (enemy.burningTimer <= 0) enemy.burningDps = 0;
     if (enemy.rotTimer <= 0) enemy.rotDps = 0;
+    if (enemy.bleedTimer <= 0) enemy.bleedDps = 0;
+    if (enemy.rangerMarkedTimer <= 0) enemy.rangerMarkedBy = null;
   }
 }
 
