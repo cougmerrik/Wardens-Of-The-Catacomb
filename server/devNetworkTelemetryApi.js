@@ -54,6 +54,49 @@ function sanitizeProjectileRejectEvent(entry) {
   };
 }
 
+function sanitizeStateAnomalyEvent(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  return {
+    id: Number.isFinite(entry.id) ? Math.floor(entry.id) : null,
+    atMs: Number.isFinite(entry.atMs) ? Math.max(0, Math.round(entry.atMs)) : null,
+    kind: typeof entry.kind === "string" ? entry.kind.slice(0, 64) : "",
+    keyframe: typeof entry.keyframe === "boolean" ? entry.keyframe : null,
+    ackSeq: Number.isFinite(entry.ackSeq) ? Math.floor(entry.ackSeq) : null,
+    enemyCount: Number.isFinite(entry.enemyCount) ? Math.floor(entry.enemyCount) : null,
+    tripleStatusCount: Number.isFinite(entry.tripleStatusCount) ? Math.floor(entry.tripleStatusCount) : null,
+    fullHpBarCount: Number.isFinite(entry.fullHpBarCount) ? Math.floor(entry.fullHpBarCount) : null,
+    localMimicTimer: Number.isFinite(entry.localMimicTimer) ? entry.localMimicTimer : null,
+    remoteMimicCount: Number.isFinite(entry.remoteMimicCount) ? Math.floor(entry.remoteMimicCount) : null,
+    remotePlayerIds: Array.isArray(entry.remotePlayerIds)
+      ? entry.remotePlayerIds
+          .filter((id) => typeof id === "string" && id)
+          .slice(0, 6)
+          .map((id) => id.slice(0, 80))
+      : []
+  };
+}
+
+function sanitizeServerStateAnomalyEvent(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const sanitizeEntityList = (list) =>
+    Array.isArray(list)
+      ? list.slice(0, 4).map((item) => (item && typeof item === "object" ? { ...item } : null)).filter(Boolean)
+      : [];
+  return {
+    id: Number.isFinite(entry.id) ? Math.floor(entry.id) : null,
+    atMs: Number.isFinite(entry.atMs) ? Math.max(0, Math.round(entry.atMs)) : null,
+    snapshotSeq: Number.isFinite(entry.snapshotSeq) ? Math.floor(entry.snapshotSeq) : null,
+    kind: typeof entry.kind === "string" ? entry.kind.slice(0, 64) : "",
+    paused: typeof entry.paused === "boolean" ? entry.paused : null,
+    context: entry.context && typeof entry.context === "object" ? { ...entry.context } : null,
+    enemyCount: Number.isFinite(entry.enemyCount) ? Math.floor(entry.enemyCount) : null,
+    tripleStatusCount: Number.isFinite(entry.tripleStatusCount) ? Math.floor(entry.tripleStatusCount) : null,
+    tripleStatusEnemies: sanitizeEntityList(entry.tripleStatusEnemies),
+    mimicPlayers: sanitizeEntityList(entry.mimicPlayers),
+    classMismatches: sanitizeEntityList(entry.classMismatches)
+  };
+}
+
 function finiteNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
 }
@@ -118,6 +161,12 @@ function sanitizeSample(sample) {
   const recentProjectileReconcileRejects = Array.isArray(sample.recentProjectileReconcileRejects)
     ? sample.recentProjectileReconcileRejects.slice(-8).map(sanitizeProjectileRejectEvent).filter(Boolean)
     : [];
+  const recentStateAnomalies = Array.isArray(sample.recentStateAnomalies)
+    ? sample.recentStateAnomalies.slice(-8).map(sanitizeStateAnomalyEvent).filter(Boolean)
+    : [];
+  const recentServerStateAnomalies = Array.isArray(sample.recentServerStateAnomalies)
+    ? sample.recentServerStateAnomalies.slice(-8).map(sanitizeServerStateAnomalyEvent).filter(Boolean)
+    : [];
   return {
     kind,
     at: typeof sample.at === "string" ? sample.at : new Date().toISOString(),
@@ -165,6 +214,10 @@ function sanitizeSample(sample) {
     projectileReconcileRejects: Number.isFinite(sample.projectileReconcileRejects) ? sample.projectileReconcileRejects : null,
     projectileReconcileRejectDelta: Number.isFinite(sample.projectileReconcileRejectDelta) ? sample.projectileReconcileRejectDelta : null,
     recentProjectileReconcileRejects,
+    networkStateAnomalyEventId: Number.isFinite(sample.networkStateAnomalyEventId) ? Math.floor(sample.networkStateAnomalyEventId) : null,
+    recentStateAnomalies,
+    serverStateAnomalyEventId: Number.isFinite(sample.serverStateAnomalyEventId) ? Math.floor(sample.serverStateAnomalyEventId) : null,
+    recentServerStateAnomalies,
     visibleProjectiles: Number.isFinite(sample.visibleProjectiles) ? sample.visibleProjectiles : null,
     visibleRangerProjectiles: Number.isFinite(sample.visibleRangerProjectiles) ? sample.visibleRangerProjectiles : null,
     ownedProjectiles: Number.isFinite(sample.ownedProjectiles) ? sample.ownedProjectiles : null,

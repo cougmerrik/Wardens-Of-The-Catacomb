@@ -19,7 +19,7 @@ export const rendererEffectsProjectileMethods = {
   drawProjectiles(game, cameraX, cameraY) {
     const ctx = this.ctx;
     for (const swing of game.meleeSwings || []) {
-      this.drawMeleeSwing(swing, cameraX, cameraY, game.player);
+      this.drawMeleeSwing(swing, cameraX, cameraY);
     }
 
     if (game.necromancerBeam?.active) {
@@ -515,7 +515,7 @@ export const rendererEffectsProjectileMethods = {
     ctx.restore();
   },
 
-  drawMeleeSwing(swing, cameraX, cameraY, player) {
+  drawMeleeSwing(swing, cameraX, cameraY) {
     const ctx = this.ctx;
     const life = Number.isFinite(swing.life) ? swing.life : 0;
     const maxLife = Number.isFinite(swing.maxLife) && swing.maxLife > 0 ? swing.maxLife : this.config.effects.meleeSwingLife;
@@ -530,7 +530,6 @@ export const rendererEffectsProjectileMethods = {
     const end = swing.angle + arc * 0.5;
     const dirX = Math.cos(swing.angle);
     const dirY = Math.sin(swing.angle);
-    const originPlayer = player && Number.isFinite(player.x) && Number.isFinite(player.y) ? player : null;
     if (![x, y, range, arc, start, end, dirX, dirY].every(Number.isFinite)) return;
     const style = typeof swing.style === "string" ? swing.style : "broadswing";
     const modifier = typeof swing.modifier === "string" ? swing.modifier : "";
@@ -718,9 +717,9 @@ export const rendererEffectsProjectileMethods = {
     const bladeY = y + dirY * (range * 0.72);
     ctx.strokeStyle = swing.executeProc ? "#ffd0d0" : "#e9e0d1";
     ctx.lineWidth = swing.executeProc ? 2.3 : 2;
-    if (originPlayer && style !== "warWhip" && style !== "twinHatchets") {
+    if (style !== "warWhip" && style !== "twinHatchets") {
       ctx.beginPath();
-      ctx.moveTo(originPlayer.x - cameraX + dirX * 12, originPlayer.y - cameraY + dirY * 12);
+      ctx.moveTo(x + dirX * 12, y + dirY * 12);
       ctx.lineTo(bladeX, bladeY);
       ctx.stroke();
     }

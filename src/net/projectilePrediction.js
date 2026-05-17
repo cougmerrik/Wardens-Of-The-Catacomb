@@ -1,5 +1,8 @@
 import { getRangerCurrentWeaponModeStats, getRangerSelectedWeapon } from "../game/rangerTalentTree.js";
 
+const PREDICTIVE_RANGED_PROJECTILES_ENABLED = false;
+const PREDICTIVE_MELEE_SWINGS_ENABLED = false;
+
 function removeRenderedPredictedProjectile(game, renderId) {
   if (!game || typeof renderId !== "string" || !renderId) return;
   for (const collection of [game.bullets, game.fireArrows, game.meleeSwings]) {
@@ -240,6 +243,8 @@ export function predictProjectileSpawn(game, input, nowMs, isNetworkController, 
   const dirY = rawY / len;
   const usesRanged = !!game.classSpec?.usesRanged;
   if (usesRanged && typeof game.getBowMuzzleOrigin !== "function") return nextHeldPrimaryPredictAtMs;
+  if (usesRanged && !PREDICTIVE_RANGED_PROJECTILES_ENABLED) return 0;
+  if (!usesRanged && !PREDICTIVE_MELEE_SWINGS_ENABLED) return 0;
 
   const primaryCdSec = typeof game.getPlayerFireCooldown === "function" ? game.getPlayerFireCooldown() : 0.25;
   const primaryCadenceMs = Math.max(40, (Number.isFinite(primaryCdSec) ? primaryCdSec : 0.25) * 1000);

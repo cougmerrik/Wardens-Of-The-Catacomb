@@ -93,6 +93,51 @@ async function main() {
           floor: 1,
           projectileReconcileRejects: 1,
           projectileReconcileRejectDelta: 1,
+          networkStateAnomalyEventId: 5,
+          recentStateAnomalies: [
+            {
+              id: 4,
+              atMs: 940,
+              kind: "enemyStatusFanout",
+              keyframe: true,
+              ackSeq: 12,
+              enemyCount: 6,
+              tripleStatusCount: 5,
+              fullHpBarCount: 5,
+              localMimicTimer: 0,
+              remoteMimicCount: 0,
+              remotePlayerIds: []
+            },
+            {
+              id: 5,
+              atMs: 980,
+              kind: "playerMimicRuntimeVisible",
+              keyframe: false,
+              ackSeq: 13,
+              enemyCount: null,
+              tripleStatusCount: null,
+              fullHpBarCount: null,
+              localMimicTimer: 0,
+              remoteMimicCount: 1,
+              remotePlayerIds: ["owner"]
+            }
+          ],
+          serverStateAnomalyEventId: 7,
+          recentServerStateAnomalies: [
+            {
+              id: 7,
+              atMs: 990,
+              snapshotSeq: 44,
+              kind: "enemyStatusFanout",
+              paused: false,
+              context: { source: "activePlayerAction", playerId: "owner" },
+              enemyCount: 6,
+              tripleStatusCount: 5,
+              tripleStatusEnemies: [{ id: "e_1", burningTimer: 1, curseTimer: 1, rotTimer: 1 }],
+              mimicPlayers: [],
+              classMismatches: []
+            }
+          ],
           recentProjectileReconcileRejects: [{
             id: 3,
             atMs: 975,
@@ -180,6 +225,17 @@ async function main() {
     assert.equal(sample.recentProjectileReconcileRejects[0].bucketSeq, 41, "projectile reject should preserve predicted bucket seq");
     assert.equal(sample.recentProjectileReconcileRejects[0].distancePx, 72.25, "projectile reject should preserve distance");
     assert.equal(sample.recentProjectileReconcileRejects[0].maxDistancePx, 48, "projectile reject should preserve max distance");
+    assert.equal(sample.networkStateAnomalyEventId, 5, "sample should preserve network state anomaly event id");
+    assert.equal(sample.recentStateAnomalies?.length, 2, "sample should preserve recent state anomaly events");
+    assert.equal(sample.recentStateAnomalies[0].kind, "enemyStatusFanout", "state anomaly should preserve enemy status kind");
+    assert.equal(sample.recentStateAnomalies[0].tripleStatusCount, 5, "state anomaly should preserve triple status count");
+    assert.equal(sample.recentStateAnomalies[1].kind, "playerMimicRuntimeVisible", "state anomaly should preserve player mimic kind");
+    assert.equal(sample.recentStateAnomalies[1].remoteMimicCount, 1, "state anomaly should preserve remote mimic count");
+    assert.deepEqual(sample.recentStateAnomalies[1].remotePlayerIds, ["owner"], "state anomaly should preserve remote player ids");
+    assert.equal(sample.serverStateAnomalyEventId, 7, "sample should preserve server state anomaly event id");
+    assert.equal(sample.recentServerStateAnomalies?.length, 1, "sample should preserve server state anomalies");
+    assert.equal(sample.recentServerStateAnomalies[0].context?.source, "activePlayerAction", "server anomaly should preserve source context");
+    assert.equal(sample.recentServerStateAnomalies[0].tripleStatusEnemies?.[0]?.id, "e_1", "server anomaly should preserve enemy samples");
     assert.equal(sample.renderContext?.rendererMode, "canvas2d", "sample should preserve renderer mode");
     assert.equal(sample.renderContext?.devicePixelRatio, 1.25, "sample should preserve device pixel ratio");
     assert.equal(sample.renderContext?.visualViewportWidth, 1280, "sample should preserve visual viewport width");

@@ -1,11 +1,21 @@
 import { GameSim } from "../../src/sim/GameSim.js";
-import { cloneRangerTalentState, createRangerTalentState } from "../../src/game/rangerTalentTree.js";
-import { cloneWarriorTalentState, createWarriorTalentState } from "../../src/game/warriorTalentTree.js";
-import { cloneNecromancerTalentState, createNecromancerTalentState } from "../../src/game/necromancerTalentTree.js";
-import { cloneConsumableInventoryState } from "../../src/game/consumables.js";
-import { cloneNecromancerBeamState, cloneNecromancerRuntimeState, cloneRangerRuntimeState, cloneSkillState, cloneUpgradeState, cloneWarriorRuntimeState } from "./playerStateCloneHelpers.js";
+import { cloneNecromancerBeamState } from "./playerStateCloneHelpers.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
 import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
+import {
+  getInputQueueDepth,
+  getProcessedInputSeq,
+  getReceivedInputSeq,
+  promoteQueuedClientInput,
+  resetClientInputState
+} from "./clientInputQueue.js";
+import {
+  createActivePlayerStateForRoom,
+  createPlayerSimulationContextForRoom,
+  syncActivePlayerStateFromContextForRoom,
+  syncPrimaryActivePlayerFromSimForRoom,
+  syncSimPrimaryPlayerStateForRoom
+} from "./activePlayerState.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -42,6 +52,9 @@ export class AuthoritativeRoom {
     this.currentMusicTrack = this.options.chooseGameplayTrack();
     this.snapshotCounter = 0;
     this.snapshotSeq = 0;
+    this.serverStateAnomalyEventId = 0;
+    this.recentServerStateAnomalies = [];
+    this.lastServerStateAnomalySignature = "";
     this.telemetry = {
       tickDurationsMs: [],
       serializeDurationsMs: [],
@@ -172,62 +185,7 @@ export class AuthoritativeRoom {
   }
 
   createActivePlayerState(client, spawn = null) {
-    const classSpec = this.getClassSpec(client?.classType);
-    const baseMaxHealth = Number.isFinite(classSpec.baseMaxHealth) ? classSpec.baseMaxHealth : this.sim.config?.player?.maxHealth || 100;
-    const x = Number.isFinite(spawn?.x) ? spawn.x : this.sim.player?.x || 0;
-    const y = Number.isFinite(spawn?.y) ? spawn.y : this.sim.player?.y || 0;
-    return {
-      id: client.id,
-      handle: client.name,
-      classType: client.classType,
-      x,
-      y,
-      size: Number.isFinite(this.sim.player?.size) ? this.sim.player.size : 22,
-      speed: Number.isFinite(classSpec.baseMoveSpeed) ? classSpec.baseMoveSpeed : this.sim.config?.player?.speed || 180,
-      health: baseMaxHealth,
-      maxHealth: baseMaxHealth,
-      level: 1,
-      score: 0,
-      gold: 0,
-      experience: 0,
-      expToNextLevel: this.sim.config?.progression?.baseXpToLevel || 10,
-      skillPoints: 0,
-      refundCount: 0,
-      levelWeaponDamageBonus: 0,
-      lanternFuel: Number.isFinite(spawn?.lanternFuel) ? spawn.lanternFuel : this.sim.config?.lighting?.lanternInitialFuel,
-      kills: 0,
-      damageDealt: 0,
-      goldEarned: 0,
-      fireCooldown: 0,
-      fireArrowCooldown: 0,
-      deathBoltCooldown: 0,
-      skills: cloneSkillState(),
-      rangerTalents: createRangerTalentState(),
-      warriorTalents: createWarriorTalentState(),
-      necromancerTalents: createNecromancerTalentState(),
-      upgrades: cloneUpgradeState(),
-      consumables: cloneConsumableInventoryState(),
-      rangerRuntime: cloneRangerRuntimeState(),
-      warriorRuntime: cloneWarriorRuntimeState(),
-      necromancerRuntime: cloneNecromancerRuntimeState(),
-      consumableRuntime: { tempHp: 0 },
-      warriorMomentumTimer: 0,
-      warriorRageActiveTimer: 0,
-      warriorRageCooldownTimer: 0,
-      warriorRageVictoryRushPool: 0,
-      warriorRageVictoryRushTimer: 0,
-      necromancerBeam: cloneNecromancerBeamState(),
-      hitCooldown: 0,
-      hpBarTimer: 0,
-      animTime: 0,
-      dirX: 1,
-      dirY: 0,
-      facing: 0,
-      moving: false,
-      alive: true,
-      spectateTargetId: "",
-      color: this.getClientRunColor(client)
-    };
+    return createActivePlayerStateForRoom(this, client, spawn);
   }
 
   buildRunParticipantRecord(client, state = null, outcome = "Dead") {
@@ -283,191 +241,143 @@ export class AuthoritativeRoom {
   }
 
   syncSimPrimaryPlayerState() {
-    if (!this.pauseOwnerId) return null;
-    const client = this.clients.get(this.pauseOwnerId);
-    const state = client ? this.activePlayers.get(client.id) : null;
-    if (!client || !state) return null;
-    const classSpec = this.getClassSpec(state.classType);
-    this.sim.classType = state.classType;
-    this.sim.classSpec = classSpec;
-    this.sim.player.classType = state.classType;
-    this.sim.player.id = state.id;
-    this.sim.player.handle = state.handle;
-    this.sim.player.color = state.color;
-    this.sim.player.x = Number.isFinite(state.x) ? state.x : this.sim.player.x;
-    this.sim.player.y = Number.isFinite(state.y) ? state.y : this.sim.player.y;
-    this.sim.player.size = Number.isFinite(state.size) ? state.size : this.sim.player.size;
-    this.sim.player.speed = Number.isFinite(state.speed) ? state.speed : this.sim.player.speed;
-    this.sim.player.health = Number.isFinite(state.health) ? state.health : this.sim.player.health;
-    this.sim.player.maxHealth = Number.isFinite(state.maxHealth) ? state.maxHealth : this.sim.player.maxHealth;
-    this.sim.player.alive = this.sim.player.health > 0;
-    this.sim.player.fireCooldown = Number.isFinite(state.fireCooldown) ? state.fireCooldown : 0;
-    this.sim.player.fireArrowCooldown = Number.isFinite(state.fireArrowCooldown) ? state.fireArrowCooldown : 0;
-    this.sim.player.deathBoltCooldown = Number.isFinite(state.deathBoltCooldown) ? state.deathBoltCooldown : 0;
-    this.sim.player.hitCooldown = Number.isFinite(state.hitCooldown) ? state.hitCooldown : 0;
-    this.sim.player.hpBarTimer = Number.isFinite(state.hpBarTimer) ? state.hpBarTimer : 0;
-    this.sim.player.animTime = Number.isFinite(state.animTime) ? state.animTime : 0;
-    this.sim.player.dirX = Number.isFinite(state.dirX) ? state.dirX : this.sim.player.dirX;
-    this.sim.player.dirY = Number.isFinite(state.dirY) ? state.dirY : this.sim.player.dirY;
-    this.sim.player.facing = Number.isFinite(state.facing) ? state.facing : this.sim.player.facing;
-    this.sim.player.moving = !!state.moving;
-    this.sim.level = Number.isFinite(state.level) ? state.level : this.sim.level;
-    this.sim.score = Number.isFinite(state.score) ? state.score : this.sim.score;
-    this.sim.gold = Number.isFinite(state.gold) ? state.gold : this.sim.gold;
-    this.sim.experience = Number.isFinite(state.experience) ? state.experience : this.sim.experience;
-    this.sim.expToNextLevel = Number.isFinite(state.expToNextLevel) ? state.expToNextLevel : this.sim.expToNextLevel;
-    this.sim.skillPoints = Number.isFinite(state.skillPoints) ? state.skillPoints : this.sim.skillPoints;
-    this.sim.refundCount = Number.isFinite(state.refundCount) ? state.refundCount : this.sim.refundCount;
-    this.sim.levelWeaponDamageBonus = Number.isFinite(state.levelWeaponDamageBonus) ? state.levelWeaponDamageBonus : this.sim.levelWeaponDamageBonus;
-    this.sim.skills = cloneSkillState(state.skills);
-    this.sim.rangerTalents = cloneRangerTalentState(state.rangerTalents);
-    this.sim.warriorTalents = cloneWarriorTalentState(state.warriorTalents);
-    this.sim.necromancerTalents = cloneNecromancerTalentState(state.necromancerTalents);
-    this.sim.upgrades = cloneUpgradeState(state.upgrades);
-    this.sim.consumables = cloneConsumableInventoryState(state.consumables);
-    this.sim.rangerRuntime = cloneRangerRuntimeState(state.rangerRuntime);
-    this.sim.warriorRuntime = cloneWarriorRuntimeState(state.warriorRuntime);
-    this.sim.player.consumableRuntime = {
-      tempHp: Number.isFinite(state?.consumableRuntime?.tempHp) ? state.consumableRuntime.tempHp : 0
-    };
-    this.sim.warriorMomentumTimer = Number.isFinite(state.warriorMomentumTimer) ? state.warriorMomentumTimer : 0;
-    this.sim.warriorRageActiveTimer = Number.isFinite(state.warriorRageActiveTimer) ? state.warriorRageActiveTimer : 0;
-    this.sim.warriorRageCooldownTimer = Number.isFinite(state.warriorRageCooldownTimer) ? state.warriorRageCooldownTimer : 0;
-    this.sim.warriorRageVictoryRushPool = Number.isFinite(state.warriorRageVictoryRushPool) ? state.warriorRageVictoryRushPool : 0;
-    this.sim.warriorRageVictoryRushTimer = Number.isFinite(state.warriorRageVictoryRushTimer) ? state.warriorRageVictoryRushTimer : 0;
-    this.sim.necromancerBeam = cloneNecromancerBeamState(state.necromancerBeam);
-    return state;
+    return syncSimPrimaryPlayerStateForRoom(this);
   }
 
   syncPrimaryActivePlayerFromSim() {
-    if (!this.pauseOwnerId) return null;
-    const client = this.clients.get(this.pauseOwnerId);
-    if (!client) return null;
-    const state = this.activePlayers.get(client.id) || this.createActivePlayerState(client, this.sim.player);
-    state.handle = client.name;
-    state.classType = client.classType;
-    state.x = this.sim.player.x;
-    state.y = this.sim.player.y;
-    state.size = this.sim.player.size;
-    state.health = this.sim.player.health;
-    state.maxHealth = this.sim.player.maxHealth;
-    state.fireCooldown = this.sim.player.fireCooldown;
-    state.fireArrowCooldown = this.sim.player.fireArrowCooldown;
-    state.deathBoltCooldown = this.sim.player.deathBoltCooldown;
-    state.skills = cloneSkillState(this.sim.skills);
-    state.rangerTalents = cloneRangerTalentState(this.sim.rangerTalents);
-    state.warriorTalents = cloneWarriorTalentState(this.sim.warriorTalents);
-    state.necromancerTalents = cloneNecromancerTalentState(this.sim.necromancerTalents);
-    state.upgrades = cloneUpgradeState(this.sim.upgrades);
-    state.consumables = cloneConsumableInventoryState(this.sim.consumables);
-    state.rangerRuntime = cloneRangerRuntimeState(this.sim.rangerRuntime);
-    state.warriorRuntime = cloneWarriorRuntimeState(this.sim.warriorRuntime);
-    state.score = this.sim.score;
-    state.gold = this.sim.gold;
-    state.experience = this.sim.experience;
-    state.expToNextLevel = this.sim.expToNextLevel;
-    state.skillPoints = this.sim.skillPoints;
-    state.refundCount = Number.isFinite(this.sim.refundCount) ? this.sim.refundCount : 0;
-    state.levelWeaponDamageBonus = this.sim.levelWeaponDamageBonus;
-    state.lanternFuel = this.sim.player.lanternFuel;
-    state.kills = this.sim.runStats?.totalKills || 0;
-    state.damageDealt = this.sim.runStats?.damageDealt || 0;
-    state.goldEarned = this.sim.runStats?.goldEarned || 0;
-    state.warriorMomentumTimer = this.sim.warriorMomentumTimer || 0;
-    state.warriorRageActiveTimer = this.sim.warriorRageActiveTimer || 0;
-    state.warriorRageCooldownTimer = this.sim.warriorRageCooldownTimer || 0;
-    state.warriorRageVictoryRushPool = this.sim.warriorRageVictoryRushPool || 0;
-    state.warriorRageVictoryRushTimer = this.sim.warriorRageVictoryRushTimer || 0;
-    state.necromancerBeam = cloneNecromancerBeamState(this.sim.necromancerBeam);
-    state.hitCooldown = this.sim.player.hitCooldown;
-    state.hpBarTimer = this.sim.player.hpBarTimer;
-    state.animTime = this.sim.player.animTime;
-    state.level = this.sim.level;
-    state.dirX = this.sim.player.dirX;
-    state.dirY = this.sim.player.dirY;
-    state.facing = this.sim.player.facing;
-    state.moving = !!this.sim.player.moving;
-    state.alive = this.sim.player.health > 0;
-    state.spectateTargetId = state.alive ? "" : (typeof client.input?.spectateTargetId === "string" ? client.input.spectateTargetId : "");
-    state.consumableRuntime = {
-      tempHp: Number.isFinite(this.sim.player?.consumableRuntime?.tempHp) ? this.sim.player.consumableRuntime.tempHp : 0
-    };
-    state.color = this.getClientRunColor(client);
-    this.activePlayers.set(client.id, state);
-    return state;
+    return syncPrimaryActivePlayerFromSimForRoom(this);
   }
 
   createPlayerSimulationContext(state) {
-    if (!state) return null;
-    const context = Object.create(this.sim);
-    context.player = state;
-    context.classType = state.classType;
-    context.classSpec = this.getClassSpec(state.classType);
-    context.level = Number.isFinite(state.level) ? state.level : 1;
-    context.score = Number.isFinite(state.score) ? state.score : 0;
-    context.gold = Number.isFinite(state.gold) ? state.gold : 0;
-    context.experience = Number.isFinite(state.experience) ? state.experience : 0;
-    context.expToNextLevel = Number.isFinite(state.expToNextLevel)
-      ? state.expToNextLevel
-      : this.sim.config?.progression?.baseXpToLevel || 10;
-    context.skillPoints = Number.isFinite(state.skillPoints) ? state.skillPoints : 0;
-    context.refundCount = Number.isFinite(state.refundCount) ? state.refundCount : 0;
-    context.levelWeaponDamageBonus = Number.isFinite(state.levelWeaponDamageBonus) ? state.levelWeaponDamageBonus : 0;
-    context.skills = cloneSkillState(state.skills);
-    context.rangerTalents = cloneRangerTalentState(state.rangerTalents);
-    context.warriorTalents = cloneWarriorTalentState(state.warriorTalents);
-    context.necromancerTalents = cloneNecromancerTalentState(state.necromancerTalents);
-    context.upgrades = cloneUpgradeState(state.upgrades);
-    context.consumables = cloneConsumableInventoryState(state.consumables);
-    context.rangerRuntime = cloneRangerRuntimeState(state.rangerRuntime);
-    context.warriorRuntime = cloneWarriorRuntimeState(state.warriorRuntime);
-    context.necromancerRuntime = cloneNecromancerRuntimeState(state.necromancerRuntime);
-    context.player.consumableRuntime = {
-      tempHp: Number.isFinite(state?.consumableRuntime?.tempHp) ? state.consumableRuntime.tempHp : 0
-    };
-    context.warriorMomentumTimer = Number.isFinite(state.warriorMomentumTimer) ? state.warriorMomentumTimer : 0;
-    context.warriorRageActiveTimer = Number.isFinite(state.warriorRageActiveTimer) ? state.warriorRageActiveTimer : 0;
-    context.warriorRageCooldownTimer = Number.isFinite(state.warriorRageCooldownTimer) ? state.warriorRageCooldownTimer : 0;
-    context.warriorRageVictoryRushPool = Number.isFinite(state.warriorRageVictoryRushPool) ? state.warriorRageVictoryRushPool : 0;
-    context.warriorRageVictoryRushTimer = Number.isFinite(state.warriorRageVictoryRushTimer) ? state.warriorRageVictoryRushTimer : 0;
-    context.necromancerBeam = cloneNecromancerBeamState(state.necromancerBeam);
-    context.recordRunGoldSpent = () => {};
-    context.recordClassSpecificStat = () => {};
-    return context;
+    return createPlayerSimulationContextForRoom(this, state);
   }
 
   syncActivePlayerStateFromContext(state, context) {
-    if (!state || !context) return;
-    state.classType = context.classType;
-    state.level = Number.isFinite(context.level) ? context.level : state.level;
-    state.score = Number.isFinite(context.score) ? context.score : state.score;
-    state.gold = Number.isFinite(context.gold) ? context.gold : state.gold;
-    state.experience = Number.isFinite(context.experience) ? context.experience : state.experience;
-    state.expToNextLevel = Number.isFinite(context.expToNextLevel) ? context.expToNextLevel : state.expToNextLevel;
-    state.skillPoints = Number.isFinite(context.skillPoints) ? context.skillPoints : state.skillPoints;
-    state.refundCount = Number.isFinite(context.refundCount) ? context.refundCount : state.refundCount;
-    state.levelWeaponDamageBonus = Number.isFinite(context.levelWeaponDamageBonus)
-      ? context.levelWeaponDamageBonus
-      : state.levelWeaponDamageBonus;
-    state.skills = cloneSkillState(context.skills);
-    state.rangerTalents = cloneRangerTalentState(context.rangerTalents);
-    state.warriorTalents = cloneWarriorTalentState(context.warriorTalents);
-    state.necromancerTalents = cloneNecromancerTalentState(context.necromancerTalents);
-    state.upgrades = cloneUpgradeState(context.upgrades);
-    state.consumables = cloneConsumableInventoryState(context.consumables);
-    state.rangerRuntime = cloneRangerRuntimeState(context.rangerRuntime);
-    state.warriorRuntime = cloneWarriorRuntimeState(context.warriorRuntime);
-    state.necromancerRuntime = cloneNecromancerRuntimeState(context.necromancerRuntime);
-    state.consumableRuntime = {
-      tempHp: Number.isFinite(context?.player?.consumableRuntime?.tempHp) ? context.player.consumableRuntime.tempHp : 0
+    syncActivePlayerStateFromContextForRoom(state, context);
+  }
+
+  trimServerStateAnomalies(limit = 48) {
+    if (this.recentServerStateAnomalies.length > limit) {
+      this.recentServerStateAnomalies.splice(0, this.recentServerStateAnomalies.length - limit);
+    }
+  }
+
+  getPlayerAuditRecords() {
+    const records = [];
+    const pushRecord = (source, player) => {
+      if (!player) return;
+      const id = typeof player.id === "string" ? player.id : "";
+      const client = id ? this.clients.get(id) : null;
+      records.push({
+        source,
+        id,
+        classType: typeof player.classType === "string" ? player.classType : "",
+        clientClassType: typeof client?.classType === "string" ? client.classType : "",
+        health: Number.isFinite(player.health) ? player.health : null,
+        alive: player.alive !== false && (!Number.isFinite(player.health) || player.health > 0),
+        mimicTimer: Number.isFinite(player.necromancerRuntime?.mimicTimer) ? player.necromancerRuntime.mimicTimer : 0,
+        mimicHealth: Number.isFinite(player.necromancerRuntime?.mimicHealth) ? player.necromancerRuntime.mimicHealth : 0
+      });
     };
-    state.warriorMomentumTimer = Number.isFinite(context.warriorMomentumTimer) ? context.warriorMomentumTimer : 0;
-    state.warriorRageActiveTimer = Number.isFinite(context.warriorRageActiveTimer) ? context.warriorRageActiveTimer : 0;
-    state.warriorRageCooldownTimer = Number.isFinite(context.warriorRageCooldownTimer) ? context.warriorRageCooldownTimer : 0;
-    state.warriorRageVictoryRushPool = Number.isFinite(context.warriorRageVictoryRushPool) ? context.warriorRageVictoryRushPool : 0;
-    state.warriorRageVictoryRushTimer = Number.isFinite(context.warriorRageVictoryRushTimer) ? context.warriorRageVictoryRushTimer : 0;
-    state.necromancerBeam = cloneNecromancerBeamState(context.necromancerBeam);
-    if (typeof context.getPlayerMoveSpeed === "function") state.speed = context.getPlayerMoveSpeed();
+    pushRecord("simPrimary", this.sim.player);
+    for (const state of this.activePlayers.values()) pushRecord("activePlayer", state);
+    return records;
+  }
+
+  collectServerStateAudit() {
+    const tripleStatusEnemies = [];
+    for (const enemy of Array.isArray(this.sim.enemies) ? this.sim.enemies : []) {
+      if (!enemy || (enemy.hp || 0) <= 0) continue;
+      const burningTimer = Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0;
+      const curseTimer = Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0;
+      const rotTimer = Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0;
+      if (!(burningTimer > 0 && curseTimer > 0 && rotTimer > 0)) continue;
+      tripleStatusEnemies.push({
+        id: this.options.getStableId(this, "enemy", "e", enemy),
+        type: typeof enemy.type === "string" ? enemy.type : "",
+        hp: Number.isFinite(enemy.hp) ? enemy.hp : null,
+        maxHp: Number.isFinite(enemy.maxHp) ? enemy.maxHp : null,
+        burningTimer,
+        curseTimer,
+        rotTimer,
+        burningDps: Number.isFinite(enemy.burningDps) ? enemy.burningDps : 0,
+        rotDps: Number.isFinite(enemy.rotDps) ? enemy.rotDps : 0
+      });
+    }
+
+    const players = this.getPlayerAuditRecords();
+    const mimicPlayers = players.filter((player) => player.mimicTimer > 0 || player.mimicHealth > 0);
+    const classMismatches = players.filter((player) =>
+      player.id &&
+      player.clientClassType &&
+      player.classType &&
+      player.classType !== player.clientClassType
+    );
+    const parts = [];
+    if (tripleStatusEnemies.length >= 3) {
+      parts.push(`enemyStatusFanout:${tripleStatusEnemies.map((enemy) => enemy.id).join(",")}`);
+    }
+    if (mimicPlayers.length > 0) {
+      parts.push(`playerMimicRuntimeVisible:${mimicPlayers.map((player) => `${player.source}:${player.id}:${Math.round(player.mimicTimer * 10)}`).join(",")}`);
+    }
+    if (classMismatches.length > 0) {
+      parts.push(`playerClassMismatch:${classMismatches.map((player) => `${player.source}:${player.id}:${player.classType}->${player.clientClassType}`).join(",")}`);
+    }
+    return {
+      signature: parts.join("|"),
+      tripleStatusEnemies,
+      mimicPlayers,
+      classMismatches
+    };
+  }
+
+  recordServerStateAnomaly(kind, details = {}) {
+    this.serverStateAnomalyEventId += 1;
+    const event = {
+      id: this.serverStateAnomalyEventId,
+      atMs: Date.now(),
+      snapshotSeq: this.snapshotSeq,
+      phase: this.phase,
+      paused: !!this.sim.paused,
+      kind,
+      controllerId: this.pauseOwnerId || null,
+      lastInputSeqByPlayer: this.getLastInputSeqByPlayer(),
+      inputQueueDepthByPlayer: this.getInputQueueDepthByPlayer(),
+      ...details
+    };
+    this.recentServerStateAnomalies.push(event);
+    this.trimServerStateAnomalies();
+    return event;
+  }
+
+  auditServerState(context = {}) {
+    const audit = this.collectServerStateAudit();
+    if (!audit.signature || audit.signature === this.lastServerStateAnomalySignature) return null;
+    this.lastServerStateAnomalySignature = audit.signature;
+    const kind = audit.tripleStatusEnemies.length >= 3
+      ? "enemyStatusFanout"
+      : audit.mimicPlayers.length > 0
+      ? "playerMimicRuntimeVisible"
+      : "playerClassMismatch";
+    return this.recordServerStateAnomaly(kind, {
+      context,
+      signature: audit.signature,
+      enemyCount: Array.isArray(this.sim.enemies) ? this.sim.enemies.length : 0,
+      tripleStatusCount: audit.tripleStatusEnemies.length,
+      tripleStatusEnemies: audit.tripleStatusEnemies.slice(0, 8),
+      mimicPlayers: audit.mimicPlayers.slice(0, 8),
+      classMismatches: audit.classMismatches.slice(0, 8)
+    });
+  }
+
+  clearQueuedCombatInputFlags(clients = this.clients.values()) {
+    for (const client of clients) {
+      if (!client?.input) continue;
+      client.input.swapAttackQueued = false;
+      client.input.firePrimaryQueued = false;
+      client.input.fireAltQueued = false;
+      client.input.modeSwapQueued = false;
+    }
   }
 
   beamHasLineOfSight(x0, y0, x1, y1) {
@@ -664,7 +574,13 @@ export class AuthoritativeRoom {
     };
     const result = fn(context, state);
     this.syncActivePlayerStateFromContext(state, context);
-    this.tagNewProjectilesForPlayer(beforeCounts, clientId, this.clients.get(clientId)?.lastInputSeq || 0);
+    this.tagNewProjectilesForPlayer(beforeCounts, clientId, getProcessedInputSeq(this.clients.get(clientId)));
+    this.auditServerState({
+      source: "activePlayerAction",
+      playerId: clientId,
+      classType: state.classType,
+      processedInputSeq: getProcessedInputSeq(this.clients.get(clientId))
+    });
     return result;
   }
 
@@ -840,7 +756,23 @@ export class AuthoritativeRoom {
   getLastInputSeqByPlayer() {
     const out = {};
     for (const client of this.clients.values()) {
-      out[client.id] = Number.isFinite(client.lastInputSeq) ? client.lastInputSeq : 0;
+      out[client.id] = getProcessedInputSeq(client);
+    }
+    return out;
+  }
+
+  getLastReceivedInputSeqByPlayer() {
+    const out = {};
+    for (const client of this.clients.values()) {
+      out[client.id] = getReceivedInputSeq(client);
+    }
+    return out;
+  }
+
+  getInputQueueDepthByPlayer() {
+    const out = {};
+    for (const client of this.clients.values()) {
+      out[client.id] = getInputQueueDepth(client);
     }
     return out;
   }
@@ -906,6 +838,7 @@ export class AuthoritativeRoom {
     if (this.requestedStartFloor > 1 && typeof this.sim.applyDebugStartingFloor === "function") {
       this.sim.applyDebugStartingFloor(this.requestedStartFloor);
     }
+    for (const client of this.clients.values()) resetClientInputState(client, this.options.makeDefaultInput);
     this.initializeActivePlayers();
     this.completedRunPlayers.clear();
     this.finalResults = null;
@@ -950,6 +883,9 @@ export class AuthoritativeRoom {
     this.lastSnapshotPortalActive = null;
     this.snapshotCounter = 0;
     this.snapshotSeq = 0;
+    this.serverStateAnomalyEventId = 0;
+    this.recentServerStateAnomalies = [];
+    this.lastServerStateAnomalySignature = "";
     this.deltaCache = {
       enemies: new Map(),
       drops: new Map(),
@@ -986,8 +922,7 @@ export class AuthoritativeRoom {
       wallTrap: new WeakMap()
     };
     for (const client of this.clients.values()) {
-      client.input = this.options.makeDefaultInput();
-      client.lastInputSeq = 0;
+      resetClientInputState(client, this.options.makeDefaultInput);
       client.lastSnapshotAckSeq = 0;
       client.classLocked = false;
     }
@@ -1068,6 +1003,10 @@ export class AuthoritativeRoom {
     return client.input;
   }
 
+  promoteQueuedClientInputs() {
+    for (const client of this.clients.values()) promoteQueuedClientInput(client);
+  }
+
   updateClientLobbyState(clientId, { classType, locked } = {}) {
     const client = this.clients.get(clientId);
     if (!client) return false;
@@ -1113,7 +1052,6 @@ export class AuthoritativeRoom {
       return;
     }
     this.sim.activePlayerCount = Math.max(1, this.clients.size);
-    if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     this.tickDriftSampleCounter += 1;
     if (Number.isFinite(scheduleDriftMs)) {
       if (scheduleDriftMs > this.options.tickDriftEpsilonMs) {
@@ -1129,10 +1067,30 @@ export class AuthoritativeRoom {
       }
     }
     const t0 = this.options.monotonicNowMs();
+    const rawDt = Number.isFinite(nowMs) && Number.isFinite(this.lastTickMs)
+      ? (nowMs - this.lastTickMs) / 1000
+      : 0;
+    const dt = Math.min(Math.max(rawDt, 0), 0.05);
+    if (rawDt < -0.001) {
+      this.recordServerStateAnomaly("negativeTickDelta", {
+        context: {
+          source: "tickClock",
+          rawDtMs: Math.round(rawDt * 1000),
+          previousTickMs: this.lastTickMs,
+          nowMs
+        }
+      });
+    }
+    this.lastTickMs = nowMs;
+    this.promoteQueuedClientInputs();
+    if (this.sim.paused && !this.sim.gameOver) {
+      this.clearQueuedCombatInputFlags();
+      this.options.pushTelemetrySample(this.telemetry.tickDurationsMs, this.options.monotonicNowMs() - t0);
+      return;
+    }
+    if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     const preBulletCount = this.sim.bullets.length;
     const preFireArrowCount = this.sim.fireArrows.length;
-    const dt = Math.min((nowMs - this.lastTickMs) / 1000, 0.05);
-    this.lastTickMs = nowMs;
     const previousFloor = Number.isFinite(this.sim.floor) ? this.sim.floor : null;
     this.sim.networkActivePlayers = this.getSimulationPlayerEntities();
     this.sim.tick(dt, this.getControllerInput());
@@ -1148,7 +1106,7 @@ export class AuthoritativeRoom {
     }
     if (typeof this.sim.ensurePlayerSafePosition === "function") this.sim.ensurePlayerSafePosition(12);
     const controllerClient = this.clients.get(this.pauseOwnerId);
-    const taggedSeq = controllerClient ? controllerClient.input?.seq || controllerClient.lastInputSeq || 0 : 0;
+    const taggedSeq = getProcessedInputSeq(controllerClient);
     const ownerId = this.pauseOwnerId || null;
     for (let i = preBulletCount; i < this.sim.bullets.length; i++) {
       const bullet = this.sim.bullets[i];
@@ -1163,12 +1121,14 @@ export class AuthoritativeRoom {
       if (!(Number.isFinite(fireArrow.spawnSeq) && fireArrow.spawnSeq > 0)) fireArrow.spawnSeq = taggedSeq;
       if (!(typeof fireArrow.ownerId === "string" && fireArrow.ownerId)) fireArrow.ownerId = ownerId;
     }
-    if (controllerClient) {
-      controllerClient.input.swapAttackQueued = false;
-      controllerClient.input.firePrimaryQueued = false;
-      controllerClient.input.fireAltQueued = false;
-      controllerClient.input.modeSwapQueued = false;
-    }
+    if (controllerClient) this.clearQueuedCombatInputFlags([controllerClient]);
+    this.auditServerState({
+      source: "tick",
+      dtMs: Math.round(dt * 1000),
+      rawDtMs: Math.round(rawDt * 1000),
+      controllerId: this.pauseOwnerId || null,
+      processedInputSeq: getProcessedInputSeq(controllerClient)
+    });
     this.options.pushTelemetrySample(this.telemetry.tickDurationsMs, this.options.monotonicNowMs() - t0);
   }
 
@@ -1335,6 +1295,10 @@ export class AuthoritativeRoom {
     const controllerClient = this.clients.get(this.pauseOwnerId);
     const serializeStart = this.options.monotonicNowMs();
     const fullState = this.options.serializeState(this);
+    this.auditServerState({
+      source: "snapshot",
+      force: !!force
+    });
     this.options.pushTelemetrySample(this.telemetry.serializeDurationsMs, this.options.monotonicNowMs() - serializeStart);
     this.snapshotCounter += 1;
     this.snapshotSeq += 1;
@@ -1378,6 +1342,7 @@ export class AuthoritativeRoom {
       time: fullState.time,
       player: fullState.player,
       players: fullState.players,
+      serverStateAnomalies: this.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry })),
       delta
     };
     if (keyframe || floorStateChanged) state.floor = fullState.floor;
@@ -1397,8 +1362,10 @@ export class AuthoritativeRoom {
       ownerId: this.roomOwnerId,
       pauseOwnerId: this.pauseOwnerId,
       controllerId: this.pauseOwnerId,
-      lastInputSeq: controllerClient ? controllerClient.lastInputSeq : 0,
+      lastInputSeq: getProcessedInputSeq(controllerClient),
       lastInputSeqByPlayer: this.getLastInputSeqByPlayer(),
+      lastReceivedInputSeqByPlayer: this.getLastReceivedInputSeqByPlayer(),
+      inputQueueDepthByPlayer: this.getInputQueueDepthByPlayer(),
       mapSignature: sig,
       state
     });

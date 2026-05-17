@@ -40,6 +40,7 @@ const SCRIPT_TARGETS = {
   "validate:network-controller": "server/validate-network-controller-responsiveness.js",
   "validate:network-projectiles": "server/validate-network-projectile-prediction.js",
   "validate:network-smoothness": "server/validate-network-smoothness.js",
+  "validate:network-state-corruption": "server/validate-network-state-corruption.js",
   "validate:mobile-transport": "server/validate-mobile-transport-defaults.js",
   "validate:network-framework": "server/validate-network-framework-evaluation.js",
   "validate:selective-closeout-plan": "server/validate-selective-closeout-plan.js",
@@ -81,6 +82,7 @@ const SUITES = {
     "validate:network-controller",
     "validate:network-projectiles",
     "validate:network-smoothness",
+    "validate:network-state-corruption",
     "validate:network-join",
     "validate:network-combat-hit",
     "validate:network-archer"

@@ -227,6 +227,10 @@ async function main() {
 
     await ownerPage.keyboard.press("Escape");
 
+    await ownerPage.waitForFunction(() => {
+      const state = window.__WOTC_DEBUG__?.getState?.();
+      return !!state && state.ui?.paused === false && state.ui?.shopOpen === false;
+    }, { timeout: 5000 });
     await otherPage.waitForFunction(() => {
       const state = window.__WOTC_DEBUG__?.getState?.();
       return !!state && state.ui?.paused === false;

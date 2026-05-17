@@ -1,93 +1,4 @@
-function shallowPlayerState(simPlayer) {
-  return {
-    x: simPlayer.x,
-    y: simPlayer.y,
-    size: simPlayer.size,
-    health: simPlayer.health,
-    maxHealth: simPlayer.maxHealth,
-    hpBarTimer: simPlayer.hpBarTimer || 0,
-    level: simPlayer.level,
-    score: simPlayer.score,
-    gold: simPlayer.gold,
-    experience: simPlayer.experience,
-    expToNextLevel: simPlayer.expToNextLevel,
-    skillPoints: simPlayer.skillPoints,
-    refundCount: simPlayer.refundCount,
-    levelWeaponDamageBonus: simPlayer.levelWeaponDamageBonus,
-    lanternFuel: simPlayer.lanternFuel,
-    skills: simPlayer.skills,
-    rangerTalents: simPlayer.rangerTalents,
-    warriorTalents: simPlayer.warriorTalents,
-    necromancerTalents: simPlayer.necromancerTalents,
-    rangerRuntime: simPlayer.rangerRuntime,
-    warriorRuntime: simPlayer.warriorRuntime,
-    necromancerRuntime: simPlayer.necromancerRuntime,
-    consumableRuntime: simPlayer.consumableRuntime,
-    consumables: simPlayer.consumables,
-    upgrades: simPlayer.upgrades,
-    dirX: simPlayer.dirX,
-    dirY: simPlayer.dirY,
-    facing: simPlayer.facing,
-    classType: simPlayer.classType
-  };
-}
-
-function shallowActivePlayerState(player) {
-  return {
-    id: player.id,
-    handle: player.handle,
-    classType: player.classType,
-    x: player.x,
-    y: player.y,
-    size: player.size,
-    health: player.health,
-    maxHealth: player.maxHealth,
-    hpBarTimer: player.hpBarTimer || 0,
-    level: player.level,
-    score: player.score,
-    gold: player.gold,
-    experience: player.experience,
-    expToNextLevel: player.expToNextLevel,
-    skillPoints: player.skillPoints,
-    refundCount: player.refundCount,
-    levelWeaponDamageBonus: player.levelWeaponDamageBonus,
-    lanternFuel: player.lanternFuel,
-    fireCooldown: player.fireCooldown,
-    fireArrowCooldown: player.fireArrowCooldown,
-    deathBoltCooldown: player.deathBoltCooldown,
-    warriorMomentumTimer: player.warriorMomentumTimer,
-    warriorRageActiveTimer: player.warriorRageActiveTimer,
-    warriorRageCooldownTimer: player.warriorRageCooldownTimer,
-    warriorRageVictoryRushPool: player.warriorRageVictoryRushPool,
-    warriorRageVictoryRushTimer: player.warriorRageVictoryRushTimer,
-    necromancerBeam: player.necromancerBeam
-      ? {
-          active: !!player.necromancerBeam.active,
-          targetId: typeof player.necromancerBeam.targetId === "string" ? player.necromancerBeam.targetId : null,
-          targetX: Number.isFinite(player.necromancerBeam.targetX) ? player.necromancerBeam.targetX : 0,
-          targetY: Number.isFinite(player.necromancerBeam.targetY) ? player.necromancerBeam.targetY : 0,
-          progress: Number.isFinite(player.necromancerBeam.progress) ? player.necromancerBeam.progress : 0
-        }
-      : null,
-    skills: player.skills,
-    rangerTalents: player.rangerTalents,
-    warriorTalents: player.warriorTalents,
-    necromancerTalents: player.necromancerTalents,
-    upgrades: player.upgrades,
-    consumableRuntime: player.consumableRuntime,
-    consumables: player.consumables,
-    rangerRuntime: player.rangerRuntime,
-    warriorRuntime: player.warriorRuntime,
-    necromancerRuntime: player.necromancerRuntime,
-    dirX: player.dirX,
-    dirY: player.dirY,
-    facing: player.facing,
-    moving: !!player.moving,
-    alive: player.alive !== false,
-    spectateTargetId: typeof player.spectateTargetId === "string" ? player.spectateTargetId : "",
-    color: player.color
-  };
-}
+import { createActivePlayerSnapshot, createPlayerSnapshot } from "../../src/net/playerSnapshotSchema.js";
 
 function resolveControlledEnemyColor(room, enemy) {
   const ownerId = typeof enemy?.controllerPlayerId === "string" && enemy.controllerPlayerId ? enemy.controllerPlayerId : null;
@@ -117,6 +28,24 @@ export function getStableId(room, domain, prefix, obj) {
   return id;
 }
 
+function copyFiniteFields(payload, source, fields) {
+  for (const field of fields) {
+    if (Number.isFinite(source?.[field])) payload[field] = source[field];
+  }
+}
+
+function copyStringFields(payload, source, fields) {
+  for (const field of fields) {
+    if (typeof source?.[field] === "string" && source[field]) payload[field] = source[field];
+  }
+}
+
+function copyBooleanFields(payload, source, fields) {
+  for (const field of fields) {
+    if (typeof source?.[field] === "boolean") payload[field] = source[field];
+  }
+}
+
 function serializeBullet(room, b, domain = "bullet", prefix = "b") {
   const payload = {
     id: getStableId(room, domain, prefix, b),
@@ -136,6 +65,45 @@ function serializeBullet(room, b, domain = "bullet", prefix = "b") {
   if (Number.isFinite(b.lightRadius)) payload.lightRadius = b.lightRadius;
   if (Number.isFinite(b.lightIntensity)) payload.lightIntensity = b.lightIntensity;
   if (typeof b.projectileType === "string" && b.projectileType !== "bullet") payload.projectileType = b.projectileType;
+  copyStringFields(payload, b, ["damageType"]);
+  copyFiniteFields(payload, b, ["critMultiplier", "visualLife", "deathBoltRadius"]);
+  return payload;
+}
+
+function serializeFireZone(room, z) {
+  const payload = {
+    id: getStableId(room, "fireZone", "fz", z),
+    x: z.x,
+    y: z.y,
+    targetX: z.targetX,
+    targetY: z.targetY,
+    radius: z.radius,
+    lightRadius: z.lightRadius,
+    lightIntensity: z.lightIntensity,
+    life: z.life,
+    totalLife: z.totalLife,
+    zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire",
+    damageType: typeof z.damageType === "string" ? z.damageType : ""
+  };
+  copyStringFields(payload, z, ["doctrine", "ownerId"]);
+  copyFiniteFields(payload, z, ["size", "strikeAt", "visualLife"]);
+  copyBooleanFields(payload, z, ["followOwner"]);
+  return payload;
+}
+
+function serializeMeleeSwing(room, s) {
+  const payload = {
+    id: getStableId(room, "meleeSwing", "ms", s),
+    x: s.x,
+    y: s.y,
+    angle: s.angle,
+    arc: s.arc,
+    range: s.range,
+    life: s.life
+  };
+  copyStringFields(payload, s, ["style", "modifier", "doctrine", "ownerId"]);
+  copyFiniteFields(payload, s, ["maxLife"]);
+  copyBooleanFields(payload, s, ["executeProc"]);
   return payload;
 }
 
@@ -184,6 +152,13 @@ function serializeEnemy(room, e) {
       break;
     case "treasure_goblin":
       base.goldEaten = e.goldEaten || 0;
+      break;
+    case "mimic":
+      base.dormant = !!e.dormant;
+      base.revealed = !!e.revealed;
+      base.tongueDirX = e.tongueDirX;
+      base.tongueDirY = e.tongueDirY;
+      base.tongueLength = e.tongueLength || 0;
       break;
     default:
       break;
@@ -371,8 +346,8 @@ export function serializeState(room) {
     floor: sim.floor,
     biomeKey: sim.biomeKey,
     floorBoss,
-    player: shallowPlayerState(primaryPlayer),
-    players: activePlayers.map((player) => shallowActivePlayerState(player)),
+    player: createPlayerSnapshot(primaryPlayer),
+    players: activePlayers.map((player) => createActivePlayerSnapshot(player)),
     door: { ...sim.door },
     pickup: { ...sim.pickup },
     portal: sim.portal ? { ...sim.portal } : null,
@@ -383,28 +358,7 @@ export function serializeState(room) {
     wallTraps: activeWallTraps.map((t) => serializeWallTrap(room, t)),
     bullets: activeBullets.map((b) => serializeBullet(room, b, "bullet", "b")),
     fireArrows: activeFireArrows.map((a) => serializeBullet(room, a, "fireArrow", "fa")),
-    fireZones: activeFireZones.map((z) => ({
-      id: getStableId(room, "fireZone", "fz", z),
-      x: z.x,
-      y: z.y,
-      targetX: z.targetX,
-      targetY: z.targetY,
-      radius: z.radius,
-      lightRadius: z.lightRadius,
-      lightIntensity: z.lightIntensity,
-      life: z.life,
-      totalLife: z.totalLife,
-      zoneType: typeof z.zoneType === "string" ? z.zoneType : "fire",
-      damageType: typeof z.damageType === "string" ? z.damageType : ""
-    })),
-    meleeSwings: activeMeleeSwings.map((s) => ({
-      id: getStableId(room, "meleeSwing", "ms", s),
-      x: s.x,
-      y: s.y,
-      angle: s.angle,
-      arc: s.arc,
-      range: s.range,
-      life: s.life
-    }))
+    fireZones: activeFireZones.map((z) => serializeFireZone(room, z)),
+    meleeSwings: activeMeleeSwings.map((s) => serializeMeleeSwing(room, s))
   };
 }

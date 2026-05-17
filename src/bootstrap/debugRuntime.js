@@ -29,6 +29,12 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               y: enemy.y,
               hp: enemy.hp,
               maxHp: enemy.maxHp,
+              hpBarTimer: Number.isFinite(enemy.hpBarTimer) ? enemy.hpBarTimer : 0,
+              burningTimer: Number.isFinite(enemy.burningTimer) ? enemy.burningTimer : 0,
+              curseTimer: Number.isFinite(enemy.curseTimer) ? enemy.curseTimer : 0,
+              rotTimer: Number.isFinite(enemy.rotTimer) ? enemy.rotTimer : 0,
+              burningDps: Number.isFinite(enemy.burningDps) ? enemy.burningDps : 0,
+              rotDps: Number.isFinite(enemy.rotDps) ? enemy.rotDps : 0,
               size: enemy.size || 0,
               distToPlayer: Math.hypot((enemy.x || 0) - playerX, (enemy.y || 0) - playerY),
               screenX: (enemy.x || 0) - camera.x,
@@ -288,9 +294,21 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               recentPostLoadCorrections: Array.isArray(game.networkPerf.recentPostLoadCorrections)
                 ? game.networkPerf.recentPostLoadCorrections.slice(-8).map((entry) => ({ ...entry }))
                 : [],
+              networkFlightEventId: game.networkPerf.networkFlightEventId || 0,
+              recentFlightEvents: Array.isArray(game.networkPerf.recentFlightEvents)
+                ? game.networkPerf.recentFlightEvents.slice(-24).map((entry) => ({ ...entry }))
+                : [],
               projectileReconcileRejects: game.networkPerf.projectileReconcileRejects || 0,
               recentProjectileReconcileRejects: Array.isArray(game.networkPerf.recentProjectileReconcileRejects)
                 ? game.networkPerf.recentProjectileReconcileRejects.slice(-8).map((entry) => ({ ...entry }))
+                : [],
+              networkStateAnomalyEventId: game.networkPerf.networkStateAnomalyEventId || 0,
+              recentStateAnomalies: Array.isArray(game.networkPerf.recentStateAnomalies)
+                ? game.networkPerf.recentStateAnomalies.slice(-12).map((entry) => ({ ...entry }))
+                : [],
+              serverStateAnomalyEventId: game.networkPerf.serverStateAnomalyEventId || 0,
+              recentServerStateAnomalies: Array.isArray(game.networkPerf.recentServerStateAnomalies)
+                ? game.networkPerf.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry }))
                 : []
             }
           : null,
@@ -379,6 +397,16 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
         torch.lit = data?.lit !== false;
         if (torch.lit) torch.snuffCooldown = 0;
         return { ok: true, id: torch.id || null, lit: torch.lit };
+      }
+      if (command === "dumpNetworkFlightRecorder") {
+        const perf = game.networkPerf && typeof game.networkPerf === "object" ? game.networkPerf : {};
+        return {
+          ok: true,
+          eventId: Number.isFinite(perf.networkFlightEventId) ? perf.networkFlightEventId : 0,
+          events: Array.isArray(perf.recentFlightEvents) ? perf.recentFlightEvents.map((entry) => ({ ...entry })) : [],
+          corrections: Array.isArray(perf.recentCorrections) ? perf.recentCorrections.map((entry) => ({ ...entry })) : [],
+          postLoadCorrections: Array.isArray(perf.recentPostLoadCorrections) ? perf.recentPostLoadCorrections.map((entry) => ({ ...entry })) : []
+        };
       }
       return { ok: false, error: "unknownCommand" };
     }
