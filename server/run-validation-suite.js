@@ -10,6 +10,8 @@ process.chdir(projectRoot);
 const SCRIPT_TARGETS = {
   check: "server/check-all.js",
   "validate:boss": "server/validate-floor-boss.js",
+  "validate:spawn-scale": "server/validate-spawn-scale.js",
+  "validate:xp-pacing": "server/validate-xp-pacing.js",
   "validate:tactics": "server/validate-tactics.js",
   "validate:minotaur": "server/validate-minotaur.js",
   "validate:solo-xp": "server/validate-solo-xp.js",
@@ -50,7 +52,7 @@ const SCRIPT_TARGETS = {
 
 const SUITES = {
   core: ["check", "validate:loc"],
-  gameplay: ["validate:boss", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],
+  gameplay: ["validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],
   lighting: [
     "validate:lighting-state",
     "validate:lighting-placement",
@@ -84,11 +86,13 @@ const SUITES = {
     "validate:network-archer"
   ],
   perf: ["perf:test", "perf:network-browser", "perf:floor-scaling"],
-  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],
+  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],
   closeout: [
     "check",
     "validate:loc",
     "validate:boss",
+    "validate:spawn-scale",
+    "validate:xp-pacing",
     "validate:tactics",
     "validate:minotaur",
     "validate:solo-xp",
