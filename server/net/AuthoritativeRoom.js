@@ -1,4 +1,5 @@
 import { GameSim } from "../../src/sim/GameSim.js";
+import { getClassDisplayLabel } from "../../src/game/classDisplay.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
 import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
 import {
@@ -195,7 +196,7 @@ export class AuthoritativeRoom {
     const primaryState = primaryClient ? this.syncPrimaryActivePlayerFromSim() : null;
     const resolved = primaryState && client?.id === primaryState.id ? primaryState : source;
     const classType = resolved?.classType || client?.classType || this.sim.player?.classType || "archer";
-    const classLabel = this.getClassSpec(classType)?.label || classType;
+    const classLabel = getClassDisplayLabel({ classType, ...resolved });
     return {
       id: client?.id || resolved?.id || "",
       handle: client?.name || resolved?.handle || "Player",
@@ -446,8 +447,16 @@ export class AuthoritativeRoom {
       fireArrows: this.sim.fireArrows.length,
       meleeSwings: this.sim.meleeSwings.length
     };
+    const beforeX = Number.isFinite(context.player?.x) ? context.player.x : null;
+    const beforeY = Number.isFinite(context.player?.y) ? context.player.y : null;
     const result = fn(context, state);
     this.syncActivePlayerStateFromContext(state, context);
+    const afterX = Number.isFinite(state.x) ? state.x : null;
+    const afterY = Number.isFinite(state.y) ? state.y : null;
+    if (input?.fireAltQueued && beforeX !== null && beforeY !== null && afterX !== null && afterY !== null) {
+      const movedPx = Math.hypot(afterX - beforeX, afterY - beforeY);
+      if (movedPx >= 48) state.teleportSeq = getProcessedInputSeq(this.clients.get(clientId));
+    }
     this.tagNewProjectilesForPlayer(beforeCounts, clientId, getProcessedInputSeq(this.clients.get(clientId)));
     this.auditServerState({
       source: "activePlayerAction",

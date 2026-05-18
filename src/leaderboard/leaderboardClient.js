@@ -1,14 +1,9 @@
+import { getBaseClassDisplayLabel, getClassDisplayLabel, normalizeBaseClassType } from "../game/classDisplay.js";
+
 export const PLAYER_HANDLE_STORAGE_KEY = "wardens.playerHandle";
 export const LEADERBOARD_REQUEST_TIMEOUT_MS = 5000;
 export const LEADERBOARD_BOARD_SOLO = "solo";
 export const LEADERBOARD_BOARD_GROUP = "group";
-
-const CLASS_LABELS = {
-  archer: "Elvish Archer",
-  fighter: "Castle Warrior",
-  warrior: "Castle Warrior",
-  necromancer: "Mage"
-};
 
 export function sanitizePlayerHandle(value, fallback = "") {
   if (typeof value !== "string") return fallback;
@@ -55,7 +50,7 @@ export function getDefaultLeaderboardApiUrl(locationObject = globalThis?.locatio
 }
 
 export function getClassLabel(classType) {
-  return CLASS_LABELS[classType] || CLASS_LABELS.archer;
+  return getBaseClassDisplayLabel(classType);
 }
 
 export function compareLeaderboardEntries(a, b) {
@@ -75,19 +70,24 @@ export function normalizeLeaderboardRow(row = {}) {
     : [sanitizePlayerHandle(row.handle, "Player")];
   const classTypes = Array.isArray(row.classTypes) && row.classTypes.length > 0
     ? row.classTypes.map((classType) => (
-      classType === "fighter" || classType === "warrior" || classType === "necromancer"
-        ? (classType === "warrior" ? "fighter" : classType)
-        : "archer"
+      normalizeBaseClassType(classType)
     ))
-    : [row.classType === "fighter" || row.classType === "warrior" || row.classType === "necromancer"
-      ? (row.classType === "warrior" ? "fighter" : row.classType)
-      : "archer"];
+    : [normalizeBaseClassType(row.classType)];
+  const submittedLabels = Array.isArray(row.classLabels) ? row.classLabels : [];
+  const classLabels = classTypes.map((classType, index) => {
+    const label = submittedLabels[index];
+    if (typeof label === "string" && label.trim()) return label.trim();
+    if (index === 0 && typeof row.classLabel === "string" && row.classLabel.trim()) return row.classLabel.trim();
+    return getClassLabel(classType);
+  });
   return {
     boardType,
     handle: handles[0] || "Player",
     classType: classTypes[0] || "archer",
+    classLabel: classLabels[0] || getClassLabel(classTypes[0]),
     handles,
     classTypes,
+    classLabels,
     score: Number.isFinite(row.score) ? Math.max(0, Math.floor(row.score)) : 0,
     timeSeconds: Number.isFinite(row.timeSeconds) ? Math.max(0, Math.floor(row.timeSeconds)) : 0,
     floorReached: Number.isFinite(row.floorReached) ? Math.max(1, Math.floor(row.floorReached)) : 1,
@@ -100,6 +100,7 @@ export function buildLocalRunSummary(game, handle) {
     boardType: LEADERBOARD_BOARD_SOLO,
     handle,
     classType: game?.classType,
+    classLabel: getClassDisplayLabel(game),
     score: game?.score,
     timeSeconds: game?.time,
     floorReached: game?.floor,
@@ -118,6 +119,7 @@ export function buildGroupRunSummary(game) {
     return {
       handle: sanitizePlayerHandle(player?.handle || player?.name, "Player"),
       classType: player?.classType,
+      classLabel: getClassDisplayLabel(entity || player),
       score: Number.isFinite(entity?.score) ? entity.score : 0
     };
   });
@@ -125,6 +127,7 @@ export function buildGroupRunSummary(game) {
     boardType: LEADERBOARD_BOARD_GROUP,
     handles: connectedPlayers.map((player) => sanitizePlayerHandle(player?.handle, "Player")),
     classTypes: connectedPlayers.map((player) => player?.classType),
+    classLabels: connectedPlayers.map((player) => player?.classLabel),
     score: connectedPlayers.reduce((sum, player) => sum + (Number.isFinite(player?.score) ? player.score : 0), 0),
     timeSeconds: game?.time,
     floorReached: game?.floor,
@@ -140,8 +143,8 @@ export function getLeaderboardHandleText(entry = {}) {
 
 export function getLeaderboardClassText(entry = {}) {
   const normalized = normalizeLeaderboardRow(entry);
-  if (normalized.boardType === LEADERBOARD_BOARD_GROUP) return normalized.classTypes.map((classType) => getClassLabel(classType)).join(" / ");
-  return getClassLabel(normalized.classType);
+  if (normalized.boardType === LEADERBOARD_BOARD_GROUP) return normalized.classLabels.join(" / ");
+  return normalized.classLabel || getClassLabel(normalized.classType);
 }
 
 export function formatLeaderboardDuration(totalSeconds) {

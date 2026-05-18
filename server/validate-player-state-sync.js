@@ -8,7 +8,9 @@ import { makeDefaultInput } from "./net/serverHelpers.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { GameSim } from "../src/sim/GameSim.js";
 import { syncNamedObject } from "../src/net/clientSnapshotHelpers.js";
+import { syncByIdLerp } from "../src/net/clientStateSync.js";
 import { applyPlayerSnapshotToGameState, ACTIVE_PLAYER_SNAPSHOT_FIELDS } from "../src/net/playerSnapshotSchema.js";
+import { applyPredictedTeleportAction } from "../src/net/teleportPrediction.js";
 
 function createFakeSocket() {
   return {
@@ -62,7 +64,30 @@ function assertSnapshotFields(snapshot) {
   }
 }
 
+function validateTeleportPrediction() {
+  const archer = { classType: "archer", rangerTalents: { roguePath: { points: 1 } }, player: { classType: "archer", x: 240, y: 240, dirX: 1, dirY: 0 }, moveWithCollisionSubsteps(entity, dx, dy) { entity.x += dx; entity.y += dy; } };
+  const archerStartX = archer.player.x;
+  assert.equal(applyPredictedTeleportAction(archer, { fireAltQueued: true, hasAim: true, aimDirX: 1, aimDirY: 0 }), true, "remote controller should predict rogue shadowstep");
+  assert.ok(archer.player.x > archerStartX + 120, "predicted shadowstep should move immediately instead of waiting for correction");
+
+  const mage = { classType: "necromancer", config: { map: { tile: 32 } }, necromancerTalents: { sorcererPath: { points: 1 } }, player: { classType: "necromancer", x: 240, y: 240, dirX: 1, dirY: 0 }, moveWithCollisionSubsteps(entity, dx, dy) { entity.x += dx; entity.y += dy; }, isWallAt: () => false };
+  const mageStartX = mage.player.x;
+  assert.equal(applyPredictedTeleportAction(mage, { fireAltQueued: true, hasAim: true, aimDirX: 1, aimDirY: 0 }), true, "remote controller should predict mage blink paths");
+  assert.ok(mage.player.x > mageStartX + 40, "predicted mage blink should move immediately instead of smoothing in");
+
+  const deathBoltMage = new GameSim({ classType: "necromancer", viewportWidth: 960, viewportHeight: 640 });
+  deathBoltMage.necromancerTalents.necromancerPath.points = 1;
+  const beforeX = deathBoltMage.player.x;
+  assert.equal(applyPredictedTeleportAction(deathBoltMage, { fireAltQueued: true, hasAim: true, aimDirX: 1, aimDirY: 0 }), false, "Death Bolt should not be treated as teleport prediction");
+  assert.equal(deathBoltMage.player.x, beforeX, "non-teleport mage class skill should not move during teleport prediction");
+
+  const remotes = [{ id: "blink", x: 10, y: 10, teleportSeq: 1 }];
+  syncByIdLerp(remotes, [{ id: "blink", x: 150, y: 10, teleportSeq: 2 }], 0.5);
+  assert.equal(remotes[0].x, 150, "remote player teleportSeq changes should snap instead of lerping");
+}
+
 function main() {
+  validateTeleportPrediction();
   const room = new AuthoritativeRoom("validate-player-state-sync", "archer", createRoomOptions());
   const owner = makeClient("owner", "Owner", "necromancer");
   const peer = makeClient("peer", "Peer", "fighter");
@@ -119,6 +144,22 @@ function main() {
   assert.equal(syncedOwner.necromancerRuntime.activeMode, "cantrip", "active state necromancer runtime mode did not sync from primary sim");
   assert.equal(syncedOwner.necromancerRuntime.mimicTimer, 0, "active state necromancer mimic timer stayed stale after primary sim sync");
   assert.equal(syncedOwner.necromancerBeam.progress, 0.6, "active state beam did not sync from primary sim");
+
+  const peerState = room.activePlayers.get(peer.id);
+  assert.ok(peerState, "peer active player state missing");
+  peer.lastProcessedInputSeq = 77;
+  peerState.classType = "archer";
+  peerState.rangerTalents.roguePath.points = 1;
+  peerState.x = 260;
+  peerState.y = 260;
+  const originalMoveWithCollisionSubsteps = room.sim.moveWithCollisionSubsteps;
+  room.sim.moveWithCollisionSubsteps = (entity, dx, dy) => { entity.x += dx; entity.y += dy; };
+  try {
+    room.applyRemotePlayerCombat(peer, peerState, { ...makeDefaultInput(), fireAltQueued: true, hasAim: true, aimDirX: 1, aimDirY: 0 }, 0.016);
+  } finally {
+    room.sim.moveWithCollisionSubsteps = originalMoveWithCollisionSubsteps;
+  }
+  assert.equal(peerState.teleportSeq, 77, "authoritative teleport actions should mark active player teleportSeq");
 
   const state = serializeState(room);
   const ownerSnapshot = state.players.find((player) => player.id === owner.id);

@@ -2,7 +2,7 @@ import { NetClient } from "../net/NetClient.js";
 import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, syncByIdLerp } from "../net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "../net/mapChunkReadiness.js";
 import { discardPredictedProjectile, predictProjectileSpawn, prunePredictedProjectiles, updateNetworkProjectilePresentation, updatePredictedProjectiles } from "../net/projectilePrediction.js";
-import { canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, shouldSendNetworkInput, updateNetworkRole } from "../net/sessionInteraction.js";
+import { applyPredictedTeleportAction, canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, shouldSendNetworkInput, updateNetworkRole } from "../net/sessionInteraction.js";
 import {
   consumeSnapshotForRender,
   estimateServerNowMs as estimateServerNowMsFromState,
@@ -467,6 +467,7 @@ export function createNetworkSessionController({
           netPredictedProjectiles,
           netNextHeldPrimaryPredictAtMs
         );
+        applyPredictedTeleportAction(game, input);
         netPendingInputs.push({
           seq: input.seq,
           dt: inputDt,
@@ -476,7 +477,7 @@ export function createNetworkSessionController({
           aimX: input.aimX,
           aimY: input.aimY,
           aimDirX: input.aimDirX,
-          aimDirY: input.aimDirY
+          aimDirY: input.aimDirY, fireAltQueued: input.fireAltQueued
         });
         if (netPendingInputs.length > 120) netPendingInputs.splice(0, netPendingInputs.length - 120);
       }

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { getBaseClassDisplayLabel } from "../src/game/classDisplay.js";
 
 export const DEFAULT_STORE_PATH = resolve(process.cwd(), "data", "leaderboard.json");
 export const MAX_GLOBAL_ROWS = 25;
@@ -34,12 +35,21 @@ export function normalizeRow(row = {}) {
   const classTypes = Array.isArray(row.classTypes) && row.classTypes.length > 0
     ? row.classTypes.map((classType) => normalizeClassType(classType))
     : [normalizeClassType(row.classType)];
+  const submittedLabels = Array.isArray(row.classLabels) ? row.classLabels : [];
+  const classLabels = classTypes.map((classType, index) => {
+    const label = submittedLabels[index];
+    if (typeof label === "string" && label.trim()) return label.trim();
+    if (index === 0 && typeof row.classLabel === "string" && row.classLabel.trim()) return row.classLabel.trim();
+    return getBaseClassDisplayLabel(classType);
+  });
   return {
     boardType,
     handle: handles[0] || "Player",
     classType: classTypes[0] || "archer",
+    classLabel: classLabels[0] || getBaseClassDisplayLabel(classTypes[0]),
     handles,
     classTypes,
+    classLabels,
     score: Number.isFinite(row.score) ? Math.max(0, Math.floor(row.score)) : 0,
     timeSeconds: Number.isFinite(row.timeSeconds) ? Math.max(0, Math.floor(row.timeSeconds)) : 0,
     floorReached: Number.isFinite(row.floorReached) ? Math.max(1, Math.floor(row.floorReached)) : 1,

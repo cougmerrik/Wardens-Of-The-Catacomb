@@ -24,6 +24,7 @@ import {
   recordSuspiciousNetworkState
 } from "./clientCorrectionMetrics.js";
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
+import { applyPredictedTeleportAction } from "./teleportPrediction.js";
 export { applyMetaStateToGame } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
@@ -166,8 +167,11 @@ export function syncByIdLerp(target, source, positionAlpha = 1, decorate) {
       const prevY = Number.isFinite(dst.y) ? dst.y : null;
       const sx = Number.isFinite(srcItem.x) ? srcItem.x : null;
       const sy = Number.isFinite(srcItem.y) ? srcItem.y : null;
+      const prevTeleportSeq = Number.isFinite(dst.teleportSeq) ? dst.teleportSeq : null;
+      const nextTeleportSeq = Number.isFinite(srcItem?.teleportSeq) ? srcItem.teleportSeq : null;
       Object.assign(dst, srcItem);
-      if (sx !== null && sy !== null && prevX !== null && prevY !== null && positionAlpha < 1) {
+      const teleportSnap = nextTeleportSeq !== null && nextTeleportSeq !== prevTeleportSeq;
+      if (!teleportSnap && sx !== null && sy !== null && prevX !== null && prevY !== null && positionAlpha < 1) {
         dst.x = prevX * (1 - positionAlpha) + sx * positionAlpha;
         dst.y = prevY * (1 - positionAlpha) + sy * positionAlpha;
       }
@@ -303,6 +307,7 @@ export function applySnapshotToGame({
             const speed = game.getPlayerMoveSpeed();
             game.moveWithCollisionSubsteps(probe, (mx / len) * speed * entry.dt, (my / len) * speed * entry.dt);
           }
+          applyPredictedTeleportAction(game, entry, probe);
         }
         correctedX = probe.x;
         correctedY = probe.y;
@@ -312,6 +317,7 @@ export function applySnapshotToGame({
       const dy = correctedY - game.player.y;
       const errorSq = dx * dx + dy * dy;
       const errorDist = Math.sqrt(errorSq);
+      const teleportSnap = Number.isFinite(snapshotPlayer.teleportSeq) && snapshotPlayer.teleportSeq !== game.player.teleportSeq;
       const jitterMs = Number.isFinite(snapshotJitterMs) ? Math.max(0, snapshotJitterMs) : 0;
       const frameGap = Number.isFinite(frameGapMs) ? Math.max(0, frameGapMs) : 16.67;
       const pendingDepth = Array.isArray(netPendingInputs) ? netPendingInputs.length : 0;
@@ -339,14 +345,14 @@ export function applySnapshotToGame({
       game.networkPerf.lastCorrectionPx = errorDist;
       if (errorDist > game.networkPerf.maxCorrectionPx) game.networkPerf.maxCorrectionPx = errorDist;
       flightCorrectionPx = errorDist;
-      if (isInitialControllerSync || localPlayerBlocked || errorDist > hardSnapDist) {
-        flightCorrectionKind = localPlayerBlocked ? "blockedHardSnap" : "hardSnap";
+      if (isInitialControllerSync || teleportSnap || localPlayerBlocked || errorDist > hardSnapDist) {
+        flightCorrectionKind = teleportSnap ? "teleportSnap" : localPlayerBlocked ? "blockedHardSnap" : "hardSnap";
         flightAppliedPx = errorDist;
         game.networkPerf.hardSnapCount += 1;
         if (postLoadCorrectionActive) game.networkPerf.postLoadHardSnapCount += 1;
         if (localPlayerBlocked) game.networkPerf.blockedSnapCount += 1;
         if (postLoadCorrectionActive && localPlayerBlocked) game.networkPerf.postLoadBlockedSnapCount += 1;
-        recordCorrection(game, localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+        recordCorrection(game, flightCorrectionKind, errorDist, {
           ackSeq,
           pendingInputs: netPendingInputs,
           extra: {
@@ -354,7 +360,7 @@ export function applySnapshotToGame({
             correctedY: Math.round(correctedY)
           }
         });
-        recordPostLoadCorrection(game, postLoadCorrectionActive, localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+        recordPostLoadCorrection(game, postLoadCorrectionActive, flightCorrectionKind, errorDist, {
           ackSeq,
           pendingDepth,
           extra: {

@@ -1,3 +1,6 @@
+import { applyPredictedTeleportAction } from "./teleportPrediction.js";
+export { applyPredictedTeleportAction } from "./teleportPrediction.js";
+
 export function collectInput(game, consumeQueued = true) {
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
   const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen;
@@ -370,6 +373,7 @@ export function predictFromInput(game, input, dt, canRunPredictedCollision) {
   } else {
     game.player.moving = false;
   }
+  applyPredictedTeleportAction(game, input);
 
   if (input.hasAim) {
     if (Number.isFinite(input.aimDirX) && Number.isFinite(input.aimDirY)) {

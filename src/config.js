@@ -4,7 +4,7 @@ export const CONFIG = {
   classes: {
     archer: {
       key: "archer",
-      label: "Elvish Archer",
+      label: "Scout",
       usesRanged: true,
       baseLifeLeech: 0,
       baseMaxHealth: 95,
@@ -24,7 +24,7 @@ export const CONFIG = {
     },
     fighter: {
       key: "fighter",
-      label: "Castle Warrior",
+      label: "Warrior",
       usesRanged: false,
       combatStyle: "warrior",
       baseLifeLeech: 0.01,
