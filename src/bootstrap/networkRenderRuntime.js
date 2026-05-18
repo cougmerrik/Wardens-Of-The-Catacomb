@@ -126,7 +126,7 @@ export function startNetworkRenderLoopRuntime({
         : Number.isFinite(pkt.lastInputSeq) ? pkt.lastInputSeq : 0;
       applySnapshot(game, stateWithServerTime, isNetworkController(), ackSeq);
     }
-    if (isNetworkController()) {
+    if (isNetworkController() && game.networkRole !== "Spectating" && (game.player?.health || 0) > 0) {
       const input = collectInput(game, false);
       if (game.networkReady && typeof predictFromInput === "function") {
         predictFromInput(game, input, dt, typeof canRunPredictedCollision === "function" ? canRunPredictedCollision() : false);

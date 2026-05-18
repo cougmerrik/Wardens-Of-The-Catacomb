@@ -279,20 +279,20 @@ export class MusicController {
   pauseCurrentTrack() {
     this.cancelFade();
     if (this.currentMode === "death") {
-      this.deathAudio.pause();
+      if (!this.deathAudio.paused) this.deathAudio.pause();
       this.setAudioBaseVolume(this.deathAudio, 1);
       return;
     }
     if (this.currentTrack?.audio) {
-      this.currentTrack.audio.pause();
+      if (!this.currentTrack.audio.paused) this.currentTrack.audio.pause();
       this.setAudioBaseVolume(this.currentTrack.audio, 1);
     }
   }
   stopDeathMusic({ reset = true } = {}) {
-    this.deathAudio.pause();
+    if (!this.deathAudio.paused) this.deathAudio.pause();
     this.setAudioBaseVolume(this.deathAudio, 1);
     this.deathPlaybackStarted = false;
-    if (reset) this.deathAudio.currentTime = 0;
+    if (reset && this.deathAudio.currentTime !== 0) this.deathAudio.currentTime = 0;
   }
   playCurrentTrack({ reset = false, volume = 1 } = {}) {
     if (!this.currentTrack || this.muted) return;
@@ -337,22 +337,33 @@ export class MusicController {
       }
     });
   }
-  transitionToTrack(track, { reset = true, immediate = false, fadeInMs = 0, transitionMs = FADE_DURATION_MS } = {}) {
+  transitionToTrack(track, { reset = true, immediate = false, fadeInMs = 0, transitionMs = FADE_DURATION_MS, autoplay = true } = {}) {
     if (!track) return;
     this.stopDeathMusic();
     const previousTrack = this.currentTrack;
     const previousAudio = previousTrack?.audio || null;
     const nextAudio = track.audio;
+    if (!autoplay) {
+      this.cancelFade();
+      if (previousAudio && previousAudio !== nextAudio && !previousAudio.paused) previousAudio.pause();
+      const changed = previousTrack !== track;
+      this.currentTrack = track;
+      if (changed) this.debug.trackTransitions += 1;
+      this.debug.activeTrackTitle = track.title || "";
+      this.debug.activeTrackSrc = track.src || "";
+      if (reset && nextAudio.currentTime !== 0) nextAudio.currentTime = 0;
+      this.setAudioBaseVolume(nextAudio, 1);
+      return;
+    }
     if (this.muted) {
       this.cancelFade();
       if (previousAudio && previousAudio !== nextAudio) {
-        previousAudio.pause();
-        this.setAudioBaseVolume(previousAudio, 1);
+        if (!previousAudio.paused) previousAudio.pause(); this.setAudioBaseVolume(previousAudio, 1);
       }
       this.currentTrack = track;
       this.debug.activeTrackTitle = track.title || "";
       this.debug.activeTrackSrc = track.src || "";
-      if (reset) nextAudio.currentTime = 0;
+      if (reset && nextAudio.currentTime !== 0) nextAudio.currentTime = 0;
       this.setAudioBaseVolume(nextAudio, 1);
       return;
     }
@@ -360,27 +371,20 @@ export class MusicController {
     if (!previousAudio || immediate) {
       this.cancelFade();
       if (previousAudio && previousAudio !== nextAudio) {
-        previousAudio.pause();
+        if (!previousAudio.paused) previousAudio.pause();
         this.setAudioBaseVolume(previousAudio, 1);
       }
       this.currentTrack = track;
       this.debug.trackTransitions += 1;
       this.debug.activeTrackTitle = track.title || "";
       this.debug.activeTrackSrc = track.src || "";
-      this.recordDebugEvent("transition", {
-        title: track.title,
-        immediate: true,
-        reset,
-        fadeInMs
-      });
+      this.recordDebugEvent("transition", { title: track.title, immediate: true, reset, fadeInMs });
       if (fadeInMs > 0 && !this.muted) {
-        if (reset) nextAudio.currentTime = 0;
+        if (reset && nextAudio.currentTime !== 0) nextAudio.currentTime = 0;
         this.setAudioBaseVolume(nextAudio, 0);
         this.attemptAudioPlay(nextAudio, "transition-immediate-fade");
         const token = this.transitionToken;
-        this.fadeAudio(nextAudio, 0, 1, fadeInMs, token, () => {
-          this.setAudioBaseVolume(nextAudio, 1);
-        });
+        this.fadeAudio(nextAudio, 0, 1, fadeInMs, token, () => this.setAudioBaseVolume(nextAudio, 1));
         return;
       }
       this.setAudioBaseVolume(nextAudio, 1);
@@ -396,20 +400,14 @@ export class MusicController {
     this.debug.trackTransitions += 1;
     this.debug.activeTrackTitle = track.title || "";
     this.debug.activeTrackSrc = track.src || "";
-      this.recordDebugEvent("transition", {
-        title: track.title,
-        previousTitle: previousTrack?.title || "",
-        immediate: false,
-        reset,
-        transitionMs
-      });
+      this.recordDebugEvent("transition", { title: track.title, previousTitle: previousTrack?.title || "", immediate: false, reset, transitionMs });
 
     this.currentTrack = track;
-    if (reset) nextAudio.currentTime = 0;
+    if (reset && nextAudio.currentTime !== 0) nextAudio.currentTime = 0;
     this.setAudioBaseVolume(nextAudio, 0);
     this.attemptAudioPlay(nextAudio, "transition-crossfade");
     this.crossfadeTracks(previousAudio, nextAudio, transitionMs, token, () => {
-      previousAudio.pause();
+      if (!previousAudio.paused) previousAudio.pause();
       this.setAudioBaseVolume(previousAudio, 1);
       this.setAudioBaseVolume(nextAudio, 1);
     });
@@ -424,7 +422,7 @@ export class MusicController {
       fadeInMs
     });
   }
-  playGameplayMusic(floor, trackLike = null) {
+  playGameplayMusic(floor, trackLike = null, { autoplay = true } = {}) {
     if (this.currentMode === "victory" && !this.currentTrack?.audio?.ended) return;
     this.stopDeathMusic();
     const normalizedFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
@@ -441,13 +439,14 @@ export class MusicController {
     this.transitionToTrack(nextTrack, {
       reset: floorChanged || trackChanged,
       immediate: !this.currentTrack,
-      transitionMs: previousMode === "boss" ? BOSS_FADE_DURATION_MS : FADE_DURATION_MS
+      transitionMs: previousMode === "boss" ? BOSS_FADE_DURATION_MS : FADE_DURATION_MS,
+      autoplay
     });
   }
   getBossTrackForBiome(biomeKey = "") {
     return this.resolveTrack(getBossTrackDefinitionForBiome(biomeKey));
   }
-  playBossMusic({ floor = null, biomeKey = "" } = {}) {
+  playBossMusic({ floor = null, biomeKey = "", autoplay = true } = {}) {
     if (this.currentMode === "victory" && !this.currentTrack?.audio?.ended) return;
     this.stopDeathMusic();
     const normalizedFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : this.currentFloor;
@@ -460,7 +459,8 @@ export class MusicController {
     this.transitionToTrack(nextTrack, {
       reset: modeChanged || trackChanged,
       immediate: !this.currentTrack,
-      transitionMs: BOSS_FADE_DURATION_MS
+      transitionMs: BOSS_FADE_DURATION_MS,
+      autoplay
     });
   }
   playBossVictoryCue(victoryKey = "") {

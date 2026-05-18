@@ -22,6 +22,15 @@ function isFloorBossMusicActive(game) {
   return game.floorBoss?.phase === "active";
 }
 
+function shouldHoldGameplayAudio(game) {
+  if (!game || game.paused || game.gameOver) return true;
+  if (typeof document !== "undefined") {
+    if (document.visibilityState === "hidden") return true;
+    if (typeof document.hasFocus === "function" && !document.hasFocus()) return true;
+  }
+  return false;
+}
+
 export function syncMusicForGame(music, splashActive, game) {
   if (splashActive) return;
   syncIdleSoundState(music, splashActive, game);
@@ -42,25 +51,27 @@ export function syncMusicForGame(music, splashActive, game) {
     !(typeof music.hasPlayedBossVictoryCue === "function" && music.hasPlayedBossVictoryCue(victoryKey))
   ) {
     music.playBossVictoryCue(victoryKey);
-    if (game.paused) music.pauseCurrentTrack();
+    if (shouldHoldGameplayAudio(game)) music.pauseCurrentTrack();
     else music.playCurrentTrack();
     return;
   }
+  const autoplay = !shouldHoldGameplayAudio(game);
   if (isFloorBossMusicActive(game)) {
     music.playBossMusic({
       floor: game.floor,
-      biomeKey: typeof game.biomeKey === "string" ? game.biomeKey : ""
+      biomeKey: typeof game.biomeKey === "string" ? game.biomeKey : "",
+      autoplay
     });
-    if (game.paused) music.pauseCurrentTrack();
+    if (!autoplay) music.pauseCurrentTrack();
     else music.playCurrentTrack();
     return;
   }
   if (game.networkEnabled) {
-    if (game.musicTrack) music.playGameplayMusic(game.floor, game.musicTrack);
+    if (game.musicTrack) music.playGameplayMusic(game.floor, game.musicTrack, { autoplay });
   } else {
-    music.playGameplayMusic(game.floor);
+    music.playGameplayMusic(game.floor, null, { autoplay });
   }
-  if (game.paused || game.gameOver) music.pauseCurrentTrack();
+  if (!autoplay) music.pauseCurrentTrack();
   else music.playCurrentTrack();
 }
 

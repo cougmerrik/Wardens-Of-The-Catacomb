@@ -26,6 +26,7 @@ const META_BROADCAST_MIN_MS = Number.parseInt(process.env.META_BROADCAST_MIN_MS 
 const MAP_CHUNK_SIZE = Number.parseInt(process.env.MAP_CHUNK_SIZE || "24", 10);
 const MAP_CHUNK_RADIUS = Number.parseInt(process.env.MAP_CHUNK_RADIUS || "2", 10);
 const MAP_CHUNK_PUSH_MS = Number.parseInt(process.env.MAP_CHUNK_PUSH_MS || "120", 10);
+const MAX_MAP_CHUNKS_PER_SNAPSHOT = Number.parseInt(process.env.MAX_MAP_CHUNKS_PER_SNAPSHOT || "4", 10);
 const DELTA_KEYFRAME_EVERY = Number.parseInt(process.env.DELTA_KEYFRAME_EVERY || "30", 10);
 const SNAPSHOT_ACK_GAP_FORCE_KEYFRAME = Number.parseInt(process.env.SNAPSHOT_ACK_GAP_FORCE_KEYFRAME || "8", 10);
 const MAX_ROOMS = 64;
@@ -53,6 +54,7 @@ const roomOptions = {
   mapChunkPushMs: MAP_CHUNK_PUSH_MS,
   mapChunkRadius: MAP_CHUNK_RADIUS,
   mapChunkSize: MAP_CHUNK_SIZE,
+  maxMapChunksPerSnapshot: MAX_MAP_CHUNKS_PER_SNAPSHOT,
   maxWsBufferedBytes: MAX_WS_BUFFERED_BYTES,
   metaBroadcastMinMs: META_BROADCAST_MIN_MS,
   monotonicNowMs,

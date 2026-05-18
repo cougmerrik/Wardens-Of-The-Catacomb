@@ -61,12 +61,17 @@ export class AuthoritativeRoom {
       tickDurationsMs: [],
       serializeDurationsMs: [],
       snapshotBroadcastDurationsMs: [],
+      snapshotPayloadBytes: [],
+      snapshotBroadcastGapsMs: [],
+      snapshotSendQueueBytes: [],
+      mapChunkPushDurationsMs: [],
       tickScheduleOverrunMs: [],
       tickScheduleUnderrunMs: [],
       tickOverrunCount: 0,
       tickUnderrunCount: 0,
       droppedSnapshots: 0,
-      snapshotBroadcastCount: 0
+      snapshotBroadcastCount: 0,
+      lastSnapshotTelemetry: null
     };
     this.tickDriftSampleCounter = 0;
     this.clientChunkState = new Map();
@@ -947,21 +952,23 @@ export class AuthoritativeRoom {
       }
     }
     const t0 = this.options.monotonicNowMs();
-    const rawDt = Number.isFinite(nowMs) && Number.isFinite(this.lastTickMs)
-      ? (nowMs - this.lastTickMs) / 1000
-      : 0;
-    const dt = Math.min(Math.max(rawDt, 0), 0.05);
-    if (rawDt < -0.001) {
-      this.recordServerStateAnomaly("negativeTickDelta", {
+    let effectiveNowMs = Number.isFinite(nowMs) ? nowMs : this.lastTickMs;
+    if (Number.isFinite(effectiveNowMs) && Number.isFinite(this.lastTickMs) && effectiveNowMs < this.lastTickMs) {
+      this.recordServerStateAnomaly("tickClockBackwards", {
         context: {
           source: "tickClock",
-          rawDtMs: Math.round(rawDt * 1000),
+          rawDtMs: Math.round(effectiveNowMs - this.lastTickMs),
           previousTickMs: this.lastTickMs,
-          nowMs
+          nowMs: effectiveNowMs
         }
       });
+      effectiveNowMs = this.lastTickMs;
     }
-    this.lastTickMs = nowMs;
+    const rawDt = Number.isFinite(effectiveNowMs) && Number.isFinite(this.lastTickMs)
+      ? (effectiveNowMs - this.lastTickMs) / 1000
+      : 0;
+    const dt = Math.min(Math.max(rawDt, 0), 0.05);
+    this.lastTickMs = effectiveNowMs;
     this.promoteQueuedClientInputs();
     if (this.sim.paused && !this.sim.gameOver) {
       this.clearQueuedCombatInputFlags();
@@ -1015,9 +1022,15 @@ export class AuthoritativeRoom {
   broadcast(type, payload) {
     const t0 = this.options.monotonicNowMs();
     const msg = JSON.stringify({ type, roomId: this.id, ...payload });
+    const payloadBytes = Buffer.byteLength(msg);
     let dropped = 0;
+    let recipientCount = 0;
+    let maxBufferedBeforeBytes = 0;
     for (const client of this.clients.values()) {
       if (!client.transport?.isOpen()) continue;
+      recipientCount += 1;
+      const bufferedBefore = Number.isFinite(client.transport.bufferedAmount) ? client.transport.bufferedAmount : 0;
+      if (bufferedBefore > maxBufferedBeforeBytes) maxBufferedBeforeBytes = bufferedBefore;
       if (type === "state.snapshot" && client.transport.bufferedAmount > this.options.maxWsBufferedBytes) {
         dropped += 1;
         continue;
@@ -1029,8 +1042,18 @@ export class AuthoritativeRoom {
       this.telemetry.snapshotBroadcastCount += 1;
       this.telemetry.droppedSnapshots += dropped;
       this.options.pushTelemetrySample(this.telemetry.snapshotBroadcastDurationsMs, elapsed);
+      this.options.pushTelemetrySample(this.telemetry.snapshotPayloadBytes, payloadBytes);
+      this.options.pushTelemetrySample(this.telemetry.snapshotSendQueueBytes, maxBufferedBeforeBytes);
+      this.telemetry.lastSnapshotTelemetry = {
+        broadcastDurationMs: Math.round(elapsed * 10) / 10,
+        payloadBytes,
+        recipientCount,
+        droppedSnapshots: dropped,
+        maxBufferedBeforeBytes,
+        snapshotBroadcastCount: this.telemetry.snapshotBroadcastCount
+      };
     }
-    return { elapsedMs: elapsed, dropped };
+    return { elapsedMs: elapsed, dropped, payloadBytes, recipientCount, maxBufferedBeforeBytes };
   }
 
   broadcastRoster() {
@@ -1117,9 +1140,11 @@ export class AuthoritativeRoom {
   }
 
   sendMapChunksToClient(client, nowMs = Date.now()) {
-    if (!client?.transport?.isOpen()) return;
+    const startedAt = this.options.monotonicNowMs();
+    const result = { sent: 0, bytes: 0, elapsedMs: 0 };
+    if (!client?.transport?.isOpen()) return result;
     const chunkState = this.clientChunkState.get(client.id);
-    if (!chunkState) return;
+    if (!chunkState) return result;
     const tile = this.sim.config.map.tile || 32;
     const chunkPlayer = this.activePlayers.get(client.id) || this.sim.player;
     const ptx = Math.floor((chunkPlayer?.x || 0) / tile);
@@ -1127,6 +1152,7 @@ export class AuthoritativeRoom {
     const centerCx = Math.floor(ptx / this.options.mapChunkSize);
     const centerCy = Math.floor(pty / this.options.mapChunkSize);
     const sig = this.mapSignature();
+    const maxChunks = Math.max(1, Number.isFinite(this.options.maxMapChunksPerSnapshot) ? Math.floor(this.options.maxMapChunksPerSnapshot) : 4);
 
     for (let cy = centerCy - this.options.mapChunkRadius; cy <= centerCy + this.options.mapChunkRadius; cy++) {
       for (let cx = centerCx - this.options.mapChunkRadius; cx <= centerCx + this.options.mapChunkRadius; cx++) {
@@ -1135,7 +1161,7 @@ export class AuthoritativeRoom {
         if (chunkState.sent.has(key) && nowMs - this.lastChunkPushMs < this.options.mapChunkPushMs) continue;
         const chunk = this.options.buildMapChunkRows(this.sim, cx, cy, this.options.mapChunkSize);
         if (!chunk) continue;
-        client.transport.sendJson({
+        const payload = {
           type: "state.mapChunk",
           roomId: this.id,
           mapSignature: sig,
@@ -1143,11 +1169,21 @@ export class AuthoritativeRoom {
           cy,
           chunkSize: this.options.mapChunkSize,
           rows: chunk.rows
-        });
+        };
+        result.bytes += Buffer.byteLength(JSON.stringify(payload));
+        client.transport.sendJson(payload);
         chunkState.sent.add(key);
+        result.sent += 1;
+        if (result.sent >= maxChunks) {
+          this.lastChunkPushMs = nowMs;
+          result.elapsedMs = this.options.monotonicNowMs() - startedAt;
+          return result;
+        }
       }
     }
     this.lastChunkPushMs = nowMs;
+    result.elapsedMs = this.options.monotonicNowMs() - startedAt;
+    return result;
   }
 
   maybeBroadcastSnapshot(nowMs) {
@@ -1171,7 +1207,17 @@ export class AuthoritativeRoom {
       this.sendMapState();
       this.maybeBroadcastMeta(nowMs, true);
     }
-    for (const client of this.clients.values()) this.sendMapChunksToClient(client, nowMs);
+    const previousSnapshotMs = this.lastSnapshotMs;
+    const snapshotBroadcastGapMs = previousSnapshotMs > 0 ? Math.max(0, nowMs - previousSnapshotMs) : 0;
+    if (snapshotBroadcastGapMs > 0) this.options.pushTelemetrySample(this.telemetry.snapshotBroadcastGapsMs, snapshotBroadcastGapMs);
+    const chunkTelemetry = { sent: 0, bytes: 0, elapsedMs: 0 };
+    for (const client of this.clients.values()) {
+      const pushed = this.sendMapChunksToClient(client, nowMs);
+      chunkTelemetry.sent += pushed?.sent || 0;
+      chunkTelemetry.bytes += pushed?.bytes || 0;
+      chunkTelemetry.elapsedMs += pushed?.elapsedMs || 0;
+    }
+    this.options.pushTelemetrySample(this.telemetry.mapChunkPushDurationsMs, chunkTelemetry.elapsedMs);
     const controllerClient = this.clients.get(this.pauseOwnerId);
     const serializeStart = this.options.monotonicNowMs();
     const fullState = this.options.serializeState(this);
@@ -1239,6 +1285,16 @@ export class AuthoritativeRoom {
     this.broadcast("state.snapshot", {
       serverTime: nowMs,
       snapshotSeq: this.snapshotSeq,
+      snapshotTelemetry: {
+        snapshotBroadcastGapMs: Math.round(snapshotBroadcastGapMs),
+        mapChunksSent: chunkTelemetry.sent,
+        mapChunkBytes: chunkTelemetry.bytes,
+        mapChunkPushDurationMs: Math.round(chunkTelemetry.elapsedMs * 10) / 10,
+        previousPayloadBytes: this.telemetry.lastSnapshotTelemetry?.payloadBytes || 0,
+        previousBroadcastDurationMs: this.telemetry.lastSnapshotTelemetry?.broadcastDurationMs || 0,
+        previousMaxBufferedBeforeBytes: this.telemetry.lastSnapshotTelemetry?.maxBufferedBeforeBytes || 0,
+        droppedSnapshotsTotal: this.telemetry.droppedSnapshots
+      },
       phase: this.phase,
       ownerId: this.roomOwnerId,
       pauseOwnerId: this.pauseOwnerId,
@@ -1302,6 +1358,22 @@ export class AuthoritativeRoom {
         avg: this.options.average(this.telemetry.snapshotBroadcastDurationsMs),
         p95: this.options.percentile(this.telemetry.snapshotBroadcastDurationsMs, 95)
       },
+      snapshotBroadcastGapMs: {
+        avg: this.options.average(this.telemetry.snapshotBroadcastGapsMs),
+        p95: this.options.percentile(this.telemetry.snapshotBroadcastGapsMs, 95)
+      },
+      snapshotPayloadBytes: {
+        avg: this.options.average(this.telemetry.snapshotPayloadBytes),
+        p95: this.options.percentile(this.telemetry.snapshotPayloadBytes, 95)
+      },
+      snapshotSendQueueBytes: {
+        avg: this.options.average(this.telemetry.snapshotSendQueueBytes),
+        p95: this.options.percentile(this.telemetry.snapshotSendQueueBytes, 95)
+      },
+      mapChunkPushDurationMs: {
+        avg: this.options.average(this.telemetry.mapChunkPushDurationsMs),
+        p95: this.options.percentile(this.telemetry.mapChunkPushDurationsMs, 95)
+      },
       tickScheduleOverrunMs: {
         avg: this.options.average(this.telemetry.tickScheduleOverrunMs),
         p95: this.options.percentile(this.telemetry.tickScheduleOverrunMs, 95),
@@ -1313,7 +1385,8 @@ export class AuthoritativeRoom {
         count: this.telemetry.tickUnderrunCount
       },
       droppedSnapshots: this.telemetry.droppedSnapshots,
-      snapshotBroadcastCount: this.telemetry.snapshotBroadcastCount
+      snapshotBroadcastCount: this.telemetry.snapshotBroadcastCount,
+      lastSnapshotTelemetry: this.telemetry.lastSnapshotTelemetry ? { ...this.telemetry.lastSnapshotTelemetry } : null
     };
   }
 }

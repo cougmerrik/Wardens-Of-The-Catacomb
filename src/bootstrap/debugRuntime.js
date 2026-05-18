@@ -309,7 +309,10 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
               serverStateAnomalyEventId: game.networkPerf.serverStateAnomalyEventId || 0,
               recentServerStateAnomalies: Array.isArray(game.networkPerf.recentServerStateAnomalies)
                 ? game.networkPerf.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry }))
-                : []
+                : [],
+              serverSnapshotTelemetry: game.networkPerf.serverSnapshotTelemetry && typeof game.networkPerf.serverSnapshotTelemetry === "object"
+                ? { ...game.networkPerf.serverSnapshotTelemetry }
+                : null
             }
           : null,
         ui: {

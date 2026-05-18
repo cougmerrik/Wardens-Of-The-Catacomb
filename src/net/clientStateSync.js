@@ -274,7 +274,9 @@ export function applySnapshotToGame({
     let flightAppliedPx = 0;
     let flightPendingDepth = Array.isArray(netPendingInputs) ? netPendingInputs.length : 0;
     let flightPostLoadActive = false;
-    if (!controller) {
+    const snapshotPlayerAlive = snapshotPlayer.alive !== false && (!Number.isFinite(snapshotPlayer.health) || snapshotPlayer.health > 0);
+    const reconcileAsController = !!controller && !!isNetworkController && snapshotPlayerAlive;
+    if (!reconcileAsController) {
       Object.assign(game.player, snapshotPlayer);
     } else {
       const baseX = Number.isFinite(snapshotPlayer.x) ? snapshotPlayer.x : game.player.x;

@@ -16,6 +16,25 @@ export function collectInput(game, consumeQueued = true) {
   return input;
 }
 
+export function isLocalGameplayInputActive(game) {
+  if (!game || game.gameOver) return false;
+  if (game.networkRoomPhase === "active" && game.networkRole === "Spectating") return false;
+  return !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
+}
+
+export function stripGameplayInputForSpectator(input) {
+  if (!input || typeof input !== "object") return input;
+  input.moveX = 0;
+  input.moveY = 0;
+  input.firePrimaryQueued = false;
+  input.firePrimaryHeld = false;
+  input.fireAltQueued = false;
+  input.swapAttackQueued = false;
+  input.modeSwapQueued = false;
+  input.spectatorOnly = true;
+  return input;
+}
+
 export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, forceSendIdleMs) {
   if (!previous) return true;
   const changedMove = input.moveX !== previous.moveX || input.moveY !== previous.moveY;
@@ -30,6 +49,7 @@ export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, 
     (Math.abs((input.aimDirX || 0) - (previous.aimDirX || 0)) > 0.01 || Math.abs((input.aimDirY || 0) - (previous.aimDirY || 0)) > 0.01);
   const changedPrimaryHold = !!input.firePrimaryHeld !== !!previous.firePrimaryHeld;
   const changedSpectateTarget = (input.spectateTargetId || "") !== (previous.spectateTargetId || "");
+  if (input.spectatorOnly) return !previous || changedSpectateTarget;
   const hasQueuedAction = !!input.firePrimaryQueued || !!input.fireAltQueued || !!input.swapAttackQueued || !!input.modeSwapQueued;
   const hasContinuousInput = !!input.firePrimaryHeld || !!input.moveX || !!input.moveY;
   if (changedMove || changedAimMode || changedAimPos || changedAimDir || changedPrimaryHold || changedSpectateTarget || hasQueuedAction || hasContinuousInput) return true;
@@ -344,6 +364,7 @@ export function handleNetworkUiActions(game, netClient, isController) {
 }
 
 export function predictFromInput(game, input, dt, canRunPredictedCollision) {
+  if (!isLocalGameplayInputActive(game)) return;
   if (!canRunPredictedCollision) return;
   const mx = Number.isFinite(input.moveX) ? input.moveX : 0;
   const my = Number.isFinite(input.moveY) ? input.moveY : 0;
@@ -405,6 +426,7 @@ export function hasRecentCorrectionPressure(game, nowMs = performance.now()) {
 
 export function canRunPredictedCollision(game, isKnownMapTileAt) {
   if (!game || !game.player) return false;
+  if (!isLocalGameplayInputActive(game)) return false;
   if (hasRecentCorrectionPressure(game)) return false;
   const r = (game.player.size || 22) * 0.5;
   return (

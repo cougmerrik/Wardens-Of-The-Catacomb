@@ -22,7 +22,7 @@ export function startRoomSchedulers(options) {
   function runTickStep(scheduledMonoMs) {
     const actualMonoMs = monotonicNowMs();
     const driftMs = actualMonoMs - scheduledMonoMs;
-    const wallNowMs = Date.now();
+    const wallNowMs = monotonicToWallClockMs(actualMonoMs);
     for (const room of rooms.values()) {
       room.tick(wallNowMs, driftMs);
     }
