@@ -228,6 +228,44 @@ function resolveRemoteRangerProjectileHit(room, owner, target, { damage = 8, dam
   });
 }
 
+function validateRemoteNecromancerBeamAllowsZeroAim(room, remote) {
+  const state = resetRemoteNecromancerState(room, remote);
+  state.x = 128;
+  state.y = 128;
+  state.necromancerBeam = {
+    active: false,
+    targetId: null,
+    targetX: 0,
+    targetY: 0,
+    progress: 0,
+    healTickTimer: 0,
+    mode: "idle",
+    targetEnemy: null
+  };
+  const aimX = 0;
+  const aimY = 192;
+  const lineLen = Math.hypot(aimX - state.x, aimY - state.y);
+  const offset = 9;
+  const breakable = {
+    id: "zero-aim-breakable",
+    x: (state.x + aimX) * 0.5 + (-(aimY - state.y) / lineLen) * offset,
+    y: (state.y + aimY) * 0.5 + ((aimX - state.x) / lineLen) * offset,
+    size: 20,
+    hp: 10,
+    maxHp: 10
+  };
+  room.sim.breakables = [breakable];
+  room.sim.enemies = [];
+  const hit = room.processRemoteNecromancerBeam(state, {
+    firePrimaryHeld: true,
+    hasAim: true,
+    aimX,
+    aimY
+  }, 0.016);
+  assert.equal(hit, true, "remote necromancer beam should accept x=0 aim coordinates");
+  assert.equal(breakable.hp, 0, "remote necromancer beam should hit breakables near an x=0 aim line");
+}
+
 function main() {
   const progressionCoverage = validateProgressionEffectCoverage();
   const { room, remote } = createActiveRoom();
@@ -284,6 +322,7 @@ function main() {
   }, 1);
   assert.ok(goblin.hp < 40, "remote necromancer offensive beam should damage non-undead targets");
   assert.ok((remoteState.necromancerRuntime.tempHp || 0) > 0, "remote necromancer offensive beam should grant temp HP from damage");
+  validateRemoteNecromancerBeamAllowsZeroAim(room, remote);
 
   const remoteFireballTargetErrorPx = validateRemoteMageClickTargetedSpell(room, remote, "fireballSpell");
   const remoteCloudTargetErrorPx = validateRemoteMageClickTargetedSpell(room, remote, "cloudDaggersSpell");

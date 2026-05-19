@@ -22,11 +22,13 @@ export function processRemoteNecromancerBeamForRoom(room, state, input, dt) {
   const beamWidth = Number.isFinite(room.sim.config?.necromancer?.beamWidth) ? room.sim.config.necromancer.beamWidth : 11;
   const offensiveBeamEnabled = isNecromancerTalentGame(context);
   const beamDamagePeriod = 1.0 / getNecromancerBeamPulseRateMultiplier(context);
+  const aimX = Number.isFinite(input.aimX) ? input.aimX : state.x;
+  const aimY = Number.isFinite(input.aimY) ? input.aimY : state.y;
   beam.active = held;
   beam.targetId = null;
   beam.targetEnemy = null;
-  beam.targetX = Number.isFinite(input.aimX) ? input.aimX : state.x;
-  beam.targetY = Number.isFinite(input.aimY) ? input.aimY : state.y;
+  beam.targetX = aimX;
+  beam.targetY = aimY;
   if (!held) {
     beam.progress = 0;
     beam.healTickTimer = 0;
@@ -35,7 +37,7 @@ export function processRemoteNecromancerBeamForRoom(room, state, input, dt) {
     return false;
   }
 
-  const aimLen = Math.hypot((input.aimX || state.x) - state.x, (input.aimY || state.y) - state.y) || 1;
+  const aimLen = Math.hypot(aimX - state.x, aimY - state.y) || 1;
   let hitBreakable = null;
   let bestBreakableDist = Number.POSITIVE_INFINITY;
   for (const br of room.sim.breakables || []) {
@@ -45,7 +47,7 @@ export function processRemoteNecromancerBeamForRoom(room, state, input, dt) {
     if (!room.beamHasLineOfSight(state.x, state.y, br.x, br.y)) continue;
     const lineDist = room.getAimLineDistance(state, input, br, aimLen);
     if (lineDist > beamWidth + (br.size || 20) * 0.35) continue;
-    const distToAim = Math.hypot(br.x - input.aimX, br.y - input.aimY);
+    const distToAim = Math.hypot(br.x - aimX, br.y - aimY);
     if (distToAim < bestBreakableDist) {
       hitBreakable = br;
       bestBreakableDist = distToAim;
@@ -74,7 +76,7 @@ export function processRemoteNecromancerBeamForRoom(room, state, input, dt) {
     if (!room.beamHasLineOfSight(state.x, state.y, enemy.x, enemy.y)) continue;
     const lineDist = room.getAimLineDistance(state, input, enemy, aimLen);
     if (lineDist > beamWidth) continue;
-    const distToAim = Math.hypot(enemy.x - input.aimX, enemy.y - input.aimY);
+    const distToAim = Math.hypot(enemy.x - aimX, enemy.y - aimY);
     if (distToAim < invalidTargetDist) {
       invalidTarget = enemy;
       invalidTargetDist = distToAim;
