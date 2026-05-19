@@ -1,41 +1,4 @@
-import { getNecromancerTalentDef } from "../../game/necromancerTalentTree.js";
-import { getRangerSelectedPath, getRangerTalentDef } from "../../game/rangerTalentTree.js";
-import { getWarriorClassSkillColor, getWarriorClassSkillCooldown, getWarriorClassSkillName, getWarriorDoctrine, getWarriorTalentDef } from "../../game/warriorTalentTree.js";
-
-function createGlyphIcon(label, color) {
-  return { kind: "glyph", label, color };
-}
-
-function createTalentGlyphIcon(def, fallbackLabel, fallbackColor) {
-  return createGlyphIcon(def?.icon || fallbackLabel, def?.color || fallbackColor);
-}
-
-function createScoutTalentIcon(key, fallbackLabel, fallbackColor) {
-  const def = getRangerTalentDef(key);
-  return { kind: "scoutSkill", key, label: def?.icon || fallbackLabel, color: def?.color || fallbackColor };
-}
-
-function getWarriorDoctrineIcon(game) {
-  const keyMap = {
-    paladin: "paladinDoctrine",
-    berserker: "berserkerDoctrine",
-    gladiator: "gladiatorDoctrine",
-    eldritch: "eldritchDoctrine"
-  };
-  const key = keyMap[getWarriorDoctrine(game)];
-  return key ? createTalentGlyphIcon(getWarriorTalentDef(key), "BC", getWarriorClassSkillColor(game)) : createGlyphIcon("BC", getWarriorClassSkillColor(game));
-}
-
-function getNecromancerPathIcon(path, color) {
-  const keyMap = {
-    wizard: "wizardPath",
-    necromancer: "necromancerPath",
-    sorcerer: "sorcererPath",
-    enchanter: "enchanterPath"
-  };
-  const key = keyMap[path];
-  return key ? createTalentGlyphIcon(getNecromancerTalentDef(key), "BL", color) : createGlyphIcon("BL", color);
-}
+import { getWarriorClassSkillColor, getWarriorClassSkillCooldown, getWarriorClassSkillName } from "../../game/warriorTalentTree.js";
 
 function getHudAbilitySource(game) {
   const target = game?.player && (game.player.alive === false || (game.player.health || 0) <= 0) && typeof game.getSpectateTargetEntity === "function"
@@ -68,7 +31,6 @@ export function getHudAbilityState(game) {
       title,
       color,
       accent: "#ffb0b0",
-      icon: getWarriorDoctrineIcon(source),
       cooldownRemaining,
       cooldownMax,
       progress: cooldownRemaining > 0 ? 1 - cooldownRemaining / cooldownMax : 1,
@@ -112,21 +74,19 @@ export function getHudAbilityState(game) {
       title: titleMap[path],
       color: colorMap[path],
       accent: "#ffffff",
-      icon: getNecromancerPathIcon(path, colorMap[path]),
       cooldownRemaining,
       cooldownMax,
       progress: cooldownRemaining > 0 ? 1 - cooldownRemaining / cooldownMax : 1,
       hoverText: cooldownRemaining > 0 ? `${titleMap[path]} cooldown: ${cooldownRemaining.toFixed(1)}s` : `${titleMap[path]} ready`
     };
   }
-  const selectedPath = getRangerSelectedPath(source);
-  const path = selectedPath === "rangerPath"
+  const path = source.rangerTalents?.rangerPath?.points > 0
     ? "ranger"
-    : selectedPath === "roguePath"
+    : source.rangerTalents?.roguePath?.points > 0
     ? "rogue"
-    : selectedPath === "assassinPath"
+    : source.rangerTalents?.assassinPath?.points > 0
     ? "assassin"
-    : selectedPath === "beastMasterPath"
+    : source.rangerTalents?.beastMasterPath?.points > 0
     ? "beastMaster"
     : "dodge";
   const titleMap = {
@@ -159,7 +119,6 @@ export function getHudAbilityState(game) {
     title: titleMap[path],
     color: colorMap[path],
     accent: "#d7ffd0",
-    icon: selectedPath ? createScoutTalentIcon(selectedPath, "DG", colorMap[path]) : createGlyphIcon("DG", colorMap[path]),
     cooldownRemaining,
     cooldownMax,
     progress: unlocked ? (cooldownRemaining > 0 ? 1 - cooldownRemaining / cooldownMax : 1) : 0,

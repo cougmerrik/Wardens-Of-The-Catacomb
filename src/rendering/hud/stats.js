@@ -1,7 +1,6 @@
 import { drawStatsGameOverActions } from "./statsGameOverActions.js";
 import { getAndroidHudCardX } from "./androidLayout.js";
 import { drawPinnedAbilityTooltip } from "./abilityWidgetTooltip.js";
-import { drawAbilityCenterIcon, drawAbilityCooldownBadge } from "./abilityWidgetIcon.js";
 import { getHudAbilityState } from "./abilityWidgetState.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 import { getClassDisplayLabel } from "../../game/classDisplay.js";
@@ -54,13 +53,13 @@ function drawAbilityCooldownWidget(renderer, game, x, y, size) {
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  drawAbilityCenterIcon(ctx, state, cx, cy, size);
-
   ctx.fillStyle = "#f2efe3";
   ctx.font = "bold 10px Trebuchet MS";
   ctx.textAlign = "center";
   if (!game.isAndroidLayout) ctx.fillText(state.title, cx, y + size + 11);
-  drawAbilityCooldownBadge(ctx, state, cx, y, size);
+  ctx.font = "bold 12px Trebuchet MS";
+  const text = state.cooldownRemaining > 0 ? `${Math.ceil(state.cooldownRemaining)}` : "R";
+  ctx.fillText(text, cx, cy + 4);
   ctx.textAlign = "left";
   ctx.restore();
 

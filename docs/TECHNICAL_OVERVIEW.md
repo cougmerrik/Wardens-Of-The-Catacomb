@@ -10,6 +10,7 @@ This document summarizes the current high-level architecture and validation work
 - `src/rendering/*`: renderer, HUD, scene drawing, and effects
 - Class skill tree menus share layout sizing and row-splitting helpers in `src/rendering/hud/skillTreeMenuSections.js` so Scout, Warrior, and Necromancer progression views do not drift visually.
 - `assets/images/skills/scout/*`: transparent Scout progression icons; new Scout talent icons should be generated from the canonical prompt in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#scout-progression-icon-assets)
+- `assets/images/skills/warrior/*` and `assets/images/skills/mage/*`: transparent Warrior and Mage progression icons; new Warrior or Mage talent icons should be generated from the canonical prompt in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#warrior-and-mage-progression-icon-assets)
 - `assets/images/items/*`: transparent consumable item icons; new consumable icons should be generated from the canonical prompt in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md#icon-generation-prompt)
 - `src/net/*`: client-side networking, prediction, interpolation, and map sync helpers
 - `src/runtime/runtimeConfig.js`: platform-aware runtime defaults, network URL resolution, and persisted server override helpers

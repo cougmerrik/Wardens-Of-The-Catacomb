@@ -23,6 +23,7 @@ import {
   getSkillTierHeader,
   getSkillTreeTierLayouts
 } from "./skillTreeMenuSections.js";
+import { drawMageSkillIcon } from "./mageSkillIcons.js";
 
 function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
@@ -38,6 +39,15 @@ function drawIcon(ctx, rect, icon, fill, muted) {
   ctx.textAlign = "center";
   ctx.fillText(icon, rect.x + rect.w * 0.5, rect.y + rect.h * 0.62);
   ctx.textAlign = "left";
+}
+
+function drawMageNodeIcon(ctx, rect, def, muted) {
+  ctx.fillStyle = muted ? "rgba(48, 52, 61, 0.96)" : "rgba(18, 16, 28, 0.95)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = muted ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.78)";
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  if (drawMageSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, 1, muted)) return;
+  drawIcon(ctx, rect, def.icon, def.color, muted);
 }
 
 function drawTooltip(ctx, renderer, mouseX, mouseY, tooltip) {
@@ -139,7 +149,7 @@ export function drawNecromancerSkillTreeMenu(renderer, game, layout, frame) {
       const locked = !canSpendNecromancerNode(game, def.key) && points <= 0;
       const iconX = rect.x + Math.floor((rect.w - SKILL_TREE_ICON_SIZE) / 2);
       const iconY = rect.y + Math.floor((rect.h - SKILL_TREE_ICON_SIZE) / 2);
-      drawIcon(ctx, { x: iconX, y: iconY, w: SKILL_TREE_ICON_SIZE, h: SKILL_TREE_ICON_SIZE }, def.icon, def.color, points <= 0);
+      drawMageNodeIcon(ctx, { x: iconX, y: iconY, w: SKILL_TREE_ICON_SIZE, h: SKILL_TREE_ICON_SIZE }, def, points <= 0);
       game.uiRects.skillTreeNodes.push({ key: def.key, kind: "node", rect });
       if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
         hovered = getNecromancerTooltip(game, { key: def.key, kind: "node", locked: locked || !accessible });
