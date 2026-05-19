@@ -66,13 +66,21 @@ export function getScoutSkillIconStatus(key) {
   return "loading";
 }
 
-export function drawScoutSkillIcon(ctx, key, x, y, size, padding = 1) {
+export function drawScoutSkillIcon(ctx, key, x, y, size, padding = 1, muted = false) {
   const record = getIconRecord(key);
   if (!record || !record.loaded || record.failed) return false;
 
   const previousSmoothing = ctx.imageSmoothingEnabled;
+  const previousAlpha = ctx.globalAlpha;
+  const previousFilter = ctx.filter;
   ctx.imageSmoothingEnabled = false;
+  if (muted) {
+    ctx.globalAlpha = 0.42;
+    ctx.filter = "grayscale(1)";
+  }
   ctx.drawImage(record.image, x + padding, y + padding, size - padding * 2, size - padding * 2);
   ctx.imageSmoothingEnabled = previousSmoothing;
+  ctx.globalAlpha = previousAlpha;
+  ctx.filter = previousFilter;
   return true;
 }

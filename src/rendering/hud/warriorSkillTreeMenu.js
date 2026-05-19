@@ -1,6 +1,5 @@
 import {
   canSpendWarriorNode,
-  formatWarriorLaneLabel,
   getWarriorAvailableSkillPoints,
   getWarriorSpentSkillPoints,
   getWarriorTalentDefs,
@@ -11,6 +10,7 @@ import {
 import {
   SKILL_TREE_CARD_GAP,
   SKILL_TREE_CARD_HEIGHT,
+  SKILL_TREE_CARD_MIN_WIDTH,
   SKILL_TREE_ICON_SIZE,
   SKILL_TREE_NODE_ROW_GAP,
   SKILL_TREE_ROW_GAP,
@@ -34,13 +34,13 @@ function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
 }
 
-function drawIcon(ctx, rect, icon, fill, locked) {
-  ctx.fillStyle = locked ? "rgba(48, 52, 61, 0.96)" : fill;
+function drawIcon(ctx, rect, icon, fill, muted) {
+  ctx.fillStyle = muted ? "rgba(48, 52, 61, 0.96)" : fill;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = locked ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.62)";
+  ctx.strokeStyle = muted ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.78)";
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
-  ctx.fillStyle = "#f4efe3";
-  ctx.font = "bold 11px Trebuchet MS";
+  ctx.fillStyle = muted ? "#9ea4af" : "#f4efe3";
+  ctx.font = "bold 18px Trebuchet MS";
   ctx.textAlign = "center";
   ctx.fillText(icon, rect.x + rect.w * 0.5, rect.y + rect.h * 0.62);
   ctx.textAlign = "left";
@@ -134,7 +134,7 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
     const tierLimit = tier === 5 ? 2 : 1;
     ctx.fillText(getSkillTierHeader(tier, WARRIOR_TIER_LABELS[tier], selectedCount, tierLimit), rowRect.x + 12, rowRect.y + 20);
 
-    const cardW = Math.max(120, Math.floor((rowRect.w - 24 - Math.max(0, columns - 1) * SKILL_TREE_CARD_GAP) / Math.max(1, columns)));
+    const cardW = Math.max(SKILL_TREE_CARD_MIN_WIDTH, Math.floor((rowRect.w - 24 - Math.max(0, columns - 1) * SKILL_TREE_CARD_GAP) / Math.max(1, columns)));
     nodes.forEach((def, index) => {
       const col = index % columns;
       const row = Math.floor(index / columns);
@@ -146,17 +146,9 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
       };
       const points = getWarriorTalentPoints(game, def.key);
       const locked = !canSpendWarriorNode(game, def.key) && points <= 0;
-      drawIcon(ctx, { x: rect.x + 4, y: rect.y + 6, w: SKILL_TREE_ICON_SIZE, h: SKILL_TREE_ICON_SIZE }, def.icon, def.color, locked || !accessible);
-      ctx.fillStyle = locked || !accessible ? "#9ea4af" : "#f2efe7";
-      ctx.font = "bold 12px Trebuchet MS";
-      ctx.fillText(def.label, rect.x + 38, rect.y + 16);
-      ctx.font = "11px Trebuchet MS";
-      ctx.fillStyle = locked || !accessible ? "#828894" : "#cfd7e6";
-      ctx.fillText(formatWarriorLaneLabel(def.lane), rect.x + 38, rect.y + 30);
-      if (points > 0) {
-        ctx.fillStyle = "#f6ddb4";
-        ctx.fillText("Selected", rect.x + rect.w - 50, rect.y + 30);
-      }
+      const iconX = rect.x + Math.floor((rect.w - SKILL_TREE_ICON_SIZE) / 2);
+      const iconY = rect.y + Math.floor((rect.h - SKILL_TREE_ICON_SIZE) / 2);
+      drawIcon(ctx, { x: iconX, y: iconY, w: SKILL_TREE_ICON_SIZE, h: SKILL_TREE_ICON_SIZE }, def.icon, def.color, points <= 0);
       game.uiRects.skillTreeNodes.push({ key: def.key, kind: "node", rect });
       if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
         hovered = getWarriorTooltip(game, { key: def.key, kind: "node", locked: locked || !accessible });

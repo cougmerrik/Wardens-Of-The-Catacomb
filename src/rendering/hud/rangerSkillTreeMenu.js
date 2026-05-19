@@ -14,6 +14,7 @@ import { drawScoutSkillIcon, getScoutSkillIconStatus } from "./scoutSkillIcons.j
 import {
   SKILL_TREE_CARD_GAP,
   SKILL_TREE_CARD_HEIGHT,
+  SKILL_TREE_CARD_MIN_WIDTH,
   SKILL_TREE_ICON_SIZE,
   SKILL_TREE_NODE_ROW_GAP,
   SKILL_TREE_ROW_GAP,
@@ -28,38 +29,26 @@ function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
 }
 
-function drawRankPips(ctx, x, y, filled, total, color, locked) {
-  const size = 10;
-  const gap = 4;
-  for (let i = 0; i < total; i++) {
-    const px = x + i * (size + gap);
-    ctx.fillStyle = i < filled ? color : locked ? "rgba(68, 74, 86, 0.92)" : "rgba(28, 34, 44, 0.96)";
-    ctx.fillRect(px, y, size, size);
-    ctx.strokeStyle = locked ? "rgba(110, 116, 128, 0.72)" : "rgba(220, 228, 238, 0.52)";
-    ctx.strokeRect(px + 0.5, y + 0.5, size - 1, size - 1);
-  }
-}
-
-function drawIcon(ctx, rect, icon, fill, locked) {
-  ctx.fillStyle = locked ? "rgba(48, 52, 61, 0.96)" : fill;
+function drawIcon(ctx, rect, icon, fill, muted) {
+  ctx.fillStyle = muted ? "rgba(48, 52, 61, 0.96)" : fill;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = locked ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.62)";
+  ctx.strokeStyle = muted ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.78)";
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
-  ctx.fillStyle = "#f4efe3";
-  ctx.font = "bold 11px Trebuchet MS";
+  ctx.fillStyle = muted ? "#9ea4af" : "#f4efe3";
+  ctx.font = "bold 18px Trebuchet MS";
   ctx.textAlign = "center";
   ctx.fillText(icon, rect.x + rect.w * 0.5, rect.y + rect.h * 0.62);
   ctx.textAlign = "left";
 }
 
-function drawScoutNodeIcon(ctx, rect, def, locked) {
-  ctx.fillStyle = locked ? "rgba(48, 52, 61, 0.96)" : "rgba(8, 12, 18, 0.94)";
+function drawScoutNodeIcon(ctx, rect, def, muted) {
+  ctx.fillStyle = muted ? "rgba(20, 22, 26, 0.96)" : "rgba(8, 12, 18, 0.94)";
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = locked ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.62)";
+  ctx.strokeStyle = muted ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.78)";
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
-  if (drawScoutSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, 1)) return;
+  if (drawScoutSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, 2, muted)) return;
   if (getScoutSkillIconStatus(def.key) === "loading") return;
-  drawIcon(ctx, rect, def.icon, def.color, locked);
+  drawIcon(ctx, rect, def.icon, def.color, muted);
 }
 
 function drawTooltip(ctx, renderer, mouseX, mouseY, tooltip) {
@@ -146,7 +135,7 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
     ctx.font = "bold 14px Trebuchet MS";
     ctx.fillText(getSkillTierHeader(tier, getRangerTierLabel(tier), selectedCount, groupLimit), tierRect.x + 12, tierRect.y + 20);
 
-    const cardW = Math.max(120, Math.floor((tierRect.w - 24 - Math.max(0, columns - 1) * SKILL_TREE_CARD_GAP) / Math.max(1, columns)));
+    const cardW = Math.max(SKILL_TREE_CARD_MIN_WIDTH, Math.floor((tierRect.w - 24 - Math.max(0, columns - 1) * SKILL_TREE_CARD_GAP) / Math.max(1, columns)));
     tierDefs.forEach((def, index) => {
       const col = index % columns;
       const row = Math.floor(index / columns);
@@ -158,11 +147,9 @@ export function drawRangerSkillTreeMenu(renderer, game, layout, frame) {
       };
       const points = getRangerTalentPoints(game, def.key);
       const locked = !canSpendRangerNode(game, def.key) && points <= 0;
-      drawScoutNodeIcon(ctx, { x: rect.x + 4, y: rect.y + 6, w: SKILL_TREE_ICON_SIZE, h: SKILL_TREE_ICON_SIZE }, def, locked || !accessible);
-      ctx.fillStyle = locked || !accessible ? "#9ea4af" : "#f2efe7";
-      ctx.font = "bold 11px Trebuchet MS";
-      ctx.fillText(def.label, rect.x + 38, rect.y + 16);
-      drawRankPips(ctx, rect.x + 38, rect.y + 29, points, def.maxRanks, def.color, locked || !accessible);
+      const iconX = rect.x + Math.floor((rect.w - SKILL_TREE_ICON_SIZE) / 2);
+      const iconY = rect.y + Math.floor((rect.h - SKILL_TREE_ICON_SIZE) / 2);
+      drawScoutNodeIcon(ctx, { x: iconX, y: iconY, w: SKILL_TREE_ICON_SIZE, h: SKILL_TREE_ICON_SIZE }, def, points <= 0);
       game.uiRects.skillTreeNodes.push({ key: def.key, kind: "node", rect });
       if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
         hovered = getRangerTooltip(game, { key: def.key, kind: "node", locked: locked || !accessible });

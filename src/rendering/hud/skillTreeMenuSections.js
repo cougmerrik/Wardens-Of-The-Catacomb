@@ -1,5 +1,6 @@
-export const SKILL_TREE_ICON_SIZE = 28;
-export const SKILL_TREE_CARD_HEIGHT = 42;
+export const SKILL_TREE_ICON_SIZE = 58;
+export const SKILL_TREE_CARD_HEIGHT = 72;
+export const SKILL_TREE_CARD_MIN_WIDTH = 68;
 export const SKILL_TREE_CARD_GAP = 10;
 export const SKILL_TREE_ROW_GAP = 10;
 export const SKILL_TREE_NODE_ROW_GAP = 8;
@@ -7,8 +8,9 @@ export const SKILL_TREE_NODE_ROW_GAP = 8;
 export function getSkillTreeTierColumnCount(tier, count) {
   const safeCount = Math.max(1, Math.floor(Number.isFinite(count) ? count : 1));
   if (tier === 5) return Math.min(4, Math.max(2, safeCount));
-  if (safeCount >= 6) return 3;
-  if (safeCount >= 4) return 2;
+  if (safeCount >= 6) return 6;
+  if (safeCount >= 5) return 5;
+  if (safeCount >= 4) return 4;
   return safeCount;
 }
 
@@ -27,7 +29,7 @@ export function getSkillTreeTierLayouts(defs, maxTier = 6) {
     const nodes = tiers.get(tier) || [];
     const columns = getSkillTreeTierColumnCount(tier, nodes.length || 1);
     const rows = Math.max(1, Math.ceil(Math.max(1, nodes.length) / Math.max(1, columns)));
-    const height = 42 + rows * 48 + Math.max(0, rows - 1) * SKILL_TREE_NODE_ROW_GAP;
+    const height = 42 + rows * SKILL_TREE_CARD_HEIGHT + Math.max(0, rows - 1) * SKILL_TREE_NODE_ROW_GAP;
     tierLayouts.push({ tier, nodes, columns, rows, height });
     contentHeight += height + SKILL_TREE_ROW_GAP;
   }
