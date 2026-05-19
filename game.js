@@ -77,6 +77,7 @@ import {
 import { getBaseClassDisplayLabel } from "./src/game/classDisplay.js";
 import { spawnTreasureGoblin } from "./src/game/enemySpawnFactories.js";
 import { preloadConsumableItemIcons } from "./src/rendering/hud/consumableItemIcons.js";
+import { preloadScoutSkillIcons } from "./src/rendering/hud/scoutSkillIcons.js";
 import {
   clearStoredServerUrlOverride,
   getRuntimeAllowServerUrlOverride,
@@ -2871,6 +2872,7 @@ window.addEventListener("resize", syncMenuScrollIndicator);
 window.addEventListener("scroll", syncMenuScrollIndicator, { passive: true });
 warmStartupAudio();
 preloadConsumableItemIcons();
+preloadScoutSkillIcons();
 if (isDevMode) {
   splashActive = false;
   splashDismissed = true;

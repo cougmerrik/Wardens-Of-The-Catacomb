@@ -147,6 +147,25 @@ This front-loads the early tree enough for Row 4 access at the start of floor 5,
 
 ## Ranger
 
+### Scout Progression Icon Assets
+
+The implemented Scout progression tree uses transparent `128x128` PNG icons under `assets/images/skills/scout/`, keyed by the talent keys in `src/game/rangerTalentData.js`. The skill tree renderer preloads these icons at startup and draws them at the shared class-tree icon size from `src/rendering/hud/skillTreeMenuSections.js`.
+
+Use this prompt template when adding a new Scout progression node. Replace the node name and subject details, but keep the shared style, composition, background, and avoid rules.
+
+```text
+Use case: stylized-concept
+Asset type: retro fantasy roguelike Scout progression skill icon
+Primary request: Create a small pixel-art skill tree icon for <Scout Node Name>.
+Subject: <One compact sentence describing the weapon, path, buff, status, or magical effect as a readable Scout-themed symbol.>
+Style: retro 16-bit pixel art fantasy skill icon matching the Longbow style, crisp hand-pixeled edges, limited palette, chunky silhouette, high contrast, readable at 28x28 pixels, deliberately low-detail, no antialiasing look, no realistic rendering, no painterly brushwork, no smooth gradients.
+Composition: Single centered symbol/object with generous padding, front-facing view unless the subject reads better in slight three-quarter view, object occupies about 70 percent of the canvas.
+Background: perfectly flat solid #00ff00 chroma-key background for background removal. The background must be one uniform color with no shadows, gradients, texture, floor plane, or lighting variation. Do not use #00ff00 anywhere in the subject. Use #ff00ff instead when the subject contains important green pixels.
+Avoid: no text, no letters, no numbers, no watermark, no UI border frame, no cast shadow, no contact shadow.
+```
+
+Generate larger than the in-game display size, then downscale and remove the chroma-key background into a transparent `128x128` PNG before adding it to `assets/images/skills/scout/`. New Scout talents should not be considered visually complete until their icon is generated and added to the Scout icon source map.
+
 ### Class Identity
 
 The ranger is a ranged kiter in a horde game.

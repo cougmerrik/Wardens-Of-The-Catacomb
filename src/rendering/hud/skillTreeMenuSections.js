@@ -1,3 +1,39 @@
+export const SKILL_TREE_ICON_SIZE = 28;
+export const SKILL_TREE_CARD_HEIGHT = 42;
+export const SKILL_TREE_CARD_GAP = 10;
+export const SKILL_TREE_ROW_GAP = 10;
+export const SKILL_TREE_NODE_ROW_GAP = 8;
+
+export function getSkillTreeTierColumnCount(tier, count) {
+  const safeCount = Math.max(1, Math.floor(Number.isFinite(count) ? count : 1));
+  if (tier === 5) return Math.min(4, Math.max(2, safeCount));
+  if (safeCount >= 6) return 3;
+  if (safeCount >= 4) return 2;
+  return safeCount;
+}
+
+export function getSkillTreeTierLayouts(defs, maxTier = 6) {
+  const tiers = new Map();
+  for (const def of Array.isArray(defs) ? defs : []) {
+    const tier = Number.isFinite(def?.tier) ? Math.max(1, Math.floor(def.tier)) : 1;
+    const list = tiers.get(tier) || [];
+    list.push(def);
+    tiers.set(tier, list);
+  }
+
+  const tierLayouts = [];
+  let contentHeight = 40;
+  for (let tier = 1; tier <= maxTier; tier++) {
+    const nodes = tiers.get(tier) || [];
+    const columns = getSkillTreeTierColumnCount(tier, nodes.length || 1);
+    const rows = Math.max(1, Math.ceil(Math.max(1, nodes.length) / Math.max(1, columns)));
+    const height = 42 + rows * 48 + Math.max(0, rows - 1) * SKILL_TREE_NODE_ROW_GAP;
+    tierLayouts.push({ tier, nodes, columns, rows, height });
+    contentHeight += height + SKILL_TREE_ROW_GAP;
+  }
+  return { tierLayouts, contentHeight };
+}
+
 export function drawSkillTreeTitle(ctx, menuX, menuY) {
   ctx.fillStyle = "#f3efe3";
   ctx.font = "bold 20px Trebuchet MS";
