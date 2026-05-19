@@ -152,6 +152,34 @@ Passive consumables appear to the right of the active hotbar area.
 - Passive items should show cooldown feedback if applicable
 - If the last charge is consumed, the passive icon disappears immediately
 
+## Consumable Icon Assets
+
+Consumable icons are stored under `assets/images/items/` as transparent `128x128` PNG files named after the consumable key, such as `regenerationPotion.png`.
+
+The icons are rendered small in-game:
+
+- shop rows use roughly `36x36` on desktop and `42x42` on Android
+- hotbar and passive HUD slots use `34x34`
+
+Generate icons larger than the display size, then downscale to transparent `128x128` PNGs before adding them to the repository. The renderer should keep a text/placeholder fallback for missing or loading icons.
+
+### Icon Generation Prompt
+
+Use this prompt template when adding a new consumable. Replace the item name and subject details, but keep the shared style, composition, background, and avoid rules.
+
+```text
+Use case: stylized-concept
+Asset type: retro fantasy roguelike consumable item icon
+Primary request: Create a small pixel-art inventory icon for <Consumable Name>.
+Subject: <One compact sentence describing the item as a readable fantasy object or magical effect.>
+Style: retro 16-bit pixel art fantasy item icon matching the Regeneration Potion style anchor, crisp hand-pixeled edges, limited palette, chunky silhouette, high contrast, readable at 34x34 pixels, deliberately low-detail, no antialiasing look, no realistic rendering, no painterly brushwork, no smooth gradients.
+Composition: Single centered object with generous padding, front-facing three-quarter view unless the item reads better head-on, object occupies about 70 percent of the canvas.
+Background: perfectly flat solid #00ff00 chroma-key background for background removal. The background must be one uniform color with no shadows, gradients, texture, floor plane, or lighting variation. Do not use #00ff00 anywhere in the subject. Use #ff00ff instead when the subject contains important green pixels.
+Avoid: no text, no letters, no numbers, no watermark, no UI border frame, no cast shadow, no contact shadow, no realistic reflections.
+```
+
+For magical protection or effect-only consumables, describe the subject as an effect rather than a literal object. For example, the `shield` consumable uses an arcane guard/ward icon because it blocks a hit; it should not be represented as a physical metal shield.
+
 ## Tooltip Structure
 
 Tooltip text should follow a consistent structure.
@@ -243,7 +271,9 @@ All new consumables should be created using the same workflow so they remain con
 6. Define `Cooldown` and `Unlock Floor`
 7. Define `Price`, `Max Stack`, and `Max Inventory`
 8. Write the `Effect` as concise gameplay-facing rules text
-9. Confirm the item respects v1 constraints such as no hybrid behavior, slot limits, and run-only persistence
+9. Generate a matching icon using the prompt in [Icon Generation Prompt](#icon-generation-prompt)
+10. Add the transparent `128x128` PNG to `assets/images/items/` and wire its key into the HUD icon source map
+11. Confirm the item respects v1 constraints such as no hybrid behavior, slot limits, and run-only persistence
 
 The schema should be treated as the canonical starting point for new item design.
 

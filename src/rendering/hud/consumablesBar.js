@@ -1,21 +1,29 @@
 import { getAndroidConsumablesStartX } from "./androidLayout.js";
+import { drawConsumableItemIcon, getConsumableItemIconStatus } from "./consumableItemIcons.js";
 
-function drawConsumableSlot(ctx, slotX, slotY, slotSize, fillStyle, label, count, cooldownRatio = 0, keyLabel = "") {
+function drawConsumableSlot(ctx, slotX, slotY, slotSize, fillStyle, key, label, count, cooldownRatio = 0, keyLabel = "") {
   ctx.fillStyle = "rgba(8, 12, 18, 0.94)";
   ctx.fillRect(slotX, slotY, slotSize, slotSize);
   ctx.strokeStyle = "rgba(198, 212, 246, 0.35)";
   ctx.strokeRect(slotX + 0.5, slotY + 0.5, slotSize - 1, slotSize - 1);
   if (label) {
+    const hasIcon = drawConsumableItemIcon(ctx, key, slotX, slotY, slotSize, 2);
+    const iconLoading = !hasIcon && getConsumableItemIconStatus(key) === "loading";
     ctx.fillStyle = fillStyle;
-    ctx.fillRect(slotX + 3, slotY + 3, slotSize - 6, slotSize - 6);
+    if (!hasIcon && !iconLoading) ctx.fillRect(slotX + 3, slotY + 3, slotSize - 6, slotSize - 6);
     if (cooldownRatio > 0) {
       ctx.fillStyle = "rgba(6, 8, 12, 0.66)";
       ctx.fillRect(slotX + 2, slotY + 2, slotSize - 4, (slotSize - 4) * cooldownRatio);
     }
-    ctx.fillStyle = "#eef3ff";
-    ctx.font = "bold 10px Trebuchet MS";
-    ctx.fillText(label, slotX + 8, slotY + 19);
+    if (!hasIcon && !iconLoading) {
+      ctx.fillStyle = "#eef3ff";
+      ctx.font = "bold 10px Trebuchet MS";
+      ctx.fillText(label, slotX + 8, slotY + 19);
+    }
+    ctx.fillStyle = "rgba(4, 7, 11, 0.78)";
+    ctx.fillRect(slotX + slotSize - 13, slotY + slotSize - 13, 11, 11);
     ctx.font = "bold 11px Trebuchet MS";
+    ctx.fillStyle = "#eef3ff";
     ctx.fillText(`${count || 0}`, slotX + 24, slotY + 28);
   }
   if (!keyLabel) return;
@@ -50,6 +58,7 @@ export function drawConsumablesBar(renderer, game, layout, xpBarY) {
       barBaseY,
       slotSize,
       "rgba(126, 168, 255, 0.16)",
+      slot?.key || "",
       slot ? (slot.key || "").slice(0, 2).toUpperCase() : "",
       slot?.count || 0,
       cooldownRatio,
@@ -67,6 +76,7 @@ export function drawConsumablesBar(renderer, game, layout, xpBarY) {
       barBaseY,
       slotSize,
       "rgba(210, 168, 255, 0.16)",
+      slot?.key || "",
       (slot.key || "").slice(0, 2).toUpperCase(),
       slot.count || 0,
       Math.max(0, Math.min(1, (slot.cooldownRemaining || 0) / 5))

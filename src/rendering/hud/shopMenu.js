@@ -1,8 +1,12 @@
+import { drawConsumableItemIcon, getConsumableItemIconStatus } from "./consumableItemIcons.js";
+
 function drawConsumablePlaceholder(ctx, key, x, y, size, accent = "rgba(126, 168, 255, 0.16)") {
   ctx.fillStyle = "rgba(8, 12, 18, 0.94)";
   ctx.fillRect(x, y, size, size);
   ctx.strokeStyle = "rgba(198, 212, 246, 0.35)";
   ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+  if (drawConsumableItemIcon(ctx, key, x, y, size, 2)) return;
+  if (getConsumableItemIconStatus(key) === "loading") return;
   ctx.fillStyle = accent;
   ctx.fillRect(x + 3, y + 3, size - 6, size - 6);
   ctx.fillStyle = "#eef3ff";

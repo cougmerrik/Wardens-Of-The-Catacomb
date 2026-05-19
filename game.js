@@ -76,6 +76,7 @@ import {
 } from "./src/leaderboard/leaderboardClient.js";
 import { getBaseClassDisplayLabel } from "./src/game/classDisplay.js";
 import { spawnTreasureGoblin } from "./src/game/enemySpawnFactories.js";
+import { preloadConsumableItemIcons } from "./src/rendering/hud/consumableItemIcons.js";
 import {
   clearStoredServerUrlOverride,
   getRuntimeAllowServerUrlOverride,
@@ -2869,6 +2870,7 @@ syncDebugHudStatsDom(currentGame);
 window.addEventListener("resize", syncMenuScrollIndicator);
 window.addEventListener("scroll", syncMenuScrollIndicator, { passive: true });
 warmStartupAudio();
+preloadConsumableItemIcons();
 if (isDevMode) {
   splashActive = false;
   splashDismissed = true;

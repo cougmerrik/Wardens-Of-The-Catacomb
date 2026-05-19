@@ -136,11 +136,8 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Health drops use a computed drop-rate helper instead of a flat static chance.
 - Health pickups restore `25%` of max health.
 - Gold-find and spawn-rate shop upgrades were removed from the shop.
-- Current shop upgrades are:
-  - Move Speed
-  - Attack Speed
-  - Damage
-  - Defense
+- The current shop is consumable-only. Consumables are active or passive, have finite charges, appear in the HUD while owned, and follow the schema in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md).
+- New consumables should include a matching item icon generated with the canonical prompt in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md#icon-generation-prompt).
 
 ## Skills and Refunds
 - Skill points are earned from level-ups and spent per player.

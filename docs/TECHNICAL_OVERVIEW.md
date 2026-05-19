@@ -8,6 +8,7 @@ This document summarizes the current high-level architecture and validation work
 - `src/biomes.js`: biome definitions for floor layout, colors, traps, breakables, and special-rule hooks
 - `src/mapGenerator.js`: biome-specific procedural map generators for catacomb and sewer floors
 - `src/rendering/*`: renderer, HUD, scene drawing, and effects
+- `assets/images/items/*`: transparent consumable item icons; new consumable icons should be generated from the canonical prompt in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md#icon-generation-prompt)
 - `src/net/*`: client-side networking, prediction, interpolation, and map sync helpers
 - `src/runtime/runtimeConfig.js`: platform-aware runtime defaults, network URL resolution, and persisted server override helpers
 - `scripts/prepare-capacitor-web.js`: deterministic Capacitor web-bundle preparation for Android builds
