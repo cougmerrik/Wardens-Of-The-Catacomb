@@ -352,13 +352,13 @@ export const runtimeMageCoreAttackMethods = {
       if (diff > Math.PI * 0.16) continue;
       this.applyEnemyDamage(enemy, this.getPrimaryDamage() * 1.15, "physical", this.player.id || null);
       if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null, consumableAttackEffects);
-      if (
-        (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
-        typeof this.consumeConsumableAttackCharge === "function"
-      ) {
-        this.consumeConsumableAttackCharge(consumableAttackEffects);
-      }
       break;
+    }
+    if (
+      (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
+      typeof this.consumeConsumableAttackCharge === "function"
+    ) {
+      this.consumeConsumableAttackCharge(consumableAttackEffects);
     }
     return true;
   },
@@ -384,7 +384,6 @@ export const runtimeMageCoreAttackMethods = {
     const critMultiplier = this.rollMageCritical();
     const damage = this.getPrimaryDamage() * (hasMageTalent(this, "battlemage") ? 1.45 : 1.15) * scale * critMultiplier;
     let leechTotal = 0;
-    let hitAnyEnemy = false;
     for (const enemy of this.enemies || []) {
       if (!enemy || (enemy.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(enemy)) continue;
       const ex = enemy.x - this.player.x;
@@ -403,7 +402,6 @@ export const runtimeMageCoreAttackMethods = {
       enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, damage * 0.2));
       if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null, consumableAttackEffects);
       this.applyMageOnHitEffects(enemy, { status: "burning" });
-      hitAnyEnemy = true;
       if (hasMageTalent(this, "battlemage")) {
         for (const other of this.enemies || []) {
           if (!other || other === enemy || (other.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(other)) continue;
@@ -412,7 +410,6 @@ export const runtimeMageCoreAttackMethods = {
       }
     }
     if (
-      hitAnyEnemy &&
       (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
       typeof this.consumeConsumableAttackCharge === "function"
     ) {
