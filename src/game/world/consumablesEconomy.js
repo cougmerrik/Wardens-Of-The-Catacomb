@@ -3,18 +3,11 @@ import {
   ACTIVE_CONSUMABLE_SLOT_CAP,
   PASSIVE_CONSUMABLE_SLOT_CAP,
   cloneConsumableSlots,
+  createConsumableEffectState,
   getConsumableDefinition,
   getConsumablePriceForFloor,
   rollConsumableShopStock
 } from "../consumables.js";
-
-const DEFAULT_CONSUMABLE_EFFECTS = () => ({
-  regenerationPotion: { timer: 0, total: 0, healPool: 0, textTimer: 0, textHealPool: 0 },
-  speedPotion: { timer: 0 },
-  frostOil: { timer: 0, attacksRemaining: 0 },
-  fireOil: { timer: 0, attacksRemaining: 0 },
-  spikeGrowth: { timer: 0 }
-});
 
 const OIL_ATTACK_CHARGES = 15;
 
@@ -33,13 +26,13 @@ function ensureConsumableState(game) {
       sharedCooldown: 0,
       message: "",
       messageTimer: 0,
-      effects: DEFAULT_CONSUMABLE_EFFECTS()
+      effects: createConsumableEffectState()
     };
   }
   if (!Array.isArray(game.consumables.activeSlots)) game.consumables.activeSlots = [];
   if (!Array.isArray(game.consumables.passiveSlots)) game.consumables.passiveSlots = [];
   if (!game.consumables.effects || typeof game.consumables.effects !== "object") {
-    game.consumables.effects = DEFAULT_CONSUMABLE_EFFECTS();
+    game.consumables.effects = createConsumableEffectState();
   }
   for (const key of ["fireOil", "frostOil"]) {
     const effect = game.consumables.effects[key];
@@ -158,6 +151,14 @@ function setConsumableTempHp(game, amount) {
     game.player.consumableRuntime = { tempHp: 0 };
   }
   game.player.consumableRuntime.tempHp = Math.max(0, Number.isFinite(amount) ? amount : 0);
+}
+
+function clearConsumableStateForRemoval(game, consumables) {
+  consumables.activeSlots = [];
+  consumables.passiveSlots = [];
+  consumables.sharedCooldown = 0;
+  consumables.effects = createConsumableEffectState();
+  setConsumableTempHp(game, 0);
 }
 
 function canUseConsumable(game, def) {
@@ -342,9 +343,7 @@ export function applyPassiveConsumableEvent(game, eventKey, payload = {}) {
       game.player.health = game.player.maxHealth;
       if (typeof game.gainExperience === "function") game.gainExperience(game.expToNextLevel);
       showConsumableConsumedText(game, def);
-      consumables.activeSlots = [];
-      consumables.passiveSlots = [];
-      consumables.sharedCooldown = 0;
+      clearConsumableStateForRemoval(game, consumables);
       pushConsumableMessage(game, "Monkey Paw triggered");
       changed = true;
       break;
