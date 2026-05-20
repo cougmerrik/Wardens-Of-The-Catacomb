@@ -1,6 +1,5 @@
 import {
   canSpendWarriorNode,
-  formatWarriorLaneLabel,
   getWarriorAvailableSkillPoints,
   getWarriorSpentSkillPoints,
   getWarriorTalentDefs,
@@ -8,7 +7,20 @@ import {
   getWarriorTooltip,
   isWarriorRowAccessible
 } from "../../game/warriorTalentTree.js";
-import { drawSkillRefundFooter, drawSkillTreeTitle, getSkillTierHeader } from "./skillTreeMenuSections.js";
+import {
+  SKILL_TREE_CARD_GAP,
+  SKILL_TREE_CARD_HEIGHT,
+  SKILL_TREE_CARD_MIN_WIDTH,
+  SKILL_TREE_ICON_SIZE,
+  SKILL_TREE_NODE_ROW_GAP,
+  SKILL_TREE_ROW_GAP,
+  drawSkillRefundFooter,
+  drawSkillTreeScrollbar,
+  drawSkillTreeTitle,
+  getSkillTierHeader,
+  getSkillTreeTierLayouts
+} from "./skillTreeMenuSections.js";
+import { drawWarriorSkillIcon } from "./warriorSkillIcons.js";
 
 const WARRIOR_TIER_LABELS = {
   1: "Weapon Form",
@@ -23,16 +35,25 @@ function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
 }
 
-function drawIcon(ctx, rect, icon, fill, locked) {
-  ctx.fillStyle = locked ? "rgba(48, 52, 61, 0.96)" : fill;
+function drawIcon(ctx, rect, icon, fill, muted) {
+  ctx.fillStyle = muted ? "rgba(48, 52, 61, 0.96)" : fill;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = locked ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.62)";
+  ctx.strokeStyle = muted ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.78)";
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
-  ctx.fillStyle = "#f4efe3";
-  ctx.font = "bold 11px Trebuchet MS";
+  ctx.fillStyle = muted ? "#9ea4af" : "#f4efe3";
+  ctx.font = "bold 18px Trebuchet MS";
   ctx.textAlign = "center";
   ctx.fillText(icon, rect.x + rect.w * 0.5, rect.y + rect.h * 0.62);
   ctx.textAlign = "left";
+}
+
+function drawWarriorNodeIcon(ctx, rect, def, muted) {
+  ctx.fillStyle = muted ? "rgba(48, 52, 61, 0.96)" : "rgba(20, 18, 16, 0.95)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = muted ? "rgba(119, 124, 134, 0.82)" : "rgba(242, 236, 224, 0.78)";
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  if (drawWarriorSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, 1, muted)) return;
+  drawIcon(ctx, rect, def.icon, def.color, muted);
 }
 
 function drawTooltip(ctx, renderer, mouseX, mouseY, tooltip) {
@@ -78,28 +99,7 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
   const visibleH = contentBottom - contentTop;
   const defs = getWarriorTalentDefs();
   const maxTier = defs.reduce((max, def) => Math.max(max, def.tier || 1), 1);
-  const tiers = new Map();
-  for (const def of defs) {
-    const list = tiers.get(def.tier) || [];
-    list.push(def);
-    tiers.set(def.tier, list);
-  }
-  const getTierColumnCount = (tier, count) => {
-    if (tier === 5) return Math.min(4, Math.max(2, count));
-    if (count >= 6) return 3;
-    if (count >= 4) return 2;
-    return Math.max(1, count);
-  };
-  const tierLayouts = [];
-  let contentHeight = 40;
-  for (let tier = 1; tier <= maxTier; tier++) {
-    const nodes = tiers.get(tier) || [];
-    const columns = getTierColumnCount(tier, nodes.length || 1);
-    const rows = Math.max(1, Math.ceil(Math.max(1, nodes.length) / Math.max(1, columns)));
-    const height = 42 + rows * 48 + Math.max(0, rows - 1) * 8;
-    tierLayouts.push({ tier, nodes, columns, rows, height });
-    contentHeight += height + 10;
-  }
+  const { tierLayouts, contentHeight } = getSkillTreeTierLayouts(defs, maxTier);
   const scrollMax = Math.max(0, contentHeight - visibleH);
   const scroll = Math.max(0, Math.min(scrollMax, game.uiScroll?.skillTree || 0));
   game.uiScroll.skillTree = scroll;
@@ -144,40 +144,31 @@ export function drawWarriorSkillTreeMenu(renderer, game, layout, frame) {
     const tierLimit = tier === 5 ? 2 : 1;
     ctx.fillText(getSkillTierHeader(tier, WARRIOR_TIER_LABELS[tier], selectedCount, tierLimit), rowRect.x + 12, rowRect.y + 20);
 
-    const cardGap = 10;
-    const cardH = 42;
-    const cardW = Math.max(120, Math.floor((rowRect.w - 24 - Math.max(0, columns - 1) * cardGap) / Math.max(1, columns)));
+    const cardW = Math.max(SKILL_TREE_CARD_MIN_WIDTH, Math.floor((rowRect.w - 24 - Math.max(0, columns - 1) * SKILL_TREE_CARD_GAP) / Math.max(1, columns)));
     nodes.forEach((def, index) => {
       const col = index % columns;
       const row = Math.floor(index / columns);
       const rect = {
-        x: rowRect.x + 12 + col * (cardW + cardGap),
-        y: rowRect.y + 30 + row * (cardH + 8),
+        x: rowRect.x + 12 + col * (cardW + SKILL_TREE_CARD_GAP),
+        y: rowRect.y + 30 + row * (SKILL_TREE_CARD_HEIGHT + SKILL_TREE_NODE_ROW_GAP),
         w: cardW,
-        h: cardH
+        h: SKILL_TREE_CARD_HEIGHT
       };
       const points = getWarriorTalentPoints(game, def.key);
       const locked = !canSpendWarriorNode(game, def.key) && points <= 0;
-      drawIcon(ctx, { x: rect.x + 4, y: rect.y + 6, w: 28, h: 28 }, def.icon, def.color, locked || !accessible);
-      ctx.fillStyle = locked || !accessible ? "#9ea4af" : "#f2efe7";
-      ctx.font = "bold 12px Trebuchet MS";
-      ctx.fillText(def.label, rect.x + 38, rect.y + 16);
-      ctx.font = "11px Trebuchet MS";
-      ctx.fillStyle = locked || !accessible ? "#828894" : "#cfd7e6";
-      ctx.fillText(formatWarriorLaneLabel(def.lane), rect.x + 38, rect.y + 30);
-      if (points > 0) {
-        ctx.fillStyle = "#f6ddb4";
-        ctx.fillText("Selected", rect.x + rect.w - 50, rect.y + 30);
-      }
+      const iconX = rect.x + Math.floor((rect.w - SKILL_TREE_ICON_SIZE) / 2);
+      const iconY = rect.y + Math.floor((rect.h - SKILL_TREE_ICON_SIZE) / 2);
+      drawWarriorNodeIcon(ctx, { x: iconX, y: iconY, w: SKILL_TREE_ICON_SIZE, h: SKILL_TREE_ICON_SIZE }, def, points <= 0);
       game.uiRects.skillTreeNodes.push({ key: def.key, kind: "node", rect });
       if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) {
         hovered = getWarriorTooltip(game, { key: def.key, kind: "node", locked: locked || !accessible });
       }
     });
-    tierCursorY += height + 10;
+    tierCursorY += height + SKILL_TREE_ROW_GAP;
   }
 
   ctx.restore();
+  drawSkillTreeScrollbar(ctx, menuX, menuW, contentTop, visibleH, contentHeight, scroll, scrollMax);
   drawSkillRefundFooter(ctx, game, menuX, menuY, menuW, menuH);
   if (hovered && Number.isFinite(mouseX) && Number.isFinite(mouseY)) {
     drawTooltip(ctx, renderer, mouseX, mouseY, hovered);

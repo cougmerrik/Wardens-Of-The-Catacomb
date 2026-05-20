@@ -147,6 +147,45 @@ This front-loads the early tree enough for Row 4 access at the start of floor 5,
 
 ## Ranger
 
+### Scout Progression Icon Assets
+
+The implemented Scout progression tree uses transparent `128x128` PNG icons under `assets/images/skills/scout/`, keyed by the talent keys in `src/game/rangerTalentData.js`. The skill tree renderer preloads these icons at startup and draws them at the shared class-tree icon size from `src/rendering/hud/skillTreeMenuSections.js`.
+
+Use this prompt template when adding a new Scout progression node. Replace the node name and subject details, but keep the shared style, composition, background, and avoid rules.
+
+```text
+Use case: stylized-concept
+Asset type: retro fantasy roguelike Scout progression skill icon
+Primary request: Create a small pixel-art skill tree icon for <Scout Node Name>.
+Subject: <One compact sentence describing the weapon, path, buff, status, or magical effect as a readable Scout-themed symbol.>
+Style: retro 16-bit pixel art fantasy skill icon matching the Longbow style, crisp hand-pixeled edges, limited palette, chunky silhouette, high contrast, readable at 28x28 pixels, deliberately low-detail, no antialiasing look, no realistic rendering, no painterly brushwork, no smooth gradients.
+Composition: Single centered symbol/object with generous padding, front-facing view unless the subject reads better in slight three-quarter view, object occupies about 70 percent of the canvas.
+Background: perfectly flat solid #00ff00 chroma-key background for background removal. The background must be one uniform color with no shadows, gradients, texture, floor plane, or lighting variation. Do not use #00ff00 anywhere in the subject. Use #ff00ff instead when the subject contains important green pixels.
+Avoid: no text, no letters, no numbers, no watermark, no UI border frame, no cast shadow, no contact shadow.
+```
+
+Generate larger than the in-game display size, then downscale and remove the chroma-key background into a transparent `128x128` PNG before adding it to `assets/images/skills/scout/`. New Scout talents should not be considered visually complete until their icon is generated and added to the Scout icon source map.
+
+### Warrior And Mage Progression Icon Assets
+
+The implemented Warrior and Mage/Necromancer progression trees use transparent `128x128` PNG icons under `assets/images/skills/warrior/` and `assets/images/skills/mage/`, keyed by the talent keys in `src/game/warriorTalentTree.js` and `src/game/necromancerTalentTree.js`. Stance A and Stance B Warrior modifiers intentionally share the same generated form icons so those duplicated mechanical choices do not drift visually.
+
+Use this prompt template when adding a new Warrior or Mage progression node. Replace the class, node name, and subject details, but keep the dense composition, style, background, and avoid rules.
+
+```text
+Use case: stylized-concept
+Asset type: retro fantasy roguelike <Warrior or Mage> progression skill icon
+Input images: The World of Warcraft icon sheet is a density/framing reference only: compact fantasy symbols fill most of the icon box with high contrast. Do not copy any specific icon.
+Primary request: Create a small pixel-art skill tree icon for <Node Name>.
+Subject: <One compact sentence describing the weapon, stance, doctrine, spell, path, buff, status, or magical effect as a readable class-themed symbol.>
+Style: retro 16-bit pixel art fantasy skill icon, crisp hand-pixeled edges, limited palette, chunky silhouette, high contrast, readable at 28x28 pixels, deliberately low-detail, no antialiasing look, no realistic rendering, no painterly brushwork, no smooth gradients.
+Composition: Single centered symbol/object with very little dead space, subject fills 88 to 94 percent of the canvas, bold silhouette reaches near the edges while staying fully visible, front-facing view unless the subject reads better in slight three-quarter view, no UI border frame.
+Background: perfectly flat solid #00ff00 chroma-key background for background removal. The background must be one uniform color with no shadows, gradients, texture, floor plane, or lighting variation. Do not use #00ff00 anywhere in the subject. Use #ff00ff instead when the subject contains important green pixels.
+Avoid: no text, no letters, no numbers, no watermark, no cast shadow, no contact shadow.
+```
+
+Generate larger than the in-game display size, then downscale and remove the chroma-key background into a transparent `128x128` PNG before adding it to the appropriate class asset directory. New Warrior or Mage talents should not be considered visually complete until their icon is generated and added to that class icon source map.
+
 ### Class Identity
 
 The ranger is a ranged kiter in a horde game.
