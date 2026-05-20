@@ -1,5 +1,5 @@
 import { NetClient } from "../net/NetClient.js";
-import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, syncByIdLerp } from "../net/clientStateSync.js";
+import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, resetNetworkFloatingTextEventCache, syncByIdLerp } from "../net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "../net/mapChunkReadiness.js";
 import { discardPredictedProjectile, predictProjectileSpawn, prunePredictedProjectiles, updateNetworkProjectilePresentation, updatePredictedProjectiles } from "../net/projectilePrediction.js";
 import { applyPredictedTeleportAction, canRunPredictedCollision, collectInput, handleNetworkUiActions, isLocalGameplayInputActive, predictFromInput, shouldSendNetworkInput, stripGameplayInputForSpectator, updateNetworkRole } from "../net/sessionInteraction.js";
@@ -283,6 +283,7 @@ export function createNetworkSessionController({
     });
     netClient.on("state.mapMeta", (msg) => {
       netMapSignature = applyMapMetaToGame(game, msg) || netMapSignature;
+      resetNetworkFloatingTextEventCache(game);
       netPendingInputs = [];
       netLastAckSeq = 0;
       netSnapshotBuffer.length = 0;
@@ -314,6 +315,7 @@ export function createNetworkSessionController({
     });
     netClient.on("state.map", (msg) => {
       netMapSignature = applyMapStateToGame(game, msg) || netMapSignature;
+      resetNetworkFloatingTextEventCache(game);
       netPendingInputs = [];
       netLastAckSeq = 0;
       netSnapshotBuffer.length = 0;

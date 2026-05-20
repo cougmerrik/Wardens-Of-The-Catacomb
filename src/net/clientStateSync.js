@@ -25,7 +25,7 @@ import {
 } from "./clientCorrectionMetrics.js";
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
 import { applyPredictedTeleportAction } from "./teleportPrediction.js";
-export { applyMetaStateToGame } from "./clientSnapshotHelpers.js";
+export { applyMetaStateToGame, resetNetworkFloatingTextEventCache } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
   if (typeof row === "string") return Array.from(row);

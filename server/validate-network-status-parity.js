@@ -8,6 +8,7 @@ import { makeDefaultInput } from "./net/serverHelpers.js";
 import { applyRemoteActionAimToContext, getRemoteActionAimVector } from "./net/remoteActionAim.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { resolveCombatAndDrops } from "../src/game/stepCombatResolution.js";
+import { applyNetworkFloatingTextEvents, resetNetworkFloatingTextEventCache } from "../src/net/clientSnapshotHelpers.js";
 import { getHudAbilityState } from "../src/rendering/hud/abilityWidgetState.js";
 import {
   validateProgressionEffectCoverage,
@@ -24,6 +25,22 @@ function createFakeSocket() {
   };
 }
 
+function createFakeTransport() {
+  return {
+    sent: [],
+    bufferedAmount: 0,
+    isOpen: () => true,
+    send(data) {
+      this.sent.push(typeof data === "string" ? JSON.parse(data) : data);
+      return true;
+    },
+    sendJson(payload) {
+      this.sent.push(payload);
+      return true;
+    }
+  };
+}
+
 function makeClient(id, name, classType) {
   return {
     id,
@@ -31,6 +48,7 @@ function makeClient(id, name, classType) {
     classType,
     protocolVersion: 2,
     ws: createFakeSocket(),
+    transport: createFakeTransport(),
     input: makeDefaultInput(),
     lastInputSeq: 0,
     classLocked: true
@@ -266,6 +284,38 @@ function validateRemoteNecromancerBeamAllowsZeroAim(room, remote) {
   assert.equal(breakable.hp, 0, "remote necromancer beam should hit breakables near an x=0 aim line");
 }
 
+function validateFloatingTextBackpressureRetention() {
+  const { room, owner, remote } = createActiveRoom();
+  room.sim.networkFloatingTextEvents = [{
+    id: "ft_1",
+    x: room.sim.player.x,
+    y: room.sim.player.y,
+    text: "-4",
+    color: "#ffffff",
+    life: 0.75,
+    size: 14,
+    vy: 22
+  }];
+  remote.transport.bufferedAmount = room.options.maxWsBufferedBytes + 1;
+  room.broadcastSnapshot(Date.now(), true);
+  assert.equal(room.sim.networkFloatingTextEvents.length, 1, "floating text should remain queued if any snapshot recipient is skipped");
+  assert.ok(owner.transport.sent.some((msg) => msg.type === "state.snapshot" && Array.isArray(msg.state?.floatingTexts)), "available clients should still receive queued floating text events");
+
+  remote.transport.bufferedAmount = 0;
+  room.broadcastSnapshot(Date.now() + 16, true);
+  assert.equal(room.sim.networkFloatingTextEvents.length, 0, "floating text should clear after a snapshot reaches every open recipient");
+}
+
+function validateFloatingTextDedupeReset() {
+  const game = { floatingTexts: [] };
+  applyNetworkFloatingTextEvents(game, [{ id: "ft_1", x: 10, y: 20, text: "-1" }]);
+  applyNetworkFloatingTextEvents(game, [{ id: "ft_1", x: 10, y: 20, text: "-1" }]);
+  assert.equal(game.floatingTexts.length, 1, "network floating text should dedupe repeated ids within a session");
+  resetNetworkFloatingTextEventCache(game);
+  applyNetworkFloatingTextEvents(game, [{ id: "ft_1", x: 14, y: 24, text: "-2" }]);
+  assert.equal(game.floatingTexts.length, 2, "network floating text ids should be reusable after a session cache reset");
+}
+
 function main() {
   const progressionCoverage = validateProgressionEffectCoverage();
   const { room, remote } = createActiveRoom();
@@ -323,6 +373,8 @@ function main() {
   assert.ok(goblin.hp < 40, "remote necromancer offensive beam should damage non-undead targets");
   assert.ok((remoteState.necromancerRuntime.tempHp || 0) > 0, "remote necromancer offensive beam should grant temp HP from damage");
   validateRemoteNecromancerBeamAllowsZeroAim(room, remote);
+  validateFloatingTextBackpressureRetention();
+  validateFloatingTextDedupeReset();
 
   const remoteFireballTargetErrorPx = validateRemoteMageClickTargetedSpell(room, remote, "fireballSpell");
   const remoteCloudTargetErrorPx = validateRemoteMageClickTargetedSpell(room, remote, "cloudDaggersSpell");

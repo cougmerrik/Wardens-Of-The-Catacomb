@@ -66,6 +66,13 @@ export function applyNetworkFloatingTextEvents(game, events) {
   }
 }
 
+export function resetNetworkFloatingTextEventCache(game) {
+  if (!game) return;
+  game.networkFloatingTextEventIds = new Set();
+  game.networkFloatingTextEventIdOrder = [];
+  game.networkFloatingTextEventSignatures = [];
+}
+
 export function syncFloorBossState(target, source, game) {
   if (!source || typeof source !== "object") return target;
   const base =

@@ -1282,7 +1282,7 @@ export class AuthoritativeRoom {
     this.lastSnapshotDoorOpen = !!fullState.door?.open;
     this.lastSnapshotPickupTaken = !!fullState.pickup?.taken;
     this.lastSnapshotPortalActive = !!fullState.portal?.active;
-    this.broadcast("state.snapshot", {
+    const snapshotBroadcast = this.broadcast("state.snapshot", {
       serverTime: nowMs,
       snapshotSeq: this.snapshotSeq,
       snapshotTelemetry: {
@@ -1306,7 +1306,9 @@ export class AuthoritativeRoom {
       mapSignature: sig,
       state
     });
-    if (Array.isArray(this.sim.networkFloatingTextEvents)) this.sim.networkFloatingTextEvents.length = 0;
+    if (Array.isArray(this.sim.networkFloatingTextEvents) && snapshotBroadcast.dropped <= 0) {
+      this.sim.networkFloatingTextEvents.length = 0;
+    }
     this.lastSnapshotMs = nowMs;
     this.maybeBroadcastMeta(nowMs);
     return true;
