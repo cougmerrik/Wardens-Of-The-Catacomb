@@ -371,9 +371,10 @@ export const rendererEffectsPlayerMethods = {
   drawMinimap(game, layout, panelY = null) {
     const mapW = game.map[0].length;
     const mapH = game.map.length;
-    const miniW = layout.isAndroid ? 146 : layout.sidebarW - this.sidebarPadding * 2;
+    const configuredW = Number.isFinite(this.config?.minimap?.width) ? this.config.minimap.width : 180;
+    const miniW = layout.isAndroid ? 176 : Math.min(240, Math.max(220, configuredW));
     const miniH = layout.isAndroid ? 126 : Math.min(this.config.minimap.height, 190);
-    const miniX = layout.isAndroid ? layout.playW - miniW - 12 : layout.sidebarX + this.sidebarPadding;
+    const miniX = layout.playW - miniW - (layout.isAndroid ? 12 : 16);
     const defaultY = layout.topHudH + this.sidebarPadding;
     const miniY = Number.isFinite(panelY) ? Math.max(defaultY, Math.floor(panelY)) : defaultY;
     const scale = Math.min(miniW / mapW, miniH / mapH);
@@ -381,10 +382,12 @@ export const rendererEffectsPlayerMethods = {
     const drawH = mapH * scale;
     const ctx = this.ctx;
 
+    ctx.save();
+    ctx.globalAlpha = 0.8;
     ctx.fillStyle = "rgba(8, 11, 18, 0.88)";
-    ctx.fillRect(miniX - 6, miniY - 6, drawW + 12, drawH + 12);
+    ctx.fillRect(miniX - 6, miniY - 6, miniW + 12, miniH + 12);
     ctx.strokeStyle = "rgba(126, 139, 171, 0.8)";
-    ctx.strokeRect(miniX - 6, miniY - 6, drawW + 12, drawH + 12);
+    ctx.strokeRect(miniX - 6, miniY - 6, miniW + 12, miniH + 12);
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     const cacheKey = `${mapW}x${mapH}@${scale.toFixed(4)}`;
     const needRebuild = !this._minimapCache || this._minimapCache.key !== cacheKey || now - this._minimapCache.lastBuildAt > 125;
@@ -455,6 +458,7 @@ export const rendererEffectsPlayerMethods = {
       ctx.restore();
     }
 
-    return miniY + drawH + 6;
+    ctx.restore();
+    return miniY + miniH + 6;
   }
 };

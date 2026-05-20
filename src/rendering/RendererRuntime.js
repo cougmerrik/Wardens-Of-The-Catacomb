@@ -6,8 +6,8 @@ export class Renderer extends RendererRuntimeEffects {
     drawHud(this, game, layout);
   }
 
-  drawClassStatusPanel(game, layout) {
-    return drawClassStatusPanel(this, game, layout);
+  drawClassStatusPanel(game, layout, panelY) {
+    return drawClassStatusPanel(this, game, layout, panelY);
   }
 
   drawPlayerStatsPanel(game, layout, panelY) {

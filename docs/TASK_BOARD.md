@@ -1,6 +1,6 @@
 # Task Board
 
-Branch: `feature/issue-43-class-sprites`
+Branch: `help`
 
 Use this file as the temporary working board for the current branch. Keep tasks finite, testable, and tied to concrete validation steps. When branch work is ready for closeout, roll durable summaries into long-lived docs and reset this file to this clean state.
 

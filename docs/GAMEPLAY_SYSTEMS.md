@@ -129,7 +129,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - radius scales linearly with fuel percentage
   - full-fuel radius is configured through `playerFuelRadiusTiles`
   - level and item radius modifiers reuse the same helper path and scale with fuel
-- Lantern fuel slowly decays over time, is bounded between `0%` and `100%`, and is shown in a right-panel HUD gauge above the XP bar.
+- Lantern fuel slowly decays over time, is bounded between `0%` and `100%`, and is shown in the bottom HUD area above the XP bar.
 - Torches are persistent floor objects placed on walkable tiles near walls while avoiding spawn, key, door, portal, and invalid map positions.
 - Players collect lit torches by touching them, removing the torch from the floor and restoring `20%` lantern fuel.
 - Players relight unlit torches by touching them.
@@ -267,8 +267,10 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 ## Multiplayer HUD And Results
 - Remote players render as full in-world avatars.
 - Remote player handles appear below their characters using that player's stable run color.
-- The bottom-right HUD keeps the local player panel, then adds a compact group panel below it for other connected run members.
-- The group panel shows:
+- The active-play HUD is rendered in-canvas instead of reserving a desktop sidebar. The minimap anchors to the top-right of the play canvas at `80%` opacity, and the combined player/class HUD aligns directly beneath it.
+- The combined HUD shows local player identity, gold, the class skill button, shop/skill tree/stats buttons, the class meter, active consumable effects, and the group list.
+- Unspent skill points are no longer displayed as an `SP` counter during active play. When points are available, the `Skill Tree` button slowly blinks green.
+- The group list is embedded at the bottom of the combined HUD and shows:
   - handle
   - class/color identity
   - level
@@ -285,6 +287,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 
 ## Player HUD Presentation
 - The local overhead player health bar is intentionally compact. It renders only the base health span when the player has no temporary HP, then extends the bar only while temporary HP is present.
+- The old active-play enemy counter and pace display are not shown in the in-canvas HUD. Enemy pacing diagnostics remain internal balance data unless exposed through a debug flow.
 
 ## Floor Boss Rules
 - The floor boss trigger level is `floor * 5`.
