@@ -9,7 +9,7 @@ export function getMageAttackLabel(game) {
   const key = runtime.activeMode === "spell"
     ? getMageSelectedSpell(game)
     : getMageSelectedCantrip(game);
-  const fallback = runtime.activeMode === "spell" ? "Spell" : "Cantrip";
+  const fallback = runtime.activeMode === "spell" ? "Spell" : "Arcane Bolt";
   return getNecromancerTalentDef(key)?.label || fallback;
 }
 

@@ -1271,7 +1271,9 @@ export class AuthoritativeRoom {
       serverStateAnomalies: this.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry })),
       delta
     };
-    if (Array.isArray(fullState.floatingTexts) && fullState.floatingTexts.length > 0) state.floatingTexts = fullState.floatingTexts;
+    if (Array.isArray(fullState.floatingTexts) && fullState.floatingTexts.length > 0) {
+      state.floatingTexts = fullState.floatingTexts;
+    }
     if (keyframe || floorStateChanged) state.floor = fullState.floor;
     if (keyframe || bossPhaseChanged) state.floorBoss = fullState.floorBoss;
     if (keyframe || doorStateChanged) state.door = fullState.door;

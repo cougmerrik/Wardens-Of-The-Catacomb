@@ -288,6 +288,27 @@ export function synthesizeDespawnDamageFloatingTexts(game, previousById, despawn
   }
 }
 
+export function applyNetworkFloatingTexts(game, texts) {
+  if (typeof game?.spawnFloatingText !== "function" || !Array.isArray(texts) || texts.length === 0) return;
+  if (!(game.networkFloatingTextIds instanceof Set)) game.networkFloatingTextIds = new Set();
+  if (!Array.isArray(game.networkFloatingTextIdOrder)) game.networkFloatingTextIdOrder = [];
+  for (const entry of texts) {
+    if (!entry || typeof entry.id !== "string" || !entry.id || game.networkFloatingTextIds.has(entry.id)) continue;
+    if (typeof entry.text !== "string" || !entry.text) continue;
+    if (!Number.isFinite(entry.x) || !Number.isFinite(entry.y)) continue;
+    const life = Number.isFinite(entry.life) && entry.life > 0 ? entry.life : 0.75;
+    const size = Number.isFinite(entry.size) ? entry.size : 14;
+    const color = typeof entry.color === "string" && entry.color ? entry.color : "#ffffff";
+    game.spawnFloatingText(entry.x, entry.y, entry.text, color, life, size);
+    game.networkFloatingTextIds.add(entry.id);
+    game.networkFloatingTextIdOrder.push(entry.id);
+  }
+  while (game.networkFloatingTextIdOrder.length > 96) {
+    const oldId = game.networkFloatingTextIdOrder.shift();
+    game.networkFloatingTextIds.delete(oldId);
+  }
+}
+
 export function applyMetaStateToGame(game, state) {
   if (!state || typeof state !== "object") return;
   const isActiveMultiplayer = !!game?.networkEnabled && state.roomPhase === "active" && Number.isFinite(state.activePlayerCount) && state.activePlayerCount > 1;

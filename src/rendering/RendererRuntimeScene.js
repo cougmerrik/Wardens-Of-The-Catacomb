@@ -1,5 +1,6 @@
 import { RendererRuntimeBase } from "./RendererRuntimeBase.js";
 import { runtimeSceneDrawMethods } from "./runtimeSceneDrawMethods.js";
+import { drawChilledEnemyTint } from "./chilledEnemyTint.js";
 import { getNetworkDeathRulesLabel } from "../net/networkDeathRules.js";
 
 function drawArcaneMarkSigil(ctx, enemy, screenX, screenY, time = 0) {
@@ -120,11 +121,31 @@ function drawMultiplayerResultsOverlay(ctx, game, canvas) {
 }
 
 export class RendererRuntimeScene extends RendererRuntimeBase {
+  isEnemyBodyLayer(enemy) {
+    if (!enemy) return false;
+    if ((enemy.hp || 0) <= 0) return true;
+    if (enemy.type === "skeleton_warrior" && enemy.collapsed) return true;
+    return false;
+  }
+
   drawSceneEnemy(game, enemy, cameraX, cameraY, options = {}) {
     const ctx = this.ctx;
     const screenX = enemy.x - cameraX;
     const screenY = enemy.y - cameraY;
-    if (enemy.type === "goblin") this.drawTreasureGoblin(enemy, screenX, screenY);
+    if ((enemy.hp || 0) > 0 && (enemy.slowTimer || 0) > 0) {
+      this.drawChilledSceneEnemyBody(game, enemy, screenX, screenY);
+      if (options.drawOverlays === false) return;
+      this.drawSceneEnemyOverlays(game, enemy, cameraX, cameraY);
+      return;
+    }
+    this.drawSceneEnemyBody(game, enemy, screenX, screenY);
+    if (options.drawOverlays === false) return;
+    this.drawSceneEnemyOverlays(game, enemy, cameraX, cameraY);
+  }
+
+  drawSceneEnemyBody(game, enemy, screenX, screenY) {
+    if ((enemy.hp || 0) <= 0) this.drawEnemyCorpse(enemy, screenX, screenY, game.time);
+    else if (enemy.type === "goblin") this.drawTreasureGoblin(enemy, screenX, screenY);
     else if (enemy.type === "armor") this.drawAnimatedArmor(game, enemy, screenX, screenY);
     else if (enemy.type === "mummy") this.drawMummy(enemy, screenX, screenY);
     else if (enemy.type === "prisoner") this.drawPrisoner(enemy, screenX, screenY);
@@ -145,11 +166,29 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     } else {
       this.drawGhost(enemy, screenX, screenY, enemy.size);
     }
-    if (options.drawOverlays === false) return;
-    this.drawSceneEnemyOverlays(game, enemy, cameraX, cameraY);
+  }
+
+  drawChilledSceneEnemyBody(game, enemy, screenX, screenY) {
+    const size = Math.max(96, (enemy?.size || 24) * 4);
+    const half = size * 0.5;
+    const canvas = this._chilledEnemyCanvas || document.createElement("canvas");
+    if (canvas.width !== size || canvas.height !== size) {
+      canvas.width = size;
+      canvas.height = size;
+    }
+    const bufferCtx = canvas.getContext("2d");
+    bufferCtx.clearRect(0, 0, size, size);
+    const mainCtx = this.ctx;
+    this.ctx = bufferCtx;
+    this.drawSceneEnemyBody(game, enemy, half, half);
+    this.ctx = mainCtx;
+    drawChilledEnemyTint(bufferCtx, enemy, 0, 0, size, size, game.time);
+    mainCtx.drawImage(canvas, screenX - half, screenY - half);
+    this._chilledEnemyCanvas = canvas;
   }
 
   drawSceneEnemyOverlays(game, enemy, cameraX, cameraY) {
+    if ((enemy?.hp || 0) <= 0) return;
     const ctx = this.ctx;
     const screenX = enemy.x - cameraX;
     const screenY = enemy.y - cameraY;
@@ -235,9 +274,15 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     this.drawSpectatorWisps(game, cameraX, cameraY);
     this.drawProjectiles(game, cameraX, cameraY);
     this.drawPlayerHealthBar(game, cameraX, cameraY);
+    for (const enemy of game.enemies) {
+      if (!this.isEnemyBodyLayer(enemy)) continue;
+      if (this.drawEnemyDarkenedLayer(game, enemy, cameraX, cameraY, layout)) continue;
+      this.drawSceneEnemy(game, enemy, cameraX, cameraY);
+    }
     this.drawLightingOverlay(game, cameraX, cameraY, layout);
     this.drawDrops(game, cameraX, cameraY);
     for (const enemy of game.enemies) {
+      if (this.isEnemyBodyLayer(enemy)) continue;
       if (this.drawEnemyDarkenedLayer(game, enemy, cameraX, cameraY, layout)) continue;
       this.drawSceneEnemy(game, enemy, cameraX, cameraY);
     }

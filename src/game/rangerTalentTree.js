@@ -419,7 +419,7 @@ export function hasWildfireVolley() {
 export function getRangerMultishotBonus(game) {
   if (!hasRangerTalent(game, "rangerPath")) return 0;
   const tier = getRangerComboTier(game);
-  return tier >= 3 ? 2 : tier >= 2 ? 1 : 0;
+  return 1 + (tier >= 3 ? 2 : tier >= 2 ? 1 : 0);
 }
 
 export function getRangerVolleyCooldownReduction() {

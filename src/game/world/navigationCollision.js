@@ -276,6 +276,20 @@ export function getPathDirectionToTarget(game, entity, targetX, targetY, options
   return { x: dx / len, y: dy / len, reached: false };
 }
 
+function getEntityMoveDistance(entity, beforeX, beforeY) {
+  return vecLength((entity.x || 0) - beforeX, (entity.y || 0) - beforeY);
+}
+
+function isEntityPositionWalkable(game, entity, x, y) {
+  const r = (Number.isFinite(entity?.size) ? entity.size : 20) * 0.5;
+  return (
+    !isWallAt(game, x - r, y - r) &&
+    !isWallAt(game, x + r, y - r) &&
+    !isWallAt(game, x - r, y + r) &&
+    !isWallAt(game, x + r, y + r)
+  );
+}
+
 function moveEntityWithCornerAssist(game, entity, dirX, dirY, moveStep) {
   const perpX = -dirY;
   const perpY = dirX;
@@ -283,8 +297,8 @@ function moveEntityWithCornerAssist(game, entity, dirX, dirY, moveStep) {
   const beforeX = entity.x;
   const beforeY = entity.y;
   moveWithCollision(game, entity, dirX * moveStep, dirY * moveStep);
-  const movedDirect = vecLength(entity.x - beforeX, entity.y - beforeY) > moveStep * 0.12;
-  if (movedDirect) return;
+  const movedDirect = getEntityMoveDistance(entity, beforeX, beforeY);
+  if (movedDirect > moveStep * 0.12) return movedDirect;
 
   const probes = [
     { x: perpX, y: perpY },
@@ -300,8 +314,35 @@ function moveEntityWithCornerAssist(game, entity, dirX, dirY, moveStep) {
     const px = entity.x;
     const py = entity.y;
     moveWithCollision(game, entity, sx, sy);
-    if (vecLength(entity.x - px, entity.y - py) > moveStep * 0.12) return;
+    const movedProbe = getEntityMoveDistance(entity, px, py);
+    if (movedProbe > moveStep * 0.12) return getEntityMoveDistance(entity, beforeX, beforeY);
   }
+  return getEntityMoveDistance(entity, beforeX, beforeY);
+}
+
+function moveEntityWithUnstuckSweep(game, entity, targetX, targetY, moveStep) {
+  const tile = game.config?.map?.tile || 32;
+  const probes = 16;
+  let best = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < probes; i++) {
+    const angle = (Math.PI * 2 * i) / probes;
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const nx = entity.x + dx * Math.max(moveStep, tile * 0.18);
+    const ny = entity.y + dy * Math.max(moveStep, tile * 0.18);
+    if (!isEntityPositionWalkable(game, entity, nx, ny)) continue;
+    const score = vecLength(targetX - nx, targetY - ny);
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x: dx, y: dy };
+    }
+  }
+  if (!best) return 0;
+  const beforeX = entity.x;
+  const beforeY = entity.y;
+  moveWithCollision(game, entity, best.x * moveStep, best.y * moveStep);
+  return getEntityMoveDistance(entity, beforeX, beforeY);
 }
 
 export function moveEnemyTowardTargetPoint(game, enemy, targetX, targetY, speedScale, dt, minDistance = 0, usePathfinding = false) {
@@ -327,7 +368,22 @@ export function moveEnemyTowardTargetPoint(game, enemy, targetX, targetY, speedS
   const biasX = pathDir && Number.isFinite(pathDir.x) ? directX * 0.35 + pathDir.x * 0.65 : directX;
   const biasY = pathDir && Number.isFinite(pathDir.y) ? directY * 0.35 + pathDir.y * 0.65 : directY;
   const biasLen = vecLength(biasX, biasY) || 1;
-  moveEntityWithCornerAssist(game, enemy, biasX / biasLen, biasY / biasLen, moveStep);
+  let moved = moveEntityWithCornerAssist(game, enemy, biasX / biasLen, biasY / biasLen, moveStep);
+  if (moved <= moveStep * 0.12 && pathDir && Number.isFinite(pathDir.x) && Number.isFinite(pathDir.y)) {
+    const pathLen = vecLength(pathDir.x, pathDir.y) || 1;
+    moved = Math.max(moved, moveEntityWithCornerAssist(game, enemy, pathDir.x / pathLen, pathDir.y / pathLen, moveStep));
+  }
+  const cache = enemy._pathToTargetCache;
+  if (moved <= moveStep * 0.12) {
+    enemy._pathStuckTimer = Math.max(0, (Number.isFinite(enemy._pathStuckTimer) ? enemy._pathStuckTimer : 0) + delta);
+    if (cache) cache.repathTimer = 0;
+    if (enemy._pathStuckTimer >= 0.18) {
+      moved = Math.max(moved, moveEntityWithUnstuckSweep(game, enemy, targetX, targetY, moveStep));
+    }
+  } else {
+    enemy._pathStuckTimer = Math.max(0, (Number.isFinite(enemy._pathStuckTimer) ? enemy._pathStuckTimer : 0) - delta * 2);
+  }
+  if (moved > moveStep * 0.12 && cache && enemy._pathStuckTimer <= 0) cache.stuckRepaths = 0;
 }
 
 export function moveEnemyTowardPlayer(game, enemy, speedScale, dt) {
@@ -359,6 +415,8 @@ export function moveEnemyTowardPlayer(game, enemy, speedScale, dt) {
 
 export function separateEnemyFromPlayer(game, enemy) {
   if (!game?.player || !enemy) return;
+  if (Number.isFinite(enemy.hp) && enemy.hp <= 0) return;
+  if (enemy.type === "skeleton_warrior" && enemy.collapsed) return;
   const playerRadius = typeof game.getPlayerEnemyCollisionRadius === "function"
     ? game.getPlayerEnemyCollisionRadius()
     : ((game.config?.player?.enemyCollisionSize ?? game.player?.size ?? 0) * 0.5);

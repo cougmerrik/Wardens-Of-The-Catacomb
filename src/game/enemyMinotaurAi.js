@@ -1,10 +1,40 @@
 import { vecLength } from "../utils.js";
 import { getPriorityTarget, moveEnemyTowardPoint } from "./enemyAiShared.js";
 
+function smashMinotaurBreakables(game, enemy, dirX = 0, dirY = 0, tile = 32) {
+  const list = Array.isArray(game?.breakables) ? game.breakables : [];
+  if (!enemy || list.length === 0) return false;
+  const enemyRadius = Math.max(6, (Number.isFinite(enemy.size) ? enemy.size : 34) * 0.5);
+  const dirLen = vecLength(dirX || 0, dirY || 0);
+  const nx = dirLen > 0.001 ? (dirX || 0) / dirLen : 0;
+  const ny = dirLen > 0.001 ? (dirY || 0) / dirLen : 0;
+  let smashed = false;
+  for (const br of list) {
+    if (!br || (br.hp || 0) <= 0) continue;
+    const breakableRadius = Math.max(4, (Number.isFinite(br.size) ? br.size : 20) * 0.5);
+    const dx = (br.x || 0) - (enemy.x || 0);
+    const dy = (br.y || 0) - (enemy.y || 0);
+    const touchDistance = enemyRadius + breakableRadius + tile * 0.1;
+    const directTouch = vecLength(dx, dy) <= touchDistance;
+    const forward = nx * dx + ny * dy;
+    const side = Math.abs(-ny * dx + nx * dy);
+    const forwardTouch = dirLen > 0.001 && forward >= -enemyRadius * 0.2 && forward <= touchDistance + tile * 0.35 && side <= breakableRadius + enemyRadius * 0.72;
+    if (!directTouch && !forwardTouch) continue;
+    br.hp = 0;
+    smashed = true;
+  }
+  if (smashed) {
+    enemy._pathToTargetCache = null;
+    enemy.stuckTimer = 0;
+  }
+  return smashed;
+}
+
 function tryRecoverMinotaurMovement(game, enemy, dirX, dirY, tile) {
   enemy._pathToTargetCache = null;
   enemy.chargeTimer = 0;
   enemy.chargeWindupTimer = 0;
+  if (smashMinotaurBreakables(game, enemy, dirX, dirY, tile)) return true;
   const perpX = -dirY;
   const perpY = dirX;
   const recoveryStep = tile * 0.38;
@@ -17,6 +47,7 @@ function tryRecoverMinotaurMovement(game, enemy, dirX, dirY, tile) {
     const beforeX = enemy.x;
     const beforeY = enemy.y;
     game.moveWithCollision(enemy, option.x * recoveryStep, option.y * recoveryStep);
+    smashMinotaurBreakables(game, enemy, option.x, option.y, tile);
     if (vecLength(enemy.x - beforeX, enemy.y - beforeY) > tile * 0.08) return true;
   }
   return false;
@@ -42,6 +73,7 @@ export function updateMinotaur(game, enemy, dt, speedScale) {
   const stompRange = (game.config.enemy.minotaurStompRangeTiles || 1.8) * tile;
   const chargePushDistance = (game.config.enemy.minotaurChargePushDistanceTiles || 1.2) * tile;
   const chargeDamageMultiplier = Math.max(1, game.config.enemy.minotaurChargeContactDamageMultiplier || 1.3);
+  const smashedInitialBreakable = smashMinotaurBreakables(game, enemy, dirX, dirY, tile);
 
   enemy.chargeCooldown = Math.max(0, (enemy.chargeCooldown || 0) - dt);
   enemy.chargeTimer = Math.max(0, (enemy.chargeTimer || 0) - dt);
@@ -55,13 +87,11 @@ export function updateMinotaur(game, enemy, dt, speedScale) {
     const chargeTravel = (game.config.enemy.minotaurChargeTravelTiles || 7) * tile;
     const beforeX = enemy.x;
     const beforeY = enemy.y;
-    moveEnemyTowardPoint(
-      game,
-      enemy,
-      { x: enemy.x + (enemy.chargeDirX || dirX) * chargeTravel, y: enemy.y + (enemy.chargeDirY || dirY) * chargeTravel },
-      dt,
-      chargeScale
-    );
+    const chargeDirX = enemy.chargeDirX || dirX;
+    const chargeDirY = enemy.chargeDirY || dirY;
+    const chargeStep = Math.min((Number.isFinite(enemy.speed) ? enemy.speed : 70) * chargeScale * dt, chargeTravel);
+    game.moveWithCollision(enemy, chargeDirX * chargeStep, chargeDirY * chargeStep);
+    smashMinotaurBreakables(game, enemy, enemy.chargeDirX || dirX, enemy.chargeDirY || dirY, tile);
     trackMinotaurStall(game, enemy, beforeX, beforeY, dt, enemy.chargeDirX || dirX, enemy.chargeDirY || dirY, tile);
     if (game.isPlayerEntity && game.isPlayerEntity(target)) {
       const playerRadius = typeof game.getPlayerEnemyCollisionRadiusFor === "function"
@@ -119,5 +149,7 @@ export function updateMinotaur(game, enemy, dt, speedScale) {
   const beforeX = enemy.x;
   const beforeY = enemy.y;
   moveEnemyTowardPoint(game, enemy, target, dt, speedScale, Math.max(8, stompRange * 0.45));
+  smashMinotaurBreakables(game, enemy, dirX, dirY, tile);
   trackMinotaurStall(game, enemy, beforeX, beforeY, dt, dirX, dirY, tile);
+  if (smashedInitialBreakable) enemy.stuckTimer = 0;
 }

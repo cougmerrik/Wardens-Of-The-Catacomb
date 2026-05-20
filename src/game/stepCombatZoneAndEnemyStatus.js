@@ -273,7 +273,14 @@ export function resolveFireZonesAndEnemyStatus({
     if ((enemy.bleedTimer || 0) <= 0) enemy.bleedDps = 0;
     if ((enemy.rotTimer || 0) <= 0) enemy.rotDps = 0;
     if ((enemy.burningTimer || 0) > 0 && Number.isFinite(enemy.burningDps) && enemy.burningDps > 0) {
-      game.applyEnemyDamage(enemy, enemy.burningDps * dt, "fire", enemy.lastDamageOwnerId || null);
+      const burnTickInterval = Math.max(0.1, Number.isFinite(enemy.burningTickInterval) ? enemy.burningTickInterval : 1);
+      enemy.burningTickTimer = Math.max(-2, (Number.isFinite(enemy.burningTickTimer) ? enemy.burningTickTimer : burnTickInterval) - dt);
+      while ((enemy.hp || 0) > 0 && (enemy.burningTimer || 0) > 0 && enemy.burningTickTimer <= 0) {
+        game.applyEnemyDamage(enemy, enemy.burningDps * burnTickInterval, "fire", enemy.lastDamageOwnerId || null);
+        enemy.burningTickTimer += burnTickInterval;
+      }
+    } else {
+      enemy.burningTickTimer = 0;
     }
     if ((enemy.rotTimer || 0) > 0 && Number.isFinite(enemy.rotDps) && enemy.rotDps > 0) {
       game.applyEnemyDamage(enemy, enemy.rotDps * dt, "poison", enemy.lastDamageOwnerId || null);

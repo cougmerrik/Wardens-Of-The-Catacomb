@@ -457,6 +457,15 @@ export const runtimePlayerAttackMethods = {
 
   ...runtimeMageSpellAttackMethods,
 
+  recordThrowingKnifeVisualAttack() {
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    const nextHand = this.rangerRuntime.throwingKnifeVisualHand === -1 ? -1 : 1;
+    this.rangerRuntime.throwingKnifeLastThrownHand = nextHand;
+    this.rangerRuntime.throwingKnifeVisualHand = nextHand === 1 ? -1 : 1;
+    this.rangerRuntime.throwingKnifeVisualAttackSeq = Math.max(0, Math.floor(this.rangerRuntime.throwingKnifeVisualAttackSeq || 0)) + 1;
+    if (this.player) this.player.rangerRuntime = this.rangerRuntime;
+  },
+
   fire(dx, dy) {
     if (this.isNecromancerClass()) {
       this.fireMagePrimary(dx, dy);
@@ -471,12 +480,16 @@ export const runtimePlayerAttackMethods = {
     }
     this.player.fireCooldown = this.getPlayerFireCooldown();
     if (this.isArcherClass && this.isArcherClass() && getRangerCurrentWeaponMode(this) === "melee") {
+      if (getRangerSelectedWeapon(this) === "throwingKnives") this.recordThrowingKnifeVisualAttack();
       this.performMeleeAttack(dx, dy);
       return;
     }
     if (!this.classSpec.usesRanged) {
       this.performMeleeAttack(dx, dy);
       return;
+    }
+    if (this.isArcherClass && this.isArcherClass() && getRangerSelectedWeapon(this) === "throwingKnives" && getRangerCurrentWeaponMode(this) === "ranged") {
+      this.recordThrowingKnifeVisualAttack();
     }
     const origin = this.getBowMuzzleOrigin(dx, dy);
     const baseAngle = Math.atan2(origin.dirY, origin.dirX);

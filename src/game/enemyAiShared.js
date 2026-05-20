@@ -107,7 +107,7 @@ export function moveEnemyTowardPoint(game, enemy, target, dt, speedScale, minDis
     return;
   }
   if (typeof game.moveEnemyTowardTargetPoint === "function") {
-    game.moveEnemyTowardTargetPoint(enemy, target, speedScale, dt, minDistance);
+    game.moveEnemyTowardTargetPoint(enemy, target.x, target.y, speedScale, dt, minDistance, true);
     return;
   }
   const dx = target.x - enemy.x;

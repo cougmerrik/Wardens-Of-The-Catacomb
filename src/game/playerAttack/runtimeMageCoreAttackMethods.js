@@ -239,16 +239,17 @@ export const runtimeMageCoreAttackMethods = {
     const runtime = this.ensureMageRuntimeState();
     if ((runtime.mimicTimer || 0) > 0) return this.performMageMimicTongue(dx, dy);
     if (runtime.activeMode === "spell") return this.castMageSpell(dx, dy);
-    const cantrip = getMageSelectedCantrip(this) || "fireBoltCantrip";
+    const cantrip = getMageSelectedCantrip(this) || "arcaneBolt";
     if (cantrip === "necroticBeamCantrip") return false;
     if (this.player.fireCooldown > 0) return false;
     const cantripPower = getMageSpellPowerMultiplier(this);
     const cooldowns = {
-      fireBoltCantrip: 0.3,
-      frostShardCantrip: 0.5,
-      shockCantrip: 0.4,
-      arcaneMissileCantrip: 0.45,
-      greenFlameBladeCantrip: 0.576
+      arcaneBolt: 0.5,
+      fireBoltCantrip: 0.44,
+      frozenOrbCantrip: 0.68,
+      shockCantrip: 0.48,
+      arcaneMissileCantrip: 0.56,
+      greenFlameBladeCantrip: 0.72
     };
     this.player.fireCooldown = (cooldowns[cantrip] || 0.4) * (hasMageTalent(this, "rapidCasting") ? 0.85 : 1);
     this.pauseMageManaRegen(hasMageTalent(this, "rapidCasting") ? 0.35 : 0.5);
@@ -260,10 +261,11 @@ export const runtimeMageCoreAttackMethods = {
     const origin = this.getBowMuzzleOrigin(dx, dy);
     const angle = Math.atan2(origin.dirY, origin.dirX);
     const profile = {
-      fireBoltCantrip: { speed: 340, life: 0.95, size: 6, damage: this.getPrimaryDamage() * 0.95 * cantripPower, projectileType: "mage_fireBolt", damageType: "fire", burn: 3 },
-      frostShardCantrip: { speed: 250, life: 1.1, size: 7, damage: this.getPrimaryDamage() * 1.08 * cantripPower, projectileType: "mage_frostShard", damageType: "cold", slow: 5, knockback: 24 },
-      shockCantrip: { speed: 560, life: 0.75, size: 5, damage: this.getPrimaryDamage() * 0.72 * cantripPower, projectileType: "mage_shock", damageType: "lightning", chainCount: 2 },
-      arcaneMissileCantrip: { speed: 330, life: 0.85, size: 6, damage: this.getPrimaryDamage() * 0.68 * cantripPower, projectileType: "mage_arcaneMissile", damageType: "arcane", homing: true, range: (this.config?.map?.tile || 32) * 8 }
+      arcaneBolt: { speed: 320, life: 0.9, size: 5, damage: this.getPrimaryDamage() * 0.62 * cantripPower, projectileType: "mage_arcaneBolt", damageType: "arcane", lightRadius: (this.config?.map?.tile || 32) * 1.25, lightIntensity: 0.12 },
+      fireBoltCantrip: { speed: 340, life: 0.95, size: 6, damage: this.getPrimaryDamage() * 0.85 * cantripPower, projectileType: "mage_fireBolt", damageType: "fire", burn: 3, lightRadius: (this.config?.map?.tile || 32) * 1.65, lightIntensity: 0.27 },
+      frozenOrbCantrip: { speed: 145, life: 1.65, size: 11, damage: this.getPrimaryDamage() * 0.38 * cantripPower, projectileType: "mage_frozenOrb", damageType: "cold", slow: 1.5, knockback: 0, pierce: true, maxHitsPerFrame: 4, frostPulseInterval: 0.18, frostPulseTimer: 0.04, frostPulseShardDamage: this.getPrimaryDamage() * 0.16 * cantripPower },
+      shockCantrip: { speed: 560, life: 0.75, size: 5, damage: this.getPrimaryDamage() * 0.64 * cantripPower, projectileType: "mage_shock", damageType: "lightning", chainCount: 2, lightRadius: (this.config?.map?.tile || 32) * 1.45, lightIntensity: 0.22 },
+      arcaneMissileCantrip: { speed: 330, life: 0.85, size: 6, damage: this.getPrimaryDamage() * 0.56 * cantripPower, projectileType: "mage_arcaneMissile", damageType: "arcane", homing: true, range: (this.config?.map?.tile || 32) * 8 }
     }[cantrip];
     const critMultiplier = this.rollMageCritical();
     const shotAngles = cantrip === "arcaneMissileCantrip" ? [angle - 0.08, angle + 0.08] : [angle];
@@ -281,8 +283,15 @@ export const runtimeMageCoreAttackMethods = {
         damageType: profile.damageType,
         ownerId: this.player.id || null,
         burnDuration: profile.burn || 0,
+        lightRadius: profile.lightRadius || null,
+        lightIntensity: profile.lightIntensity || null,
         slowDuration: profile.slow || 0,
         knockback: profile.knockback || 0,
+        pierce: !!profile.pierce,
+        maxHitsPerFrame: profile.maxHitsPerFrame || null,
+        frostPulseInterval: profile.frostPulseInterval || null,
+        frostPulseTimer: profile.frostPulseTimer || null,
+        frostPulseShardDamage: profile.frostPulseShardDamage || null,
         chainCount: profile.chainCount || 0,
         shockStunChance: cantrip === "shockCantrip" ? 0.25 : 0,
         shockStunDuration: cantrip === "shockCantrip" ? 0.2 : 0,
@@ -355,7 +364,7 @@ export const runtimeMageCoreAttackMethods = {
       maxLife: this.config.effects.meleeSwingLife
     });
     const critMultiplier = this.rollMageCritical();
-    const damage = this.getPrimaryDamage() * (hasMageTalent(this, "battlemage") ? 1.55 : 1.3) * scale * critMultiplier;
+    const damage = this.getPrimaryDamage() * (hasMageTalent(this, "battlemage") ? 1.45 : 1.15) * scale * critMultiplier;
     let leechTotal = 0;
     for (const enemy of this.enemies || []) {
       if (!enemy || (enemy.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(enemy)) continue;

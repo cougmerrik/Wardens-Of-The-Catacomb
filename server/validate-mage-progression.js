@@ -2,6 +2,7 @@ import { Game } from "../src/Game.js";
 import { stepGame } from "../src/game/gameStep.js";
 import { getActiveLightSources } from "../src/game/world/lighting.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "../src/rendering/hud/mageHudState.js";
+import { validateMageBaselineTuning } from "./validate-mage-balance.js";
 import {
   canSpendNecromancerNode,
   getMageSelectedCantrip,
@@ -166,7 +167,7 @@ function validateGreenFlameBladeReachAndLeech() {
   game.fire(1, 0);
   assert(enemy.hp < 30, "Green-Flame Blade should hit beyond 1.5 tiles");
   assert(crate.hp <= 0, "Green-Flame Blade should destroy breakables in its cleave");
-  assert(game.player.fireCooldown >= 0.57, "Green-Flame Blade cooldown should be 20% slower than the previous 0.48s baseline");
+  assert(game.player.fireCooldown >= 0.7, "Green-Flame Blade cooldown should stay slower than ranged cantrips");
   assert(game.player.health > game.player.maxHealth - 10, "Green-Flame Blade should leech health from damage dealt");
   const swing = game.meleeSwings.find((candidate) => candidate.style === "greenFlameBlade");
   assert(swing && swing.range >= tile * 1.7, "Green-Flame Blade swing should render as a longer reach attack");
@@ -176,6 +177,15 @@ function validateGreenFlameBladeReachAndLeech() {
 function validateShockChainLighting() {
   const game = makeMage();
   const tile = game.config.map.tile;
+  spend(game, "shockCantrip");
+  game.input.mouse.worldX = game.player.x + tile * 4;
+  game.input.mouse.worldY = game.player.y;
+  game.fire(1, 0);
+  const shock = game.bullets.find((bullet) => bullet.projectileType === "mage_shock");
+  assert(shock && shock.lightRadius > 0 && shock.lightIntensity > 0, "Shock projectile should emit light");
+  assert(getActiveLightSources(game).some((source) => source.sourceType === "mage_shock" && source.radius > 0), "Shock projectile light should be exposed to lighting");
+  game.bullets = [];
+  game.player.fireCooldown = 0;
   const source = { id: "shock-a", type: "goblin", x: game.player.x + tile, y: game.player.y, size: 20, hp: 20, maxHp: 20 };
   const target = { id: "shock-b", type: "goblin", x: game.player.x + tile * 1.7, y: game.player.y, size: 20, hp: 20, maxHp: 20 };
   game.enemies.push(source, target);
@@ -202,10 +212,10 @@ function validateShockChainLighting() {
 
 function validateMageHudState() {
   const game = makeMage();
-  spend(game, "frostShardCantrip");
+  spend(game, "frozenOrbCantrip");
   spend(game, "confusionSpell");
   game.necromancerRuntime.mana = 7;
-  assert(getMageAttackLabel(game) === "Frost Shard", "Mage HUD should show selected cantrip name");
+  assert(getMageAttackLabel(game) === "Frozen Orb", "Mage HUD should show selected cantrip name");
   assert(getMageEfficiencyState(game).tier === "high", "Mage HUD should show high efficiency at high mana");
   game.necromancerRuntime.mana = 3.5;
   assert(getMageEfficiencyState(game).tier === "mid", "Mage HUD should show normal efficiency at mid mana");
@@ -266,8 +276,12 @@ function validateCasterEffectHooks() {
   assert(decoy, "Enchanter Blink decoy should create a targetable friendly decoy");
   assert(!decoy.tempMageCharmTimer, "Mirage decoy should persist until killed");
   game.enemies.push({ id: "mirage-target", type: "goblin", x: decoy.x + 80, y: decoy.y, size: 20, hp: 20, maxHp: 20 });
-  stepGame(game, 0.4, { processUi: false });
-  assert(game.bullets.some((bullet) => bullet.projectileType === "mage_fireBolt" && bullet.ownerId === game.player.id), "Mirage decoy should cast Fire Bolt");
+  let decoyCast = false;
+  for (let i = 0; i < 18; i++) {
+    stepGame(game, 1 / 30, { processUi: false });
+    decoyCast ||= game.bullets.some((bullet) => bullet.projectileType === "mage_fireBolt" && bullet.ownerId === game.player.id);
+  }
+  assert(decoyCast, "Mirage decoy should cast Fire Bolt");
 }
 
 function validateFlamingSphereAndBattlemageHooks() {
@@ -382,33 +396,6 @@ function validateNecroticBeamCharm() {
   assert(!game.markUndeadAsControlled(bossSkeleton), "Boss creatures should not be charmed by undead control abilities");
 }
 
-function validateFrostShardSplinter() {
-  const game = makeMage();
-  const x = game.player.x + 40;
-  const y = game.player.y;
-  const enemy = { id: "frost-target", type: "goblin", x, y, size: 20, hp: 20, maxHp: 20 };
-  game.enemies.push(enemy);
-  game.bullets.push({
-    x,
-    y,
-    vx: 250,
-    vy: 0,
-    angle: 0,
-    life: 1,
-    size: 7,
-    damage: 6,
-    projectileType: "mage_frostShard",
-    damageType: "cold",
-    ownerId: game.player.id,
-    slowDuration: 5,
-    knockback: 24,
-    hitTargets: new Set()
-  });
-  stepGame(game, 1 / 60, { processUi: false });
-  const splinters = game.bullets.filter((bullet) => bullet.projectileType === "mage_frostShard" && bullet.frostShardSplinter);
-  assert(splinters.length === 2, "Frost Shard should splinter into exactly two shards on hit");
-}
-
 function validateRunesAndLichSouls() {
   const game = makeMage();
   spend(game, "fireBoltCantrip");
@@ -464,6 +451,7 @@ function validateNecromancerRaisesNonUndead() {
 
 function main() {
   validateTreeGates();
+  validateMageBaselineTuning();
   validateManaAndMode();
   validateFireballExplodesOnEnemyImpact();
   validateCantripManaSlowdown();
@@ -479,10 +467,9 @@ function main() {
   validateFlamingSphereAndBattlemageHooks();
   validateWildMagicHooks();
   validateNecroticBeamCharm();
-  validateFrostShardSplinter();
   validateRunesAndLichSouls();
   validateNecromancerRaisesNonUndead();
-  console.log(JSON.stringify({ ok: true, checks: ["tree-gates", "mana-mode", "fireball-impact-explosion", "cantrip-mana-slow", "arcane-missile-cone", "chromatic-orb-pierce", "spirit-guardians", "green-flame-blade-reach-leech", "shock-chain-lighting", "mage-hud-state", "confusion-persist", "caster-effect-hooks", "mirage-decoy", "flaming-sphere", "battlemage-close-cantrip", "runic-refraction", "wild-magic-hooks", "necrotic-beam-charm", "frost-shard-splinter", "lich-souls", "necromancer-raise"] }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: ["tree-gates", "mage-baseline-tuning", "mana-mode", "fireball-impact-explosion", "cantrip-mana-slow", "arcane-missile-cone", "chromatic-orb-pierce", "spirit-guardians", "green-flame-blade-reach-leech", "shock-chain-lighting", "mage-hud-state", "confusion-persist", "caster-effect-hooks", "mirage-decoy", "flaming-sphere", "battlemage-close-cantrip", "runic-refraction", "wild-magic-hooks", "necrotic-beam-charm", "lich-souls", "necromancer-raise"] }, null, 2));
 }
 
 main();

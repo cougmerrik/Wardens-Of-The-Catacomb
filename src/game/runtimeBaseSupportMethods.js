@@ -901,13 +901,13 @@ export const runtimeBaseSupportMethods = {
   },
 
   spawnFloatingText(x, y, text, color, life = 0.75, size = 14) {
-    const entry = { x, y, text, color, life, maxLife: life, vy: 22, size };
+    this.nextFloatingTextId = (this.nextFloatingTextId || 0) + 1;
+    const id = `ft_${this.nextFloatingTextId}`;
+    const entry = { id, x, y, text, color, life, maxLife: life, vy: 22, size };
     this.floatingTexts.push(entry);
     if (!Array.isArray(this.networkFloatingTextEvents)) this.networkFloatingTextEvents = [];
-    if (!Number.isFinite(this.networkFloatingTextEventSeq)) this.networkFloatingTextEventSeq = 0;
-    this.networkFloatingTextEventSeq += 1;
     this.networkFloatingTextEvents.push({
-      id: `ft_${this.networkFloatingTextEventSeq}`,
+      id,
       x,
       y,
       text: String(text ?? ""),

@@ -171,6 +171,12 @@ export function stepGame(game, dt, controls = {}) {
   const playerEnemyRadius = typeof game.getPlayerEnemyCollisionRadius === "function"
     ? game.getPlayerEnemyCollisionRadius()
     : game.player.size * 0.5;
+  const enemyBlocksPlayerBody = (enemy) => {
+    if (!enemy) return false;
+    if (Number.isFinite(enemy.hp) && enemy.hp <= 0) return false;
+    if (enemy.type === "skeleton_warrior" && enemy.collapsed) return false;
+    return true;
+  };
   const livingPlayers = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
   const isPlayerInTrapLane = (trap, player) => {
     if (!trap) return false;
@@ -239,7 +245,7 @@ export function stepGame(game, dt, controls = {}) {
     game.isNecromancerClass &&
     game.isNecromancerClass() &&
     (!isNecromancerTalentGame(game) ||
-      ((game.necromancerRuntime?.activeMode || "cantrip") === "cantrip" && (getMageSelectedCantrip(game) || "fireBoltCantrip") === "necroticBeamCantrip"));
+      ((game.necromancerRuntime?.activeMode || "cantrip") === "cantrip" && (getMageSelectedCantrip(game) || "arcaneBolt") === "necroticBeamCantrip"));
   if (necromancerBeamCantripActive) {
     const beam = game.necromancerBeam || (game.necromancerBeam = {
       active: false,
@@ -588,9 +594,11 @@ export function stepGame(game, dt, controls = {}) {
     enemy.hpBarTimer = Math.max(0, (enemy.hpBarTimer || 0) - dt);
     enemy.damageTextTimer = Math.max(0, (enemy.damageTextTimer || 0) - dt);
     enemy.damageBuffTimer = Math.max(0, (enemy.damageBuffTimer || 0) - dt);
+    enemy.corpseTimer = Math.max(0, (Number.isFinite(enemy.corpseTimer) ? enemy.corpseTimer : 0) - dt);
     const alwaysActiveBoss = !!enemy?.isFloorBoss && (typeof game.isFloorBossActive !== "function" || game.isFloorBossActive());
     if (!alwaysActiveBoss && !isActive(enemy, 72)) continue;
     activeEnemies.push(enemy);
+    if (Number.isFinite(enemy.hp) && enemy.hp <= 0) continue;
     if (updateFriendlyMageSummon(game, enemy, dt, enemySpeedScale)) continue;
     if (enemy.charmLocked) continue;
     if ((enemy.hitCooldown || 0) > 0) continue;
@@ -606,7 +614,7 @@ export function stepGame(game, dt, controls = {}) {
   }
   for (const enemy of activeEnemies) {
     if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
-    if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
+    if (!enemyBlocksPlayerBody(enemy)) continue;
     if (typeof game.separateEnemyFromPlayer === "function") game.separateEnemyFromPlayer(enemy);
   }
 
@@ -616,6 +624,7 @@ export function stepGame(game, dt, controls = {}) {
     activeEnemies,
     activeBreakables,
     playerEnemyRadius,
+    enemyBlocksPlayerBody,
     isActive,
     segmentRectHit,
     skeletonIgnoresArrow
