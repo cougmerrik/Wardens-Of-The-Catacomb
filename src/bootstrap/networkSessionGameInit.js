@@ -24,7 +24,8 @@ export function initializeNetworkGameState(game, predictedProjectiles) {
     postLoadSoftCorrectionCount: 0,
     postLoadSettleCorrectionCount: 0,
     postLoadBlockedSnapCount: 0,
-    recentPostLoadCorrections: []
+    recentPostLoadCorrections: [],
+    serverSnapshotTelemetry: null
   };
   game.networkPredictedProjectiles = predictedProjectiles;
   game.map = [];

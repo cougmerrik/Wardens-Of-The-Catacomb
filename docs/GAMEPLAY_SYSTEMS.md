@@ -215,6 +215,11 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Duplicate classes are allowed.
 - The first joined player becomes the room owner and initial pause owner.
 - Only the pause owner controls global pause.
+- Gameplay feedback parity is required between local and multiplayer play:
+  - combat/progression floating text must show in multiplayer when the same event would show locally
+  - active status icons must use the same status-row presentation in multiplayer as local play
+  - damage text must still show when a hit kills or despawns the target
+  - class progression effects for Archer, Fighter, and Necromancer must have targeted network validation when they add statuses, procs, summons, resource changes, or player-visible text
 - Shop, skill tree, and stats overlays are per-player UI in multiplayer:
   - pause-owner shop/skill actions pause the room globally
   - other players can open their own local overlays without opening them on teammates' clients

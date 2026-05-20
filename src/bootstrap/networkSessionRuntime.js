@@ -1,8 +1,8 @@
 import { NetClient } from "../net/NetClient.js";
-import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, syncByIdLerp } from "../net/clientStateSync.js";
+import { applyMapStateToGame, applyMapMetaToGame, applyMapChunkToGame, applyMetaStateToGame, applySnapshotToGame, isKnownMapTileAt, resetNetworkFloatingTextEventCache, syncByIdLerp } from "../net/clientStateSync.js";
 import { chunkKey, computeChunkReadiness } from "../net/mapChunkReadiness.js";
 import { discardPredictedProjectile, predictProjectileSpawn, prunePredictedProjectiles, updateNetworkProjectilePresentation, updatePredictedProjectiles } from "../net/projectilePrediction.js";
-import { canRunPredictedCollision, collectInput, handleNetworkUiActions, predictFromInput, shouldSendNetworkInput, updateNetworkRole } from "../net/sessionInteraction.js";
+import { applyPredictedTeleportAction, canRunPredictedCollision, collectInput, handleNetworkUiActions, isLocalGameplayInputActive, predictFromInput, shouldSendNetworkInput, stripGameplayInputForSpectator, updateNetworkRole } from "../net/sessionInteraction.js";
 import {
   consumeSnapshotForRender,
   estimateServerNowMs as estimateServerNowMsFromState,
@@ -74,6 +74,7 @@ export function createNetworkSessionController({
   let netSnapshotJitterMs = 0;
   let netLastSnapshotGapMs = 33;
   let netInitialSnapshotApplied = false;
+  let netLastSnapshotTelemetry = null;
   const isNetworkController = () => !!(netControllerId && netPlayerId && netControllerId === netPlayerId);
 
   const getDebugState = () => ({
@@ -84,7 +85,9 @@ export function createNetworkSessionController({
     snapshotBuffer: netSnapshotBuffer.length,
     pendingSnapshot: !!netPendingSnapshot,
     jitterMs: netSnapshotJitterMs,
-    gapMs: netLastSnapshotGapMs
+    gapMs: netLastSnapshotGapMs,
+    transportBufferedBytes: Number.isFinite(netClient?.transport?.bufferedAmount) ? netClient.transport.bufferedAmount : 0,
+    snapshotTelemetry: netLastSnapshotTelemetry ? { ...netLastSnapshotTelemetry } : null
   });
 
   const getAckSeqForPacket = (pkt) => Number.isFinite(pkt?.lastInputSeqByPlayer?.[netPlayerId]) ? pkt.lastInputSeqByPlayer[netPlayerId] : Number.isFinite(pkt?.lastInputSeq) ? pkt.lastInputSeq : 0;
@@ -116,6 +119,7 @@ export function createNetworkSessionController({
     netSnapshotJitterMs = 0;
     netLastSnapshotGapMs = 33;
     netInitialSnapshotApplied = false;
+    netLastSnapshotTelemetry = null;
   };
 
   const stopNetworkSession = () => {
@@ -279,6 +283,7 @@ export function createNetworkSessionController({
     });
     netClient.on("state.mapMeta", (msg) => {
       netMapSignature = applyMapMetaToGame(game, msg) || netMapSignature;
+      resetNetworkFloatingTextEventCache(game);
       netPendingInputs = [];
       netLastAckSeq = 0;
       netSnapshotBuffer.length = 0;
@@ -310,6 +315,7 @@ export function createNetworkSessionController({
     });
     netClient.on("state.map", (msg) => {
       netMapSignature = applyMapStateToGame(game, msg) || netMapSignature;
+      resetNetworkFloatingTextEventCache(game);
       netPendingInputs = [];
       netLastAckSeq = 0;
       netSnapshotBuffer.length = 0;
@@ -360,6 +366,10 @@ export function createNetworkSessionController({
       netControllerId = msg.controllerId || netControllerId;
       observeServerTimeIntoState(netClockState, msg.serverTime, NET_CLOCK_OFFSET_SMOOTHING);
       if (Number.isFinite(msg.snapshotSeq)) netClient.send("state.snapshotAck", { snapshotSeq: Math.floor(msg.snapshotSeq) });
+      netLastSnapshotTelemetry = msg.snapshotTelemetry && typeof msg.snapshotTelemetry === "object" ? { ...msg.snapshotTelemetry } : null;
+      if (game.networkPerf && typeof game.networkPerf === "object") {
+        game.networkPerf.serverSnapshotTelemetry = netLastSnapshotTelemetry ? { ...netLastSnapshotTelemetry } : null;
+      }
       const snapshotSig = typeof msg.mapSignature === "string" ? msg.mapSignature : "";
       if (snapshotSig && netMapSignature && snapshotSig !== netMapSignature) {
         netPendingSnapshot = msg;
@@ -432,6 +442,8 @@ export function createNetworkSessionController({
       const currentGame = getCurrentGame();
       if (!netClient || !currentGame || currentGame !== game) return;
       const input = collectInput(game, true);
+      const gameplayInputActive = isLocalGameplayInputActive(game);
+      if (!gameplayInputActive) stripGameplayInputForSpectator(input);
       input.seq = ++netInputSeq;
       const nowMs = performance.now();
       const inputDt = netLastInputProcessAt > 0 ? Math.min(0.05, Math.max(0.001, (nowMs - netLastInputProcessAt) / 1000)) : NET_INPUT_DT;
@@ -439,20 +451,8 @@ export function createNetworkSessionController({
       if (nowMs - netLastInputSendAt < NET_MIN_SEND_MS && !input.firePrimaryQueued && !input.fireAltQueued && !input.swapAttackQueued && !input.modeSwapQueued) return;
       if (!shouldSendNetworkInput(input, nowMs, netLastSentInput, netLastInputSendAt, NET_FORCE_SEND_IDLE_MS)) return;
       netLastInputSendAt = nowMs;
-      netLastSentInput = {
-        moveX: input.moveX,
-        moveY: input.moveY,
-        hasAim: input.hasAim,
-        aimX: input.aimX,
-        aimY: input.aimY,
-        aimDirX: input.aimDirX,
-        aimDirY: input.aimDirY,
-        swapAttackQueued: input.swapAttackQueued,
-        firePrimaryQueued: input.firePrimaryQueued,
-        fireAltQueued: input.fireAltQueued,
-        modeSwapQueued: input.modeSwapQueued
-      };
-      if (!isNetworkController()) {
+      netLastSentInput = { moveX: input.moveX, moveY: input.moveY, hasAim: input.hasAim, aimX: input.aimX, aimY: input.aimY, aimDirX: input.aimDirX, aimDirY: input.aimDirY, swapAttackQueued: input.swapAttackQueued, firePrimaryQueued: input.firePrimaryQueued, fireAltQueued: input.fireAltQueued, modeSwapQueued: input.modeSwapQueued, spectateTargetId: input.spectateTargetId || "", spectatorOnly: !!input.spectatorOnly };
+      if (!isNetworkController() || !gameplayInputActive) {
         input.swapAttackQueued = false;
         input.firePrimaryQueued = false;
         input.firePrimaryHeld = false;
@@ -467,6 +467,7 @@ export function createNetworkSessionController({
           netPredictedProjectiles,
           netNextHeldPrimaryPredictAtMs
         );
+        applyPredictedTeleportAction(game, input);
         netPendingInputs.push({
           seq: input.seq,
           dt: inputDt,
@@ -476,7 +477,7 @@ export function createNetworkSessionController({
           aimX: input.aimX,
           aimY: input.aimY,
           aimDirX: input.aimDirX,
-          aimDirY: input.aimDirY
+          aimDirY: input.aimDirY, fireAltQueued: input.fireAltQueued
         });
         if (netPendingInputs.length > 120) netPendingInputs.splice(0, netPendingInputs.length - 120);
       }

@@ -27,6 +27,7 @@ export const PLAYER_SNAPSHOT_FIELDS = [
   "dirX",
   "dirY",
   "facing",
+  "teleportSeq",
   "classType"
 ];
 
@@ -70,6 +71,7 @@ export const ACTIVE_PLAYER_SNAPSHOT_FIELDS = [
   "dirX",
   "dirY",
   "facing",
+  "teleportSeq",
   "moving",
   "alive",
   "spectateTargetId",
@@ -116,6 +118,7 @@ export function applyPlayerSnapshotToGameState(game, snapshotPlayer, { isNetwork
   if (Number.isFinite(snapshotPlayer.deathBoltCooldown)) game.player.deathBoltCooldown = snapshotPlayer.deathBoltCooldown;
   if (Number.isFinite(snapshotPlayer.hitCooldown)) game.player.hitCooldown = snapshotPlayer.hitCooldown;
   if (Number.isFinite(snapshotPlayer.hpBarTimer)) game.player.hpBarTimer = snapshotPlayer.hpBarTimer;
+  if (Number.isFinite(snapshotPlayer.teleportSeq)) game.player.teleportSeq = snapshotPlayer.teleportSeq;
   game.player.classType = snapshotPlayer.classType;
   if (typeof snapshotPlayer.classType === "string" && game.config?.classes?.[snapshotPlayer.classType]) {
     game.classType = snapshotPlayer.classType;

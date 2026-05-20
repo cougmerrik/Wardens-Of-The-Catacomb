@@ -77,6 +77,7 @@ export function buildJoinKeyframeState(fullState) {
     door: fullState.door,
     pickup: fullState.pickup,
     portal: fullState.portal,
+    floatingTexts: Array.isArray(fullState.floatingTexts) ? fullState.floatingTexts.map((entry) => ({ ...entry })) : [],
     delta: {
       keyframe: true,
       enemies: toKeyframeCollection(fullState.enemies),

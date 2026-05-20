@@ -16,6 +16,63 @@ function hasOwn(obj, key) {
   return !!obj && Object.prototype.hasOwnProperty.call(obj, key);
 }
 
+function floatingTextSignature(text, x, y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return "";
+  return `${String(text ?? "")}@${Math.round(x)}:${Math.round(y)}`;
+}
+
+function rememberNetworkFloatingTextSignature(game, text, x, y) {
+  if (!game) return;
+  if (!Array.isArray(game.networkFloatingTextEventSignatures)) game.networkFloatingTextEventSignatures = [];
+  const signature = floatingTextSignature(text, x, y);
+  if (!signature) return;
+  game.networkFloatingTextEventSignatures.push(signature);
+  if (game.networkFloatingTextEventSignatures.length > 96) {
+    game.networkFloatingTextEventSignatures.splice(0, game.networkFloatingTextEventSignatures.length - 96);
+  }
+}
+
+function hasRecentNetworkFloatingText(game, text, x, y) {
+  const signature = floatingTextSignature(text, x, y);
+  return !!signature && Array.isArray(game?.networkFloatingTextEventSignatures) && game.networkFloatingTextEventSignatures.includes(signature);
+}
+
+export function applyNetworkFloatingTextEvents(game, events) {
+  if (!game || !Array.isArray(events) || events.length === 0) return;
+  if (!Array.isArray(game.floatingTexts)) game.floatingTexts = [];
+  if (!game.networkFloatingTextEventIds || typeof game.networkFloatingTextEventIds.has !== "function") {
+    game.networkFloatingTextEventIds = new Set();
+  }
+  if (!Array.isArray(game.networkFloatingTextEventIdOrder)) game.networkFloatingTextEventIdOrder = [];
+  for (const event of events) {
+    if (!event || typeof event.id !== "string" || !event.id || game.networkFloatingTextEventIds.has(event.id)) continue;
+    const x = Number.isFinite(event.x) ? event.x : null;
+    const y = Number.isFinite(event.y) ? event.y : null;
+    if (x === null || y === null) continue;
+    const text = String(event.text ?? "");
+    const color = typeof event.color === "string" && event.color ? event.color : "#ffffff";
+    const life = Number.isFinite(event.life) ? event.life : 0.75;
+    const size = Number.isFinite(event.size) ? event.size : 14;
+    const vy = Number.isFinite(event.vy) ? event.vy : 22;
+    game.floatingTexts.push({ x, y, text, color, life, maxLife: life, vy, size });
+    game.networkFloatingTextEventIds.add(event.id);
+    game.networkFloatingTextEventIdOrder.push(event.id);
+    rememberNetworkFloatingTextSignature(game, text, x, y);
+  }
+  if (game.networkFloatingTextEventIdOrder.length > 256) {
+    const trimCount = game.networkFloatingTextEventIdOrder.length - 256;
+    const removed = game.networkFloatingTextEventIdOrder.splice(0, trimCount);
+    for (const id of removed) game.networkFloatingTextEventIds.delete(id);
+  }
+}
+
+export function resetNetworkFloatingTextEventCache(game) {
+  if (!game) return;
+  game.networkFloatingTextEventIds = new Set();
+  game.networkFloatingTextEventIdOrder = [];
+  game.networkFloatingTextEventSignatures = [];
+}
+
 export function syncFloorBossState(target, source, game) {
   if (!source || typeof source !== "object") return target;
   const base =
@@ -40,6 +97,48 @@ export function captureEnemyStateById(enemies) {
     });
   }
   return byId;
+}
+
+export function capturePlayerProgressById(game) {
+  const byId = new Map();
+  if (game?.player?.id) {
+    byId.set(game.player.id, {
+      level: Number.isFinite(game.level) ? game.level : Number.isFinite(game.player.level) ? game.player.level : 1,
+      skillPoints: Number.isFinite(game.skillPoints) ? game.skillPoints : Number.isFinite(game.player.skillPoints) ? game.player.skillPoints : 0,
+      gold: Number.isFinite(game.gold) ? game.gold : Number.isFinite(game.player.gold) ? game.player.gold : 0,
+      x: Number.isFinite(game.player.x) ? game.player.x : null,
+      y: Number.isFinite(game.player.y) ? game.player.y : null
+    });
+  }
+  const players = [];
+  for (const player of Array.isArray(game?.remotePlayers) ? game.remotePlayers : []) players.push(player);
+  for (const player of players) {
+    if (!player?.id) continue;
+    byId.set(player.id, {
+      level: Number.isFinite(player.level) ? player.level : 1,
+      skillPoints: Number.isFinite(player.skillPoints) ? player.skillPoints : 0,
+      gold: Number.isFinite(player.gold) ? player.gold : 0,
+      x: Number.isFinite(player.x) ? player.x : null,
+      y: Number.isFinite(player.y) ? player.y : null
+    });
+  }
+  return byId;
+}
+
+function spawnEnemyDamageText(game, enemy, previous, damage) {
+  if (!game || typeof game.spawnFloatingText !== "function" || !(damage >= 0.5)) return false;
+  const textValue = Math.max(1, Math.round(damage));
+  const x = Number.isFinite(enemy?.x) ? enemy.x : previous?.x;
+  const y = Number.isFinite(enemy?.y) ? enemy.y : previous?.y;
+  const size = Number.isFinite(enemy?.size) ? enemy.size : previous?.size;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const text = `-${textValue}`;
+  const textY = y - (size || 20) * 0.65;
+  if (!hasRecentNetworkFloatingText(game, text, x, textY)) {
+    game.spawnFloatingText(x, textY, text, "#e85c5c");
+  }
+  if (enemy) enemy.hpBarTimer = Math.max(Number.isFinite(enemy.hpBarTimer) ? enemy.hpBarTimer : 0, game.config?.enemy?.hpBarDuration || 0.9);
+  return true;
 }
 
 export function findSnapshotLocalPlayer(state, localPlayerId) {
@@ -133,6 +232,41 @@ export function queuePlayerDeathNotifications(game, previousById, snapshotPlayer
   }
 }
 
+export function synthesizePlayerProgressionFloatingTexts(game, previousById, snapshotPlayer, remotes) {
+  if (typeof game?.spawnFloatingText !== "function") return;
+  const players = [];
+  if (snapshotPlayer && typeof snapshotPlayer === "object") players.push(snapshotPlayer);
+  for (const player of Array.isArray(remotes) ? remotes : []) if (player && typeof player === "object") players.push(player);
+  for (const player of players) {
+    const id = player.id || (player === snapshotPlayer ? game.player?.id : null);
+    if (!id) continue;
+    const prev = previousById.get(id);
+    if (!prev) continue;
+    const nextLevel = Number.isFinite(player.level) ? player.level : prev.level;
+    const nextSkillPoints = Number.isFinite(player.skillPoints) ? player.skillPoints : prev.skillPoints;
+    const nextGold = Number.isFinite(player.gold) ? player.gold : prev.gold;
+    const levelDelta = nextLevel - prev.level;
+    const skillPointDelta = nextSkillPoints - prev.skillPoints;
+    const goldDelta = nextGold - prev.gold;
+    if (levelDelta <= 0 && skillPointDelta <= 0 && goldDelta <= 0) continue;
+    const x = Number.isFinite(player.x) ? player.x : prev.x;
+    const y = Number.isFinite(player.y) ? player.y : prev.y;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (goldDelta > 0) {
+      const text = `+${Math.floor(goldDelta)}g`;
+      if (!hasRecentNetworkFloatingText(game, text, x, y - 30)) game.spawnFloatingText(x, y - 30, text, "#f2d76b", 0.75, 14);
+    }
+    if (levelDelta > 0) {
+      const spSuffix = skillPointDelta > 0 ? ` +${skillPointDelta} SP` : "";
+      const text = `Level ${nextLevel}!${spSuffix}`;
+      if (!hasRecentNetworkFloatingText(game, text, x, y - 48)) game.spawnFloatingText(x, y - 48, text, "#9be18a", 1.0, 15);
+    } else if (skillPointDelta > 0) {
+      const text = `+${skillPointDelta} SP`;
+      if (!hasRecentNetworkFloatingText(game, text, x, y - 48)) game.spawnFloatingText(x, y - 48, text, "#9be18a", 0.9, 14);
+    }
+  }
+}
+
 export function synthesizeEnemyDamageFloatingTexts(game, previousById, { skip = false } = {}) {
   if (skip || typeof game?.spawnFloatingText !== "function") return;
   for (const enemy of Array.isArray(game.enemies) ? game.enemies : []) {
@@ -141,12 +275,16 @@ export function synthesizeEnemyDamageFloatingTexts(game, previousById, { skip = 
     if (!prev || !Number.isFinite(prev.hp) || !Number.isFinite(enemy.hp)) continue;
     const damage = prev.hp - enemy.hp;
     if (!(damage >= 0.5)) continue;
-    const textValue = Math.max(1, Math.round(damage));
-    const x = Number.isFinite(enemy.x) ? enemy.x : prev.x;
-    const y = Number.isFinite(enemy.y) ? enemy.y : prev.y;
-    const size = Number.isFinite(enemy.size) ? enemy.size : prev.size;
-    game.spawnFloatingText(x, y - (size || 20) * 0.65, `-${textValue}`, "#e85c5c");
-    enemy.hpBarTimer = Math.max(Number.isFinite(enemy.hpBarTimer) ? enemy.hpBarTimer : 0, game.config?.enemy?.hpBarDuration || 0.9);
+    spawnEnemyDamageText(game, enemy, prev, damage);
+  }
+}
+
+export function synthesizeDespawnDamageFloatingTexts(game, previousById, despawnIds, { skip = false } = {}) {
+  if (skip || typeof game?.spawnFloatingText !== "function" || !Array.isArray(despawnIds)) return;
+  for (const id of despawnIds) {
+    const prev = previousById.get(id);
+    if (!prev || !Number.isFinite(prev.hp) || !(prev.hp >= 0.5)) continue;
+    spawnEnemyDamageText(game, null, prev, prev.hp);
   }
 }
 

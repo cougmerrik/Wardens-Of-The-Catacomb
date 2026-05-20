@@ -3,6 +3,7 @@ import { getAndroidHudCardX } from "./androidLayout.js";
 import { drawPinnedAbilityTooltip } from "./abilityWidgetTooltip.js";
 import { getHudAbilityState } from "./abilityWidgetState.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
+import { getClassDisplayLabel } from "../../game/classDisplay.js";
 function formatEnemyTypeLabel(type) {
   const raw = typeof type === "string" && type.length > 0 ? type : "unknown";
   return raw
@@ -180,8 +181,9 @@ function getRunStats(game) {
 
 function buildRunColumns(game) {
   const runStats = getRunStats(game);
+  const classLabel = getClassDisplayLabel(game);
   const overview = createSection("Overview", [
-    ["Class", game.classSpec.label],
+    ["Class", classLabel],
     ["Floor", `${game.floor}`],
     ["Level", `${game.level}`],
     ["Total Kills", `${runStats.totalKills || 0}`],
@@ -207,17 +209,17 @@ function buildRunColumns(game) {
 
   let classActivity = null;
   if (game.isArcherClass && game.isArcherClass()) {
-    classActivity = createSection("Ranger Run", [
+    classActivity = createSection(`${classLabel} Run`, [
       ["Shots Fired", `${runStats.classSpecific?.ranger?.shotsFired || 0}`],
       ["Fire Arrow Kills", `${runStats.classSpecific?.ranger?.fireArrowKills || 0}`]
     ]);
   } else if (game.isWarriorClass && game.isWarriorClass()) {
-    classActivity = createSection("Warrior Run", [
+    classActivity = createSection(`${classLabel} Run`, [
       ["Execute Kills", `${runStats.classSpecific?.warrior?.executeKills || 0}`],
       ["Frenzies", `${runStats.classSpecific?.warrior?.frenzies || 0}`]
     ]);
   } else if (game.isNecromancerClass && game.isNecromancerClass()) {
-    classActivity = createSection("Necromancer Run", [
+    classActivity = createSection(`${classLabel} Run`, [
       ["Undead Charmed", `${runStats.classSpecific?.necromancer?.undeadCharmed || 0}`],
       ["Undead Healing", `${Math.round(runStats.classSpecific?.necromancer?.undeadHealing || 0)}`]
     ]);
@@ -247,6 +249,7 @@ function buildRunColumns(game) {
 }
 
 function buildCharacterColumns(game) {
+  const classLabel = getClassDisplayLabel(game);
   const dmgRange = game.getPrimaryDamageRange();
   const tempHp =
     Math.max(0, Number.isFinite(game.player?.warriorRuntime?.tempHp) ? game.player.warriorRuntime.tempHp : 0) +
@@ -281,7 +284,7 @@ function buildCharacterColumns(game) {
     const mode = runtime.weaponMode === "melee" ? "Melee" : "Ranged";
     const combo = Math.max(0, Math.floor(runtime.combo || 0));
     const abilityState = getHudAbilityState(game);
-    classKit = createSection("Ranger Kit", [
+    classKit = createSection(`${classLabel} Kit`, [
       ["Mode", mode],
       ["Combo", `${combo}/30`],
       ["Q Swap", runtime.swapCooldownTimer > 0 ? `${runtime.swapCooldownTimer.toFixed(1)}s` : "Ready"],
@@ -291,7 +294,7 @@ function buildCharacterColumns(game) {
   } else if (game.isWarriorClass && game.isWarriorClass()) {
     const classSkillName = typeof game.getWarriorClassSkillName === "function" ? game.getWarriorClassSkillName() : "Class Skill";
     const classSkillCooldown = game.warriorRageCooldownTimer > 0 ? `Cooldown ${game.warriorRageCooldownTimer.toFixed(1)}s` : "Ready";
-    classKit = createSection("Warrior Kit", [
+    classKit = createSection(`${classLabel} Kit`, [
       ["Weapon", typeof game.getWarriorWeaponForm === "function" ? game.getWarriorWeaponForm() : "broadswing"],
       ["Class Skill", classSkillName],
       [
@@ -304,7 +307,7 @@ function buildCharacterColumns(game) {
     ]);
   } else if (game.isNecromancerClass && game.isNecromancerClass()) {
     const efficiency = getMageEfficiencyState(game);
-    classKit = createSection("Mage Kit", [
+    classKit = createSection(`${classLabel} Kit`, [
       ["Attack", getMageAttackLabel(game)],
       ["Efficiency", efficiency.shortLabel],
       ["Controlled Undead", `${game.getControlledUndeadCount()}/${game.getNecromancerControlCap()}`],
@@ -389,7 +392,7 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   const playerHandle = typeof game.playerHandle === "string" && game.playerHandle.trim()
     ? game.playerHandle.trim()
     : "Player";
-  const classLabel = game.classSpec?.label || "Unknown";
+  const classLabel = getClassDisplayLabel(game);
   ctx.fillStyle = "rgba(8, 12, 18, 0.9)";
   ctx.fillRect(panelX, panelY, panelW, panelH);
   ctx.strokeStyle = "rgba(126, 139, 171, 0.65)";

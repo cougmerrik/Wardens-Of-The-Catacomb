@@ -1,6 +1,8 @@
 import {
   applyMetaStateToGame,
+  applyNetworkFloatingTextEvents,
   captureEnemyStateById,
+  capturePlayerProgressById,
   createProjectileSpawnReconciler,
   findSnapshotLocalPlayer,
   getPredictionPressure,
@@ -8,7 +10,9 @@ import {
   syncFloorBossState,
   syncNamedObject,
   syncRemotePlayers,
-  synthesizeEnemyDamageFloatingTexts
+  synthesizeDespawnDamageFloatingTexts,
+  synthesizeEnemyDamageFloatingTexts,
+  synthesizePlayerProgressionFloatingTexts
 } from "./clientSnapshotHelpers.js";
 import {
   ensureNetworkPerf,
@@ -20,7 +24,8 @@ import {
   recordSuspiciousNetworkState
 } from "./clientCorrectionMetrics.js";
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
-export { applyMetaStateToGame } from "./clientSnapshotHelpers.js";
+import { applyPredictedTeleportAction } from "./teleportPrediction.js";
+export { applyMetaStateToGame, resetNetworkFloatingTextEventCache } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
   if (typeof row === "string") return Array.from(row);
@@ -162,8 +167,11 @@ export function syncByIdLerp(target, source, positionAlpha = 1, decorate) {
       const prevY = Number.isFinite(dst.y) ? dst.y : null;
       const sx = Number.isFinite(srcItem.x) ? srcItem.x : null;
       const sy = Number.isFinite(srcItem.y) ? srcItem.y : null;
+      const prevTeleportSeq = Number.isFinite(dst.teleportSeq) ? dst.teleportSeq : null;
+      const nextTeleportSeq = Number.isFinite(srcItem?.teleportSeq) ? srcItem.teleportSeq : null;
       Object.assign(dst, srcItem);
-      if (sx !== null && sy !== null && prevX !== null && prevY !== null && positionAlpha < 1) {
+      const teleportSnap = nextTeleportSeq !== null && nextTeleportSeq !== prevTeleportSeq;
+      if (!teleportSnap && sx !== null && sy !== null && prevX !== null && prevY !== null && positionAlpha < 1) {
         dst.x = prevX * (1 - positionAlpha) + sx * positionAlpha;
         dst.y = prevY * (1 - positionAlpha) + sy * positionAlpha;
       }
@@ -247,6 +255,7 @@ export function applySnapshotToGame({
   for (const player of Array.isArray(game?.remotePlayers) ? game.remotePlayers : []) {
     if (player?.id) previousAliveById.set(player.id, (player.alive !== false) && (player.health || 0) > 0);
   }
+  const previousProgressById = capturePlayerProgressById(game);
   ensureNetworkPerf(game);
   game.networkPerf.appliedSnapshotCount += 1;
   const isInitialControllerSync = !!controller && ackSeq <= 0 && !!state?.delta?.keyframe;
@@ -265,7 +274,9 @@ export function applySnapshotToGame({
     let flightAppliedPx = 0;
     let flightPendingDepth = Array.isArray(netPendingInputs) ? netPendingInputs.length : 0;
     let flightPostLoadActive = false;
-    if (!controller) {
+    const snapshotPlayerAlive = snapshotPlayer.alive !== false && (!Number.isFinite(snapshotPlayer.health) || snapshotPlayer.health > 0);
+    const reconcileAsController = !!controller && !!isNetworkController && snapshotPlayerAlive;
+    if (!reconcileAsController) {
       Object.assign(game.player, snapshotPlayer);
     } else {
       const baseX = Number.isFinite(snapshotPlayer.x) ? snapshotPlayer.x : game.player.x;
@@ -298,6 +309,7 @@ export function applySnapshotToGame({
             const speed = game.getPlayerMoveSpeed();
             game.moveWithCollisionSubsteps(probe, (mx / len) * speed * entry.dt, (my / len) * speed * entry.dt);
           }
+          applyPredictedTeleportAction(game, entry, probe);
         }
         correctedX = probe.x;
         correctedY = probe.y;
@@ -307,6 +319,7 @@ export function applySnapshotToGame({
       const dy = correctedY - game.player.y;
       const errorSq = dx * dx + dy * dy;
       const errorDist = Math.sqrt(errorSq);
+      const teleportSnap = Number.isFinite(snapshotPlayer.teleportSeq) && snapshotPlayer.teleportSeq !== game.player.teleportSeq;
       const jitterMs = Number.isFinite(snapshotJitterMs) ? Math.max(0, snapshotJitterMs) : 0;
       const frameGap = Number.isFinite(frameGapMs) ? Math.max(0, frameGapMs) : 16.67;
       const pendingDepth = Array.isArray(netPendingInputs) ? netPendingInputs.length : 0;
@@ -334,14 +347,14 @@ export function applySnapshotToGame({
       game.networkPerf.lastCorrectionPx = errorDist;
       if (errorDist > game.networkPerf.maxCorrectionPx) game.networkPerf.maxCorrectionPx = errorDist;
       flightCorrectionPx = errorDist;
-      if (isInitialControllerSync || localPlayerBlocked || errorDist > hardSnapDist) {
-        flightCorrectionKind = localPlayerBlocked ? "blockedHardSnap" : "hardSnap";
+      if (isInitialControllerSync || teleportSnap || localPlayerBlocked || errorDist > hardSnapDist) {
+        flightCorrectionKind = teleportSnap ? "teleportSnap" : localPlayerBlocked ? "blockedHardSnap" : "hardSnap";
         flightAppliedPx = errorDist;
         game.networkPerf.hardSnapCount += 1;
         if (postLoadCorrectionActive) game.networkPerf.postLoadHardSnapCount += 1;
         if (localPlayerBlocked) game.networkPerf.blockedSnapCount += 1;
         if (postLoadCorrectionActive && localPlayerBlocked) game.networkPerf.postLoadBlockedSnapCount += 1;
-        recordCorrection(game, localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+        recordCorrection(game, flightCorrectionKind, errorDist, {
           ackSeq,
           pendingInputs: netPendingInputs,
           extra: {
@@ -349,7 +362,7 @@ export function applySnapshotToGame({
             correctedY: Math.round(correctedY)
           }
         });
-        recordPostLoadCorrection(game, postLoadCorrectionActive, localPlayerBlocked ? "blockedHardSnap" : "hardSnap", errorDist, {
+        recordPostLoadCorrection(game, postLoadCorrectionActive, flightCorrectionKind, errorDist, {
           ackSeq,
           pendingDepth,
           extra: {
@@ -414,7 +427,9 @@ export function applySnapshotToGame({
     });
   }
   syncRemotePlayers(game, state, localPlayerId, 0.72, syncByIdLerp);
+  applyNetworkFloatingTextEvents(game, state.floatingTexts);
   queuePlayerDeathNotifications(game, previousAliveById, snapshotPlayer, game.remotePlayers);
+  synthesizePlayerProgressionFloatingTexts(game, previousProgressById, snapshotPlayer, game.remotePlayers);
   if (typeof game.updateSpectateTarget === "function") game.updateSpectateTarget();
 
   if (state.door && typeof state.door === "object") game.door = { ...state.door };
@@ -432,6 +447,7 @@ export function applySnapshotToGame({
   });
   if (state.delta && typeof state.delta === "object") {
     const keyframe = !!state.delta.keyframe;
+    const enemyDespawns = Array.isArray(state.delta.enemies?.despawn) ? state.delta.enemies.despawn.slice() : [];
     game.enemies = applyDeltaCollection(game.enemies, state.delta.enemies, { keyframe, positionAlpha: snapAlpha });
     game.drops = applyDeltaCollection(game.drops, state.delta.drops, { keyframe, positionAlpha: snapAlpha });
     game.lightSources = applyDeltaCollection(game.lightSources, state.delta.lightSources, { keyframe, positionAlpha: 1 });
@@ -451,7 +467,8 @@ export function applySnapshotToGame({
     });
     game.fireZones = applyDeltaCollection(game.fireZones, state.delta.fireZones, { keyframe, positionAlpha: 1 });
     game.meleeSwings = applyDeltaCollection(game.meleeSwings, state.delta.meleeSwings, { keyframe, positionAlpha: 1 });
-    synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: keyframe });
+    synthesizeDespawnDamageFloatingTexts(game, previousEnemyStateById, enemyDespawns, { skip: keyframe });
+    synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: false });
     recordSuspiciousNetworkState(game, { keyframe, ackSeq });
   } else {
     game.armorStands = syncByIdLerp(game.armorStands, state.armorStands, 1);

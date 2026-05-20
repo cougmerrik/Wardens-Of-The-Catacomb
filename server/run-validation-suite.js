@@ -16,7 +16,9 @@ const SCRIPT_TARGETS = {
   "validate:minotaur": "server/validate-minotaur.js",
   "validate:solo-xp": "server/validate-solo-xp.js",
   "validate:skill-refund": "server/validate-skill-refund.js",
+  "validate:player-death-healing": "server/validate-player-death-healing.js",
   "validate:dev-start": "server/validate-dev-start.js",
+  "validate:music-sync": "server/validate-music-sync.js",
   "validate:loc": "server/validate-loc.js",
   "validate:lighting-state": "server/validate-lighting-state.js",
   "validate:lighting-placement": "server/validate-lighting-placement.js",
@@ -40,7 +42,9 @@ const SCRIPT_TARGETS = {
   "validate:network-controller": "server/validate-network-controller-responsiveness.js",
   "validate:network-projectiles": "server/validate-network-projectile-prediction.js",
   "validate:network-smoothness": "server/validate-network-smoothness.js",
+  "validate:network-input-telemetry": "server/validate-network-input-telemetry.js",
   "validate:network-state-corruption": "server/validate-network-state-corruption.js",
+  "validate:network-status-parity": "server/validate-network-status-parity.js",
   "validate:mobile-transport": "server/validate-mobile-transport-defaults.js",
   "validate:network-framework": "server/validate-network-framework-evaluation.js",
   "validate:selective-closeout-plan": "server/validate-selective-closeout-plan.js",
@@ -52,8 +56,8 @@ const SCRIPT_TARGETS = {
 };
 
 const SUITES = {
-  core: ["check", "validate:loc"],
-  gameplay: ["validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],
+  core: ["check", "validate:music-sync", "validate:loc"],
+  gameplay: ["validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:player-death-healing", "validate:dev-start"],
   lighting: [
     "validate:lighting-state",
     "validate:lighting-placement",
@@ -75,6 +79,7 @@ const SUITES = {
     "validate:network-pause",
     "validate:network-ui",
     "validate:network-refund",
+    "validate:network-status-parity",
     "validate:network-bots"
   ],
   "network-stability": [
@@ -82,13 +87,15 @@ const SUITES = {
     "validate:network-controller",
     "validate:network-projectiles",
     "validate:network-smoothness",
+    "validate:network-input-telemetry",
     "validate:network-state-corruption",
+    "validate:network-status-parity",
     "validate:network-join",
     "validate:network-combat-hit",
     "validate:network-archer"
   ],
   perf: ["perf:test", "perf:network-browser", "perf:floor-scaling"],
-  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:dev-start"],
+  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:player-death-healing", "validate:dev-start"],
   closeout: [
     "check",
     "validate:loc",
@@ -99,6 +106,7 @@ const SUITES = {
     "validate:minotaur",
     "validate:solo-xp",
     "validate:skill-refund",
+    "validate:player-death-healing",
     "validate:dev-start",
     "validate:network-join",
     "validate:network-combat",
@@ -111,6 +119,7 @@ const SUITES = {
     "validate:network-pause",
     "validate:network-ui",
     "validate:network-refund",
+    "validate:network-status-parity",
     "validate:network-bots",
     "perf:test",
     "perf:network-browser",

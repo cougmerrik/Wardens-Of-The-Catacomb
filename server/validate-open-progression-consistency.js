@@ -3,6 +3,9 @@ import { OPEN_PROGRESSION_TIER_COUNT, OPEN_PROGRESSION_TIER_LEVELS, getOpenProgr
 import { getRangerRowRequirement, getRangerSkillPointGainForLevel, getRangerTalentDefs } from "../src/game/rangerTalentTree.js";
 import { getWarriorRowRequirement, getWarriorSkillPointGainForLevel, getWarriorTalentDefs } from "../src/game/warriorTalentTree.js";
 import { getNecromancerRowRequirement, getNecromancerSkillPointGainForLevel, getNecromancerTalentDefs } from "../src/game/necromancerTalentTree.js";
+import { getBaseClassDisplayLabel, getClassDisplayLabel } from "../src/game/classDisplay.js";
+import { getLeaderboardClassText, normalizeLeaderboardRow } from "../src/leaderboard/leaderboardClient.js";
+import { normalizeRow as normalizeStoredLeaderboardRow } from "./leaderboardStore.js";
 
 const EXPECTED_SP_LEVELS = new Set([2, 3, 5, 7, 9, 10, 12, 14, 16]);
 
@@ -30,6 +33,21 @@ function validateTierShape(label, defs) {
   }
 }
 
+function validateClassDisplayLabels() {
+  assert.equal(getBaseClassDisplayLabel("archer"), "Scout", "archer base display label");
+  assert.equal(getBaseClassDisplayLabel("fighter"), "Warrior", "fighter base display label");
+  assert.equal(getBaseClassDisplayLabel("warrior"), "Warrior", "legacy warrior base display label");
+  assert.equal(getBaseClassDisplayLabel("necromancer"), "Mage", "mage base display label");
+  assert.equal(getClassDisplayLabel({ classType: "archer", rangerTalents: {} }), "Scout", "archer stays base before path");
+  assert.equal(getClassDisplayLabel({ classType: "archer", rangerTalents: { roguePath: { points: 1 } } }), "Rogue", "archer displays selected path");
+  assert.equal(getClassDisplayLabel({ classType: "fighter", warriorTalents: { paladinDoctrine: { points: 1 } } }), "Paladin", "warrior displays selected path");
+  assert.equal(getClassDisplayLabel({ classType: "necromancer", necromancerTalents: { enchanterPath: { points: 1 } } }), "Enchanter", "mage displays selected path");
+  assert.equal(getLeaderboardClassText({ classType: "archer" }), "Scout", "leaderboard uses base display label by default");
+  assert.equal(getLeaderboardClassText({ classType: "archer", classLabel: "Assassin" }), "Assassin", "leaderboard preserves submitted path label");
+  assert.deepEqual(normalizeLeaderboardRow({ boardType: "group", classTypes: ["archer", "fighter"], classLabels: ["Ranger", "Berserker"] }).classLabels, ["Ranger", "Berserker"], "group leaderboard preserves path labels");
+  assert.deepEqual(normalizeStoredLeaderboardRow({ boardType: "group", classTypes: ["archer", "fighter"], classLabels: ["Ranger", "Berserker"] }).classLabels, ["Ranger", "Berserker"], "stored leaderboard preserves path labels");
+}
+
 validateRows("Ranger", getRangerRowRequirement);
 validateRows("Warrior", getWarriorRowRequirement);
 validateRows("Mage", getNecromancerRowRequirement);
@@ -42,5 +60,6 @@ validateSkillPointSchedule("Mage", getNecromancerSkillPointGainForLevel, "necrom
 validateTierShape("Ranger", getRangerTalentDefs());
 validateTierShape("Warrior", getWarriorTalentDefs());
 validateTierShape("Mage", getNecromancerTalentDefs());
+validateClassDisplayLabels();
 
 console.log("Open progression consistency validation passed.");

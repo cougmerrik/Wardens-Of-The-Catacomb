@@ -5,6 +5,7 @@ import { drawAndroidTouchControls, getAndroidTouchRegions } from "./hud/androidL
 import { drawConsumablesBar } from "./hud/consumablesBar.js";
 import { drawLanternFuelGauge } from "./hud/lanternFuelGauge.js";
 import { runtimeSceneSkeletonWarriorDrawMethods } from "./runtimeSceneSkeletonWarriorDrawMethods.js";
+import { drawEnemyAdditionalStatusIcons, drawEnemyStatusBadge } from "./enemyStatusBadges.js";
 
 function hexToRgba(color, alpha) {
   if (typeof color !== "string") return `rgba(199, 202, 209, ${alpha})`;
@@ -340,6 +341,9 @@ export const runtimeSceneDrawMethods = {
 
   ...runtimeSceneSkeletonWarriorDrawMethods,
 
+  drawEnemyStatusBadge,
+  drawEnemyAdditionalStatusIcons,
+
   drawEnemyHealthBar(enemy, screenX, screenY) {
     const ctx = this.ctx;
     if ((enemy.burningTimer || 0) > 0) {
@@ -382,6 +386,21 @@ export const runtimeSceneDrawMethods = {
       ctx.closePath();
       ctx.fill();
     }
+    if ((enemy.bleedTimer || 0) > 0) {
+      const fx = Math.floor(screenX - 20);
+      const fy = Math.floor(screenY + enemy.size * 0.42);
+      ctx.fillStyle = "rgba(214, 46, 68, 0.92)";
+      ctx.beginPath();
+      ctx.moveTo(fx, fy - 6);
+      ctx.bezierCurveTo(fx + 4, fy - 3, fx + 6, fy + 2, fx, fy + 7);
+      ctx.bezierCurveTo(fx - 6, fy + 2, fx - 4, fy - 3, fx, fy - 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255, 205, 214, 0.9)";
+      ctx.beginPath();
+      ctx.arc(fx + 1, fy - 1, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
     if ((enemy.confusionTimer || 0) > 0) {
       const fx = Math.floor(screenX);
       const fy = Math.floor(screenY + enemy.size * 0.42 - 13);
@@ -414,6 +433,24 @@ export const runtimeSceneDrawMethods = {
       ctx.arc(fx + 1, fy - 1, 1.8, 0, Math.PI * 2);
       ctx.fill();
     }
+    if ((enemy.poisonSlowTimer || 0) > 0) {
+      const fx = Math.floor(screenX + 20);
+      const fy = Math.floor(screenY + enemy.size * 0.42);
+      ctx.fillStyle = "rgba(99, 216, 83, 0.92)";
+      ctx.beginPath();
+      ctx.moveTo(fx - 1, fy + 6);
+      ctx.quadraticCurveTo(fx - 7, fy, fx - 1, fy - 6);
+      ctx.quadraticCurveTo(fx + 6, fy - 1, fx + 2, fy + 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(209, 255, 196, 0.88)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(fx - 1, fy + 4);
+      ctx.lineTo(fx + 2, fy - 4);
+      ctx.stroke();
+    }
+    this.drawEnemyAdditionalStatusIcons(enemy, screenX, screenY);
     if ((enemy.hpBarTimer || 0) <= 0) return;
     if (typeof enemy.maxHp !== "number" || enemy.maxHp <= 0) return;
 

@@ -126,6 +126,11 @@ This document summarizes the current high-level architecture and validation work
   - delta snapshot merging skips reconciled predicted arrows so matched local projectiles are not reinserted as stale artifacts
   - projectile, fire-zone, and melee-swing snapshots preserve renderer metadata such as damage type, doctrine, style, modifier, execute state, and visual timing fields so multiplayer effects use the same renderer branches as local play
   - replicated player rigs use serialized cooldown state for attack/cast pulse instead of rendering remote players with a static rig pose
+- Gameplay presentation parity is a network contract. Any local gameplay feedback that communicates combat/progression state must either be derived from serialized authoritative state or travel through a one-shot presentation event:
+  - enemy/player status icons and status timers must serialize through snapshots/deltas and explicitly clear when expired
+  - damage, kill damage, level-up, skill-point, gold, class proc, summon, defensive, boss/world, and similar floating text must appear in multiplayer with the same meaning and visual style as local play
+  - purely local UI/control feedback can remain local-only, but new local-only presentation must be intentional and documented in the validator or implementation notes
+  - new class progression effects must include targeted local-vs-network validation before merge, rather than waiting for manual multiplayer reports
 - The authoritative room still keeps one primary `sim.player` path for the pause owner, but snapshots now also serialize a `players` collection for all active participants.
 - Authoritative player-state copying lives in `server/net/activePlayerState.js`; keep new multiplayer player fields there instead of duplicating mappings inside `AuthoritativeRoom`.
 - Player snapshot DTO fields live in `src/net/playerSnapshotSchema.js`; server serialization and client snapshot application both use this schema to reduce single-player/multiplayer state drift.
@@ -255,6 +260,9 @@ This document summarizes the current high-level architecture and validation work
   - verifies local projectile prediction cadence, reconciliation, stale-prediction cleanup, and delta-merge behavior for networked ranged attacks
 - `validate:network-vfx-snapshots`
   - verifies multiplayer projectile, fire-zone, and melee-swing snapshots preserve renderer-facing VFX metadata through server serialization, keyframe deltas, and client snapshot application
+  - verifies authoritative floating-text events, duplicate suppression, status-icon row rendering, damage text, kill damage text, level/skill-point text, and gold pickup text stay visible in network play
+- `validate:network-status-parity`
+  - verifies multiplayer status/progression paths for ranger, mage, and warrior effects against local gameplay expectations, including serialized status fields and class-progression effect coverage
 - `validate:network-state-corruption`
   - reproduces stale player mimic runtime, enemy status fanout, mimic enemy presentation state, and render-stall status aging so multiplayer state corruption remains visible in validation and telemetry
 - `validate:network-smoothness`
@@ -341,6 +349,7 @@ This document summarizes the current high-level architecture and validation work
 - `server/validate-dev-start.js` now covers higher-floor local dev starts so larger-floor spawn regressions are caught by automation instead of manual testing.
 - If network startup or render regressions return, inspect snapshot-buffer identity and snapshot-consumption paths before changing interpolation or prediction. A real branch regression came from replacing the live snapshot buffer after the render loop had already captured it.
 - If local-only multiplayer HUD regressions return, inspect the split between immediate local-authoritative state application and delayed buffered snapshot playback. Some multiplayer bugs only affected the damaged player's own HUD while remote party views were already correct.
+- If presentation drift returns, inspect local `spawnFloatingText`/status-icon callers first, then confirm the authoritative snapshot/event bridge and `validate:network-vfx-snapshots` or `validate:network-status-parity` cover the same player-visible effect.
 - If controller-only network UI regressions return, inspect the active `netClient` wiring first. A real regression came from the render loop capturing `null` before connection completed, which silently drained shop/skill clicks through the no-client path.
 
 ## Operational Notes

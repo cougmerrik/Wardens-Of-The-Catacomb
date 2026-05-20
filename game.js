@@ -74,6 +74,7 @@ import {
   sanitizePlayerHandle,
   submitLocalRunToLeaderboard
 } from "./src/leaderboard/leaderboardClient.js";
+import { getBaseClassDisplayLabel } from "./src/game/classDisplay.js";
 import { spawnTreasureGoblin } from "./src/game/enemySpawnFactories.js";
 import {
   clearStoredServerUrlOverride,
@@ -855,7 +856,7 @@ function renderNetworkLobby() {
           <span class="network-lobby-roster-state">${state}</span>
         </div>
         <div class="network-lobby-roster-meta">
-          <span class="network-lobby-badge">${player.classType || "No Class Selected"}</span>
+          <span class="network-lobby-badge">${player.classType ? getBaseClassDisplayLabel(player.classType) : "No Class Selected"}</span>
           ${player.isOwner ? '<span class="network-lobby-badge star">★ Owner</span>' : ""}
         </div>
       `;

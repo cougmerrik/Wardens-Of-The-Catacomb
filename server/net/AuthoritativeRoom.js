@@ -1,5 +1,5 @@
 import { GameSim } from "../../src/sim/GameSim.js";
-import { cloneNecromancerBeamState } from "./playerStateCloneHelpers.js";
+import { getClassDisplayLabel } from "../../src/game/classDisplay.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
 import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
 import {
@@ -16,6 +16,8 @@ import {
   syncPrimaryActivePlayerFromSimForRoom,
   syncSimPrimaryPlayerStateForRoom
 } from "./activePlayerState.js";
+import { applyRemoteActionAimToContext, getRemoteActionAimVector } from "./remoteActionAim.js";
+import { processRemoteNecromancerBeamForRoom } from "./remoteNecromancerBeam.js";
 
 const PLAYER_COLOR_PALETTE = ["#5bb3ff", "#ff8f6b", "#7ae582", "#f3cf6b", "#c78bff", "#ff6fae"];
 
@@ -59,12 +61,17 @@ export class AuthoritativeRoom {
       tickDurationsMs: [],
       serializeDurationsMs: [],
       snapshotBroadcastDurationsMs: [],
+      snapshotPayloadBytes: [],
+      snapshotBroadcastGapsMs: [],
+      snapshotSendQueueBytes: [],
+      mapChunkPushDurationsMs: [],
       tickScheduleOverrunMs: [],
       tickScheduleUnderrunMs: [],
       tickOverrunCount: 0,
       tickUnderrunCount: 0,
       droppedSnapshots: 0,
-      snapshotBroadcastCount: 0
+      snapshotBroadcastCount: 0,
+      lastSnapshotTelemetry: null
     };
     this.tickDriftSampleCounter = 0;
     this.clientChunkState = new Map();
@@ -194,7 +201,7 @@ export class AuthoritativeRoom {
     const primaryState = primaryClient ? this.syncPrimaryActivePlayerFromSim() : null;
     const resolved = primaryState && client?.id === primaryState.id ? primaryState : source;
     const classType = resolved?.classType || client?.classType || this.sim.player?.classType || "archer";
-    const classLabel = this.getClassSpec(classType)?.label || classType;
+    const classLabel = getClassDisplayLabel({ classType, ...resolved });
     return {
       id: client?.id || resolved?.id || "",
       handle: client?.name || resolved?.handle || "Player",
@@ -407,135 +414,7 @@ export class AuthoritativeRoom {
   }
 
   processRemoteNecromancerBeam(state, input, dt) {
-    if (!state) return false;
-    const context = this.createPlayerSimulationContext(state);
-    if (!context || typeof input !== "object") return false;
-    const beam = context.necromancerBeam || (context.necromancerBeam = cloneNecromancerBeamState());
-    for (const enemy of this.sim.enemies || []) {
-      if (enemy) enemy.charmLocked = false;
-    }
-    const held = !!input.firePrimaryHeld && !!input.hasAim;
-    const beamRange = (this.sim.config?.necromancer?.controlRangeTiles || 10) * (this.sim.config?.map?.tile || 32);
-    const beamWidth = Number.isFinite(this.sim.config?.necromancer?.beamWidth) ? this.sim.config.necromancer.beamWidth : 11;
-    beam.active = held;
-    beam.targetId = null;
-    beam.targetEnemy = null;
-    beam.targetX = Number.isFinite(input.aimX) ? input.aimX : state.x;
-    beam.targetY = Number.isFinite(input.aimY) ? input.aimY : state.y;
-    if (!held) {
-      beam.progress = 0;
-      beam.healTickTimer = 0;
-      beam.mode = "idle";
-      this.syncActivePlayerStateFromContext(state, context);
-      return false;
-    }
-
-    const aimLen = Math.hypot((input.aimX || state.x) - state.x, (input.aimY || state.y) - state.y) || 1;
-    let hitBreakable = null;
-    let bestBreakableDist = Number.POSITIVE_INFINITY;
-    for (const br of this.sim.breakables || []) {
-      if (!br || (br.hp || 0) <= 0) continue;
-      const beamDist = Math.hypot(br.x - state.x, br.y - state.y);
-      if (beamDist > beamRange) continue;
-      if (!this.beamHasLineOfSight(state.x, state.y, br.x, br.y)) continue;
-      const lineDist = this.getAimLineDistance(state, input, br, aimLen);
-      if (lineDist > beamWidth + (br.size || 20) * 0.35) continue;
-      const distToAim = Math.hypot(br.x - input.aimX, br.y - input.aimY);
-      if (distToAim < bestBreakableDist) {
-        hitBreakable = br;
-        bestBreakableDist = distToAim;
-      }
-    }
-    if (hitBreakable) {
-      beam.targetX = hitBreakable.x;
-      beam.targetY = hitBreakable.y;
-      beam.progress = 0;
-      beam.healTickTimer = 0;
-      beam.mode = "idle";
-      hitBreakable.hp = 0;
-      this.syncActivePlayerStateFromContext(state, context);
-      return true;
-    }
-
-    let invalidTarget = null;
-    let invalidTargetDist = Number.POSITIVE_INFINITY;
-    let bestTarget = null;
-    let bestTargetDist = Number.POSITIVE_INFINITY;
-    for (const enemy of this.sim.enemies || []) {
-      if (!enemy || (enemy.hp || 0) <= 0) continue;
-      if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
-      const beamDist = Math.hypot(enemy.x - state.x, enemy.y - state.y);
-      if (beamDist > beamRange) continue;
-      if (!this.beamHasLineOfSight(state.x, state.y, enemy.x, enemy.y)) continue;
-      const lineDist = this.getAimLineDistance(state, input, enemy, aimLen);
-      if (lineDist > beamWidth) continue;
-      const distToAim = Math.hypot(enemy.x - input.aimX, enemy.y - input.aimY);
-      if (distToAim < invalidTargetDist) {
-        invalidTarget = enemy;
-        invalidTargetDist = distToAim;
-      }
-      if (!context.isUndeadEnemy(enemy)) continue;
-      if (distToAim < bestTargetDist) {
-        bestTarget = enemy;
-        bestTargetDist = distToAim;
-      }
-    }
-
-    if (
-      !hitBreakable &&
-      invalidTarget &&
-      (!context.isUndeadEnemy(invalidTarget) || (!context.isControlledUndead(invalidTarget) && !context.canControlMoreUndead(state)))
-    ) {
-      beam.active = false;
-      beam.progress = 0;
-      beam.healTickTimer = 0;
-      beam.mode = "idle";
-      this.syncActivePlayerStateFromContext(state, context);
-      return false;
-    }
-
-    const canTarget =
-      !!bestTarget &&
-      context.isUndeadEnemy(bestTarget) &&
-      (context.isControlledUndead(bestTarget)
-        ? context.getControlledUndeadOwnerId(bestTarget) === state.id
-        : context.canControlMoreUndead(state));
-
-    if (!canTarget) {
-      beam.progress = 0;
-      beam.healTickTimer = 0;
-      beam.mode = "idle";
-      this.syncActivePlayerStateFromContext(state, context);
-      return beam.active;
-    }
-
-    beam.targetEnemy = bestTarget;
-    beam.targetX = bestTarget.x;
-    beam.targetY = bestTarget.y;
-    beam.targetId = bestTarget.id || null;
-    if (context.isControlledUndead(bestTarget)) {
-      beam.mode = "heal";
-      beam.progress = 0;
-      beam.healTickTimer = (beam.healTickTimer || 0) + Math.max(0, Number.isFinite(dt) ? dt : 0);
-      const healPeriod = this.sim.config?.necromancer?.healTickSeconds || 0.2;
-      while (beam.healTickTimer >= healPeriod) {
-        beam.healTickTimer -= healPeriod;
-        context.healControlledUndead(bestTarget, context.getNecroticBeamHealAmount());
-      }
-    } else {
-      beam.mode = "charm";
-      beam.healTickTimer = 0;
-      bestTarget.charmLocked = true;
-      beam.progress += Math.max(0, Number.isFinite(dt) ? dt : 0);
-      if (beam.progress >= context.getNecromancerCharmDurationForPlayer(state)) {
-        if (context.markUndeadAsControlled(bestTarget, state)) {
-          beam.progress = 0;
-          context.spawnFloatingText(bestTarget.x, bestTarget.y - bestTarget.size * 0.7, "Charmed", "#8eb8ff", 0.9, 14);
-        }
-      }
-    }
-    this.syncActivePlayerStateFromContext(state, context);
-    return true;
+    return processRemoteNecromancerBeamForRoom(this, state, input, dt);
   }
 
   tagNewProjectilesForPlayer(beforeCounts, ownerId, spawnSeq = 0) {
@@ -561,19 +440,28 @@ export class AuthoritativeRoom {
     }
   }
 
-  performActionForActivePlayer(clientId, fn) {
+  performActionForActivePlayer(clientId, fn, input = null) {
     if (!clientId || typeof fn !== "function") return false;
     const state = this.activePlayers.get(clientId);
     if (!state || state.alive === false || (state.health || 0) <= 0) return false;
     const context = this.createPlayerSimulationContext(state);
     if (!context) return false;
+    applyRemoteActionAimToContext(context, state, input);
     const beforeCounts = {
       bullets: this.sim.bullets.length,
       fireArrows: this.sim.fireArrows.length,
       meleeSwings: this.sim.meleeSwings.length
     };
+    const beforeX = Number.isFinite(context.player?.x) ? context.player.x : null;
+    const beforeY = Number.isFinite(context.player?.y) ? context.player.y : null;
     const result = fn(context, state);
     this.syncActivePlayerStateFromContext(state, context);
+    const afterX = Number.isFinite(state.x) ? state.x : null;
+    const afterY = Number.isFinite(state.y) ? state.y : null;
+    if (input?.fireAltQueued && beforeX !== null && beforeY !== null && afterX !== null && afterY !== null) {
+      const movedPx = Math.hypot(afterX - beforeX, afterY - beforeY);
+      if (movedPx >= 48) state.teleportSeq = getProcessedInputSeq(this.clients.get(clientId));
+    }
     this.tagNewProjectilesForPlayer(beforeCounts, clientId, getProcessedInputSeq(this.clients.get(clientId)));
     this.auditServerState({
       source: "activePlayerAction",
@@ -687,26 +575,23 @@ export class AuthoritativeRoom {
       const mode = state.necromancerRuntime?.activeMode === "spell" ? "spell" : "cantrip";
       if (mode === "cantrip" && cantrip === "necroticBeamCantrip") this.processRemoteNecromancerBeam(state, input, dt);
       else if (wantsPrimary) {
+        const aim = getRemoteActionAimVector(state, input);
         this.performActionForActivePlayer(client.id, (context) => {
-          if (typeof context.fire !== "function") return false;
-          context.fire(state.dirX || 1, state.dirY || 0);
-          return true;
-        });
+          return typeof context.fire === "function" && (context.fire(aim.dx, aim.dy), true);
+        }, input);
       }
     } else if (wantsPrimary) {
+      const aim = getRemoteActionAimVector(state, input);
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.fire !== "function") return false;
-        context.fire(state.dirX || 1, state.dirY || 0);
-        return true;
-      });
+        return typeof context.fire === "function" && (context.fire(aim.dx, aim.dy), true);
+      }, input);
     }
     if (!input.fireAltQueued) return;
     if (state.classType === "archer") {
+      const aim = getRemoteActionAimVector(state, input);
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.fireFireArrow !== "function") return false;
-        context.fireFireArrow(state.dirX || 1, state.dirY || 0);
-        return true;
-      });
+        return typeof context.fireFireArrow === "function" && (context.fireFireArrow(aim.dx, aim.dy), true);
+      }, input);
       return;
     }
     if (state.classType === "fighter") {
@@ -717,10 +602,10 @@ export class AuthoritativeRoom {
       return;
     }
     if (state.classType === "necromancer") {
+      const aim = getRemoteActionAimVector(state, input);
       this.performActionForActivePlayer(client.id, (context) => {
-        if (typeof context.activateMageClassSkill !== "function") return false;
-        return context.activateMageClassSkill(state.dirX || 1, state.dirY || 0);
-      });
+        return typeof context.activateMageClassSkill === "function" && context.activateMageClassSkill(aim.dx, aim.dy);
+      }, input);
     }
   }
 
@@ -1067,21 +952,23 @@ export class AuthoritativeRoom {
       }
     }
     const t0 = this.options.monotonicNowMs();
-    const rawDt = Number.isFinite(nowMs) && Number.isFinite(this.lastTickMs)
-      ? (nowMs - this.lastTickMs) / 1000
-      : 0;
-    const dt = Math.min(Math.max(rawDt, 0), 0.05);
-    if (rawDt < -0.001) {
-      this.recordServerStateAnomaly("negativeTickDelta", {
+    let effectiveNowMs = Number.isFinite(nowMs) ? nowMs : this.lastTickMs;
+    if (Number.isFinite(effectiveNowMs) && Number.isFinite(this.lastTickMs) && effectiveNowMs < this.lastTickMs) {
+      this.recordServerStateAnomaly("tickClockBackwards", {
         context: {
           source: "tickClock",
-          rawDtMs: Math.round(rawDt * 1000),
+          rawDtMs: Math.round(effectiveNowMs - this.lastTickMs),
           previousTickMs: this.lastTickMs,
-          nowMs
+          nowMs: effectiveNowMs
         }
       });
+      effectiveNowMs = this.lastTickMs;
     }
-    this.lastTickMs = nowMs;
+    const rawDt = Number.isFinite(effectiveNowMs) && Number.isFinite(this.lastTickMs)
+      ? (effectiveNowMs - this.lastTickMs) / 1000
+      : 0;
+    const dt = Math.min(Math.max(rawDt, 0), 0.05);
+    this.lastTickMs = effectiveNowMs;
     this.promoteQueuedClientInputs();
     if (this.sim.paused && !this.sim.gameOver) {
       this.clearQueuedCombatInputFlags();
@@ -1135,9 +1022,15 @@ export class AuthoritativeRoom {
   broadcast(type, payload) {
     const t0 = this.options.monotonicNowMs();
     const msg = JSON.stringify({ type, roomId: this.id, ...payload });
+    const payloadBytes = Buffer.byteLength(msg);
     let dropped = 0;
+    let recipientCount = 0;
+    let maxBufferedBeforeBytes = 0;
     for (const client of this.clients.values()) {
       if (!client.transport?.isOpen()) continue;
+      recipientCount += 1;
+      const bufferedBefore = Number.isFinite(client.transport.bufferedAmount) ? client.transport.bufferedAmount : 0;
+      if (bufferedBefore > maxBufferedBeforeBytes) maxBufferedBeforeBytes = bufferedBefore;
       if (type === "state.snapshot" && client.transport.bufferedAmount > this.options.maxWsBufferedBytes) {
         dropped += 1;
         continue;
@@ -1149,8 +1042,18 @@ export class AuthoritativeRoom {
       this.telemetry.snapshotBroadcastCount += 1;
       this.telemetry.droppedSnapshots += dropped;
       this.options.pushTelemetrySample(this.telemetry.snapshotBroadcastDurationsMs, elapsed);
+      this.options.pushTelemetrySample(this.telemetry.snapshotPayloadBytes, payloadBytes);
+      this.options.pushTelemetrySample(this.telemetry.snapshotSendQueueBytes, maxBufferedBeforeBytes);
+      this.telemetry.lastSnapshotTelemetry = {
+        broadcastDurationMs: Math.round(elapsed * 10) / 10,
+        payloadBytes,
+        recipientCount,
+        droppedSnapshots: dropped,
+        maxBufferedBeforeBytes,
+        snapshotBroadcastCount: this.telemetry.snapshotBroadcastCount
+      };
     }
-    return { elapsedMs: elapsed, dropped };
+    return { elapsedMs: elapsed, dropped, payloadBytes, recipientCount, maxBufferedBeforeBytes };
   }
 
   broadcastRoster() {
@@ -1237,9 +1140,11 @@ export class AuthoritativeRoom {
   }
 
   sendMapChunksToClient(client, nowMs = Date.now()) {
-    if (!client?.transport?.isOpen()) return;
+    const startedAt = this.options.monotonicNowMs();
+    const result = { sent: 0, bytes: 0, elapsedMs: 0 };
+    if (!client?.transport?.isOpen()) return result;
     const chunkState = this.clientChunkState.get(client.id);
-    if (!chunkState) return;
+    if (!chunkState) return result;
     const tile = this.sim.config.map.tile || 32;
     const chunkPlayer = this.activePlayers.get(client.id) || this.sim.player;
     const ptx = Math.floor((chunkPlayer?.x || 0) / tile);
@@ -1247,6 +1152,7 @@ export class AuthoritativeRoom {
     const centerCx = Math.floor(ptx / this.options.mapChunkSize);
     const centerCy = Math.floor(pty / this.options.mapChunkSize);
     const sig = this.mapSignature();
+    const maxChunks = Math.max(1, Number.isFinite(this.options.maxMapChunksPerSnapshot) ? Math.floor(this.options.maxMapChunksPerSnapshot) : 4);
 
     for (let cy = centerCy - this.options.mapChunkRadius; cy <= centerCy + this.options.mapChunkRadius; cy++) {
       for (let cx = centerCx - this.options.mapChunkRadius; cx <= centerCx + this.options.mapChunkRadius; cx++) {
@@ -1255,7 +1161,7 @@ export class AuthoritativeRoom {
         if (chunkState.sent.has(key) && nowMs - this.lastChunkPushMs < this.options.mapChunkPushMs) continue;
         const chunk = this.options.buildMapChunkRows(this.sim, cx, cy, this.options.mapChunkSize);
         if (!chunk) continue;
-        client.transport.sendJson({
+        const payload = {
           type: "state.mapChunk",
           roomId: this.id,
           mapSignature: sig,
@@ -1263,11 +1169,21 @@ export class AuthoritativeRoom {
           cy,
           chunkSize: this.options.mapChunkSize,
           rows: chunk.rows
-        });
+        };
+        result.bytes += Buffer.byteLength(JSON.stringify(payload));
+        client.transport.sendJson(payload);
         chunkState.sent.add(key);
+        result.sent += 1;
+        if (result.sent >= maxChunks) {
+          this.lastChunkPushMs = nowMs;
+          result.elapsedMs = this.options.monotonicNowMs() - startedAt;
+          return result;
+        }
       }
     }
     this.lastChunkPushMs = nowMs;
+    result.elapsedMs = this.options.monotonicNowMs() - startedAt;
+    return result;
   }
 
   maybeBroadcastSnapshot(nowMs) {
@@ -1291,7 +1207,17 @@ export class AuthoritativeRoom {
       this.sendMapState();
       this.maybeBroadcastMeta(nowMs, true);
     }
-    for (const client of this.clients.values()) this.sendMapChunksToClient(client, nowMs);
+    const previousSnapshotMs = this.lastSnapshotMs;
+    const snapshotBroadcastGapMs = previousSnapshotMs > 0 ? Math.max(0, nowMs - previousSnapshotMs) : 0;
+    if (snapshotBroadcastGapMs > 0) this.options.pushTelemetrySample(this.telemetry.snapshotBroadcastGapsMs, snapshotBroadcastGapMs);
+    const chunkTelemetry = { sent: 0, bytes: 0, elapsedMs: 0 };
+    for (const client of this.clients.values()) {
+      const pushed = this.sendMapChunksToClient(client, nowMs);
+      chunkTelemetry.sent += pushed?.sent || 0;
+      chunkTelemetry.bytes += pushed?.bytes || 0;
+      chunkTelemetry.elapsedMs += pushed?.elapsedMs || 0;
+    }
+    this.options.pushTelemetrySample(this.telemetry.mapChunkPushDurationsMs, chunkTelemetry.elapsedMs);
     const controllerClient = this.clients.get(this.pauseOwnerId);
     const serializeStart = this.options.monotonicNowMs();
     const fullState = this.options.serializeState(this);
@@ -1345,6 +1271,7 @@ export class AuthoritativeRoom {
       serverStateAnomalies: this.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry })),
       delta
     };
+    if (Array.isArray(fullState.floatingTexts) && fullState.floatingTexts.length > 0) state.floatingTexts = fullState.floatingTexts;
     if (keyframe || floorStateChanged) state.floor = fullState.floor;
     if (keyframe || bossPhaseChanged) state.floorBoss = fullState.floorBoss;
     if (keyframe || doorStateChanged) state.door = fullState.door;
@@ -1355,9 +1282,19 @@ export class AuthoritativeRoom {
     this.lastSnapshotDoorOpen = !!fullState.door?.open;
     this.lastSnapshotPickupTaken = !!fullState.pickup?.taken;
     this.lastSnapshotPortalActive = !!fullState.portal?.active;
-    this.broadcast("state.snapshot", {
+    const snapshotBroadcast = this.broadcast("state.snapshot", {
       serverTime: nowMs,
       snapshotSeq: this.snapshotSeq,
+      snapshotTelemetry: {
+        snapshotBroadcastGapMs: Math.round(snapshotBroadcastGapMs),
+        mapChunksSent: chunkTelemetry.sent,
+        mapChunkBytes: chunkTelemetry.bytes,
+        mapChunkPushDurationMs: Math.round(chunkTelemetry.elapsedMs * 10) / 10,
+        previousPayloadBytes: this.telemetry.lastSnapshotTelemetry?.payloadBytes || 0,
+        previousBroadcastDurationMs: this.telemetry.lastSnapshotTelemetry?.broadcastDurationMs || 0,
+        previousMaxBufferedBeforeBytes: this.telemetry.lastSnapshotTelemetry?.maxBufferedBeforeBytes || 0,
+        droppedSnapshotsTotal: this.telemetry.droppedSnapshots
+      },
       phase: this.phase,
       ownerId: this.roomOwnerId,
       pauseOwnerId: this.pauseOwnerId,
@@ -1369,6 +1306,9 @@ export class AuthoritativeRoom {
       mapSignature: sig,
       state
     });
+    if (Array.isArray(this.sim.networkFloatingTextEvents) && snapshotBroadcast.dropped <= 0) {
+      this.sim.networkFloatingTextEvents.length = 0;
+    }
     this.lastSnapshotMs = nowMs;
     this.maybeBroadcastMeta(nowMs);
     return true;
@@ -1420,6 +1360,22 @@ export class AuthoritativeRoom {
         avg: this.options.average(this.telemetry.snapshotBroadcastDurationsMs),
         p95: this.options.percentile(this.telemetry.snapshotBroadcastDurationsMs, 95)
       },
+      snapshotBroadcastGapMs: {
+        avg: this.options.average(this.telemetry.snapshotBroadcastGapsMs),
+        p95: this.options.percentile(this.telemetry.snapshotBroadcastGapsMs, 95)
+      },
+      snapshotPayloadBytes: {
+        avg: this.options.average(this.telemetry.snapshotPayloadBytes),
+        p95: this.options.percentile(this.telemetry.snapshotPayloadBytes, 95)
+      },
+      snapshotSendQueueBytes: {
+        avg: this.options.average(this.telemetry.snapshotSendQueueBytes),
+        p95: this.options.percentile(this.telemetry.snapshotSendQueueBytes, 95)
+      },
+      mapChunkPushDurationMs: {
+        avg: this.options.average(this.telemetry.mapChunkPushDurationsMs),
+        p95: this.options.percentile(this.telemetry.mapChunkPushDurationsMs, 95)
+      },
       tickScheduleOverrunMs: {
         avg: this.options.average(this.telemetry.tickScheduleOverrunMs),
         p95: this.options.percentile(this.telemetry.tickScheduleOverrunMs, 95),
@@ -1431,7 +1387,8 @@ export class AuthoritativeRoom {
         count: this.telemetry.tickUnderrunCount
       },
       droppedSnapshots: this.telemetry.droppedSnapshots,
-      snapshotBroadcastCount: this.telemetry.snapshotBroadcastCount
+      snapshotBroadcastCount: this.telemetry.snapshotBroadcastCount,
+      lastSnapshotTelemetry: this.telemetry.lastSnapshotTelemetry ? { ...this.telemetry.lastSnapshotTelemetry } : null
     };
   }
 }

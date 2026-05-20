@@ -293,9 +293,10 @@ function main() {
   assert.equal(cleanEnemy.rotDps || 0, 0, "negative authoritative dt invented rot dps");
   assert.equal(negativeRoom.sim.necromancerRuntime?.mimicTimer || 0, 0, "negative authoritative dt invented primary mimic timer");
   assert.equal(negativeRoom.activePlayers.get(negativeOwner.id)?.necromancerRuntime?.mimicTimer || 0, 0, "negative authoritative dt invented active player mimic timer");
+  assert.equal(negativeRoom.lastTickMs, negativeNow + 2915, "backward authoritative tick should keep monotonic last tick time");
   assert.ok(
-    negativeRoom.recentServerStateAnomalies.some((entry) => entry.kind === "negativeTickDelta"),
-    "negative authoritative dt was not recorded for telemetry"
+    negativeRoom.recentServerStateAnomalies.some((entry) => entry.kind === "tickClockBackwards"),
+    "backward authoritative tick was not recorded for telemetry"
   );
 
   console.log(JSON.stringify({

@@ -7,6 +7,7 @@ import {
   getMageSelectedStyle,
   getNecromancerTalentDef
 } from "../../game/necromancerTalentTree.js";
+import { getClassDisplayLabel } from "../../game/classDisplay.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 
 function clamp01(value) {
@@ -83,7 +84,7 @@ function getRangerStatus(game) {
   const weapon = getRangerTalentDef(getRangerSelectedWeapon(game))?.label || "Weapon";
   const modifier = getRangerTalentDef(getRangerSelectedModifier(game))?.label || "Attack Modifier";
   return {
-    title: "Ranger",
+    title: getClassDisplayLabel(game),
     accent: color,
     primaryLabel: "Weapon",
     primary: weapon,
@@ -109,7 +110,7 @@ function getWarriorStatus(game) {
   const threshold = typeof game.getWarriorShockReleaseThreshold === "function" ? game.getWarriorShockReleaseThreshold() : 5;
   const charges = Math.max(0, Math.min(threshold, runtime.shockReleaseReady ? threshold : runtime.shockReleaseCharges || 0));
   return {
-    title: "Warrior",
+    title: getClassDisplayLabel(game),
     accent: hasShockRelease && runtime.shockReleaseReady ? "#fff0a8" : "#d7a06a",
     primaryLabel: "Weapon",
     primary: weapon,
@@ -129,7 +130,7 @@ function getMageStatus(game) {
   const mana = Number.isFinite(runtime.mana) ? runtime.mana : maxMana;
   const style = getNecromancerTalentDef(getMageSelectedStyle(game))?.label || "Casting Style";
   return {
-    title: "Mage",
+    title: getClassDisplayLabel(game),
     accent: efficiency.color,
     primaryLabel: "Attack",
     primary: getMageAttackLabel(game),
