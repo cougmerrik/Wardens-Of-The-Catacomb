@@ -33,6 +33,7 @@ import { runtimePlayerCombatMethods } from "./runtimePlayerCombatMethods.js";
 import { getRangerMaxHealthBonusPct } from "./rangerTalentTree.js";
 import { getWarriorIronGuardMaxHealthBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
 import { getXpToNextLevelForLevel } from "./xpProgression.js";
+import { triggerGameplayTip } from "./gameplayTips.js";
 
 export class GameRuntimeSystems extends GameRuntimeWorld {
   getControlledUndeadFormationPoint(enemy) {
@@ -279,6 +280,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
     while (this.experience >= this.expToNextLevel) {
       this.experience -= this.expToNextLevel;
       this.level += 1;
+      triggerGameplayTip(this, "level2");
       this.skillPoints += this.getSkillPointGainForLevel(this.level, this.classType);
       const hpGain = Number.isFinite(this.classSpec.levelHpGain) ? this.classSpec.levelHpGain : 10;
       let adjustedHpGain = hpGain;

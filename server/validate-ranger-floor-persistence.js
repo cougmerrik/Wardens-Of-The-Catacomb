@@ -28,6 +28,13 @@ game.rangerRuntime.combo = 20;
 const comboCount = game.getMultiarrowCount();
 assert(comboCount > beforeCount, `combo should add Ranger projectile pressure, got base ${beforeCount}, combo ${comboCount}`);
 
+game.rangerRuntime.combo = 10;
+const baseComboCooldown = game.getPlayerFireCooldown();
+game.rangerTalents.precision.points = 0;
+game.rangerTalents.flurry.points = 1;
+const flurryCooldown = game.getPlayerFireCooldown();
+assert(flurryCooldown < baseComboCooldown, `Flurry should reduce attack cooldown at combo tier 2, got base ${baseComboCooldown}, flurry ${flurryCooldown}`);
+
 game.advanceToNextFloor();
 
 const afterCount = game.getMultiarrowCount();

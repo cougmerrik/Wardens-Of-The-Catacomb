@@ -269,6 +269,7 @@ export const runtimeMageCoreAttackMethods = {
     }[cantrip];
     const critMultiplier = this.rollMageCritical();
     const shotAngles = cantrip === "arcaneMissileCantrip" ? [angle - 0.08, angle + 0.08] : [angle];
+    const consumableAttackEffects = typeof this.getActiveConsumableAttackEffects === "function" ? this.getActiveConsumableAttackEffects() : null;
     for (const shotAngle of shotAngles) {
       this.bullets.push({
         x: origin.x,
@@ -304,8 +305,16 @@ export const runtimeMageCoreAttackMethods = {
         homingConeCos: profile.homing ? Math.cos(Math.PI / 6) : null,
         range: profile.range || null,
         critMultiplier,
+        consumableFireOil: !!consumableAttackEffects?.fireOil,
+        consumableFrostOil: !!consumableAttackEffects?.frostOil,
         hitTargets: new Set()
       });
+    }
+    if (
+      (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
+      typeof this.consumeConsumableAttackCharge === "function"
+    ) {
+      this.consumeConsumableAttackCharge(consumableAttackEffects);
     }
     this.gainMageRune();
     return true;
@@ -321,6 +330,7 @@ export const runtimeMageCoreAttackMethods = {
     runtime.mimicTongueTimer = 0.22;
     runtime.mimicTongueDirX = Math.cos(angle);
     runtime.mimicTongueDirY = Math.sin(angle);
+    const consumableAttackEffects = typeof this.getActiveConsumableAttackEffects === "function" ? this.getActiveConsumableAttackEffects() : null;
     this.meleeSwings.push({
       x: this.player.x,
       y: this.player.y,
@@ -341,6 +351,13 @@ export const runtimeMageCoreAttackMethods = {
       const diff = Math.abs(Math.atan2(Math.sin(Math.atan2(ey, ex) - angle), Math.cos(Math.atan2(ey, ex) - angle)));
       if (diff > Math.PI * 0.16) continue;
       this.applyEnemyDamage(enemy, this.getPrimaryDamage() * 1.15, "physical", this.player.id || null);
+      if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null, consumableAttackEffects);
+      if (
+        (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
+        typeof this.consumeConsumableAttackCharge === "function"
+      ) {
+        this.consumeConsumableAttackCharge(consumableAttackEffects);
+      }
       break;
     }
     return true;
@@ -352,6 +369,7 @@ export const runtimeMageCoreAttackMethods = {
     const range = (hasMageTalent(this, "battlemage") ? 2.35 : 1.85) * tile * (0.88 + scale * 0.12);
     const arc = Math.PI * 0.58 * (0.9 + scale * 0.16) * 0.8;
     const angle = Math.atan2(dy, dx);
+    const consumableAttackEffects = typeof this.getActiveConsumableAttackEffects === "function" ? this.getActiveConsumableAttackEffects() : null;
     this.meleeSwings.push({
       x: this.player.x,
       y: this.player.y,
@@ -366,6 +384,7 @@ export const runtimeMageCoreAttackMethods = {
     const critMultiplier = this.rollMageCritical();
     const damage = this.getPrimaryDamage() * (hasMageTalent(this, "battlemage") ? 1.45 : 1.15) * scale * critMultiplier;
     let leechTotal = 0;
+    let hitAnyEnemy = false;
     for (const enemy of this.enemies || []) {
       if (!enemy || (enemy.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(enemy)) continue;
       const ex = enemy.x - this.player.x;
@@ -382,13 +401,22 @@ export const runtimeMageCoreAttackMethods = {
       leechTotal += Math.max(0, hpBefore - Math.max(0, Number.isFinite(enemy.hp) ? enemy.hp : 0)) * 0.18;
       enemy.burningTimer = Math.max(enemy.burningTimer || 0, 3);
       enemy.burningDps = Math.max(enemy.burningDps || 0, Math.max(1, damage * 0.2));
+      if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null, consumableAttackEffects);
       this.applyMageOnHitEffects(enemy, { status: "burning" });
+      hitAnyEnemy = true;
       if (hasMageTalent(this, "battlemage")) {
         for (const other of this.enemies || []) {
           if (!other || other === enemy || (other.hp || 0) <= 0 || this.isEnemyFriendlyToPlayer(other)) continue;
           if (vecLength((other.x || 0) - enemy.x, (other.y || 0) - enemy.y) <= tile * 1.1) this.applyEnemyDamage(other, damage * 0.35, "fire", this.player.id || null);
         }
       }
+    }
+    if (
+      hitAnyEnemy &&
+      (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
+      typeof this.consumeConsumableAttackCharge === "function"
+    ) {
+      this.consumeConsumableAttackCharge(consumableAttackEffects);
     }
     for (const br of this.breakables || []) {
       if (!br || (br.hp || 0) <= 0) continue;

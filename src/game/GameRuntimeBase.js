@@ -11,6 +11,7 @@ import { runtimeCombatStatsMethods } from "./runtimeCombatStatsMethods.js";
 import { runtimeFloorBossMethods } from "./runtimeFloorBossMethods.js";
 import { createRunStats } from "./runtimeBaseStateFactories.js";
 import { initializeRuntimeBaseState } from "./runtimeBaseStateInit.js";
+import { createGameplayTipState, triggerGameplayTip } from "./gameplayTips.js";
 import {
   getNecromancerBlackCandleDamageBonus,
   getNecromancerBaseCharmDurationForLevel,
@@ -62,6 +63,8 @@ export class GameRuntimeBase {
       classSpec: this.classSpec,
       config: this.config
     });
+    this.gameplayTips = createGameplayTipState(options.gameplayTipsEnabled !== false);
+    triggerGameplayTip(this, "start");
 
     this.generateFloor(this.mapWidth, this.mapHeight);
     this.renderer = null;

@@ -9,12 +9,14 @@ export function createLocalGame({
   startingFloor = 1,
   bossOverride = "auto",
   debugHudEnabled = false,
+  gameplayTipsEnabled = true,
   onGameOverChanged = null
 }) {
   const game = new Game(canvas, {
     platform,
     classType: selectedClass,
     debugHudEnabled,
+    gameplayTipsEnabled,
     onReturnToMenu: returnToMenu,
     onPauseChanged: (_paused, nextGame) => syncMusicForGame(nextGame),
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),

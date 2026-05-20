@@ -497,6 +497,7 @@ export const runtimePlayerAttackMethods = {
     const count = volleyAngles.length;
     const releaseTailOffset = 7;
     const damageMultipliers = this.getMultiarrowArrowDamageMultipliers();
+    const consumableAttackEffects = typeof this.getActiveConsumableAttackEffects === "function" ? this.getActiveConsumableAttackEffects() : null;
     const baseDamage = this.rollPrimaryDamage();
     const critChance = getRangerCritChance(this);
     const critMultiplier = getRangerCritMultiplier();
@@ -561,9 +562,17 @@ export const runtimePlayerAttackMethods = {
         linebreakerHits: 0,
         projectileType,
         knockback,
+        consumableFireOil: !!consumableAttackEffects?.fireOil,
+        consumableFrostOil: !!consumableAttackEffects?.frostOil,
         hitTargets: new Set(),
         ownerId: this.player.id || null
       });
+    }
+    if (
+      (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
+      typeof this.consumeConsumableAttackCharge === "function"
+    ) {
+      this.consumeConsumableAttackCharge(consumableAttackEffects);
     }
   },
 
@@ -635,6 +644,7 @@ export const runtimePlayerAttackMethods = {
     let markedTargetKilled = false;
     const guaranteedCrit = !!(this.warriorRuntime?.rageCritReady || this.warriorRuntime?.butcherCritReady);
     const critMultiplier = guaranteedCrit ? (raging && hasWarriorCleaveDiscipline(this) ? 2.2 : 2) : 1;
+    const consumableAttackEffects = typeof this.getActiveConsumableAttackEffects === "function" ? this.getActiveConsumableAttackEffects() : null;
     if (isWarriorTalentGame(this)) {
       this.warriorRuntime.rageCritReady = false;
       this.warriorRuntime.butcherCritReady = false;
@@ -775,7 +785,7 @@ export const runtimePlayerAttackMethods = {
           this.rangerRuntime.lastAttackAt = this.time || 0;
           this.rangerRuntime.lastAttackTargetId = enemy.id || null;
         }
-        if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null);
+        if (typeof this.applyConsumableOnHitEffects === "function") this.applyConsumableOnHitEffects(enemy, this.player.id || null, consumableAttackEffects);
         enemiesHit += 1;
         hitAnyEnemy = true;
         firstEnemyHit = true;
@@ -866,6 +876,13 @@ export const runtimePlayerAttackMethods = {
           this.warriorRuntime.gladiatorSwapMode = attackProfile?.mode || this.getCurrentWarriorAttackMode();
         }
       }
+    }
+    if (
+      hitAnyEnemy &&
+      (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
+      typeof this.consumeConsumableAttackCharge === "function"
+    ) {
+      this.consumeConsumableAttackCharge(consumableAttackEffects);
     }
     if (markedHits.length > 0) this.markHighestHpEnemy(markedHits, attackProfile?.markDuration || 5, this.player.x + Math.cos(angle) * range * 0.5, this.player.y + Math.sin(angle) * range * 0.5);
     if (consumedButcherEmpower && this.warriorRuntime?.butcherEmpowerReady) this.warriorRuntime.butcherEmpowerReady = false;

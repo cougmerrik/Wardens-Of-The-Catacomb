@@ -4,6 +4,7 @@ import { runtimeSceneObjectDrawMethods } from "./runtimeSceneObjectDrawMethods.j
 import { drawAndroidTouchControls, getAndroidTouchRegions } from "./hud/androidLayout.js";
 import { drawConsumablesBar } from "./hud/consumablesBar.js";
 import { drawLanternFuelGauge } from "./hud/lanternFuelGauge.js";
+import { drawGameplayTipBubble } from "./hud/gameplayTipBubble.js";
 import { runtimeSceneSkeletonWarriorDrawMethods } from "./runtimeSceneSkeletonWarriorDrawMethods.js";
 import { drawEnemyAdditionalStatusIcons, drawEnemyStatusBadge } from "./enemyStatusBadges.js";
 
@@ -42,6 +43,7 @@ export const runtimeSceneDrawMethods = {
     ctx.fillText("Playable area unlocks after room + map sync.", layout.playW / 2, this.canvas.height / 2 + 34);
     ctx.textAlign = "left";
     this.drawHud(game, layout);
+    drawGameplayTipBubble(this, game, layout);
     const row0 = Array.isArray(game.map) && game.map.length > 0 ? game.map[0] : null;
     const row0Len = typeof row0 === "string" ? row0.length : Array.isArray(row0) ? row0.length : 0;
     if (row0Len > 0) {

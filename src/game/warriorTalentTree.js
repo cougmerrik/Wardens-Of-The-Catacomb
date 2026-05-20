@@ -24,8 +24,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "BW",
     color: "#d7a06a",
     description: [
-      "Wide sweeping weapon form.",
-      "Balanced crowd clear and stable front-line control."
+      "Weapon. Your melee attacks use a broad 125 degree swing with 44 range.",
+      "Deals 100% melee damage with a normal attack speed multiplier and 12 knockback.",
+      "Best for stable front-line control and reliable horde coverage."
     ]
   },
   {
@@ -36,8 +37,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "LS",
     color: "#c8c39a",
     description: [
-      "Long-reaching thrust weapon form.",
-      "Best spacing and disciplined lane control."
+      "Weapon. Your melee attacks use a narrow 40 degree thrust with 76 range.",
+      "Deals 108% melee damage, attacks 12% slower, applies 11 knockback, and adds 18% stagger pressure.",
+      "Best for spacing, lane control, and disciplined single-line fighting."
     ]
   },
   {
@@ -48,8 +50,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "WW",
     color: "#9b8fd4",
     description: [
-      "Mid-range lash weapon form.",
-      "Fast control-oriented strikes with setup potential."
+      "Weapon. Your melee attacks use an 86 degree lash with 60 range.",
+      "Deals 88% melee damage, attacks 10% faster, applies 8 knockback, and slows on hit by 12% for 1.2 sec.",
+      "Best for mid-range control and setting up enemies before they reach you."
     ]
   },
   {
@@ -60,8 +63,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "TH",
     color: "#d86f5e",
     description: [
-      "Rapid close-range weapon form.",
-      "Highest tempo and strongest aggression curve."
+      "Weapon. Your melee attacks use a 70 degree close-range chop with 38 range.",
+      "Deals 80% melee damage, attacks 34% faster, and applies 9 knockback.",
+      "Every third hatchet hit deals 25% increased melee damage."
     ]
   },
   {
@@ -72,8 +76,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "CL",
     color: "#dfb57f",
     description: [
-      "Stance A gains roughly 25% wider coverage.",
-      "Trades some first-target damage for clear horde pressure."
+      "Stance. Primary attacks gain wider coverage for horde clearing.",
+      "Arc width increases by 25%, or more for spear and whip forms; range also increases slightly.",
+      "Deals 8% less melee damage but adds +2 knockback."
     ]
   },
   {
@@ -84,8 +89,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "FC",
     color: "#f0c39b",
     description: [
-      "Stance A narrows and hits about 33% harder.",
-      "Adds stronger impact and low-health finishing pressure."
+      "Stance. Primary attacks become narrower, slower, and harder hitting.",
+      "Deals 33% increased melee damage, attacks 8% slower, and adds +3 knockback.",
+      "Adds +20% execute pressure; secondary stance converts part of this into extra finishing damage."
     ]
   },
   {
@@ -96,8 +102,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "SW",
     color: "#b5e0b9",
     description: [
-      "Stance A attacks much faster with reduced single-target DPS.",
-      "Lower per-hit damage, better tempo and easier uptime."
+      "Stance. Primary attacks become faster and lighter.",
+      "Deals 32% less melee damage but attacks 28% faster.",
+      "Having Swift in either stance also grants +8% global warrior attack speed."
     ]
   },
   {
@@ -108,8 +115,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "HV",
     color: "#d48b72",
     description: [
-      "Stance A attacks slower but hits about 25% harder.",
-      "Adds meaningful knockback and short hit-stun on impact."
+      "Stance. Primary attacks become heavier and slower.",
+      "Deals 28% increased melee damage, attacks 22% slower, and adds +10 knockback.",
+      "Adds 16% stagger pressure and slightly widens most weapon arcs."
     ]
   },
   {
@@ -120,8 +128,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "GD",
     color: "#ced8bf",
     description: [
-      "Stance A becomes safer and more stable.",
-      "Lower offense, but grants guard windows and better trading."
+      "Stance. Primary attacks trade offense for guard windows.",
+      "Deals 12% less melee damage and attacks 4% slower.",
+      "Grants a 0.55 sec block window, +2 knockback, and 8% stagger pressure."
     ]
   },
   {
@@ -132,8 +141,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "MK",
     color: "#aab7c9",
     description: [
-      "Stance A applies a setup mark on hit.",
-      "Marks are generic at base and doctrines convert them into payoffs."
+      "Stance. Primary attacks apply a 5 sec Mark to enemies hit.",
+      "Range increases by 10%; whip hits also slow by at least 14%.",
+      "Marked targets take +3 bonus melee damage, with doctrine-specific payoffs."
     ]
   },
   {
@@ -144,8 +154,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "CL",
     color: "#dfb57f",
     description: [
-      "Stance B gains roughly 25% wider coverage.",
-      "Trades some first-target damage for clear horde pressure."
+      "Stance. Secondary attacks gain wider coverage for horde clearing.",
+      "Arc width increases by 25%, or more for spear and whip forms; range also increases slightly.",
+      "Deals 8% less melee damage but adds +2 knockback."
     ]
   },
   {
@@ -156,8 +167,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "FC",
     color: "#f0c39b",
     description: [
-      "Stance B narrows and hits about 33% harder.",
-      "Adds stronger impact and low-health finishing pressure."
+      "Stance. Secondary attacks become narrower, slower, and harder hitting.",
+      "Deals 33% increased melee damage, attacks 8% slower, and adds +3 knockback.",
+      "Adds +20% execute pressure; secondary stance converts part of this into extra finishing damage."
     ]
   },
   {
@@ -168,8 +180,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "SW",
     color: "#b5e0b9",
     description: [
-      "Stance B attacks much faster with reduced single-target DPS.",
-      "Lower per-hit damage, better tempo and easier uptime."
+      "Stance. Secondary attacks become faster and lighter.",
+      "Deals 32% less melee damage but attacks 28% faster.",
+      "Having Swift in either stance also grants +8% global warrior attack speed."
     ]
   },
   {
@@ -180,8 +193,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "HV",
     color: "#d48b72",
     description: [
-      "Stance B attacks slower but hits about 25% harder.",
-      "Adds meaningful knockback and short hit-stun on impact."
+      "Stance. Secondary attacks become heavier and slower.",
+      "Deals 28% increased melee damage, attacks 22% slower, and adds +10 knockback.",
+      "Adds 16% stagger pressure and slightly widens most weapon arcs."
     ]
   },
   {
@@ -192,8 +206,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "GD",
     color: "#ced8bf",
     description: [
-      "Stance B becomes safer and more stable.",
-      "Lower offense, but grants guard windows and better trading."
+      "Stance. Secondary attacks trade offense for guard windows.",
+      "Deals 12% less melee damage and attacks 4% slower.",
+      "Grants a 0.55 sec block window, +2 knockback, and 8% stagger pressure."
     ]
   },
   {
@@ -204,8 +219,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "MK",
     color: "#aab7c9",
     description: [
-      "Stance B applies a setup mark on hit.",
-      "Marks are generic at base and doctrines convert them into payoffs."
+      "Stance. Secondary attacks apply a 5 sec Mark to enemies hit.",
+      "Range increases by 10%; whip hits also slow by at least 14%.",
+      "Marked targets take +3 bonus melee damage, with doctrine-specific payoffs."
     ]
   },
   {
@@ -216,8 +232,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "PD",
     color: "#edd98f",
     description: [
-      "Class skill becomes Sanctify.",
-      "Holy defense, support, and zone-control doctrine."
+      "Doctrine. Your class skill becomes Sanctify: 10 sec cooldown, 3.5 sec duration.",
+      "While active, gain +10% melee damage and 20% damage reduction.",
+      "Attacks deal +14% primary damage as holy damage and deal +8% damage to undead enemies."
     ]
   },
   {
@@ -228,8 +245,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "BD",
     color: "#ef7f67",
     description: [
-      "Class skill becomes Bloodhowl.",
-      "Speed, leech, and aggression doctrine."
+      "Doctrine. Your class skill becomes Bloodhowl: 10 sec cooldown, 4 sec duration.",
+      "While active, gain +28% melee damage, +20% attack speed, and +20% movement speed.",
+      "When activated, marks a nearby high-health enemy for 5 sec and may stun it for 1 sec."
     ]
   },
   {
@@ -240,8 +258,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "GD",
     color: "#d8b37b",
     description: [
-      "Class skill becomes Arena Command.",
-      "Balanced weapon-mastery and tempo doctrine."
+      "Doctrine. Your class skill becomes Arena Command: 9 sec cooldown, 3 sec duration.",
+      "While active, gain +16% melee damage and 10% damage reduction.",
+      "Swapping stances has a 2 sec cooldown and grants a 1.6 sec stance-specific bonus."
     ]
   },
   {
@@ -252,8 +271,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "ED",
     color: "#8ea4ff",
     description: [
-      "Class skill becomes Arcane Armament.",
-      "Pure arcane melee hybrid doctrine."
+      "Doctrine. Your class skill becomes Arcane Armament: 10 sec cooldown, 4 sec duration.",
+      "While active, gain +12% melee damage and your attacks add 16% primary damage as arcane damage.",
+      "Attacks trigger a 1.2 sec arcane movement surge; guarded and focused stances gain extra arcane payoffs."
     ]
   },
   {
@@ -264,8 +284,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "CG",
     color: "#f0d58d",
     description: [
-      "Class skill creates a doctrine-flavored combat field.",
-      "The field gains holy, arcane, brutal, or tactical behavior based on doctrine."
+      "General. Activating your class skill creates a 3.5 tile combat field for the skill duration.",
+      "The field deals 10 damage per second with damage type and radius behavior based on doctrine.",
+      "Paladin fields are holy, Eldritch fields are arcane, Berserker fields are tighter physical leech zones, and Gladiator fields are wider tactical zones."
     ]
   },
   {
@@ -276,8 +297,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "CD",
     color: "#e8c18d",
     description: [
-      "After using your class skill, the next attack crits.",
-      "During the skill window, your swings gain visibly wider coverage."
+      "General. After activating your class skill, your next attack is a guaranteed critical strike.",
+      "Critical strikes from this effect deal 200% damage, or 220% while the class skill is active.",
+      "During the class-skill window, melee arc width increases by 20%."
     ]
   },
   {
@@ -288,8 +310,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "ER",
     color: "#d8b494",
     description: [
-      "During your class skill, melee range increases.",
-      "Low-health enemies are easier to execute."
+      "General. During your class skill, melee range increases by 20%.",
+      "Your melee hits have a 14% chance to execute enemies at or below 30% health.",
+      "If Butcher's Path is also selected, the execute chance is doubled while your class skill is active."
     ]
   },
   {
@@ -300,8 +323,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "BF",
     color: "#e27f65",
     description: [
-      "Kills during your class skill trigger a frenzy burst.",
-      "Frenzy adds movement, damage, and delayed healing."
+      "General. Kills during your class skill trigger a 3 sec frenzy, limited by a 10 sec internal cooldown.",
+      "During frenzy, gain +16% movement speed and +10% damage.",
+      "Kills during your class skill also store a 4 sec heal-over-time equal to 2% max health, capped at 10% max health."
     ]
   },
   {
@@ -312,8 +336,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "SR",
     color: "#d9d1bb",
     description: [
-      "Primary attacks can release a forward strike wave.",
-      "The base wave is physical; doctrines recolor and empower it."
+      "General. Attacks build strike-wave charges for 2 sec; 5 charges releases a forward wave, or 4 charges with Gladiator.",
+      "The wave deals 65% primary damage, lasts 0.9 sec, and travels 5 tiles by default.",
+      "Paladin waves become holy and travel 8 tiles; Eldritch waves become arcane and travel 11 tiles."
     ]
   },
   {
@@ -324,8 +349,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "BP",
     color: "#d37a66",
     description: [
-      "Executing an enemy empowers your next hit.",
-      "The next swing crits, grows larger, and hits much harder."
+      "General. Executing an enemy empowers your next melee hit.",
+      "The empowered hit is a guaranteed critical strike, deals 35% increased damage, and has 25% wider arc coverage.",
+      "Also doubles Executioner's Reach execute chance while your class skill is active."
     ]
   },
   {
@@ -336,8 +362,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "RT",
     color: "#da6d5f",
     description: [
-      "The first few seconds of class skill radiate doctrine-flavored AOE damage.",
-      "Also grants temporary HP and a short, high-impact power window."
+      "General. Activating your class skill grants temporary HP equal to 25% of max health for the skill duration.",
+      "For the first 5 sec, melee attacks use full 360 degree arc coverage.",
+      "Also creates a 1.8 tile aura for up to 3.2 sec, dealing 42% primary damage per second as doctrine-flavored area damage."
     ]
   },
   {
@@ -348,8 +375,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "SW",
     color: "#b2d8a7",
     description: [
-      "Using your class skill starts a heal-over-time effect.",
-      "Nearby allies receive a smaller version."
+      "General. Activating your class skill starts a 10 sec heal-over-time for 22% of your max health.",
+      "Nearby allies receive a 10 sec heal-over-time for 8% of their max health.",
+      "Your combat field healing multiplier is increased to 125%."
     ]
   },
   {
@@ -360,8 +388,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "BA",
     color: "#f3ddb0",
     description: [
-      "Defense and protection capstone.",
-      "Enhances holy and guarded front-line play."
+      "Capstone. During your class skill, gain an additional 10% damage reduction.",
+      "Combat fields and protection effects grant 8% damage reduction, and guarded play gains +12% melee defense.",
+      "Nearby allies receive a 10% defense aura from your stonewall presence."
     ]
   },
   {
@@ -372,8 +401,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "RV",
     color: "#f08d77",
     description: [
-      "Aggression capstone.",
-      "Missing health increases attack speed, move speed, and damage."
+      "Capstone. Missing health increases melee damage by up to 15%.",
+      "Missing health also increases attack speed by up to 25% through the main attack-speed calculation.",
+      "Best with aggressive class-skill windows and self-healing extras."
     ]
   },
   {
@@ -384,8 +414,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "PG",
     color: "#e0c692",
     description: [
-      "Technical mastery capstone.",
-      "Rewards swapping and makes both stances stronger."
+      "Capstone. Swapping stances primes the new stance for a bonus hit.",
+      "Primary stance bonus: next hit deals 18% increased melee damage.",
+      "Secondary stance bonus: next hit deals 10% increased melee damage and briefly staggers the target for 0.15 sec."
     ]
   },
   {
@@ -396,8 +427,9 @@ const WARRIOR_TALENT_DEFS = [
     icon: "SK",
     color: "#a7b7ff",
     description: [
-      "Arcane melee capstone.",
-      "Adds echo damage, bursts, and arcane blade waves."
+      "Capstone. Melee hits deal additional arcane damage equal to 15% of primary damage.",
+      "Activating your class skill releases an arcane wave that deals 55% primary damage as arcane damage over 9 tiles.",
+      "Arcane marks can detonate on death, dealing arcane splash damage to nearby enemies."
     ]
   }
 ];
@@ -419,10 +451,10 @@ function hasRequiredPreviousTier(game, tier) {
 
 function getTierLabel(tier) {
   if (tier === 1) return "Weapon";
-  if (tier === 2) return "Stance A";
-  if (tier === 3) return "Stance B";
+  if (tier === 2) return "Stance";
+  if (tier === 3) return "Stance";
   if (tier === 4) return "Doctrine";
-  if (tier === 5) return "Extras";
+  if (tier === 5) return "General";
   if (tier === 6) return "Capstone";
   return "Warrior";
 }
@@ -552,10 +584,10 @@ export function spendWarriorUtility() {
 
 export function formatWarriorLaneLabel(lane) {
   if (lane === "weapon") return "Weapon Form";
-  if (lane === "stance a") return "Stance A";
-  if (lane === "stance b") return "Stance B";
+  if (lane === "stance a") return "Stance";
+  if (lane === "stance b") return "Stance";
   if (lane === "doctrine") return "Class Skill";
-  if (lane === "extras") return "Extra Modifier";
+  if (lane === "extras") return "General";
   if (lane === "capstone") return "Capstone";
   return "Warrior";
 }

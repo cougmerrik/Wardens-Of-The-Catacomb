@@ -9,6 +9,7 @@ import {
 } from "../../game/necromancerTalentTree.js";
 import { getClassDisplayLabel } from "../../game/classDisplay.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
+import { drawConsumableItemIcon } from "./consumableItemIcons.js";
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
@@ -74,6 +75,49 @@ function drawSegmentedBar(ctx, rect, ratio, fill, sections = []) {
   ctx.fillRect(rect.x, rect.y, Math.floor(rect.w * clamp01(ratio)), rect.h);
   ctx.strokeStyle = fill;
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+}
+
+function getActiveConsumableStatuses(game) {
+  const effects = game?.consumables?.effects || {};
+  const statuses = [];
+  if ((effects.regenerationPotion?.timer || 0) > 0) statuses.push({ key: "regenerationPotion", count: Math.ceil(effects.regenerationPotion.timer || 0), color: "#79e59a" });
+  if ((effects.speedPotion?.timer || 0) > 0) statuses.push({ key: "speedPotion", count: Math.ceil(effects.speedPotion.timer || 0), color: "#7fd7ff" });
+  if ((effects.fireOil?.attacksRemaining || 0) > 0) statuses.push({ key: "fireOil", count: Math.floor(effects.fireOil.attacksRemaining || 0), color: "#ff9a54" });
+  if ((effects.frostOil?.attacksRemaining || 0) > 0) statuses.push({ key: "frostOil", count: Math.floor(effects.frostOil.attacksRemaining || 0), color: "#93ddff" });
+  if ((effects.spikeGrowth?.timer || 0) > 0) statuses.push({ key: "spikeGrowth", count: Math.ceil(effects.spikeGrowth.timer || 0), color: "#c7f06a" });
+  const tempHp = Math.max(0, Number.isFinite(game?.player?.consumableRuntime?.tempHp) ? game.player.consumableRuntime.tempHp : 0);
+  if (tempHp > 0) statuses.push({ key: "shield", count: Math.ceil(tempHp), color: "#b8c7ff" });
+  return statuses;
+}
+
+function getConsumableStatusColumns(width) {
+  return Math.max(1, Math.floor((Math.max(20, width) + 8) / 28));
+}
+
+function getConsumableStatusRows(width) {
+  return Math.ceil(6 / getConsumableStatusColumns(width));
+}
+
+function drawConsumableStatuses(ctx, statuses, x, y, width) {
+  const size = 20;
+  const columns = getConsumableStatusColumns(width);
+  for (let i = 0; i < statuses.length; i += 1) {
+    const status = statuses[i];
+    const iconX = x + (i % columns) * 28;
+    const iconY = y + Math.floor(i / columns) * 28;
+    ctx.fillStyle = "rgba(13, 18, 29, 0.96)";
+    ctx.fillRect(iconX, iconY, size, size);
+    ctx.strokeStyle = status.color;
+    ctx.strokeRect(iconX + 0.5, iconY + 0.5, size - 1, size - 1);
+    if (!drawConsumableItemIcon(ctx, status.key, iconX, iconY, size, 2)) {
+      ctx.fillStyle = status.color;
+      ctx.fillRect(iconX + 5, iconY + 5, size - 10, size - 10);
+    }
+    ctx.fillStyle = "#f7f3e8";
+    ctx.font = "bold 10px Trebuchet MS";
+    const label = `${status.count}`;
+    ctx.fillText(label, iconX + size - 4 - ctx.measureText(label).width, iconY + size - 3);
+  }
 }
 
 function getRangerStatus(game) {
@@ -160,6 +204,9 @@ export function drawClassStatusPanel(renderer, game, layout) {
   const ctx = renderer.ctx;
   const rect = getPanelRect(renderer, layout);
   const networkLines = getNetworkStatusLines(game);
+  const consumableStatuses = getActiveConsumableStatuses(game);
+  const consumableRows = getConsumableStatusRows(rect.w);
+  rect.h += consumableRows * 28;
   if (networkLines.length > 0 && !layout.isAndroid) rect.h += 42;
   drawPanelBase(ctx, rect, status.accent);
 
@@ -178,8 +225,10 @@ export function drawClassStatusPanel(renderer, game, layout) {
     drawSegmentedBar(ctx, { x: rect.x, y: rect.y + 70, w: rect.w, h: 8 }, status.barRatio, status.barColor, status.sections);
   }
 
+  drawConsumableStatuses(ctx, consumableStatuses, rect.x, rect.y + 86, rect.w);
+
   if (networkLines.length > 0 && !layout.isAndroid) {
-    const netY = rect.y + 92;
+    const netY = rect.y + 92 + consumableRows * 28;
     ctx.strokeStyle = "rgba(126, 139, 171, 0.35)";
     ctx.beginPath();
     ctx.moveTo(rect.x, netY - 10.5);

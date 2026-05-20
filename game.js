@@ -75,6 +75,7 @@ import {
   submitLocalRunToLeaderboard
 } from "./src/leaderboard/leaderboardClient.js";
 import { getBaseClassDisplayLabel } from "./src/game/classDisplay.js";
+import { getStoredGameplayTipsEnabled, persistGameplayTipsEnabled } from "./src/game/gameplayTips.js";
 import { spawnTreasureGoblin } from "./src/game/enemySpawnFactories.js";
 import { preloadConsumableItemIcons } from "./src/rendering/hud/consumableItemIcons.js";
 import { preloadMageSkillIcons } from "./src/rendering/hud/mageSkillIcons.js";
@@ -119,6 +120,7 @@ const voiceChatPushKeyButton = document.getElementById("voice-chat-push-key");
 const voiceChatVolumeInput = document.getElementById("voice-chat-volume");
 const voiceChatVolumeValue = document.getElementById("voice-chat-volume-value");
 const disableAdsInput = document.getElementById("disable-ads");
+const gameplayTipsEnabledInput = document.getElementById("gameplay-tips-enabled");
 const topAdBanner = document.getElementById("top-ad-banner");
 const topAdImage = document.getElementById("top-ad-image");
 const devBossOptionsPanel = document.getElementById("dev-boss-options");
@@ -257,6 +259,7 @@ const AD_IMAGE_SOURCES = [
   "./assets/ads/wizards.png"
 ];
 let adsDisabled = loadStoredAdsDisabled();
+let gameplayTipsEnabled = getStoredGameplayTipsEnabled(window.localStorage);
 let currentAdIndex = 0;
 let adRotationTimer = 0;
 const runtimePlatform = getRuntimePlatform(runtimeConfig) || "web";
@@ -365,6 +368,11 @@ function formatVoiceKeyLabel(key) {
 function syncDisableAdsControl() {
   if (!disableAdsInput) return;
   disableAdsInput.checked = !!adsDisabled;
+}
+
+function syncGameplayTipsControl() {
+  if (!gameplayTipsEnabledInput) return;
+  gameplayTipsEnabledInput.checked = !!gameplayTipsEnabled;
 }
 
 function rotateTopAd(force = false) {
@@ -592,6 +600,7 @@ syncDevModeUi();
 syncMenuVolumeControl();
 syncVoiceChatControls();
 syncDisableAdsControl();
+syncGameplayTipsControl();
 if (topAdImage && AD_IMAGE_SOURCES.length > 0) rotateTopAd(true);
 syncTopAdVisibility();
 
@@ -1788,6 +1797,7 @@ const dismissSplash = () => {
           syncMusicForGame,
           startingFloor: 1,
           debugHudEnabled: isDevMode,
+          gameplayTipsEnabled,
           onGameOverChanged: (gameOver, nextGame) => {
             if (gameOver) submitCompletedLocalRun(nextGame);
           }
@@ -1972,6 +1982,7 @@ function startLocalGame() {
     startingFloor: requestedStartFloor,
     bossOverride: selectedBossOverride,
     debugHudEnabled: isDevMode,
+    gameplayTipsEnabled,
     onGameOverChanged: (gameOver, nextGame) => {
       if (gameOver) submitCompletedLocalRun(nextGame);
     }
@@ -1995,6 +2006,7 @@ function startNetworkGameplay() {
     platform: runtimePlatform,
     classType: selectedClass,
     debugHudEnabled: isDevMode,
+    gameplayTipsEnabled,
     onReturnToMenu: returnToMenu,
     onPauseChanged: (_paused, nextGame) => syncMusicForGame(nextGame),
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),
@@ -2641,6 +2653,21 @@ if (disableAdsInput) {
     persistAdsDisabled(adsDisabled);
     syncDisableAdsControl();
     syncTopAdVisibility();
+  });
+}
+
+if (gameplayTipsEnabledInput) {
+  gameplayTipsEnabledInput.addEventListener("change", () => {
+    gameplayTipsEnabled = !!gameplayTipsEnabledInput.checked;
+    persistGameplayTipsEnabled(gameplayTipsEnabled, window.localStorage);
+    syncGameplayTipsControl();
+    if (currentGame?.gameplayTips) {
+      currentGame.gameplayTips.enabled = gameplayTipsEnabled;
+      if (!gameplayTipsEnabled) {
+        currentGame.gameplayTips.text = "";
+        currentGame.gameplayTips.timer = 0;
+      }
+    }
   });
 }
 
