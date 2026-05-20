@@ -62,6 +62,102 @@ function validateChargeShove() {
   };
 }
 
+function validateBreakableContactSmash() {
+  const { game, boss } = makeMinotaurBossSim();
+  const crate = {
+    type: "crate",
+    x: boss.x + (boss.size || 34) * 0.5 + 8,
+    y: boss.y,
+    size: 20,
+    hp: 1
+  };
+  game.breakables = [crate];
+  game.player.x = boss.x + 220;
+  game.player.y = boss.y;
+  boss.chargeCooldown = 999;
+  boss.stompCooldown = 999;
+  game.updateEnemyTactics(boss, 0.016, 1);
+  assert(crate.hp <= 0, "minotaur did not smash touching breakable");
+  return {
+    crateHp: crate.hp,
+    bossStuckTimer: boss.stuckTimer || 0
+  };
+}
+
+function validateChargeBreakableSmash() {
+  const { game, boss } = makeMinotaurBossSim();
+  const crate = {
+    type: "box",
+    x: boss.x + (boss.size || 34) * 0.5 + 20,
+    y: boss.y,
+    size: 20,
+    hp: 1
+  };
+  game.breakables = [crate];
+  boss.chargeTimer = 0.3;
+  boss.chargeWindupTimer = 0;
+  boss.chargeDirX = 1;
+  boss.chargeDirY = 0;
+  game.updateEnemyTactics(boss, 0.016, 1);
+  assert(crate.hp <= 0, "charging minotaur did not smash breakable in its path");
+  return {
+    crateHp: crate.hp,
+    chargeTimer: boss.chargeTimer
+  };
+}
+
+function validateStuckRecoveryBreakableSmash() {
+  const { game, boss } = makeMinotaurBossSim();
+  const crate = {
+    type: "crate",
+    x: boss.x + (boss.size || 34) * 0.5 + 10,
+    y: boss.y,
+    size: 20,
+    hp: 1
+  };
+  game.breakables = [crate];
+  game.player.x = boss.x + 260;
+  game.player.y = boss.y;
+  boss.stuckTimer = 0.5;
+  boss.chargeCooldown = 999;
+  boss.stompCooldown = 999;
+  game.updateEnemyTactics(boss, 0.016, 1);
+  assert(crate.hp <= 0, "minotaur stuck recovery did not smash blocking breakable");
+  assert((boss.stuckTimer || 0) === 0, "minotaur stuck timer did not reset after smashing breakable");
+  return {
+    crateHp: crate.hp,
+    stuckTimer: boss.stuckTimer || 0
+  };
+}
+
+function validateWallStuckRecovery() {
+  const { game, boss } = makeMinotaurBossSim();
+  const originalMoveWithCollision = game.moveWithCollision.bind(game);
+  game.moveWithCollision = function moveWithCollisionStub(entity, dx, dy) {
+    if (Math.abs(dx) > Math.abs(dy)) return;
+    entity.x += dx;
+    entity.y += dy;
+  };
+  try {
+    boss.chargeTimer = 0.3;
+    boss.chargeWindupTimer = 0;
+    boss.chargeDirX = 1;
+    boss.chargeDirY = 0;
+    boss.stuckTimer = 0.46;
+    const beforeY = boss.y;
+    game.updateEnemyTactics(boss, 0.016, 1);
+    assert(boss.chargeTimer === 0, "minotaur recovery did not cancel blocked charge");
+    assert(Math.abs(boss.y - beforeY) > 0.01, "minotaur recovery did not sidestep blocked wall movement");
+    return {
+      beforeY,
+      afterY: boss.y,
+      chargeTimer: boss.chargeTimer
+    };
+  } finally {
+    game.moveWithCollision = originalMoveWithCollision;
+  }
+}
+
 function validateStompFallback() {
   const { game, boss } = makeMinotaurBossSim();
   game.player.x = boss.x + 18;
@@ -95,6 +191,10 @@ function main() {
     bossSelection: validateBossSelection(),
     chargeTrigger: validateChargeTrigger(),
     chargeShove: validateChargeShove(),
+    breakableContactSmash: validateBreakableContactSmash(),
+    chargeBreakableSmash: validateChargeBreakableSmash(),
+    stuckRecoveryBreakableSmash: validateStuckRecoveryBreakableSmash(),
+    wallStuckRecovery: validateWallStuckRecovery(),
     stompFallback: validateStompFallback(),
     bossMarkerRegression: validateBossMarkerRegression()
   };

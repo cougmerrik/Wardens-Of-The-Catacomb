@@ -1,6 +1,7 @@
 const MAGE_SKILL_ICON_SOURCES = {
   fireBoltCantrip: "./assets/images/skills/mage/fireBoltCantrip.png",
   frostShardCantrip: "./assets/images/skills/mage/frostShardCantrip.png",
+  frozenOrbCantrip: "./assets/images/skills/mage/frozenOrbCantrip.png",
   shockCantrip: "./assets/images/skills/mage/shockCantrip.png",
   arcaneMissileCantrip: "./assets/images/skills/mage/arcaneMissileCantrip.png",
   necroticBeamCantrip: "./assets/images/skills/mage/necroticBeamCantrip.png",

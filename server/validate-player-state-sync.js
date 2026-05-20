@@ -8,7 +8,7 @@ import { makeDefaultInput } from "./net/serverHelpers.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { GameSim } from "../src/sim/GameSim.js";
 import { syncNamedObject } from "../src/net/clientSnapshotHelpers.js";
-import { syncByIdLerp } from "../src/net/clientStateSync.js";
+import { applySnapshotToGame, syncByIdLerp } from "../src/net/clientStateSync.js";
 import { applyPlayerSnapshotToGameState, ACTIVE_PLAYER_SNAPSHOT_FIELDS } from "../src/net/playerSnapshotSchema.js";
 import { applyPredictedTeleportAction } from "../src/net/teleportPrediction.js";
 
@@ -179,6 +179,21 @@ function main() {
   assert.equal(clientGame.skills.deathBolt.points, 4, "client skills did not apply from player snapshot");
   assert.equal(clientGame.necromancerRuntime.mimicTimer, 0, "client mimic timer did not clear from player snapshot");
   assert.equal(clientGame.necromancerBeam.progress, 0.6, "client beam did not apply from player snapshot");
+
+  room.sim.floatingTexts = [];
+  room.sim.spawnFloatingText(320, 260, "-9", "#e85c5c", 0.75, 14);
+  room.sim.spawnFloatingText(room.sim.player.x, room.sim.player.y - 50, "Battle Cry", "#f4efe3", 0.85, 15);
+  const floatingState = serializeState(room);
+  assert.ok(floatingState.floatingTexts.some((entry) => entry.text === "-9"), "serialized network state should include killing-blow damage text");
+  assert.ok(floatingState.floatingTexts.some((entry) => entry.text === "Battle Cry"), "serialized network state should include warrior battle cry text");
+  const floatingClient = new GameSim({ classType: "fighter", viewportWidth: 960, viewportHeight: 640 });
+  floatingClient.spawnFloatingText = function spawnFloatingText(x, y, text, color, life = 0.75, size = 14) {
+    this.floatingTexts.push({ x, y, text, color, life, maxLife: life, size });
+  };
+  applySnapshotToGame({ game: floatingClient, state: floatingState, controller: false, localPlayerId: "spectator" });
+  applySnapshotToGame({ game: floatingClient, state: floatingState, controller: false, localPlayerId: "spectator" });
+  assert.equal(floatingClient.floatingTexts.filter((entry) => entry.text === "-9").length, 1, "network killing-blow damage text should spawn once");
+  assert.equal(floatingClient.floatingTexts.filter((entry) => entry.text === "Battle Cry").length, 1, "network battle cry text should spawn once");
 
   console.log(JSON.stringify({
     playerStateSync: "ok",

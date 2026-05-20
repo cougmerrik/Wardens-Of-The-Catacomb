@@ -21,6 +21,9 @@ artifacts/*
 artifacts/perf/*
 !artifacts/perf/baseline.json
 !artifacts/perf/baseline_previous.json
+artifacts/gameplay/*
+artifacts/network/*
+artifacts/ranger-visuals/*
 
 # Runtime data
 data/leaderboard.json

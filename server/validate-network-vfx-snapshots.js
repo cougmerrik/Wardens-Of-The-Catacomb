@@ -72,6 +72,8 @@ function main() {
     damage: 12,
     projectileType: "mage_fireBolt",
     damageType: "fire",
+    lightRadius: 52.8,
+    lightIntensity: 0.18,
     critMultiplier: 1.5,
     ownerId: "local-vfx"
   });
@@ -130,6 +132,8 @@ function main() {
   assert.equal(mimic.tongueLength, 12, "mimic tongue length should survive serialization");
   const bullet = requireEntry(state.bullets, (entry) => entry.projectileType === "mage_fireBolt", "serialized mage projectile");
   assert.equal(bullet.damageType, "fire", "projectile damageType should survive serialization for renderer palette");
+  assert.equal(bullet.lightRadius, 52.8, "mage projectile lightRadius should survive serialization");
+  assert.equal(bullet.lightIntensity, 0.18, "mage projectile lightIntensity should survive serialization");
   assert.equal(bullet.critMultiplier, 1.5, "projectile critMultiplier should survive serialization");
   assert.equal(bullet.ownerId, "local-vfx", "projectile ownerId should survive serialization");
 
@@ -292,7 +296,7 @@ function main() {
     weakenedTimer: 1.5,
     tempMageCharmTimer: 1.5
   }, 160, 180);
-  assert.ok(statusCtx.calls.filter((call) => call[0] === "save").length >= 4, "active auxiliary status effects should draw visible status badges");
+  assert.ok(statusCtx.calls.filter((call) => call[0] === "save").length >= 3, "active non-chill auxiliary status effects should draw visible status badges");
   assert.ok(
     statusCtx.calls.some((call) => call[0] === "moveTo" && call[1] === 140 && call[2] === 183),
     "bleed status icon should render in the same compact enemy status row as burn/curse/rot"
@@ -310,6 +314,11 @@ function main() {
     statusCtx.calls.some((call) => call[0] === "arc" && call[1] === 157 && call[2] === 183 && call[3] === 4),
     false,
     "poison status icon should not use the larger auxiliary badge row"
+  );
+  assert.equal(
+    statusCtx.calls.some((call) => call[0] === "arc" && call[3] === 6),
+    false,
+    "chill/slow should use sprite tinting instead of drawing a separate snowflake status badge"
   );
 
   const textGame = {

@@ -138,12 +138,14 @@ function serializeEnemy(room, e) {
     shotWindupTimer: e.shotWindupTimer || 0,
     collapsed: !!e.collapsed,
     collapseTimer: e.collapseTimer || 0,
+    corpseTimer: e.corpseTimer || 0,
     goldEaten: e.goldEaten || 0,
     variant: typeof e.variant === "string" ? e.variant : null,
     damageMin: e.damageMin,
     damageMax: e.damageMax
   };
   if (e.isControlledUndead) base.isControlledUndead = true;
+  if (e.deathProcessed) base.deathProcessed = true;
   if (typeof e.controllerPlayerId === "string" && e.controllerPlayerId) base.controllerPlayerId = e.controllerPlayerId;
   if (Number.isFinite(e.curseTimer) && e.curseTimer > 0) base.curseTimer = e.curseTimer;
   if (Number.isFinite(e.rotTimer) && e.rotTimer > 0) base.rotTimer = e.rotTimer;
@@ -193,6 +195,36 @@ function serializeEnemy(room, e) {
       break;
   }
   return base;
+}
+
+function isFloatingTextNearEnemy(text, enemies) {
+  const x = Number.isFinite(text?.x) ? text.x : null;
+  const y = Number.isFinite(text?.y) ? text.y : null;
+  if (x === null || y === null) return false;
+  for (const enemy of Array.isArray(enemies) ? enemies : []) {
+    if (!enemy || !Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) continue;
+    const radius = (Number.isFinite(enemy.size) ? enemy.size : 20) + 30;
+    if (Math.hypot(enemy.x - x, enemy.y - y) <= radius) return true;
+  }
+  return false;
+}
+
+function serializeFloatingText(room, text, activeEnemies) {
+  if (!text || typeof text !== "object" || typeof text.text !== "string" || !text.text) return null;
+  if (!Number.isFinite(text.x) || !Number.isFinite(text.y)) return null;
+  const isDamageText = text.text.startsWith("-");
+  if (isDamageText && isFloatingTextNearEnemy(text, activeEnemies)) return null;
+  const id = typeof text.id === "string" && text.id ? text.id : getStableId(room, "floatingText", "ft", text);
+  return {
+    id,
+    x: text.x,
+    y: text.y,
+    text: text.text,
+    color: typeof text.color === "string" && text.color ? text.color : "#ffffff",
+    life: Number.isFinite(text.life) ? text.life : 0.75,
+    maxLife: Number.isFinite(text.maxLife) ? text.maxLife : Number.isFinite(text.life) ? text.life : 0.75,
+    size: Number.isFinite(text.size) ? text.size : 14
+  };
 }
 
 function serializeDrop(room, d) {

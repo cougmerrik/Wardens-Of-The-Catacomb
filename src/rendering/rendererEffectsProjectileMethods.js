@@ -1,4 +1,5 @@
 import { projectileEffectsFireZoneMethods } from "./projectileEffectsFireZoneMethods.js";
+import { drawRangerProjectile } from "./rangerProjectileVisuals.js";
 
 function hexToRgba(color, alpha) {
   if (typeof color !== "string") return `rgba(121, 255, 141, ${alpha})`;
@@ -149,34 +150,8 @@ export const rendererEffectsProjectileMethods = {
         ctx.fill();
         ctx.fillStyle = "#5b2f2f";
         ctx.fillRect(-8, -1.5, 5, 3);
-      } else if (rangerWeapon === "rapierPistol") {
-        ctx.fillStyle = "rgba(255, 236, 166, 0.35)";
-        ctx.fillRect(-11, -1.1, 12, 2.2);
-        ctx.fillStyle = "#fff0a8";
-        ctx.beginPath();
-        ctx.arc(2.5, 0, 3.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#7d5a2e";
-        ctx.beginPath();
-        ctx.arc(-2.5, 0, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (rangerWeapon === "throwingKnives" || rangerWeapon === "twinDaggers") {
-        const bladeLength = rangerWeapon === "twinDaggers" ? 9 : 7;
-        ctx.strokeStyle = "#f0f4fb";
-        ctx.lineWidth = rangerWeapon === "twinDaggers" ? 2.4 : 2;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(-bladeLength * 0.55, -2.4);
-        ctx.lineTo(bladeLength * 0.55, 2.4);
-        ctx.moveTo(-bladeLength * 0.55, 2.4);
-        ctx.lineTo(bladeLength * 0.55, -2.4);
-        ctx.stroke();
-        ctx.strokeStyle = "#384052";
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.moveTo(-2.2, 0);
-        ctx.lineTo(2.2, 0);
-        ctx.stroke();
+      } else if (rangerWeapon && drawRangerProjectile(ctx, projectile, game)) {
+        // Drawn by rangerProjectileVisuals.js.
       } else {
         ctx.fillStyle = isTrapArrow ? "#d66e57" : "#d9c27f";
         ctx.fillRect(-7, -1.3, 11, 2.6);
@@ -240,16 +215,7 @@ export const rendererEffectsProjectileMethods = {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(arrow.angle);
-      ctx.fillStyle = "#ffb347";
-      ctx.fillRect(-8, -1.7, 12, 3.4);
-      ctx.fillStyle = "#ff6a3d";
-      ctx.beginPath();
-      ctx.moveTo(-8, 0);
-      ctx.lineTo(-12, -3);
-      ctx.lineTo(-10, 0);
-      ctx.lineTo(-12, 3);
-      ctx.closePath();
-      ctx.fill();
+      drawRangerProjectile(ctx, arrow, game, { fireArrow: true });
       ctx.restore();
     }
 
@@ -295,7 +261,38 @@ export const rendererEffectsProjectileMethods = {
       : ["rgba(241, 218, 255, 0.95)", "rgba(153, 118, 255, 0.82)", "rgba(54, 27, 104, 0)"];
     ctx.save();
     ctx.translate(x, y);
-    if (type === "mage_chromaticOrb") {
+    if (type === "mage_shock") {
+      ctx.rotate(Number.isFinite(projectile.angle) ? projectile.angle : 0);
+      const length = Math.max(13, size * 3.2);
+      const amp = Math.max(2.2, size * 0.62);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "rgba(88, 211, 255, 0.35)";
+      ctx.lineWidth = 5.4;
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.55, 0);
+      for (let i = 1; i <= 5; i++) {
+        const t = i / 5;
+        const jitter = Math.sin(time * 31 + i * 2.4 + (projectile.x || 0) * 0.03) * amp;
+        ctx.lineTo(-length * 0.55 + length * t, i === 5 ? 0 : jitter);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255, 252, 180, 0.96)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(170, 228, 255, 0.9)";
+      ctx.lineWidth = 1.1;
+      for (const branch of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(-length * 0.05, 0);
+        ctx.lineTo(length * 0.18, branch * amp * 1.5);
+        ctx.lineTo(length * 0.34, branch * amp * 0.45);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+    if (type === "mage_chromaticOrb" || type === "mage_frozenOrb") {
       const radius = Math.max(8, size * 0.5);
       const orb = ctx.createRadialGradient(0, 0, 1, 0, 0, radius);
       orb.addColorStop(0, palette[0]);
@@ -310,6 +307,17 @@ export const rendererEffectsProjectileMethods = {
       ctx.beginPath();
       ctx.arc(0, 0, radius * 0.72, 0, Math.PI * 2);
       ctx.stroke();
+      if (type === "mage_frozenOrb") {
+        ctx.strokeStyle = "rgba(205, 248, 255, 0.78)";
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 4; i++) {
+          const a = time * 1.8 + i * Math.PI * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * radius * 0.25, Math.sin(a) * radius * 0.25);
+          ctx.lineTo(Math.cos(a) * radius * 0.78, Math.sin(a) * radius * 0.78);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
       return;
     }

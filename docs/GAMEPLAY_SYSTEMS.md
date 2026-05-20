@@ -24,6 +24,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Lower health and defense than the melee class
 - Passive level growth emphasizes move speed and attack speed
 - Skill path focuses on Fire Arrow, Piercing Strike, and Multiarrow
+- The current class-art pass focuses on making the ranger read as a female elf archer while preserving the retro sprite style. Ranger talent choices can change costume accents, weapon silhouettes, projectile styling, and short-lived status/effect visuals without changing combat rules by themselves.
+- Ranger path and capstone visual accents are intentionally small and readable: Fire Arrow/storm effects emphasize orange and pale-blue arrow energy, Rogue emphasizes dark hood/shadow cues, Assassin emphasizes sharper dagger/execution marks, and Beast Master emphasizes natural green/bone/wolf-pact accents.
+- Throwing Knives now present ranged and melee modes differently without changing attack rules: ranged throws alternate hands and briefly show the thrown hand empty during reload, while melee `Close Cuts` draws tight alternating slash arcs near the ranger.
 
 ### Fighter
 - Higher baseline health and defense
@@ -31,11 +34,20 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Passive level growth emphasizes durability through health and defense
 - Base `unholy` resistance reduces pressure from ghost siphons and related necrotic/death effects
 - Skill path focuses on Frenzy, Rage, and Execute-style melee pressure
+- The current class-art pass makes the fighter read as a castle warrior: heavy worn plate, dark cloak, leather straps, gray hair/beard, wolf clasp, and restrained doctrine accents. Warrior talent choices can change weapon silhouettes, doctrine colors, battle-cry aura colors, and short-lived status/effect visuals without changing combat rules by themselves.
+- Warrior weapon-form visuals are distinct at gameplay scale: broadsword, longspear, war whip, and twin hatchets each use their own shoulder-rooted combat presentation. Red is reserved for battle-cry-style effects instead of the default body palette.
 
 ### Necromancer
 - Control-focused ranged class
 - Passive level growth emphasizes health, control power, and charm efficiency
 - Skill path focuses on Control Mastery, Death Bolt, and augmenting controlled undead
+- The current mage art pass makes the default loadout read as a hooded spellcaster with robe mass, visible front/back/side profiles, and a separately rigged staff or focus that follows the selected aim direction.
+- No-talent mage primary fire is `Arcane Bolt`, a lower-DPS neutral projectile with modest light and no burn. Spending into Fire Bolt unlocks the stronger fire projectile and burning effect instead of duplicating the starter attack.
+- Tier-1 mage cantrips have distinct roles:
+  - `Fire Bolt` is the stronger burning projectile; burn damage and floating text pulse once per second and the projectile emits fire light.
+  - `Frozen Orb` is a slower, lower-direct-damage cold orb that pulses smaller slowing shards while traveling. Chilled enemies tint bright blue on the sprite only, with no separate badge or floor tint, and the chill visual clears when the enemy dies.
+  - `Shock` uses jagged electricity and branching arcs, with projectile and arc light emission.
+  - `Green-Flame Blade` swaps the staff presentation for a compact green flame blade that swings during melee cantrip attacks without changing the melee tuning.
 
 ## Progression
 - XP is granted directly on enemy kills.
@@ -125,6 +137,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Drops render after the global darkness overlay, then receive the same tight capped darkness pass as enemies so pickups brighten near active light and can fade to the 99% global darkness maximum at range.
 - Floating text renders after the darkness overlay so it remains fully readable outside the light radius.
 - Ranger Fire Arrow projectiles, lingering fire/pinning-fire zones, and ignited enemies emit bright temporary light with a wider bright center and slower falloff than normal dungeon lights.
+- Mage Fire Bolt, Arcane Bolt, Shock, and Frozen Orb projectiles carry spell-specific light metadata so cantrip VFX remain visible in dark rooms and serialize consistently in multiplayer snapshots.
 - Lighting is visual-only for now:
   - it does not alter collision
   - it does not change map exploration
@@ -165,6 +178,11 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - ambient spawns can appear around separated living players
   - active-world bounds expand to the union of living player view areas
   - proximity systems such as targeting, pickups, traps, and armor wakeups operate on the living player roster
+- Slain hostile enemies leave timed, non-blocking body/remnant sprites. Bosses such as the minotaur also leave bodies while still completing boss progression, opening the portal, and clearing active boss targeting. Dead bodies render below drops and living enemies, do not push the player, and do not deal contact damage.
+- Dead bodies and collapsed remnants are not valid combat targets. Projectiles, melee checks, area effects, and direct damage routing skip slain enemies so corpse contact cannot consume projectiles, spawn hit effects, or create floating damage text.
+- Ghosts leave a floor-mist remnant instead of disappearing immediately. Skeleton warrior collapsed-body behavior remains non-blocking and is treated consistently with other death remnants.
+- Shared enemy movement uses target-point pathing with corner-assist probes and blocked-move recovery. Necromancer boss summons, standard enemies, and other target-chasing enemies can recover from wall pinning through the common movement path, while enemy-specific behaviors such as minotaur charge recovery can still override or specialize movement.
+- The minotaur can destroy breakable boxes/crates by touching them, charging into them, or recovering from blocked movement against them. Blocked charges cancel into a sidestep recovery instead of staying pinned against collision.
 
 ## Difficulty Scaling
 
@@ -257,6 +275,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - kills
   - damage dealt
 - Multiplayer leaderboard submission is disabled in the current implementation.
+
+## Player HUD Presentation
+- The local overhead player health bar is intentionally compact. It renders only the base health span when the player has no temporary HP, then extends the bar only while temporary HP is present.
 
 ## Floor Boss Rules
 - The floor boss trigger level is `floor * 5`.

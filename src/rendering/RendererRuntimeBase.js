@@ -1,4 +1,9 @@
 import { drawDebugStatsHud } from "./hud/index.js";
+import { drawMageFrame } from "./mageSpriteSheet.js";
+import { drawArcherFrame } from "./rangerSpriteSheet.js";
+import { drawWarriorFrame } from "./warriorSpriteSheet.js";
+import { getRangerHandTargets, getRangerRigPose } from "./rangerRigPose.js";
+import { getThrowingKnifeMeleePresentation, getThrowingKnifeReloadState } from "./rangerThrowingKnifeReload.js";
 
 export class RendererRuntimeBase {
   constructor(canvas, ctx, config) {
@@ -9,6 +14,7 @@ export class RendererRuntimeBase {
     this.topHudHeight = this.config.hud.topHudHeight;
     this.sidebarPadding = 12;
     this.ctx.imageSmoothingEnabled = false;
+    this.playerSpriteSheetCache = new Map();
     this.playerSpriteSheet = this.createPlayerSpriteSheet();
     this.keySprite = this.createKeySprite();
     this.goldBagSprite = this.createGoldBagSprite();
@@ -19,7 +25,7 @@ export class RendererRuntimeBase {
     drawDebugStatsHud(this, game, layout);
   }
 
-  createPlayerSpriteSheet() {
+  createPlayerSpriteSheet(visualSpec = null) {
     const frame = this.config.player.spriteFrame;
     const dirs = this.config.player.spriteDirections;
     const frames = this.config.player.spriteFramesPerDir;
@@ -34,104 +40,71 @@ export class RendererRuntimeBase {
       for (let f = 0; f < frames; f++) {
         const ox = f * frame;
         const oy = dir * frame;
-        this.drawArcherFrame(sctx, ox, oy, angle, f);
+        if (visualSpec?.classKey === "mage") this.drawMageFrame(sctx, ox, oy, angle, f, visualSpec);
+        else if (visualSpec?.classKey === "warrior") this.drawWarriorFrame(sctx, ox, oy, angle, f, visualSpec);
+        else this.drawArcherFrame(sctx, ox, oy, angle, f, visualSpec);
       }
     }
     return sheet;
   }
 
-  drawArcherFrame(sctx, ox, oy, angle, frameIndex) {
-    const frame = this.config.player.spriteFrame;
-    const cx = ox + frame / 2;
-    const cy = oy + frame / 2;
-    const bob = frameIndex === 0 ? -1.3 : 1.3;
-    const stride = frameIndex === 0 ? -1 : 1;
-    const faceDirX = Math.cos(angle);
-    const faceDirY = Math.sin(angle);
-    const headY = cy - 8 + bob;
-    const torsoY = cy + 3 + bob;
+  getPlayerSpriteSheet(visualSpec = null) {
+    if (!visualSpec) return this.playerSpriteSheet;
+    const key = [
+      visualSpec.classKey || "ranger",
+      visualSpec.weapon || "longbow",
+      visualSpec.doctrine || "none",
+      visualSpec.path || "none",
+      visualSpec.modifier || "none",
+      visualSpec.swapStyle || "none",
+      visualSpec.stanceA || "none",
+      visualSpec.stanceB || "none",
+      visualSpec.capstone || "none",
+      ...(Array.isArray(visualSpec.extras) ? visualSpec.extras : []),
+      ...(Array.isArray(visualSpec.generalSkills) ? visualSpec.generalSkills : [])
+    ].join("|");
+    if (!this.playerSpriteSheetCache.has(key)) {
+      this.playerSpriteSheetCache.set(key, this.createPlayerSpriteSheet(visualSpec));
+    }
+    return this.playerSpriteSheetCache.get(key);
+  }
 
-    sctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-    sctx.beginPath();
-    sctx.ellipse(cx, cy + 18, 10.5, 3.6, 0, 0, Math.PI * 2);
-    sctx.fill();
+  drawArcherFrame(sctx, ox, oy, angle, frameIndex, visualSpec = null) {
+    drawArcherFrame(sctx, this.config, ox, oy, angle, frameIndex, visualSpec);
+  }
 
-    sctx.fillStyle = "#3a7d4d";
-    sctx.beginPath();
-    sctx.ellipse(cx, torsoY, 9.5, 12, 0, 0, Math.PI * 2);
-    sctx.fill();
-    sctx.fillStyle = "#62b276";
-    sctx.beginPath();
-    sctx.ellipse(cx - 2.3, torsoY - 2.5, 4.1, 6.7, 0, 0, Math.PI * 2);
-    sctx.fill();
-    sctx.fillStyle = "#26492f";
-    sctx.fillRect(cx - 2, torsoY - 10, 4, 19);
+  drawWarriorFrame(sctx, ox, oy, angle, frameIndex, visualSpec = null) {
+    drawWarriorFrame(sctx, this.config, ox, oy, angle, frameIndex, visualSpec);
+  }
 
-    sctx.fillStyle = "#e7c7a1";
-    sctx.beginPath();
-    sctx.ellipse(cx, headY, 6.4, 7.3, 0, 0, Math.PI * 2);
-    sctx.fill();
-    sctx.fillStyle = "#2f5d3b";
-    sctx.beginPath();
-    sctx.moveTo(cx - 8.5, headY + 2);
-    sctx.lineTo(cx + 8.5, headY + 2);
-    sctx.lineTo(cx + 6.3, headY - 9.5);
-    sctx.lineTo(cx - 6.3, headY - 9.5);
-    sctx.closePath();
-    sctx.fill();
-    sctx.fillStyle = "#8b6540";
-    sctx.beginPath();
-    sctx.ellipse(cx, headY - 1.8, 5.8, 3.8, 0, Math.PI, Math.PI * 2);
-    sctx.fill();
-
-    const eyeX = faceDirX * 2.1;
-    const eyeY = faceDirY * 1.4;
-    sctx.fillStyle = "#1a232f";
-    sctx.fillRect(cx - 2.5 + eyeX, headY - 1 + eyeY, 1.7, 1.3);
-    sctx.fillRect(cx + 0.8 + eyeX, headY - 1 + eyeY, 1.7, 1.3);
-
-    sctx.fillStyle = "#2d4f7d";
-    sctx.beginPath();
-    sctx.ellipse(cx - 3.7, cy + 15.8 - stride * 1.4, 3, 8.2, 0, 0, Math.PI * 2);
-    sctx.ellipse(cx + 3.7, cy + 15.8 + stride * 1.4, 3, 8.2, 0, 0, Math.PI * 2);
-    sctx.fill();
-    sctx.fillStyle = "#1d3048";
-    sctx.fillRect(cx - 6.4, cy + 22.5 - stride * 1.4, 4.8, 2.2);
-    sctx.fillRect(cx + 1.6, cy + 22.5 + stride * 1.4, 4.8, 2.2);
-
-    sctx.fillStyle = "#6f5534";
-    sctx.beginPath();
-    sctx.ellipse(cx - 7, torsoY + 2, 1.6, 4.8, -0.4, 0, Math.PI * 2);
-    sctx.fill();
-    sctx.fillStyle = "#c4433b";
-    sctx.fillRect(cx - 8.3, torsoY + 1.4, 2.6, 1.4);
-
+  drawMageFrame(sctx, ox, oy, angle, frameIndex, visualSpec = null) {
+    drawMageFrame(sctx, this.config, ox, oy, angle, frameIndex, visualSpec);
   }
 
   drawPlayerAimingRig(player, screenX, screenY, walkPhase = 0, firePulse = 0, weaponStyle = "longbow") {
     const ctx = this.ctx;
-    const aimAngle = Math.atan2(player.dirY || 0, player.dirX || 1);
-    const ax = Math.cos(aimAngle);
-    const ay = Math.sin(aimAngle);
-    const px = -ay;
-    const py = ax;
-
-    const chestX = screenX;
-    const chestY = screenY - 8 + Math.sin(walkPhase * Math.PI * 2) * 0.9;
-    const shoulderSpread = 4.6;
-
-    const rearShoulderX = chestX - px * shoulderSpread;
-    const rearShoulderY = chestY - py * shoulderSpread;
-    const frontShoulderX = chestX + px * shoulderSpread;
-    const frontShoulderY = chestY + py * shoulderSpread;
-    const style = ["rapierPistol", "twinDaggers", "throwingKnives"].includes(weaponStyle) ? weaponStyle : "longbow";
+    const visualSpec = weaponStyle && typeof weaponStyle === "object" ? weaponStyle : null;
+    const selectedStyle = visualSpec?.weaponVisual?.style || weaponStyle;
+    const style = ["rapierPistol", "twinDaggers", "throwingKnives"].includes(selectedStyle) ? selectedStyle : "longbow";
+    const weaponMode = visualSpec?.weaponMode === "melee" ? "melee" : "ranged";
+    const pose = getRangerRigPose(player, screenX, screenY, walkPhase, weaponMode);
+    const { ax, ay, px, py, rearShoulderX, rearShoulderY, frontShoulderX, frontShoulderY } = pose;
+    const costume = visualSpec?.costume || {};
+    const projectile = visualSpec?.projectile || {};
+    const effects = visualSpec?.effects || {};
+    const rearSleeve = costume.hood || "#2d5132";
+    const frontSleeve = costume.tunic || "#355f3b";
+    const leather = costume.leather || "#6d4a2c";
+    const trim = costume.trim || "#62b276";
+    const accent = costume.accent || visualSpec?.weaponVisual?.color || "#8eb8ff";
+    const weaponColor = visualSpec?.weaponVisual?.color || accent;
+    const arrowHeadColor = projectile.head || "#ecdfc1";
+    const trailColor = projectile.trail || "#d3c59d";
 
     // Recoil pulse after a shot: draw hand snaps back and string oscillates briefly.
     const recoil = Math.max(0, Math.min(1, firePulse));
-    const bowGripX = chestX + ax * 14 + px * 0.8;
-    const bowGripY = chestY + ay * 14 + py * 0.8;
-    const drawHandX = chestX + ax * (8 - recoil * 5.5) - px * 1.6;
-    const drawHandY = chestY + ay * (8 - recoil * 5.5) - py * 1.6;
+    const handTargets = getRangerHandTargets(pose, recoil, weaponMode, style);
+    const { bowGripX, bowGripY, drawHandX, drawHandY } = handTargets;
     const stringKick = Math.sin(recoil * Math.PI) * 2.6;
 
     const drawArm = (sx, sy, hx, hy, sleeve, skin, elbowBendSign) => {
@@ -161,36 +134,44 @@ export class RendererRuntimeBase {
     };
 
     if (style !== "longbow") {
-      const mainHandX = chestX + ax * (13 - recoil * 3) + px * 1.5;
-      const mainHandY = chestY + ay * (13 - recoil * 3) + py * 1.5;
-      const offHandX = chestX + ax * 7 - px * 5;
-      const offHandY = chestY + ay * 7 - py * 5;
-      drawArm(rearShoulderX, rearShoulderY, offHandX, offHandY, "#2d5132", "#e4c39c", -1);
-      drawArm(frontShoulderX, frontShoulderY, mainHandX, mainHandY, "#355f3b", "#e4c39c", 1);
+      const { mainHandX, mainHandY, offHandX, offHandY } = handTargets;
+      drawArm(rearShoulderX, rearShoulderY, offHandX, offHandY, rearSleeve, "#e4c39c", -1);
+      drawArm(frontShoulderX, frontShoulderY, mainHandX, mainHandY, frontSleeve, "#e4c39c", 1);
 
       ctx.lineCap = "round";
       if (style === "rapierPistol") {
-        ctx.strokeStyle = "#333842";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(mainHandX - ax * 1.5, mainHandY - ay * 1.5);
-        ctx.lineTo(mainHandX + ax * 9, mainHandY + ay * 9);
-        ctx.stroke();
-        ctx.strokeStyle = "#6d4a2c";
-        ctx.lineWidth = 2.4;
-        ctx.beginPath();
-        ctx.moveTo(mainHandX - px * 1.3, mainHandY - py * 1.3);
-        ctx.lineTo(mainHandX - ax * 2 - px * 4, mainHandY - ay * 2 - py * 4);
-        ctx.stroke();
-        ctx.strokeStyle = "#d9dde2";
+        ctx.strokeStyle = accent;
         ctx.lineWidth = 1.7;
         ctx.beginPath();
-        ctx.moveTo(offHandX - ax * 2, offHandY - ay * 2);
-        ctx.lineTo(offHandX + ax * 13, offHandY + ay * 13);
+        ctx.moveTo((weaponMode === "melee" ? mainHandX : offHandX) - ax * 2, (weaponMode === "melee" ? mainHandY : offHandY) - ay * 2);
+        ctx.lineTo((weaponMode === "melee" ? mainHandX : offHandX) + ax * 15, (weaponMode === "melee" ? mainHandY : offHandY) + ay * 15);
         ctx.stroke();
+        const pistolX = weaponMode === "melee" ? offHandX : mainHandX;
+        const pistolY = weaponMode === "melee" ? offHandY : mainHandY;
+        const pistolAim = weaponMode === "melee" ? 0.35 : 1;
+        ctx.strokeStyle = weaponColor;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pistolX - ax * 1.5, pistolY - ay * 1.5);
+        ctx.lineTo(pistolX + ax * 9 * pistolAim - px * (weaponMode === "melee" ? 3 : 0), pistolY + ay * 9 * pistolAim - py * (weaponMode === "melee" ? 3 : 0));
+        ctx.stroke();
+        ctx.strokeStyle = leather;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(pistolX - px * 1.3, pistolY - py * 1.3);
+        ctx.lineTo(pistolX - ax * 2 - px * 4, pistolY - ay * 2 - py * 4);
+        ctx.stroke();
+        if (recoil > 0.15) {
+          ctx.fillStyle = projectile.impact === "muzzleFlash" ? "#ffd98a" : accent;
+          ctx.beginPath();
+          ctx.arc(pistolX + ax * 10, pistolY + ay * 10, 1.8 + recoil * 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else {
-        const bladeColor = style === "twinDaggers" ? "#e4e8ef" : "#d5dde8";
-        const hiltColor = style === "twinDaggers" ? "#58422b" : "#2d3340";
+        const bladeColor = style === "twinDaggers" ? weaponColor : arrowHeadColor;
+        const hiltColor = style === "twinDaggers" ? leather : trim;
+        const knifeReload = getThrowingKnifeReloadState(player, firePulse, visualSpec);
+        const knifeMelee = getThrowingKnifeMeleePresentation(visualSpec, player);
         const drawKnife = (hx, hy, side) => {
           ctx.strokeStyle = hiltColor;
           ctx.lineWidth = 2.2;
@@ -204,9 +185,76 @@ export class RendererRuntimeBase {
           ctx.moveTo(hx, hy);
           ctx.lineTo(hx + ax * (style === "twinDaggers" ? 11 : 8), hy + ay * (style === "twinDaggers" ? 11 : 8));
           ctx.stroke();
+          if (effects.hit === "shortRedFlecks") {
+            ctx.fillStyle = "#d36a62";
+            ctx.fillRect(hx + ax * 6 + px * side * 2, hy + ay * 6 + py * side * 2, 1.5, 1.5);
+          }
         };
-        drawKnife(mainHandX, mainHandY, 1);
-        drawKnife(offHandX, offHandY, -1);
+        const drawCloseCut = (hx, hy, side, primary = false) => {
+          const cutPulse = 0.5 + Math.sin(recoil * Math.PI) * 0.5;
+          ctx.strokeStyle = hiltColor;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(hx - px * side * 2.2, hy - py * side * 2.2);
+          ctx.lineTo(hx + px * side * 2.2, hy + py * side * 2.2);
+          ctx.stroke();
+          ctx.strokeStyle = primary ? bladeColor : `${bladeColor}99`;
+          ctx.lineWidth = primary ? 2.3 : 1.35;
+          ctx.beginPath();
+          ctx.moveTo(hx - ax * 2.5 - px * side * 2.5, hy - ay * 2.5 - py * side * 2.5);
+          ctx.quadraticCurveTo(
+            hx + ax * (1.2 + cutPulse) + px * side * (primary ? 5 : 3.5),
+            hy + ay * (1.2 + cutPulse) + py * side * (primary ? 5 : 3.5),
+            hx + ax * (primary ? knifeMelee.maxForwardPixels : knifeMelee.maxForwardPixels - 1.6) + px * side * 2.2,
+            hy + ay * (primary ? knifeMelee.maxForwardPixels : knifeMelee.maxForwardPixels - 1.6) + py * side * 2.2
+          );
+          ctx.stroke();
+          ctx.strokeStyle = primary ? `${bladeColor}bb` : `${bladeColor}66`;
+          ctx.lineWidth = primary ? 1.2 : 0.9;
+          ctx.beginPath();
+          ctx.moveTo(hx - ax * 1.5 + px * side * 2, hy - ay * 1.5 + py * side * 2);
+          ctx.lineTo(hx + ax * 3.8 - px * side * 2.8, hy + ay * 3.8 - py * side * 2.8);
+          ctx.stroke();
+        };
+        const drawReleasedHand = (hx, hy, side) => {
+          ctx.fillStyle = "#e4c39c";
+          ctx.beginPath();
+          ctx.arc(hx, hy, 1.7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = `${weaponColor}${Math.round((1 - knifeReload.readyProgress) * 120)
+            .toString(16)
+            .padStart(2, "0")}`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(hx - ax * 3 + px * side * 1.5, hy - ay * 3 + py * side * 1.5);
+          ctx.lineTo(hx + ax * 3 + px * side * 2.5, hy + ay * 3 + py * side * 2.5);
+          ctx.stroke();
+        };
+        if (knifeMelee.active) {
+          drawCloseCut(mainHandX, mainHandY, 1, knifeMelee.primaryHand === 1);
+          drawCloseCut(offHandX, offHandY, -1, knifeMelee.primaryHand === -1);
+        } else if (knifeReload.released) {
+          if (knifeReload.thrownHand === -1) {
+            drawKnife(mainHandX, mainHandY, 1);
+            drawReleasedHand(offHandX, offHandY, -1);
+          } else {
+            drawReleasedHand(mainHandX, mainHandY, 1);
+            drawKnife(offHandX, offHandY, -1);
+          }
+        } else {
+          drawKnife(mainHandX, mainHandY, 1);
+          drawKnife(offHandX, offHandY, -1);
+        }
+        if (effects.capstone === "shadowDuplicate") {
+          ctx.globalAlpha = 0.45;
+          ctx.strokeStyle = "#c7a5ff";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(mainHandX - ax * 4 - px * 3, mainHandY - ay * 4 - py * 3);
+          ctx.lineTo(mainHandX + ax * 7 - px * 3, mainHandY + ay * 7 - py * 3);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
       }
 
       ctx.fillStyle = "#e4c39c";
@@ -217,15 +265,47 @@ export class RendererRuntimeBase {
       return;
     }
 
+    if (weaponMode === "melee") {
+      const { guardHandX, guardHandY, braceHandX, braceHandY } = handTargets;
+      drawArm(rearShoulderX, rearShoulderY, braceHandX, braceHandY, rearSleeve, "#e4c39c", -1);
+      drawArm(frontShoulderX, frontShoulderY, guardHandX, guardHandY, frontSleeve, "#e4c39c", 1);
+
+      ctx.lineCap = "round";
+      ctx.strokeStyle = leather;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(guardHandX - ax * 10 - px * 5, guardHandY - ay * 10 - py * 5);
+      ctx.lineTo(guardHandX + ax * 7 + px * 4, guardHandY + ay * 7 + py * 4);
+      ctx.stroke();
+      ctx.strokeStyle = weaponColor;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(guardHandX - ax * 7 - px * 4, guardHandY - ay * 7 - py * 4);
+      ctx.lineTo(guardHandX + ax * 5 + px * 3, guardHandY + ay * 5 + py * 3);
+      ctx.stroke();
+      ctx.fillStyle = "#e4c39c";
+      ctx.beginPath();
+      ctx.arc(rearShoulderX, rearShoulderY, 1.2, 0, Math.PI * 2);
+      ctx.arc(frontShoulderX, frontShoulderY, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
     // Rear arm draws string (behind bow).
-    drawArm(rearShoulderX, rearShoulderY, drawHandX, drawHandY, "#2d5132", "#e4c39c", -1);
+    drawArm(rearShoulderX, rearShoulderY, drawHandX, drawHandY, rearSleeve, "#e4c39c", -1);
 
     // Bow.
-    ctx.strokeStyle = "#6d4a2c";
+    ctx.strokeStyle = leather;
     ctx.lineWidth = 2.8;
     ctx.beginPath();
     ctx.moveTo(bowGripX + px * -8, bowGripY + py * -8);
     ctx.quadraticCurveTo(bowGripX + ax * 12, bowGripY + ay * 12, bowGripX + px * 8, bowGripY + py * 8);
+    ctx.stroke();
+    ctx.strokeStyle = weaponColor;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(bowGripX + px * -6, bowGripY + py * -6);
+    ctx.quadraticCurveTo(bowGripX + ax * 8, bowGripY + ay * 8, bowGripX + px * 6, bowGripY + py * 6);
     ctx.stroke();
 
     // Bow string bends toward draw hand and ripples briefly on shot.
@@ -241,22 +321,35 @@ export class RendererRuntimeBase {
     const arrowTailY = drawHandY - ay * 1.4;
     const arrowHeadX = bowGripX + ax * 12.5;
     const arrowHeadY = bowGripY + ay * 12.5;
-    ctx.strokeStyle = "#d3c59d";
+    ctx.strokeStyle = trailColor;
     ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(arrowTailX, arrowTailY);
     ctx.lineTo(arrowHeadX, arrowHeadY);
     ctx.stroke();
-    ctx.fillStyle = "#ecdfc1";
+    ctx.fillStyle = arrowHeadColor;
     ctx.beginPath();
     ctx.moveTo(arrowHeadX, arrowHeadY);
     ctx.lineTo(arrowHeadX - ax * 3.9 + px * 1.9, arrowHeadY - ay * 3.9 + py * 1.9);
     ctx.lineTo(arrowHeadX - ax * 3.9 - px * 1.9, arrowHeadY - ay * 3.9 - py * 1.9);
     ctx.closePath();
     ctx.fill();
+    if (effects.capstone === "stormFlash" || projectile.impact === "stormFork") {
+      ctx.strokeStyle = "#d8f4ff";
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(arrowHeadX - ax * 2, arrowHeadY - ay * 2);
+      ctx.lineTo(arrowHeadX - ax * 5 + px * 3, arrowHeadY - ay * 5 + py * 3);
+      ctx.lineTo(arrowHeadX - ax * 8 + px, arrowHeadY - ay * 8 + py);
+      ctx.stroke();
+    } else if (effects.buff === "emberBurst" && recoil > 0.1) {
+      ctx.fillStyle = "#ffbd68";
+      ctx.fillRect(arrowHeadX - ax * 4 + px * 2, arrowHeadY - ay * 4 + py * 2, 1.5, 1.5);
+      ctx.fillRect(arrowHeadX - ax * 6 - px * 1, arrowHeadY - ay * 6 - py * 1, 1.2, 1.2);
+    }
 
     // Front arm holds bow (drawn on top).
-    drawArm(frontShoulderX, frontShoulderY, bowGripX, bowGripY, "#355f3b", "#e4c39c", 1);
+    drawArm(frontShoulderX, frontShoulderY, bowGripX, bowGripY, frontSleeve, "#e4c39c", 1);
 
     // Shoulder joints.
     ctx.fillStyle = "#e4c39c";

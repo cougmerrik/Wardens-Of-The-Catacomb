@@ -74,7 +74,6 @@ export function drawEnemyStatusBadge(type, x, y) {
 export function drawEnemyAdditionalStatusIcons(enemy, screenX, screenY) {
   const statuses = [];
   if ((enemy.rangerMarkedTimer || 0) > 0) statuses.push("mark");
-  if ((enemy.slowTimer || 0) > 0) statuses.push("slow");
   if ((enemy.weakenedTimer || 0) > 0) statuses.push("weakened");
   if ((enemy.tempMageCharmTimer || 0) > 0) statuses.push("charm");
   if (statuses.length === 0) return;
@@ -85,7 +84,8 @@ export function drawEnemyAdditionalStatusIcons(enemy, screenX, screenY) {
   if ((enemy.bleedTimer || 0) > 0) reserved.push(-20);
   if ((enemy.poisonSlowTimer || 0) > 0) reserved.push(20);
   const candidates = [-30, -20, 20, 30, -40, 40, -50, 50];
-  const y = Math.floor(screenY + enemy.size * 0.42);
+  const hasHealthBar = (enemy.hpBarTimer || 0) > 0 && Number.isFinite(enemy.maxHp) && enemy.maxHp > 0;
+  const y = Math.floor(screenY - enemy.size * 0.85 - (hasHealthBar ? 24 : 12));
   statuses.forEach((status, index) => {
     const offset = candidates.find((candidate) => !reserved.includes(candidate)) ?? (20 + index * 10);
     reserved.push(offset);

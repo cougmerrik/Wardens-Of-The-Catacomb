@@ -6,17 +6,78 @@ import { hasWarriorSpellknight } from "./warriorTalentTree.js";
 import { hasRangerTalent } from "./rangerTalentTree.js";
 import { spawnGhost, spawnSkeleton } from "./enemySpawnFactories.js";
 
+function pulseMageFrozenOrb(game, orb, dt) {
+  if (!game || !orb || orb.projectileType !== "mage_frozenOrb" || orb.life <= 0) return;
+  const interval = Math.max(0.08, Number.isFinite(orb.frostPulseInterval) ? orb.frostPulseInterval : 0.18);
+  orb.frostPulseTimer = (Number.isFinite(orb.frostPulseTimer) ? orb.frostPulseTimer : interval) - dt;
+  if (orb.frostPulseTimer > 0) return;
+  orb.frostPulseTimer += interval;
+  const baseAngle = Number.isFinite(orb.angle) ? orb.angle : Math.atan2(orb.vy || 0, orb.vx || 1);
+  const speed = 205;
+  const shardDamage = Math.max(0.5, Number.isFinite(orb.frostPulseShardDamage) ? orb.frostPulseShardDamage : (orb.damage || 1) * 0.42);
+  const offsets = [-Math.PI * 0.5, -Math.PI * 0.18, Math.PI * 0.18, Math.PI * 0.5];
+  for (const offset of offsets) {
+    const angle = baseAngle + offset;
+    game.bullets.push({
+      x: orb.x,
+      y: orb.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      angle,
+      life: 0.32,
+      size: 3.6,
+      damage: shardDamage,
+      projectileType: "mage_frozenOrbShard",
+      damageType: "cold",
+      ownerId: orb.ownerId || null,
+      slowDuration: 2.2,
+      knockback: 0,
+      mageCantrip: orb.mageCantrip || "frozenOrbCantrip",
+      frozenOrbPulseShard: true,
+      hitTargets: new Set()
+    });
+  }
+}
+
 export function resolveCombatAndDrops({
   game,
   dt,
   activeEnemies,
   activeBreakables,
   playerEnemyRadius,
+  enemyBlocksPlayerBody,
   isActive,
   segmentRectHit,
   skeletonIgnoresArrow
 }) {
   const getLivingPlayers = () => (typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player]);
+  const preserveDeathRemnant = (enemy) => {
+    if (!enemy) return false;
+    enemy.hp = 0;
+    enemy.vx = 0;
+    enemy.vy = 0;
+    enemy.siphoning = false;
+    enemy.deathProcessed = true;
+    enemy.slowTimer = 0;
+    enemy.slowPct = 0;
+    const corpseDuration = enemy.isBoss || enemy.isFloorBoss ? 18 : 12;
+    enemy.corpseTimer = Math.max(Number.isFinite(enemy.corpseTimer) ? enemy.corpseTimer : 0, corpseDuration);
+    return true;
+  };
+  const blocksPlayerBody = typeof enemyBlocksPlayerBody === "function"
+    ? enemyBlocksPlayerBody
+    : (enemy) => {
+        if (!enemy) return false;
+        if (Number.isFinite(enemy.hp) && enemy.hp <= 0) return false;
+        if (enemy.type === "skeleton_warrior" && enemy.collapsed) return false;
+        return true;
+      };
+  const isDamageableEnemyTarget = (enemy) => {
+    if (!enemy) return false;
+    if (Number.isFinite(enemy.hp) && enemy.hp <= 0) return false;
+    if (enemy.type === "skeleton_warrior" && enemy.collapsed) return false;
+    return true;
+  };
   const damagePlayer = (player, amount, type = "physical", source = null) => {
     if (!player || amount <= 0) return;
     const resolved = typeof game.getDamageTakenForPlayerEntity === "function" ? game.getDamageTakenForPlayerEntity(player, amount, type, source) : amount;
@@ -117,6 +178,7 @@ export function resolveCombatAndDrops({
     b.prevXForHit = prevX;
     b.prevYForHit = prevY;
     b.life -= dt;
+    pulseMageFrozenOrb(game, b, dt);
     if (b.projectileType === "deathBolt" && Number.isFinite(b.detonateX) && Number.isFinite(b.detonateY)) {
       const remaining = vecLength((b.detonateX || 0) - b.x, (b.detonateY || 0) - b.y);
       const stepDistance = vecLength(b.x - prevX, b.y - prevY);
@@ -215,8 +277,8 @@ export function resolveCombatAndDrops({
     if (!b.hitTargets) b.hitTargets = new Set();
     if (b.faction === "enemy") {
       for (const enemy of activeEnemies) {
+        if (!isDamageableEnemyTarget(enemy)) continue;
         if (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)) continue;
-        if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
         if (vecLength(b.x - enemy.x, b.y - enemy.y) < (enemy.size + b.size) * 0.5) {
           const rawDamage = Number.isFinite(b.damage) ? b.damage : game.config.enemy.necromancerProjectileDamage || 16;
           game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), b.damageType || "necrotic", b.ownerId || null);
@@ -255,8 +317,8 @@ export function resolveCombatAndDrops({
     }
     if (b.life <= 0) continue;
     for (const enemy of activeEnemies) {
+      if (!isDamageableEnemyTarget(enemy)) continue;
       if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
-      if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (b.hitTargets.has(enemy)) continue;
       const projectileHitRadius = (enemy.size + b.size) * 0.5;
       const hitPrevX = Number.isFinite(b.prevXForHit) ? b.prevXForHit : b.x;
@@ -412,31 +474,6 @@ export function resolveCombatAndDrops({
             projectileOwnerContext.applyMageOnHitEffects(enemy, { status: b.wildInfusion || b.damageType || "", runesConsumed: b.runesConsumed || 0 });
           }
         }
-        if (b.projectileType === "mage_frostShard" && !b.frostShardSplinter) {
-          const baseAngle = Number.isFinite(b.angle) ? b.angle : Math.atan2(b.vy || 0, b.vx || 1);
-          const speed = vecLength(b.vx || 0, b.vy || 0) || 250;
-          for (const offset of [-0.5, 0.5]) {
-            const angle = baseAngle + offset;
-            game.bullets.push({
-              x: b.x,
-              y: b.y,
-              vx: Math.cos(angle) * speed,
-              vy: Math.sin(angle) * speed,
-              angle,
-              life: 0.55,
-              size: Math.max(4, (b.size || 7) * 0.82),
-              damage: Math.max(1, projectileDamage * 0.45),
-              projectileType: "mage_frostShard",
-              damageType: "cold",
-              ownerId: b.ownerId || null,
-              slowDuration: Math.max(2, (b.slowDuration || 5) * 0.6),
-              knockback: Math.max(8, (b.knockback || 24) * 0.55),
-              mageCantrip: b.mageCantrip || "frostShardCantrip",
-              frostShardSplinter: true,
-              hitTargets: new Set([enemy])
-            });
-          }
-        }
         if (b.projectileType !== "holyWave" && typeof projectileOwnerContext.applyRangerOnHitEffects === "function") projectileOwnerContext.applyRangerOnHitEffects(enemy, b.x, b.y);
         if (Number.isFinite(b.knockback) && b.knockback > 0) {
           const len = vecLength((enemy.x || 0) - (b.x || 0), (enemy.y || 0) - (b.y || 0)) || 1;
@@ -477,8 +514,8 @@ export function resolveCombatAndDrops({
       continue;
     }
     for (const enemy of activeEnemies) {
+      if (!isDamageableEnemyTarget(enemy)) continue;
       if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
-      if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (vecLength(arrow.x - enemy.x, arrow.y - enemy.y) < (enemy.size + arrow.size) * 0.5) {
         if (skeletonIgnoresArrow(enemy)) continue;
         hit = true;
@@ -537,6 +574,7 @@ export function resolveCombatAndDrops({
   const pendingRaisedEnemies = [];
   game.enemies = game.enemies.filter((enemy) => {
     if (enemy.type === "skeleton_warrior" && enemy.collapsed && ((enemy.collapseTimer > 0) || (enemy.reanimateTimer > 0))) return true;
+    if (enemy.deathProcessed && enemy.hp <= 0) return (enemy.corpseTimer || 0) > 0;
     if (enemy.hp <= 0) {
       if (enemy.skipRewardsOnDeath) return false;
       const isFinalGolemBossDeath = enemy.type === "golem" &&
@@ -759,6 +797,7 @@ export function resolveCombatAndDrops({
           game.spawnFloatingText(enemy.x, enemy.y - 62, "Portal Open", "#90f0ff", 1.5, 18);
         }
       } else game.maybeSpawnDrop(enemy.x, enemy.y);
+      if (preserveDeathRemnant(enemy)) return true;
       return false;
     }
     return true;
@@ -820,7 +859,7 @@ export function resolveCombatAndDrops({
     for (const enemy of activeEnemies) {
       if (game.isEnemyFriendlyToPlayer && game.isEnemyFriendlyToPlayer(enemy)) continue;
       if (enemy.type === "leprechaun" && enemy.phase !== "enraged") continue;
-      if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
+      if (!blocksPlayerBody(enemy)) continue;
       if (vecLength(player.x - enemy.x, player.y - enemy.y) > enemy.size * 0.5 + playerRadius) continue;
       player.hitCooldown = 1.0;
       const rawDamage = game.rollEnemyContactDamage(enemy);

@@ -20,7 +20,7 @@ const MAGE_TIER_LABELS = {
 
 const MAGE_TALENT_DEFS = [
   { key: "fireBoltCantrip", label: "Fire Bolt", tier: 1, group: "cantrip", maxRanks: 1, icon: "FB", color: "#ff9b62", description: ["Fast medium projectile.", "Applies Burning for 3 seconds."] },
-  { key: "frostShardCantrip", label: "Frost Shard", tier: 1, group: "cantrip", maxRanks: 1, icon: "FS", color: "#9edcff", description: ["Slow projectile with slightly higher damage.", "Applies Slow for 5 seconds and slight knockback."] },
+  { key: "frozenOrbCantrip", label: "Frozen Orb", tier: 1, group: "cantrip", maxRanks: 1, icon: "FO", color: "#9edcff", description: ["Slow cold orb with lower direct damage.", "Pulses smaller shards that Chill enemies."] },
   { key: "shockCantrip", label: "Shock", tier: 1, group: "cantrip", maxRanks: 1, icon: "SH", color: "#f5e779", description: ["Very fast low-damage projectile.", "Chains to up to 2 nearby enemies."] },
   { key: "arcaneMissileCantrip", label: "Arcane Missile", tier: 1, group: "cantrip", maxRanks: 1, icon: "AM", color: "#c6a8ff", description: ["Homing missile toward the nearest enemy in your aim direction.", "Reliable low damage at up to 8 tiles."] },
   { key: "necroticBeamCantrip", label: "Necrotic Beam", tier: 1, group: "cantrip", maxRanks: 1, icon: "NB", color: "#9b85d8", description: ["Channel a necrotic beam.", "Temporarily charms undead, or permanently charms them as Necromancer."] },

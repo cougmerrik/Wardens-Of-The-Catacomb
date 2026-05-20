@@ -1,38 +1,32 @@
-import { getRangerSelectedPath, getRangerSelectedWeapon } from "../game/rangerTalentTree.js";
-import { getMageSelectedPath } from "../game/necromancerTalentTree.js";
-import { getWarriorDoctrine, getWarriorWeaponForm, hasWarriorEldritchInvestment, isWarriorRaging } from "../game/warriorTalentTree.js";
+import { isWarriorRaging } from "../game/warriorTalentTree.js";
+import { getMageDirectionIndexFromVector } from "./mageSpriteSheet.js";
+import { getMagePathPresentation, getMageVisualSpec } from "./mageVisualPresentation.js";
+import { getRangerVisualSpec } from "./rangerVisualPresentation.js";
+import { drawRangerStatusEffects } from "./rangerStatusEffects.js";
+import {
+  getWarriorPathPresentation,
+  getWarriorVisualSpec
+} from "./warriorVisualPresentation.js";
+import { drawWarriorBattleCryAura } from "./warriorBattleCryAura.js";
 
 import { rendererEffectsFighterRigMethods } from "./rendererEffectsFighterRigMethods.js";
+import { rendererEffectsMageStaffMethods } from "./rendererEffectsMageStaffMethods.js";
+
+function isWarriorEntity(entity) {
+  return entity?.classType === "fighter" || entity?.classType === "warrior";
+}
 
 export const rendererEffectsPlayerMethods = {
-  getRangerPathPresentation(entityOrGame) {
-    const path = getRangerSelectedPath(entityOrGame);
-    if (path === "roguePath") return { tint: "#8e9297", alpha: 0.58, filter: "saturate(0.75) brightness(0.95)" };
-    if (path === "assassinPath") return { tint: "#101116", alpha: 0.62, filter: "brightness(0.72) contrast(1.15)" };
-    if (path === "beastMasterPath") return { tint: "#c7a16a", alpha: 0.48, filter: "sepia(0.22) saturate(1.08)" };
-    if (path === "rangerPath") return { tint: "#4fae5f", alpha: 0.48, filter: "saturate(1.1) brightness(1.02)" };
-    return { tint: null, alpha: 0, filter: "none" };
-  },
-
-  getRangerWeaponPresentation(entityOrGame) {
-    return getRangerSelectedWeapon(entityOrGame) || "longbow";
-  },
-
-  getWarriorDoctrinePresentation(entityOrGame) {
-    const doctrine = getWarriorDoctrine(entityOrGame);
-    if (doctrine === "eldritch") return { tint: "#9d7bff", alpha: 0.72, filter: "brightness(1.08) saturate(1.2)" };
-    if (doctrine === "paladin") return { tint: "#f5cf6f", alpha: 0.78, filter: "brightness(1.08) saturate(1.15)" };
-    if (doctrine === "gladiator") return { tint: "#d6b487", alpha: 0.62, filter: "brightness(1.06) saturate(1.08)" };
-    return { tint: "#ff2a2a", alpha: 0.5, filter: "none" };
+  getRangerVisualSpec(entityOrGame) {
+    return getRangerVisualSpec(entityOrGame);
   },
 
   getMagePathPresentation(entityOrGame) {
-    const path = getMageSelectedPath(entityOrGame);
-    if (path === "wizardPath") return { tint: "#2f7dff", alpha: 0.52, filter: "saturate(1.12) brightness(1.04)", staff: "#f3f6ff", arm: "#6f93c9", orb: "#dfeaff" };
-    if (path === "enchanterPath") return { tint: "#3faf63", alpha: 0.5, filter: "saturate(1.1) brightness(1.02)", staff: "#d8b84f", arm: "#79a06f", orb: "#f2d872" };
-    if (path === "sorcererPath") return { tint: "#c83a30", alpha: 0.54, filter: "saturate(1.18) brightness(1.02)", staff: "#f3f6ff", arm: "#b56b62", orb: "#ffb1a8" };
-    if (path === "necromancerPath") return { tint: "#8d9299", alpha: 0.54, filter: "saturate(0.7) brightness(0.92)", staff: "#111317", arm: "#6f737b", orb: "#363a42" };
-    return { tint: "#a6a8ad", alpha: 0.42, filter: "none", staff: "#7a5130", arm: "#6f737b", orb: "#8b5a34" };
+    return getMagePathPresentation(entityOrGame);
+  },
+
+  getMageVisualSpec(entityOrGame) {
+    return getMageVisualSpec(entityOrGame);
   },
 
   getPlayerTempHp(entity) {
@@ -45,6 +39,7 @@ export const rendererEffectsPlayerMethods = {
 
   getReplicatedPlayerClassSpec(player) {
     const classType = player?.classType;
+    if (classType === "warrior") return this.config.classes.fighter;
     return this.config.classes[classType] || this.config.classes.archer;
   },
 
@@ -81,14 +76,21 @@ export const rendererEffectsPlayerMethods = {
       return { movingVisual, walkPhase: movingVisual ? player._renderAnimPhase * 0.1 : 0, skipRig: true };
     }
     const frameX = animFrame * frameSize;
-    const frameY = (Number.isFinite(player.facing) ? player.facing : 0) * frameSize;
+    const mageSpec = player?.classType === "necromancer" ? this.getMageVisualSpec(player) : null;
+    const frameY = (mageSpec ? getMageDirectionIndexFromVector(player.dirX || 1, player.dirY || 0) : (Number.isFinite(player.facing) ? player.facing : 0)) * frameSize;
     const drawX = screenX - renderSize / 2;
-    const drawY = screenY - renderSize * 0.56;
+    const rangerSpec = player?.classType === "archer" ? this.getRangerVisualSpec(player) : null;
+    const warriorSpec = isWarriorEntity(player) ? getWarriorVisualSpec(player) : null;
+    const drawY = screenY - renderSize * (warriorSpec ? 0.75 : 0.56);
     const shadowVeilActive = (player?.rangerRuntime?.shadowVeilTimer || 0) > 0;
     const warriorRaging = isWarriorRaging(player);
-    const doctrineVisual = this.getWarriorDoctrinePresentation(player);
-    const rangerVisual = player?.classType === "archer" ? this.getRangerPathPresentation(player) : null;
+    const doctrineVisual = getWarriorPathPresentation(player);
+    const rangerVisual = rangerSpec?.pathPresentation || null;
+    const warriorVisual = warriorSpec?.pathPresentation || null;
     const mageVisual = player?.classType === "necromancer" ? this.getMagePathPresentation(player) : null;
+    if (warriorSpec) drawWarriorBattleCryAura(this.ctx, player, screenX, screenY, this.config, player.animTime || 0);
+    const firePulse = player.classType === "necromancer" ? this.getReplicatedPlayerFirePulse(player) : 0;
+    if (mageSpec) this.drawPlayerMageStaffRig(player, screenX, screenY, firePulse, "under");
     this.drawPlayerSpriteFrame(
       frameX,
       frameY,
@@ -96,30 +98,31 @@ export const rendererEffectsPlayerMethods = {
       drawX,
       drawY,
       renderSize,
-      warriorRaging ? doctrineVisual.tint : rangerVisual?.tint || mageVisual?.tint || null,
-      warriorRaging ? doctrineVisual.alpha : rangerVisual?.alpha || mageVisual?.alpha || 0,
-      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (warriorRaging ? doctrineVisual.filter : rangerVisual?.filter || mageVisual?.filter || "none")
+      warriorRaging ? doctrineVisual.tint : warriorVisual?.tint || rangerVisual?.tint || mageVisual?.tint || null,
+      warriorRaging ? doctrineVisual.alpha : warriorVisual?.alpha || rangerVisual?.alpha || mageVisual?.alpha || 0,
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (warriorRaging ? doctrineVisual.filter : warriorVisual?.filter || rangerVisual?.filter || mageVisual?.filter || "none"),
+      warriorSpec ? this.getPlayerSpriteSheet(warriorSpec) : rangerSpec ? this.getPlayerSpriteSheet(rangerSpec) : mageSpec ? this.getPlayerSpriteSheet(mageSpec) : null
     );
+    if (mageSpec) this.drawPlayerMageStaffRig(player, screenX, screenY, firePulse, "over");
+    if (rangerSpec) drawRangerStatusEffects(this.ctx, player, screenX, screenY, 0);
     return { movingVisual, walkPhase: movingVisual ? player._renderAnimPhase * 0.1 : 0 };
   },
 
   drawReplicatedPlayerRig(player, classSpec, screenX, screenY, walkPhase = 0) {
     const usesRanged = !!classSpec?.usesRanged;
-    const doctrine = getWarriorDoctrine(player);
-    const doctrineVisual = this.getWarriorDoctrinePresentation(player);
+    const doctrineVisual = getWarriorPathPresentation(player);
     const firePulse = this.getReplicatedPlayerFirePulse(player);
     if (player.classType === "necromancer") {
-      this.drawPlayerNecromancerRig(player, screenX, screenY, walkPhase, firePulse);
       return;
     }
     if (!usesRanged) {
       if ((player?.warriorRageActiveTimer || 0) > 0) this.ctx.save();
       if ((player?.warriorRageActiveTimer || 0) > 0) this.ctx.filter = doctrineVisual.filter;
-      this.drawPlayerFighterRig(player, screenX, screenY, walkPhase, firePulse);
+      this.drawPlayerFighterRig(player, screenX, screenY, walkPhase, firePulse, getWarriorVisualSpec(player));
       if ((player?.warriorRageActiveTimer || 0) > 0) this.ctx.restore();
       return;
     }
-    this.drawPlayerAimingRig(player, screenX, screenY, walkPhase, firePulse, this.getRangerWeaponPresentation(player));
+    this.drawPlayerAimingRig(player, screenX, screenY, walkPhase, firePulse, this.getRangerVisualSpec(player));
   },
 
   drawRemotePlayerHandle(player, screenX, screenY) {
@@ -187,11 +190,14 @@ export const rendererEffectsPlayerMethods = {
     }
     const animFrame = movingVisual ? Math.floor(p._renderAnimPhase) % this.config.player.spriteFramesPerDir : 0;
     const frameX = animFrame * frameSize;
-    const frameY = p.facing * frameSize;
+    const mageVisualSpec = game.isNecromancerClass && game.isNecromancerClass() ? this.getMageVisualSpec(game) : null;
+    const frameY = (mageVisualSpec ? getMageDirectionIndexFromVector(p.dirX || 1, p.dirY || 0) : p.facing) * frameSize;
     const drawX = playerScreenX - renderSize / 2;
-    const drawY = playerScreenY - renderSize * 0.56;
+    const isWarriorPlayer = !game.classSpec?.usesRanged;
+    const drawY = playerScreenY - renderSize * (isWarriorPlayer ? 0.75 : 0.56);
     const shadowVeilActive = (game.rangerRuntime?.shadowVeilTimer || 0) > 0;
-    const archerPathVisual = game.isArcherClass && game.isArcherClass() ? this.getRangerPathPresentation(game) : null;
+    const archerVisualSpec = game.isArcherClass && game.isArcherClass() ? this.getRangerVisualSpec(game) : null;
+    const archerPathVisual = archerVisualSpec?.pathPresentation || null;
     let tintColor = null;
     let tintAlpha = 0;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
@@ -201,16 +207,25 @@ export const rendererEffectsPlayerMethods = {
     } else if (archerPathVisual) {
       tintColor = archerPathVisual.tint;
       tintAlpha = archerPathVisual.alpha;
-    } else if (!game.classSpec?.usesRanged) {
-      const doctrineVisual = this.getWarriorDoctrinePresentation(game);
+    } else if (isWarriorPlayer) {
+      const doctrineVisual = getWarriorPathPresentation(game);
+      const warriorVisualSpec = getWarriorVisualSpec(game);
+      const warriorPathVisual = warriorVisualSpec.pathPresentation;
       if (isWarriorRaging(game)) {
         tintColor = doctrineVisual.tint;
         tintAlpha = doctrineVisual.alpha;
       } else if ((game.warriorRageCooldownTimer || 0) > 0 && game.isWarriorRageUnlocked && game.isWarriorRageUnlocked()) {
         tintColor = doctrineVisual.tint === "#d6b487" ? "#e6d2b5" : doctrineVisual.tint === "#9d7bff" ? "#c0b1ff" : doctrineVisual.tint === "#f5cf6f" ? "#f2dfad" : "#ff9b9b";
         tintAlpha = 0.32;
+      } else {
+        tintColor = warriorPathVisual.tint;
+        tintAlpha = warriorPathVisual.alpha;
       }
     }
+    if (isWarriorPlayer) drawWarriorBattleCryAura(this.ctx, game, playerScreenX, playerScreenY, this.config, game.time || 0);
+    const baseCd = game.getPlayerFireCooldown ? game.getPlayerFireCooldown() : this.config.player.baseFireCooldown;
+    const firePulse = baseCd > 0 ? Math.max(0, Math.min(1, p.fireCooldown / baseCd)) : 0;
+    if (mageVisualSpec) this.drawPlayerMageStaffRig(p, playerScreenX, playerScreenY, firePulse, "under");
     this.drawPlayerSpriteFrame(
       frameX,
       frameY,
@@ -220,35 +235,40 @@ export const rendererEffectsPlayerMethods = {
       renderSize,
       tintColor,
       tintAlpha,
-      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (!game.classSpec?.usesRanged && isWarriorRaging(game) ? this.getWarriorDoctrinePresentation(game).filter : archerPathVisual?.filter || (game.isNecromancerClass && game.isNecromancerClass() ? this.getMagePathPresentation(game).filter : "none"))
+      shadowVeilActive ? "saturate(45%) brightness(0.9) opacity(0.68)" : (isWarriorPlayer ? getWarriorPathPresentation(game).filter : archerPathVisual?.filter || (game.isNecromancerClass && game.isNecromancerClass() ? this.getMagePathPresentation(game).filter : "none")),
+      isWarriorPlayer ? this.getPlayerSpriteSheet(getWarriorVisualSpec(game)) : archerVisualSpec ? this.getPlayerSpriteSheet(archerVisualSpec) : mageVisualSpec ? this.getPlayerSpriteSheet(mageVisualSpec) : null
     );
-    const baseCd = game.getPlayerFireCooldown ? game.getPlayerFireCooldown() : this.config.player.baseFireCooldown;
-    const firePulse = baseCd > 0 ? Math.max(0, Math.min(1, p.fireCooldown / baseCd)) : 0;
+    if (mageVisualSpec) this.drawPlayerMageStaffRig(p, playerScreenX, playerScreenY, firePulse, "over");
+    if (archerVisualSpec) drawRangerStatusEffects(this.ctx, game, playerScreenX, playerScreenY, game.time || 0);
     const walkPhase = movingVisual ? p._renderAnimPhase * 0.1 : 0;
     const magePathVisual = game.isNecromancerClass && game.isNecromancerClass() ? this.getMagePathPresentation(game) : null;
+    const warriorPathVisual = isWarriorPlayer ? getWarriorPathPresentation(game) : null;
     const hasArcherPathFilter = !!archerPathVisual?.filter && archerPathVisual.filter !== "none";
     const hasMagePathFilter = !!magePathVisual?.filter && magePathVisual.filter !== "none";
-    if (shadowVeilActive || hasArcherPathFilter || hasMagePathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.save();
+    const hasWarriorPathFilter = !!warriorPathVisual?.filter && warriorPathVisual.filter !== "none";
+    if (shadowVeilActive || hasArcherPathFilter || hasMagePathFilter || hasWarriorPathFilter) this.ctx.save();
     if (shadowVeilActive) this.ctx.filter = "saturate(45%) brightness(0.9) opacity(0.68)";
     else if (hasArcherPathFilter) this.ctx.filter = archerPathVisual.filter;
     else if (hasMagePathFilter) this.ctx.filter = magePathVisual.filter;
-    else if (!game.classSpec?.usesRanged && isWarriorRaging(game)) this.ctx.filter = this.getWarriorDoctrinePresentation(game).filter;
+    else if (hasWarriorPathFilter) this.ctx.filter = warriorPathVisual.filter;
     if (game.isNecromancerClass && game.isNecromancerClass()) {
-      this.drawPlayerNecromancerRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
+      if (shadowVeilActive || hasArcherPathFilter || hasMagePathFilter || hasWarriorPathFilter) this.ctx.restore();
+      return;
     } else if (game.classSpec && !game.classSpec.usesRanged) {
-      this.drawPlayerFighterRig(p, playerScreenX, playerScreenY, walkPhase, firePulse);
+      this.drawPlayerFighterRig(p, playerScreenX, playerScreenY, walkPhase, firePulse, getWarriorVisualSpec(game));
     } else {
-      this.drawPlayerAimingRig(p, playerScreenX, playerScreenY, walkPhase, firePulse, this.getRangerWeaponPresentation(game));
+      this.drawPlayerAimingRig(p, playerScreenX, playerScreenY, walkPhase, firePulse, this.getRangerVisualSpec(game));
     }
-    if (shadowVeilActive || hasArcherPathFilter || hasMagePathFilter || (!game.classSpec?.usesRanged && isWarriorRaging(game))) this.ctx.restore();
+    if (shadowVeilActive || hasArcherPathFilter || hasMagePathFilter || hasWarriorPathFilter) this.ctx.restore();
   },
 
-  drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor = null, tintAlpha = 0, filter = "none") {
+  drawPlayerSpriteFrame(frameX, frameY, frameSize, drawX, drawY, renderSize, tintColor = null, tintAlpha = 0, filter = "none", spriteSheet = null) {
     const ctx = this.ctx;
+    const sourceSheet = spriteSheet || this.playerSpriteSheet;
     if (!tintColor || tintAlpha <= 0) {
       ctx.save();
       ctx.filter = filter || "none";
-      ctx.drawImage(this.playerSpriteSheet, frameX, frameY, frameSize, frameSize, drawX, drawY, renderSize, renderSize);
+      ctx.drawImage(sourceSheet, frameX, frameY, frameSize, frameSize, drawX, drawY, renderSize, renderSize);
       ctx.restore();
       return;
     }
@@ -259,7 +279,7 @@ export const rendererEffectsPlayerMethods = {
     }
     const cctx = cache.getContext("2d");
     cctx.clearRect(0, 0, frameSize, frameSize);
-    cctx.drawImage(this.playerSpriteSheet, frameX, frameY, frameSize, frameSize, 0, 0, frameSize, frameSize);
+    cctx.drawImage(sourceSheet, frameX, frameY, frameSize, frameSize, 0, 0, frameSize, frameSize);
     cctx.globalCompositeOperation = "source-atop";
     cctx.fillStyle = tintColor;
     cctx.globalAlpha = Math.max(0, Math.min(1, tintAlpha));
@@ -275,51 +295,7 @@ export const rendererEffectsPlayerMethods = {
 
   ...rendererEffectsFighterRigMethods,
 
-  drawPlayerNecromancerRig(player, screenX, screenY, walkPhase = 0, firePulse = 0) {
-    const ctx = this.ctx;
-    const aimAngle = Math.atan2(player.dirY || 0, player.dirX || 1);
-    const ax = Math.cos(aimAngle);
-    const ay = Math.sin(aimAngle);
-    const px = -ay;
-    const py = ax;
-    const chestX = screenX;
-    const chestY = screenY - 8 + Math.sin(walkPhase * Math.PI * 2) * 0.75;
-    const recoil = Math.max(0, Math.min(1, firePulse));
-    const rearHandX = chestX + ax * (5 - recoil * 2) - px * 2;
-    const rearHandY = chestY + ay * (5 - recoil * 2) - py * 2;
-    const frontHandX = chestX + ax * 10 + px * 1.5;
-    const frontHandY = chestY + ay * 10 + py * 1.5;
-    const staffBaseX = chestX - ax * 10;
-    const staffBaseY = chestY - ay * 10;
-    const staffTipX = chestX + ax * 20;
-    const staffTipY = chestY + ay * 20;
-
-    const runtime = player?.necromancerRuntime || {};
-    const wildBlue = (runtime.blueTimer || 0) > 0;
-    const mimic = (runtime.mimicTimer || 0) > 0;
-    const mageVisual = this.getMagePathPresentation(player);
-    ctx.strokeStyle = mimic ? "#8b5a34" : wildBlue ? "#38a7ff" : mageVisual.arm;
-    ctx.lineWidth = 3.8;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(chestX - px * 3.6, chestY - py * 3.6);
-    ctx.lineTo(rearHandX, rearHandY);
-    ctx.moveTo(chestX + px * 3.6, chestY + py * 3.6);
-    ctx.lineTo(frontHandX, frontHandY);
-    ctx.stroke();
-
-    ctx.strokeStyle = mimic ? "#3b2114" : mageVisual.staff;
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.moveTo(staffBaseX, staffBaseY);
-    ctx.lineTo(staffTipX, staffTipY);
-    ctx.stroke();
-
-    ctx.fillStyle = mimic ? "#c28a55" : wildBlue ? "#72d7ff" : mageVisual.orb;
-    ctx.beginPath();
-    ctx.arc(staffTipX, staffTipY, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-  },
+  ...rendererEffectsMageStaffMethods,
 
   drawPlayerHealthBar(game, cameraX, cameraY) {
     const p = game.player;
@@ -330,9 +306,9 @@ export const rendererEffectsPlayerMethods = {
     const ratio = p.maxHealth > 0 ? Math.max(0, Math.min(1, p.health / p.maxHealth)) : 0;
     const tempHp = this.getPlayerTempHp(p);
     const tempRatio = p.maxHealth > 0 ? Math.max(0, Math.min(0.2, tempHp / p.maxHealth)) : 0;
-    const width = 52;
-    const totalWidth = Math.round(width * 1.2);
-    const height = 6;
+    const width = 29;
+    const totalWidth = tempRatio > 0 ? Math.round(width * (1 + tempRatio)) : width;
+    const height = 4;
     const x = Math.floor(p.x - cameraX - totalWidth / 2);
     const y = Math.floor(p.y - cameraY - 36);
 
@@ -340,8 +316,10 @@ export const rendererEffectsPlayerMethods = {
     ctx.fillRect(x - 1, y - 1, totalWidth + 2, height + 2);
     ctx.fillStyle = "#2f3a4e";
     ctx.fillRect(x, y, totalWidth, height);
-    ctx.fillStyle = "rgba(85, 122, 163, 0.3)";
-    ctx.fillRect(x + width, y, totalWidth - width, height);
+    if (tempRatio > 0) {
+      ctx.fillStyle = "rgba(85, 122, 163, 0.3)";
+      ctx.fillRect(x + width, y, totalWidth - width, height);
+    }
     ctx.fillStyle = ratio > 0.5 ? "#76db8d" : ratio > 0.25 ? "#e1bf63" : "#df6767";
     ctx.fillRect(x, y, width * ratio, height);
     if (tempRatio > 0) {
@@ -355,11 +333,13 @@ export const rendererEffectsPlayerMethods = {
     ctx.strokeStyle = "rgba(175, 193, 222, 0.45)";
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, totalWidth - 1, height - 1);
-    ctx.strokeStyle = "rgba(114, 137, 171, 0.55)";
-    ctx.beginPath();
-    ctx.moveTo(x + width + 0.5, y + 0.5);
-    ctx.lineTo(x + width + 0.5, y + height - 0.5);
-    ctx.stroke();
+    if (tempRatio > 0) {
+      ctx.strokeStyle = "rgba(114, 137, 171, 0.55)";
+      ctx.beginPath();
+      ctx.moveTo(x + width + 0.5, y + 0.5);
+      ctx.lineTo(x + width + 0.5, y + height - 0.5);
+      ctx.stroke();
+    }
   },
 
   drawFloatingTexts(game, cameraX, cameraY) {

@@ -70,6 +70,12 @@ export function resolveSpecialProjectileCollision({
   skeletonIgnoresArrow
 }) {
   if (!projectile || projectile.life <= 0) return false;
+  const isDamageableEnemyTarget = (enemy) => {
+    if (!enemy) return false;
+    if (Number.isFinite(enemy.hp) && enemy.hp <= 0) return false;
+    if (enemy.type === "skeleton_warrior" && enemy.collapsed) return false;
+    return true;
+  };
   const tryReflect = (player) => {
     if (typeof game.getWarriorMissileProtectorForPlayerEntity !== "function") return false;
     const protector = game.getWarriorMissileProtectorForPlayerEntity(player);
@@ -78,8 +84,8 @@ export function resolveSpecialProjectileCollision({
   };
   if (projectile.projectileType === "ratArrow") {
     for (const enemy of activeEnemies) {
+      if (!isDamageableEnemyTarget(enemy)) continue;
       if (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)) continue;
-      if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
       if (vecLength(projectile.x - enemy.x, projectile.y - enemy.y) > (enemy.size + projectile.size) * 0.5) continue;
       const rawDamage = game.rollEnemyContactDamage({ damageMin: projectile.damageMin, damageMax: projectile.damageMax });
       game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), "arrow", projectile.ownerId || null);
@@ -107,6 +113,7 @@ export function resolveSpecialProjectileCollision({
     }
     if (!hit) {
       for (const enemy of activeEnemies) {
+        if (!isDamageableEnemyTarget(enemy)) continue;
         if (vecLength(projectile.x - enemy.x, projectile.y - enemy.y) >= (enemy.size + projectile.size) * 0.5) continue;
         hit = true;
         break;
@@ -137,7 +144,7 @@ export function resolveSpecialProjectileCollision({
       return true;
     }
     for (const enemy of activeEnemies) {
-      if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
+      if (!isDamageableEnemyTarget(enemy)) continue;
       if (vecLength(projectile.x - enemy.x, projectile.y - enemy.y) >= (enemy.size + projectile.size) * 0.5) continue;
       if (skeletonIgnoresArrow(enemy)) continue;
       const rawDamage = typeof game.rollWallTrapDamage === "function"
@@ -159,8 +166,8 @@ export function resolveSpecialProjectileCollision({
     }
     if (!hit) {
       for (const enemy of activeEnemies) {
+        if (!isDamageableEnemyTarget(enemy)) continue;
         if (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)) continue;
-        if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
         if (vecLength(projectile.x - enemy.x, projectile.y - enemy.y) >= (enemy.size + projectile.size) * 0.5) continue;
         const rawDamage = Number.isFinite(projectile.damage) ? projectile.damage : game.config.enemy.sonyaFireballDamage || 18;
         game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), "fire", projectile.ownerId || null);
@@ -219,8 +226,8 @@ export function resolveSpecialProjectileCollision({
     }
     if (!hit) {
       for (const enemy of activeEnemies) {
+        if (!isDamageableEnemyTarget(enemy)) continue;
         if (!game.isEnemyFriendlyToPlayer || !game.isEnemyFriendlyToPlayer(enemy)) continue;
-        if (enemy.type === "skeleton_warrior" && enemy.collapsed) continue;
         if (vecLength(projectile.x - enemy.x, projectile.y - enemy.y) >= (enemy.size + projectile.size) * 0.5) continue;
         const rawDamage = game.rollEnemyContactDamage({ damageMin: projectile.damageMin, damageMax: projectile.damageMax });
         game.applyEnemyDamage(enemy, rawDamage * game.getEnemyDamageScale(), projectile.damageType || "physical", projectile.ownerId || null);

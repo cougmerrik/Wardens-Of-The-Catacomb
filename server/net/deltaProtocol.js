@@ -74,6 +74,7 @@ export function buildJoinKeyframeState(fullState) {
     floor: fullState.floor,
     floorBoss: fullState.floorBoss ? { ...fullState.floorBoss } : null,
     player: fullState.player,
+    floatingTexts: Array.isArray(fullState.floatingTexts) ? fullState.floatingTexts.map((entry) => ({ ...entry })) : [],
     door: fullState.door,
     pickup: fullState.pickup,
     portal: fullState.portal,
