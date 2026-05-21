@@ -64,6 +64,23 @@ function validateOilCharges(key, statusField) {
   assert.ok(lateEnemy[statusField] > 0, `${key} projectile snapshots should keep the fired attack coated`);
 }
 
+function validateStaleOilTimersAreInactive(key, statusField) {
+  const zeroChargeGame = makeGame();
+  zeroChargeGame.consumables.effects[key] = { timer: 99, attacksRemaining: 0 };
+  assert.equal(getActiveConsumableAttackEffects(zeroChargeGame)[key], false, `${key} timer should not activate zero-charge restored state`);
+  assert.equal(getConsumableBonusDamage(zeroChargeGame), 0, `${key} timer should not add bonus damage without charges`);
+  const zeroChargeEnemy = {};
+  applyConsumableOnHitEffects(zeroChargeGame, zeroChargeEnemy, "p1");
+  assert.equal(zeroChargeEnemy[statusField], undefined, `${key} timer should not apply on-hit status without charges`);
+  assert.equal(zeroChargeGame.consumables.effects[key].timer, 0, `${key} stale timer should be normalized away`);
+
+  const missingChargeGame = makeGame();
+  missingChargeGame.consumables.effects[key] = { timer: 99 };
+  assert.equal(getActiveConsumableAttackEffects(missingChargeGame)[key], false, `${key} timer should not migrate to fresh charges`);
+  assert.equal(missingChargeGame.consumables.effects[key].attacksRemaining, 0, `${key} missing charge count should normalize to zero`);
+  assert.equal(missingChargeGame.consumables.effects[key].timer, 0, `${key} missing-charge timer should be normalized away`);
+}
+
 function validateRegenerationPotionFeedback() {
   const game = makeGame();
   game.player.health = 50;
@@ -110,6 +127,8 @@ function validateMeleeOilsSpendOnUse() {
 function main() {
   validateOilCharges("fireOil", "burningTimer");
   validateOilCharges("frostOil", "slowTimer");
+  validateStaleOilTimersAreInactive("fireOil", "burningTimer");
+  validateStaleOilTimersAreInactive("frostOil", "slowTimer");
   validateRegenerationPotionFeedback();
   validateStatusPanelCoverage();
   validateMeleeOilsSpendOnUse();
