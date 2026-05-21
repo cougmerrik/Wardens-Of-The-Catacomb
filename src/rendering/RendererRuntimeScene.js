@@ -2,6 +2,7 @@ import { RendererRuntimeBase } from "./RendererRuntimeBase.js";
 import { runtimeSceneDrawMethods } from "./runtimeSceneDrawMethods.js";
 import { drawChilledEnemyTint } from "./chilledEnemyTint.js";
 import { getNetworkDeathRulesLabel } from "../net/networkDeathRules.js";
+import { drawGameplayTipBubble } from "./hud/gameplayTipBubble.js";
 
 function drawArcaneMarkSigil(ctx, enemy, screenX, screenY, time = 0) {
   const timer = Number.isFinite(enemy?.arcaneMarkTimer) ? enemy.arcaneMarkTimer : 0;
@@ -293,6 +294,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     this.drawExperienceBar(game, layout);
     this.drawBossSpeechCallout(game, cameraX, cameraY, layout);
     this.drawHud(game, layout);
+    drawGameplayTipBubble(this, game, layout);
     const classStatusBottom = this.drawClassStatusPanel(game, layout);
     const minimapBottom = this.drawMinimap(game, layout, classStatusBottom + this.sidebarPadding);
     const statsBottom = this.drawPlayerStatsPanel(game, layout, minimapBottom + this.sidebarPadding);

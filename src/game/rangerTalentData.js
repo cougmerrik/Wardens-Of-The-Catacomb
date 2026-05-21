@@ -37,9 +37,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "LB",
     color: "#8eb8ff",
     description: [
-      "Pick Longbow as your weapon style.",
-      "Ranged: Draw Shot has the longest range and high single-hit pressure.",
-      "Melee: Bow Guard is a weak defensive shove with a wide arc."
+      "Weapon. Swapping modes has a 1.2 sec cooldown.",
+      "Ranged attacks become long-range Draw Shots: 360 range, 0.48 sec attack time, 124% physical damage, +1 combo.",
+      "Melee attacks become Bow Guard: a 34 range wide shove for 42% melee damage, +1 combo, 24% melee-mode damage reduction, and a 1.5 tile knockback."
     ]
   },
   {
@@ -51,9 +51,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "TK",
     color: "#78dcb6",
     description: [
-      "Pick Throwing Knives as your weapon style.",
-      "Ranged: fast single knife throws.",
-      "Melee: flexible close cuts with the fastest swap rhythm."
+      "Weapon. Swapping modes has a 0.5 sec cooldown.",
+      "Ranged attacks throw quick knives: 260 range, 0.30 sec attack time, 88% physical damage, +1 combo.",
+      "Melee attacks become Close Cuts: 40 range, 0.28 sec attack time, 107% melee damage, +2 combo, and 8% melee-mode damage reduction."
     ]
   },
   {
@@ -65,9 +65,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "TD",
     color: "#b7f4dc",
     description: [
-      "Pick Twin Daggers as your weapon style.",
-      "Ranged: short thrown blades for combo upkeep.",
-      "Melee: very fast flurry attacks and strong combo generation."
+      "Weapon. Swapping modes has a 0.65 sec cooldown.",
+      "Ranged attacks throw short blades: 180 range, 0.26 sec attack time, 68% physical damage, +1 combo.",
+      "Melee attacks become fast dagger flurries: 34 range, 0.20 sec attack time, 94% melee damage, +2 combo, and 12% melee-mode damage reduction."
     ]
   },
   {
@@ -79,9 +79,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "RP",
     color: "#e7d08c",
     description: [
-      "Pick Rapier & Pistol as your weapon style.",
-      "Ranged: slow pistol shot with small knockback.",
-      "Melee: precise high-damage lunge with a narrow arc."
+      "Weapon. Swapping modes has a 0.8 sec cooldown.",
+      "Ranged attacks fire pistol shots: 420 range, 0.70 sec attack time, 108% physical damage, +1 combo, and 70 knockback.",
+      "Melee attacks become lunges: 52 range, narrow arc, 0.38 sec attack time, 189% melee damage, +2 combo, and 10% melee-mode damage reduction."
     ]
   },
   {
@@ -93,9 +93,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "OP",
     color: "#7cd5ff",
     description: [
-      "Pick Opportunist as your combat rhythm.",
-      "Swapping grants a 2 second destination-mode stat window.",
-      "First attack after swapping deals moderate bonus damage."
+      "Mode. Your weapon swap cooldown is reduced by 15%.",
+      "After swapping, gain a 2 sec destination-mode window. Your next attack in that mode deals 120% damage.",
+      "While the window is active in ranged mode, projectiles gain +20% speed and +20% lifetime/range; melee mode gains +15% attack speed."
     ]
   },
   {
@@ -107,9 +107,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "AM",
     color: "#ffba6d",
     description: [
-      "Pick Ambush as your combat rhythm.",
-      "Swapping grants a short damage window and high first-hit burst.",
-      "The burst improves after idling or hitting a new target."
+      "Mode. Swapping primes your next attack for 2 sec.",
+      "The primed attack deals 155% physical or melee damage.",
+      "If you have been idle for at least 2 sec or strike a new target, the primed attack deals an additional 25% damage."
     ]
   },
   {
@@ -121,9 +121,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "PD",
     color: "#d0f09d",
     description: [
-      "Pick Predator as your combat rhythm.",
-      "Melee attacks generate additional combo.",
-      "Ranged attacks spend combo to pierce, and swap attacks scale with combo."
+      "Mode. Melee hits generate +1 additional combo.",
+      "Ranged attacks spend 2 combo, when available, to pierce one additional enemy.",
+      "Your first attack after swapping gains +1.5% damage per current combo point, up to +45% at 30 combo."
     ]
   },
   {
@@ -135,9 +135,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "FW",
     color: "#cbb5ff",
     description: [
-      "Pick Footwork as your mode-swap style.",
-      "Swapping grants temporary block chance and block power.",
-      "Your first attack after swapping grants brief damage reduction."
+      "Mode. Swapping grants 2 sec of footwork.",
+      "While active, blockable incoming hits have a 45% chance to be blocked.",
+      "Your first attack after swapping deals 105% damage and grants 1 sec of 20% damage reduction."
     ]
   },
   {
@@ -149,9 +149,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "PR",
     color: "#d6e4ff",
     description: [
-      "Pick Precision as your attack modifier.",
-      "Repeated hits and combo improve critical pressure.",
-      "Best single-target payoff with Longbow and Rapier."
+      "Modifier. Your attacks can critically strike.",
+      "Gain 8% critical strike chance, plus 3% additional critical chance for each combo tier reached at 5, 10, and 20 combo.",
+      "Critical strikes deal 150% physical or melee damage."
     ]
   },
   {
@@ -163,9 +163,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "FL",
     color: "#88efaa",
     description: [
-      "Pick Flurry as your attack modifier.",
-      "Hits increase attack speed while you stay active.",
-      "Melee ramps faster than ranged."
+      "Modifier. Your combo tiers increase attack speed.",
+      "At 5, 10, and 20 combo, gain +6%, +12%, and +18% attack speed respectively.",
+      "Melee weapons generate combo quickly, letting this ramp faster in close combat."
     ]
   },
   {
@@ -177,9 +177,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "BL",
     color: "#d36a62",
     description: [
-      "Pick Bleed as your attack modifier.",
-      "Attacks apply stacking physical damage over time.",
-      "Melee applies stronger bleed than ranged."
+      "Modifier. Hits apply or refresh a 3 sec physical bleed.",
+      "Ranged hits set bleed DPS to at least 25% of your primary damage.",
+      "Melee hits set bleed DPS to at least 50% of your primary damage."
     ]
   },
   {
@@ -191,9 +191,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "TS",
     color: "#aac7ff",
     description: [
-      "Pick Trick Shots as your attack modifier.",
-      "Ranged attacks can pierce or ricochet.",
-      "Melee attacks can create small splash or follow-up effects."
+      "Modifier. Ranged shots can ricochet off walls twice.",
+      "While stationary, ranged shots gain +25% pierce chance.",
+      "Each enemy hit by the same shot increases that shot's later hit damage by 8%."
     ]
   },
   {
@@ -205,9 +205,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "SK",
     color: "#8ee1c6",
     description: [
-      "Pick Skirmisher as your attack modifier.",
-      "Damage increases after movement.",
-      "Swapping helps preserve the movement bonus."
+      "Modifier. Deal 8% increased damage while currently moving.",
+      "The bonus applies through your normal damage multiplier, affecting physical, melee, and class-effect damage.",
+      "This has no internal cooldown and falls off immediately when you stop moving."
     ]
   },
   {
@@ -219,9 +219,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "RA",
     color: "#ff9b52",
     description: [
-      "Pick the Ranger path.",
-      "Right-click becomes Fire Arrow.",
-      "Ranged attacks gain multi-shot and projectile pressure identity."
+      "Path. Your right-click class skill becomes Fire Arrow, with a 2 sec cooldown.",
+      "Fire Arrow fires a burning projectile that deals fire impact damage in an area and leaves a 1 sec fire zone that deals fire damage over time.",
+      "Your primary ranged attacks fire +1 additional arrow, increasing further at combo tier 2 and combo tier 3."
     ]
   },
   {
@@ -233,9 +233,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "RO",
     color: "#b78dff",
     description: [
-      "Pick the Rogue path.",
-      "Right-click becomes Shadowstep.",
-      "Stealth and swap attacks gain burst identity."
+      "Path. Your right-click class skill becomes Shadowstep, with an 8 sec cooldown.",
+      "Shadowstep dashes 140 units in your aim direction and grants 1.5 sec of stealth.",
+      "After Shadowstep, your next attack in your current weapon mode deals 150% damage."
     ]
   },
   {
@@ -247,9 +247,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "AS",
     color: "#f0c39b",
     description: [
-      "Pick the Assassin path.",
-      "Right-click becomes Execute.",
-      "Marks, low-health damage, and chain kills become your identity."
+      "Path. Your right-click class skill becomes Execute, with a 7 sec cooldown.",
+      "Execute throws a physical knife at a visible target within your ranged weapon range and applies Marked for 4 sec.",
+      "Non-boss targets are killed outright. Bosses instead take a 150% critical physical hit."
     ]
   },
   {
@@ -261,9 +261,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "BM",
     color: "#a6d77c",
     description: [
-      "Pick the Beast Master path.",
-      "Right-click becomes Nature's Ally.",
-      "Summon or heal a wolf while buffing your own speed."
+      "Path. Your right-click class skill becomes Nature's Ally, with a 10 sec cooldown.",
+      "Nature's Ally summons a friendly wolf, or fully heals your existing wolf if it is alive.",
+      "Activating Nature's Ally also grants 2 sec of Dodge, increasing your movement speed by 35%."
     ]
   },
   {
@@ -275,9 +275,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "SV",
     color: "#9c88ff",
     description: [
-      "Swapping to melee grants brief untargetable invisibility.",
-      "Incidental damage can still hit you.",
-      "Breaking invisibility empowers your next hit."
+      "General. Swapping into melee mode grants 1.25 sec of stealth.",
+      "Stealth prevents enemies from targeting you, but does not prevent incidental or area damage.",
+      "Your next melee hit consumes stealth and deals 35% increased damage."
     ]
   },
   {
@@ -289,8 +289,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "RL",
     color: "#ffe27c",
     description: [
-      "Combo decay starts later and decays more slowly.",
-      "Melee hits generate extra combo."
+      "General. Your combo decay delay increases from 1.15 sec to 1.8 sec after gaining combo.",
+      "Once decay begins, combo decays more slowly at every combo tier.",
+      "Melee hits generate +1 additional combo."
     ]
   },
   {
@@ -302,9 +303,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "VC",
     color: "#8ae06f",
     description: [
-      "Hits apply slowing poison.",
-      "Poison has a 1 second internal cooldown.",
-      "Wolf attacks can inherit a reduced slow."
+      "General. Your hits poison-slow enemies by 25% for 2 sec.",
+      "This poison application has a 1 sec internal cooldown.",
+      "If you have a wolf, its bites also apply a weaker poison slow: 16% for 1.2 sec."
     ]
   },
   {
@@ -316,8 +317,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "FG",
     color: "#b7e38a",
     description: [
-      "Pickups grant regeneration over time.",
-      "Mushrooms can spawn in the dungeon and heal when picked up."
+      "General. Health pickups and mushroom pickups grant 4 sec of regeneration.",
+      "Regeneration heals 1.2% of maximum health per second.",
+      "Healing mushrooms periodically spawn in the dungeon; picking one up resets its spawn timer."
     ]
   },
   {
@@ -329,8 +331,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "PF",
     color: "#ffb36a",
     description: [
-      "Player or wolf credited kills restore health and grant a short buff.",
-      "Triggers at most once every 2 seconds."
+      "General. When you or your wolf kill an enemy, heal for 4% of your maximum health.",
+      "Also gain a 2 sec buff that increases movement speed by 10%.",
+      "This effect has a 5 sec internal cooldown."
     ]
   },
   {
@@ -342,8 +345,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "CS",
     color: "#ffe27c",
     description: [
-      "At combo thresholds, attacks trigger shockwave or tempest effects.",
-      "Effects are cooldown-gated and automatic."
+      "General. While you have at least 10 combo, your hits automatically trigger a physical shockwave.",
+      "At combo tier 2, the shockwave deals 45% primary damage in a 1 tile radius and has a 2.2 sec internal cooldown.",
+      "At combo tier 3, it deals 85% primary damage in a 1.6 tile radius and has a 1.5 sec internal cooldown."
     ]
   },
   {
@@ -355,8 +359,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "SB",
     color: "#9ea7ad",
     description: [
-      "Swapping drops a smoke cloud that prevents enemy targeting.",
-      "Attacks inside smoke generate extra combo."
+      "General. Swapping modes drops a smoke cloud for 2.75 sec in a 1.55 tile radius.",
+      "Enemies cannot target players standing inside your smoke cloud.",
+      "Attacks made while standing in smoke generate +1 combo. This has a 15 sec internal cooldown."
     ]
   },
   {
@@ -368,8 +373,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "QY",
     color: "#f5e8b0",
     description: [
-      "Repeated hits apply the existing Marked condition.",
-      "Marks are tracked per player in multiplayer."
+      "General. Repeated hits against the same enemy build stacks, up to 3.",
+      "At 2 or more stacks, the target is Marked for 4 sec.",
+      "Enemies Marked by you take 8% increased damage from your ranger arrows."
     ]
   },
   {
@@ -381,8 +387,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "SC",
     color: "#d8f4ff",
     description: [
-      "Ranged attacks gain projectile escalation.",
-      "Melee attacks gain storm extensions."
+      "Capstone. Your Fire Arrow impact damage and fire-zone damage over time are increased by 15%.",
+      "Fire Arrow's blast radius is increased by 25%, and its projectile size is increased by 2.",
+      "Your ranged shots gain +2 ricochets, +25% stationary pierce chance, and one storm split on ricochet."
     ]
   },
   {
@@ -394,8 +401,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "LS",
     color: "#c7a5ff",
     description: [
-      "Attacks after stealth or swapping create shadow echo damage.",
-      "Combo increases echo pressure."
+      "Capstone. Your hits trigger a shadow echo, limited by a 0.8 sec internal cooldown.",
+      "The echo deals 55% of its base echo damage, with a minimum of 3 damage. Damage type follows the triggering hit.",
+      "Hits empowered by stealth or by a swap bonus can trigger additional shadow echoes."
     ]
   },
   {
@@ -407,8 +415,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "DC",
     color: "#ffc0b3",
     description: [
-      "Kills can chain reduced execute hits to nearby enemies.",
-      "Marked targets improve the chain but are not required."
+      "Capstone. When you kill an enemy, chain damage strikes up to 2 nearby enemies within 3 tiles.",
+      "Chain damage is physical and based on your primary damage.",
+      "The chain deals 70% primary damage, or 110% primary damage if the killed enemy was Marked."
     ]
   },
   {
@@ -420,8 +429,9 @@ export const RANGER_TALENT_DEFS = [
     icon: "AP",
     color: "#fff0bd",
     description: [
-      "Each combo tier grants broad damage, speed, and defense bonuses.",
-      "At high combo, the wolf gains a pouncing bite."
+      "Capstone. Your combo tiers grant broad bonuses to damage, movement speed, attack speed, and damage reduction.",
+      "At 5, 10, and 20 combo, this grants up to +15% damage, +12% movement speed, +8% attack speed, and +6% damage reduction.",
+      "At 20 combo, your wolf can pounce every 4 sec, dealing bonus physical damage and splash damage."
     ]
   }
 ];

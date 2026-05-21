@@ -16,7 +16,11 @@ const SCRIPT_TARGETS = {
   "validate:minotaur": "server/validate-minotaur.js",
   "validate:solo-xp": "server/validate-solo-xp.js",
   "validate:skill-refund": "server/validate-skill-refund.js",
+  "validate:consumables-economy": "server/validate-consumables-economy.js",
+  "validate:consumable-oils": "server/validate-consumable-oils.js",
+  "validate:gameplay-tips": "server/validate-gameplay-tips.js",
   "validate:player-death-healing": "server/validate-player-death-healing.js",
+  "validate:ranger-floor-persistence": "server/validate-ranger-floor-persistence.js",
   "validate:dev-start": "server/validate-dev-start.js",
   "validate:music-sync": "server/validate-music-sync.js",
   "validate:loc": "server/validate-loc.js",
@@ -57,7 +61,7 @@ const SCRIPT_TARGETS = {
 
 const SUITES = {
   core: ["check", "validate:music-sync", "validate:loc"],
-  gameplay: ["validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:player-death-healing", "validate:dev-start"],
+  gameplay: ["validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:consumables-economy", "validate:consumable-oils", "validate:gameplay-tips", "validate:player-death-healing", "validate:ranger-floor-persistence", "validate:dev-start"],
   lighting: [
     "validate:lighting-state",
     "validate:lighting-placement",
@@ -95,7 +99,7 @@ const SUITES = {
     "validate:network-archer"
   ],
   perf: ["perf:test", "perf:network-browser", "perf:floor-scaling"],
-  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:player-death-healing", "validate:dev-start"],
+  "pre-commit": ["check", "validate:loc", "validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:consumables-economy", "validate:consumable-oils", "validate:gameplay-tips", "validate:player-death-healing", "validate:ranger-floor-persistence", "validate:dev-start"],
   closeout: [
     "check",
     "validate:loc",
@@ -106,7 +110,11 @@ const SUITES = {
     "validate:minotaur",
     "validate:solo-xp",
     "validate:skill-refund",
+    "validate:consumables-economy",
+    "validate:consumable-oils",
+    "validate:gameplay-tips",
     "validate:player-death-healing",
+    "validate:ranger-floor-persistence",
     "validate:dev-start",
     "validate:network-join",
     "validate:network-combat",

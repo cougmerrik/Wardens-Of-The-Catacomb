@@ -16,6 +16,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Primary attack: left click
 - Secondary skill: right click
 - Pause / close menus: `Esc`
+- Gameplay Tips are enabled by default from the Options menu. Tips appear as a top-left help bubble for `5s`, are prefixed with `TIP:`, and fade out. The start tip explains movement, primary fire, and the class special; the level `2` tip explains swapping between class modes using `Q` on desktop or the Swap button on Android. Level `3` shows a class-specific tip, then additional tips from `tips.txt` appear at random after level `3`.
 
 ## Classes
 
@@ -27,6 +28,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - The current class-art pass focuses on making the ranger read as a female elf archer while preserving the retro sprite style. Ranger talent choices can change costume accents, weapon silhouettes, projectile styling, and short-lived status/effect visuals without changing combat rules by themselves.
 - Ranger path and capstone visual accents are intentionally small and readable: Fire Arrow/storm effects emphasize orange and pale-blue arrow energy, Rogue emphasizes dark hood/shadow cues, Assassin emphasizes sharper dagger/execution marks, and Beast Master emphasizes natural green/bone/wolf-pact accents.
 - Throwing Knives now present ranged and melee modes differently without changing attack rules: ranged throws alternate hands and briefly show the thrown hand empty during reload, while melee `Close Cuts` draws tight alternating slash arcs near the ranger.
+- Ranger `Flurry` converts combo tiers into attack speed, granting `+6%`, `+12%`, or `+18%` attack speed at `5`, `10`, or `20` combo.
 
 ### Fighter
 - Higher baseline health and defense
@@ -150,11 +152,16 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Health pickups restore `25%` of max health.
 - Gold-find and spawn-rate shop upgrades were removed from the shop.
 - The current shop is consumable-only. Consumables are active or passive, have finite charges, appear in the HUD while owned, and follow the schema in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md).
+- The class status area reserves fixed space for active consumable effect icons so the panel does not resize as effects start or expire.
+- Regeneration Potion shows its item icon with remaining seconds in the class status area while active and displays periodic healing gain text as health is restored.
+- Speed Potion, Spike Growth, Shield, Fire Oil, and Frost Oil also show active effect icons in the class status area. Timed effects count down seconds, Shield shows temporary HP, and oil coatings show remaining charged attacks.
+- Fire Oil and Frost Oil are attack-count weapon coatings: each use grants `15` charged attacks and applies the oil's damage/status effect to coated hits.
 - New consumables should include a matching item icon generated with the canonical prompt in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md#icon-generation-prompt).
 
 ## Skills and Refunds
 - Skill points are earned from level-ups and spent per player.
 - Each class skill tree now shows spent-point totals, current refund count, and the current refund gold cost.
+- Skill descriptions should follow the shared tooltip convention in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#skill-description-convention): start with the category, omit redundant skill-name repeats, and describe mechanical effects with damage types, conditions, cooldowns, internal cooldowns, durations, and statuses where relevant.
 - Full refunds reset all spent skill ranks for the acting player, restore the spent skill points, and increment that player's `refundCount`.
 - Refunds charge gold and use an escalating cost model based on prior refunds, so repeated respecs are possible but not free.
 - Refunds also clear skill-derived active state such as temporary timers or beam/cast state so the reset build cannot keep stale ability effects.

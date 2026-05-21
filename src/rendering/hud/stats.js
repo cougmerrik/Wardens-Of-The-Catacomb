@@ -84,7 +84,7 @@ function drawAbilityCooldownWidget(renderer, game, x, y, size) {
 
 function drawAndroidSwapWidget(renderer, game, abilityRect) {
   if (!game?.isAndroidLayout || !abilityRect) return;
-  const canSwap = !!(game.isArcherClass?.() || game.isWarriorClass?.());
+  const canSwap = !!(game.isArcherClass?.() || game.isWarriorClass?.() || game.isNecromancerClass?.());
   if (!canSwap) {
     game.uiRects.hudSwapButton = null;
     return;
@@ -101,7 +101,9 @@ function drawAndroidSwapWidget(renderer, game, abilityRect) {
   };
   const cooldown = game.isArcherClass?.()
     ? Math.max(0, game.rangerRuntime?.swapCooldownTimer || 0)
-    : Math.max(0, game.warriorRuntime?.attackSwapCooldownTimer || 0);
+    : game.isWarriorClass?.()
+    ? Math.max(0, game.warriorRuntime?.attackSwapCooldownTimer || 0)
+    : 0;
   const ready = cooldown <= 0;
   game.uiRects.hudSwapButton = rect;
   ctx.save();

@@ -1,6 +1,7 @@
 import { GameRuntimeSystems } from "./GameRuntimeSystems.js";
 import { stepGame } from "./gameStep.js";
 import { updateDebugHudFrameStats } from "../bootstrap/debugHudStats.js";
+import { tickGameplayTips } from "./gameplayTips.js";
 
 export class Game extends GameRuntimeSystems {
   constructor(canvas, options = {}) {
@@ -22,6 +23,7 @@ export class Game extends GameRuntimeSystems {
       processUi: true,
       ...input
     });
+    tickGameplayTips(this, dt);
   }
 
   start() {

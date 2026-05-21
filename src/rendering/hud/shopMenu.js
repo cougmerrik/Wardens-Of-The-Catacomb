@@ -124,7 +124,7 @@ export function drawShopMenu(renderer, game, layout) {
     for (let i = 0; i < Math.min(2, wrappedEffect.length); i++) {
       ctx.fillText(wrappedEffect[i], effectStartX, rowY + 20 + i * 14);
     }
-    if (failure) {
+    if (failure && failure !== "Not enough gold") {
       ctx.fillStyle = "#d8aa8e";
       ctx.fillText(failure, effectStartX, rowY + 48);
     }

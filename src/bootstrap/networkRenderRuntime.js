@@ -1,4 +1,5 @@
 import { updateDebugHudFrameStats, updateDebugHudNetworkStats } from "./debugHudStats.js";
+import { tickGameplayTips } from "../game/gameplayTips.js";
 
 export function stepNetworkEnemyPresentation(enemies, dt) {
   if (!Array.isArray(enemies) || !Number.isFinite(dt) || dt <= 0) return;
@@ -147,6 +148,7 @@ export function startNetworkRenderLoopRuntime({
     }
     if (typeof game.updateDeathTransition === "function") game.updateDeathTransition(dt);
     if (typeof game.tickMultiplayerNotifications === "function") game.tickMultiplayerNotifications(dt);
+    tickGameplayTips(game, dt);
     if (Array.isArray(game.map) && game.map.length > 0) {
       if (game.player.health > 0 || !game.getSpectateTargetEntity) game.revealAroundPlayer();
       else {

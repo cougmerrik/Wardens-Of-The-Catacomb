@@ -63,6 +63,8 @@ import {
   useConsumableSlot,
   applyConsumableOnHitEffects,
   getConsumableBonusDamage,
+  getActiveConsumableAttackEffects,
+  consumeConsumableAttackCharge,
   applyPassiveConsumableEvent,
   refundAllSkills,
   toggleShop,
@@ -294,12 +296,20 @@ export class GameRuntimeWorld extends GameRuntimeBase {
     return useConsumableSlot(this, slotIndex);
   }
 
-  applyConsumableOnHitEffects(enemy, ownerId = null) {
-    return applyConsumableOnHitEffects(this, enemy, ownerId);
+  applyConsumableOnHitEffects(enemy, ownerId = null, attackEffects = null) {
+    return applyConsumableOnHitEffects(this, enemy, ownerId, attackEffects);
   }
 
   getConsumableBonusDamage() {
     return getConsumableBonusDamage(this);
+  }
+
+  getActiveConsumableAttackEffects() {
+    return getActiveConsumableAttackEffects(this);
+  }
+
+  consumeConsumableAttackCharge(attackEffects = null) {
+    return consumeConsumableAttackCharge(this, attackEffects);
   }
 
   applyPassiveConsumableEvent(eventKey, payload = {}) {

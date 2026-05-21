@@ -12,50 +12,50 @@ const MAGE_GROUP_LIMITS = {
 const MAGE_TIER_LABELS = {
   1: "Cantrip",
   2: "Spell",
-  3: "Casting Style",
+  3: "Style",
   4: "Path",
-  5: "System Skills",
+  5: "General",
   6: "Capstone"
 };
 
 const MAGE_TALENT_DEFS = [
-  { key: "fireBoltCantrip", label: "Fire Bolt", tier: 1, group: "cantrip", maxRanks: 1, icon: "FB", color: "#ff9b62", description: ["Fast medium projectile.", "Applies Burning for 3 seconds."] },
-  { key: "frozenOrbCantrip", label: "Frozen Orb", tier: 1, group: "cantrip", maxRanks: 1, icon: "FO", color: "#9edcff", description: ["Slow cold orb with lower direct damage.", "Pulses smaller shards that Chill enemies."] },
-  { key: "shockCantrip", label: "Shock", tier: 1, group: "cantrip", maxRanks: 1, icon: "SH", color: "#f5e779", description: ["Very fast low-damage projectile.", "Chains to up to 2 nearby enemies."] },
-  { key: "arcaneMissileCantrip", label: "Arcane Missile", tier: 1, group: "cantrip", maxRanks: 1, icon: "AM", color: "#c6a8ff", description: ["Homing missile toward the nearest enemy in your aim direction.", "Reliable low damage at up to 8 tiles."] },
-  { key: "necroticBeamCantrip", label: "Necrotic Beam", tier: 1, group: "cantrip", maxRanks: 1, icon: "NB", color: "#9b85d8", description: ["Channel a necrotic beam.", "Temporarily charms undead, or permanently charms them as Necromancer."] },
-  { key: "greenFlameBladeCantrip", label: "Green-Flame Blade", tier: 1, group: "cantrip", maxRanks: 1, icon: "GB", color: "#7ee082", description: ["Reach melee cantrip with life leech.", "Applies Burning and supports Battlemage."] },
+  { key: "fireBoltCantrip", label: "Fire Bolt", tier: 1, group: "cantrip", maxRanks: 1, icon: "FB", color: "#ff9b62", description: ["Cantrip. Fires a fast medium projectile that deals fire damage.", "On hit, applies Burning for 3 sec and contributes to Mage on-hit effects."] },
+  { key: "frozenOrbCantrip", label: "Frozen Orb", tier: 1, group: "cantrip", maxRanks: 1, icon: "FO", color: "#9edcff", description: ["Cantrip. Fires a slow cold orb with lower direct frost damage.", "The orb pulses smaller shards that Chill enemies, slowing them by 25%."] },
+  { key: "shockCantrip", label: "Shock", tier: 1, group: "cantrip", maxRanks: 1, icon: "SH", color: "#f5e779", description: ["Cantrip. Fires a very fast low-damage lightning projectile.", "On hit, chains lightning damage to up to 2 nearby enemies."] },
+  { key: "arcaneMissileCantrip", label: "Arcane Missile", tier: 1, group: "cantrip", maxRanks: 1, icon: "AM", color: "#c6a8ff", description: ["Cantrip. Fires a homing arcane missile toward the nearest enemy in your aim direction.", "Reliable low damage at up to 8 tiles, useful when line pressure matters less than target acquisition."] },
+  { key: "necroticBeamCantrip", label: "Necrotic Beam", tier: 1, group: "cantrip", maxRanks: 1, icon: "NB", color: "#9b85d8", description: ["Cantrip. Channels a necrotic beam that deals necrotic damage over time.", "Temporarily charms undead targets, or permanently charms them after choosing the undead-control path."] },
+  { key: "greenFlameBladeCantrip", label: "Green-Flame Blade", tier: 1, group: "cantrip", maxRanks: 1, icon: "GB", color: "#7ee082", description: ["Cantrip. Performs a reach melee spell attack with life leech.", "Applies Burning, supports close-range casting, and gains extra reach and splash from the melee capstone."] },
 
-  { key: "fireballSpell", label: "Fireball", tier: 2, group: "spell", maxRanks: 1, icon: "FI", color: "#ff754f", description: ["2 mana. Targeted projectile explosion.", "Large radius, high damage, and Burning."] },
-  { key: "chromaticOrbSpell", label: "Chromatic Orb", tier: 2, group: "spell", maxRanks: 1, icon: "CO", color: "#f2d77a", description: ["2 mana. Piercing orb that cycles Fire, Frost, and Lightning.", "Flexible multi-target pressure."] },
-  { key: "cloudDaggersSpell", label: "Cloud of Daggers", tier: 2, group: "spell", maxRanks: 1, icon: "CD", color: "#d7d9e8", description: ["2 mana. Targeted damage field.", "Lasts 4 seconds with a high tick rate."] },
-  { key: "confusionSpell", label: "Confusion", tier: 2, group: "spell", maxRanks: 1, icon: "CF", color: "#e1a8ff", description: ["2 mana. Targeted disruption field.", "Confuses enemies and disables boss special abilities."] },
-  { key: "invisibilitySpell", label: "Spirit Guardians", tier: 2, group: "spell", maxRanks: 1, icon: "SG", color: "#b7f0d0", description: ["2 mana. Briefly vanish and summon orbiting spirits.", "The aura damages enemies and triggers Mage on-hit effects."] },
-  { key: "flamingSphereSpell", label: "Flaming Sphere", tier: 2, group: "spell", maxRanks: 1, icon: "SP", color: "#ffb05f", description: ["2 mana. Summon a mobile fire orb for 5 seconds.", "Recasting creates a new sphere at the target location."] },
+  { key: "fireballSpell", label: "Fireball", tier: 2, group: "spell", maxRanks: 1, icon: "FI", color: "#ff754f", description: ["Spell. Costs 2 mana and launches a targeted projectile explosion.", "Deals high fire damage in a large radius and applies Burning to enemies hit."] },
+  { key: "chromaticOrbSpell", label: "Chromatic Orb", tier: 2, group: "spell", maxRanks: 1, icon: "CO", color: "#f2d77a", description: ["Spell. Costs 2 mana and fires a piercing orb that cycles Fire, Frost, and Lightning effects.", "Provides flexible multi-target pressure with damage type and status changing by orb element."] },
+  { key: "cloudDaggersSpell", label: "Cloud of Daggers", tier: 2, group: "spell", maxRanks: 1, icon: "CD", color: "#d7d9e8", description: ["Spell. Costs 2 mana and creates a targeted persistent damage field.", "The field lasts 4 sec before modifiers and deals rapid repeated physical damage ticks."] },
+  { key: "confusionSpell", label: "Confusion", tier: 2, group: "spell", maxRanks: 1, icon: "CF", color: "#e1a8ff", description: ["Spell. Costs 2 mana and creates a targeted disruption field.", "Confuses enemies caught inside and disables boss special abilities while affected."] },
+  { key: "invisibilitySpell", label: "Spirit Guardians", tier: 2, group: "spell", maxRanks: 1, icon: "SG", color: "#b7f0d0", description: ["Spell. Costs 2 mana, briefly vanishes you, and summons orbiting spirits.", "The aura damages nearby enemies and triggers Mage on-hit effects from its hits."] },
+  { key: "flamingSphereSpell", label: "Flaming Sphere", tier: 2, group: "spell", maxRanks: 1, icon: "SP", color: "#ffb05f", description: ["Spell. Costs 2 mana and summons a mobile fire orb for 5 sec before duration modifiers.", "Recasting creates a new sphere at the target location and replaces the previous pressure point."] },
 
-  { key: "highFocus", label: "High Focus", tier: 3, group: "style", maxRanks: 1, icon: "HF", color: "#f4efe3", description: ["Stronger high-mana payoff.", "Harsher low-mana penalty."] },
-  { key: "rapidCasting", label: "Rapid Casting", tier: 3, group: "style", maxRanks: 1, icon: "RC", color: "#9fd9ff", description: ["Shorter cantrip regen pause and spell delay.", "Lower peak spell efficiency."] },
-  { key: "bloodCasting", label: "Blood Casting", tier: 3, group: "style", maxRanks: 1, icon: "BC", color: "#df6b6b", description: ["Health can cover missing mana.", "Blood-cast spells cannot self-kill you."] },
-  { key: "battleCaster", label: "Battle Caster", tier: 3, group: "style", maxRanks: 1, icon: "BT", color: "#d5ab73", description: ["Adds defense and periodic arcane shielding.", "Supports close-range spell use."] },
+  { key: "highFocus", label: "High Focus", tier: 3, group: "style", maxRanks: 1, icon: "HF", color: "#f4efe3", description: ["Style. Strengthens high-mana casting and punishes low-mana casting.", "At high mana, gain +12% spell power on top of the normal high-mana bonus; at low mana, suffer an additional 10% spell power penalty."] },
+  { key: "rapidCasting", label: "Rapid Casting", tier: 3, group: "style", maxRanks: 1, icon: "RC", color: "#9fd9ff", description: ["Style. Cast faster and recover mana cadence more quickly.", "Spell delay is reduced by 15% and mana regeneration improves by 10%, but peak spell power is reduced by 8%."] },
+  { key: "bloodCasting", label: "Blood Casting", tier: 3, group: "style", maxRanks: 1, icon: "BC", color: "#df6b6b", description: ["Style. Health can cover missing mana when casting spells.", "Blood-cast spells cannot kill you directly, enabling emergency casts at low mana."] },
+  { key: "battleCaster", label: "Battle Caster", tier: 3, group: "style", maxRanks: 1, icon: "BT", color: "#d5ab73", description: ["Style. Adds close-range durability and arcane shielding.", "Grants +1 flat damage reduction and adds temporary HP after blink-style class skills, supporting close spell use."] },
 
-  { key: "wizardPath", label: "Wizard", tier: 4, group: "path", maxRanks: 1, icon: "WZ", color: "#8eb8ff", description: ["Disciplined high-mana caster.", "Arcane Focus replaces Blink."] },
-  { key: "necromancerPath", label: "Necromancer", tier: 4, group: "path", maxRanks: 1, icon: "NE", color: "#a186ff", description: ["Permanent undead control and kill conversion.", "Death Bolt replaces Blink."] },
-  { key: "sorcererPath", label: "Sorcerer", tier: 4, group: "path", maxRanks: 1, icon: "SO", color: "#ff8ed9", description: ["Wild Magic and low-mana chaos.", "Chaos Surge replaces Blink."] },
-  { key: "enchanterPath", label: "Enchanter", tier: 4, group: "path", maxRanks: 1, icon: "EN", color: "#d4b1ff", description: ["Influence, charm, weakening, and decoys.", "Blink leaves a decoy."] },
+  { key: "wizardPath", label: "Wizard", tier: 4, group: "path", maxRanks: 1, icon: "WZ", color: "#8eb8ff", description: ["Path. Your class skill becomes Arcane Focus instead of baseline Blink.", "Gain +3 maximum mana and a high-mana threshold tuned around 5.6 mana, making disciplined high-mana casting stronger."] },
+  { key: "necromancerPath", label: "Necromancer", tier: 4, group: "path", maxRanks: 1, icon: "NE", color: "#a186ff", description: ["Path. Your class skill becomes Death Bolt instead of baseline Blink.", "Undead control becomes permanent, control cap increases by 3, and controlled undead gain health, defense, and damage bonuses."] },
+  { key: "sorcererPath", label: "Sorcerer", tier: 4, group: "path", maxRanks: 1, icon: "SO", color: "#ff8ed9", description: ["Path. Your class skill becomes Chaos Surge instead of baseline Blink.", "Low-mana chaos removes the normal low-mana spell power penalty and supports aggressive surge windows."] },
+  { key: "enchanterPath", label: "Enchanter", tier: 4, group: "path", maxRanks: 1, icon: "EN", color: "#d4b1ff", description: ["Path. Your class skill remains Blink but leaves a decoy behind.", "Focuses on influence, charm, weakening, and redirecting enemies through summoned distractions."] },
 
-  { key: "arcaneClarity", label: "Arcane Clarity", tier: 5, group: "general", maxRanks: 1, icon: "AC", color: "#f2e6bc", description: ["After standing still for 3 seconds, gain clarity until moving.", "+25% mana regeneration and +25% spell power."] },
-  { key: "deepReserves", label: "Deep Reserves", tier: 5, group: "general", maxRanks: 1, icon: "DR", color: "#8eb8ff", description: ["+8 maximum mana.", "-15% mana regeneration speed."] },
-  { key: "manaSurge", label: "Mana Surge", tier: 5, group: "general", maxRanks: 1, icon: "MS", color: "#ffcf77", description: ["At low mana, spell delay is reduced by 33%.", "At low mana, spell damage is increased by 20%."] },
-  { key: "phaseBarrier", label: "Phase Barrier", tier: 5, group: "general", maxRanks: 1, icon: "PB", color: "#9dd7ff", description: ["Once per second, spend 1 mana to reduce an incoming hit by 50%.", "Does not trigger at 0 mana."] },
-  { key: "catalyst", label: "Catalyst", tier: 5, group: "general", maxRanks: 1, icon: "CA", color: "#ffb36a", description: ["Swapping modes grants a short Spellweaver window.", "Status-affected kills spread one status to nearby enemies."] },
-  { key: "arcanePresence", label: "Arcane Presence", tier: 5, group: "general", maxRanks: 1, icon: "AP", color: "#b7e0ff", description: ["Standing in owned magical effects improves damage and mana regeneration.", "Also grants +1 flat damage reduction."] },
-  { key: "lingeringPower", label: "Lingering Power", tier: 5, group: "general", maxRanks: 1, icon: "LP", color: "#d7d9e8", description: ["Persistent effects last longer.", "Persistent effects tick faster."] },
-  { key: "arcaneBind", label: "Arcane Bind", tier: 5, group: "general", maxRanks: 1, icon: "AB", color: "#b6f0ff", description: ["Hits can create a short binding field.", "Enemies inside are slowed and weakened."] },
+  { key: "arcaneClarity", label: "Arcane Clarity", tier: 5, group: "general", maxRanks: 1, icon: "AC", color: "#f2e6bc", description: ["General. After standing still for 3 sec, gain clarity until you move.", "While active, mana regeneration is increased by 25% and spell power is increased by 25%."] },
+  { key: "deepReserves", label: "Deep Reserves", tier: 5, group: "general", maxRanks: 1, icon: "DR", color: "#8eb8ff", description: ["General. Maximum mana is increased by 8.", "Mana regeneration speed is reduced by 15%, trading recovery speed for a larger spell pool."] },
+  { key: "manaSurge", label: "Mana Surge", tier: 5, group: "general", maxRanks: 1, icon: "MS", color: "#ffcf77", description: ["General. While below 40% mana, spell delay is reduced by 33%.", "While below 40% mana, spell damage is increased by 20% and the normal low-mana penalty is avoided."] },
+  { key: "phaseBarrier", label: "Phase Barrier", tier: 5, group: "general", maxRanks: 1, icon: "PB", color: "#9dd7ff", description: ["General. Once per second, incoming damage can spend 1 mana to reduce that hit by 50%.", "Does not trigger at 0 mana and will not consume mana unless damage is being reduced."] },
+  { key: "catalyst", label: "Catalyst", tier: 5, group: "general", maxRanks: 1, icon: "CA", color: "#ffb36a", description: ["General. Swapping cast modes grants a short Spellweaver window.", "During the window, spell delay is reduced by 15% and spell power is increased by 10%; status-affected kills spread one status to nearby enemies."] },
+  { key: "arcanePresence", label: "Arcane Presence", tier: 5, group: "general", maxRanks: 1, icon: "AP", color: "#b7e0ff", description: ["General. Standing in your owned magical effects empowers your casting.", "While active, gain +12% spell power, +20% mana regeneration, and +1 flat damage reduction."] },
+  { key: "lingeringPower", label: "Lingering Power", tier: 5, group: "general", maxRanks: 1, icon: "LP", color: "#d7d9e8", description: ["General. Persistent magical effects last 25% longer before other spell power scaling.", "Persistent effects also tick faster, increasing damage and utility frequency over their lifetime."] },
+  { key: "arcaneBind", label: "Arcane Bind", tier: 5, group: "general", maxRanks: 1, icon: "AB", color: "#b6f0ff", description: ["General. Hits can create a short binding field.", "Enemies inside the field are slowed and weakened, giving your spells and summons a control window."] },
 
-  { key: "archmage", label: "Archmage", tier: 6, group: "capstone", maxRanks: 1, icon: "AR", color: "#f6f0df", description: ["High-mana mastery.", "Maximum high-mana spell bonus rises to +45%."] },
-  { key: "lich", label: "Lich", tier: 6, group: "capstone", maxRanks: 1, icon: "LI", color: "#c7f0a0", description: ["Kills create Souls.", "Souls drift to you and restore health."] },
-  { key: "battlemage", label: "Battlemage", tier: 6, group: "capstone", maxRanks: 1, icon: "BM", color: "#d5ab73", description: ["Close spells grant damage reduction and release Arcane Shockwave.", "Green-Flame Blade gains reach and splash."] },
-  { key: "runicMastery", label: "Runic Mastery", tier: 6, group: "capstone", maxRanks: 1, icon: "RM", color: "#9d8cff", description: ["Cantrip hits build up to 3 Runes.", "Spells consume Runes for stronger and spell-specific effects."] }
+  { key: "archmage", label: "Archmage", tier: 6, group: "capstone", maxRanks: 1, icon: "AR", color: "#f6f0df", description: ["Capstone. High-mana spell mastery improves your maximum spell power bonus.", "The high-mana spell power cap rises from +30% to +45%; high-mana class-skill use also grants temporary HP and a rune."] },
+  { key: "lich", label: "Lich", tier: 6, group: "capstone", maxRanks: 1, icon: "LI", color: "#c7f0a0", description: ["Capstone. Enemy kills create Souls that drift to you and restore health.", "Also enables death-burst style effects, letting slain enemies create additional pressure around their death point."] },
+  { key: "battlemage", label: "Battlemage", tier: 6, group: "capstone", maxRanks: 1, icon: "BM", color: "#d5ab73", description: ["Capstone. Close spell play gains defensive and shockwave payoffs.", "Blink-style class skills grant temporary HP, close spells gain damage reduction, and melee cantrip attacks gain reach and splash."] },
+  { key: "runicMastery", label: "Runic Mastery", tier: 6, group: "capstone", maxRanks: 1, icon: "RM", color: "#9d8cff", description: ["Capstone. Cantrip hits build up to 3 Runes.", "Spells consume Runes for +10% spell power per Rune and additional spell-specific effects."] }
 ];
 
 const DEF_BY_KEY = Object.fromEntries(MAGE_TALENT_DEFS.map((def) => [def.key, def]));
@@ -229,7 +229,7 @@ export function formatNecromancerLaneLabel(group) {
   if (group === "spell") return "Spell";
   if (group === "style") return "Style";
   if (group === "path") return "Path";
-  if (group === "general") return "System";
+  if (group === "general") return "General";
   if (group === "capstone") return "Capstone";
   return "Mage";
 }

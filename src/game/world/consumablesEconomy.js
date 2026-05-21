@@ -3,18 +3,13 @@ import {
   ACTIVE_CONSUMABLE_SLOT_CAP,
   PASSIVE_CONSUMABLE_SLOT_CAP,
   cloneConsumableSlots,
+  createConsumableEffectState,
   getConsumableDefinition,
   getConsumablePriceForFloor,
   rollConsumableShopStock
 } from "../consumables.js";
 
-const DEFAULT_CONSUMABLE_EFFECTS = () => ({
-  regenerationPotion: { timer: 0, total: 0, healPool: 0 },
-  speedPotion: { timer: 0 },
-  frostOil: { timer: 0 },
-  fireOil: { timer: 0 },
-  spikeGrowth: { timer: 0 }
-});
+const OIL_ATTACK_CHARGES = 15;
 
 export function ensureShopStock(game) {
   if (!Array.isArray(game.shopStock) || game.shopStock.length <= 0) {
@@ -31,13 +26,18 @@ function ensureConsumableState(game) {
       sharedCooldown: 0,
       message: "",
       messageTimer: 0,
-      effects: DEFAULT_CONSUMABLE_EFFECTS()
+      effects: createConsumableEffectState()
     };
   }
   if (!Array.isArray(game.consumables.activeSlots)) game.consumables.activeSlots = [];
   if (!Array.isArray(game.consumables.passiveSlots)) game.consumables.passiveSlots = [];
   if (!game.consumables.effects || typeof game.consumables.effects !== "object") {
-    game.consumables.effects = DEFAULT_CONSUMABLE_EFFECTS();
+    game.consumables.effects = createConsumableEffectState();
+  }
+  for (const key of ["fireOil", "frostOil"]) {
+    const effect = game.consumables.effects[key];
+    if (!effect || typeof effect !== "object") game.consumables.effects[key] = { timer: 0, attacksRemaining: 0 };
+    else if (!Number.isFinite(effect.attacksRemaining)) effect.attacksRemaining = (effect.timer || 0) > 0 ? OIL_ATTACK_CHARGES : 0;
   }
   return game.consumables;
 }
@@ -113,7 +113,7 @@ export function buyShopItem(game, key) {
   if (!def) return false;
   const failure = getShopFailureReason(game, key);
   if (failure) {
-    pushConsumableMessage(game, failure);
+    if (failure !== "Not enough gold") pushConsumableMessage(game, failure);
     return false;
   }
   const price = getConsumablePriceForFloor(def, game.floor);
@@ -153,6 +153,14 @@ function setConsumableTempHp(game, amount) {
   game.player.consumableRuntime.tempHp = Math.max(0, Number.isFinite(amount) ? amount : 0);
 }
 
+function clearConsumableStateForRemoval(game, consumables) {
+  consumables.activeSlots = [];
+  consumables.passiveSlots = [];
+  consumables.sharedCooldown = 0;
+  consumables.effects = createConsumableEffectState();
+  setConsumableTempHp(game, 0);
+}
+
 function canUseConsumable(game, def) {
   if (!def) return false;
   if (def.key === "regenerationPotion") return (game.player?.health || 0) < (game.player?.maxHealth || 0);
@@ -166,15 +174,19 @@ function activateConsumableEffect(game, def) {
       effects.regenerationPotion.timer = 10;
       effects.regenerationPotion.total = 10;
       effects.regenerationPotion.healPool = Math.max(1, (game.player?.maxHealth || 1) * 0.2);
+      effects.regenerationPotion.textTimer = 1;
+      effects.regenerationPotion.textHealPool = 0;
       return true;
     case "speedPotion":
       effects.speedPotion.timer = 10;
       return true;
     case "frostOil":
-      effects.frostOil.timer = 5;
+      effects.frostOil.timer = 0;
+      effects.frostOil.attacksRemaining = OIL_ATTACK_CHARGES;
       return true;
     case "fireOil":
-      effects.fireOil.timer = 5;
+      effects.fireOil.timer = 0;
+      effects.fireOil.attacksRemaining = OIL_ATTACK_CHARGES;
       return true;
     case "spikeGrowth":
       effects.spikeGrowth.timer = 5;
@@ -231,21 +243,72 @@ export function tickConsumables(game, dt) {
     const healAmount = Math.min(regen.healPool, (regen.healPool / duration) * dt);
     regen.healPool = Math.max(0, regen.healPool - healAmount);
     if (healAmount > 0 && typeof game.applyPlayerHealing === "function") {
+      const before = Number.isFinite(game.player?.health) ? game.player.health : 0;
       game.applyPlayerHealing(healAmount, { suppressText: true });
+      const after = Number.isFinite(game.player?.health) ? game.player.health : before;
+      regen.textHealPool = Math.max(0, (regen.textHealPool || 0) + Math.max(0, after - before));
+      regen.textTimer = Math.max(0, (regen.textTimer || 0) - dt);
+      if ((regen.textTimer || 0) <= 0 && (regen.textHealPool || 0) > 0 && typeof game.spawnFloatingText === "function") {
+        game.spawnFloatingText(
+          game.player.x,
+          game.player.y - 26,
+          `+${Math.max(1, Math.round(regen.textHealPool))}`,
+          typeof game.getHealingTextColor === "function" ? game.getHealingTextColor() : "#79e59a",
+          0.8,
+          14
+        );
+        regen.textHealPool = 0;
+        regen.textTimer = 1;
+      }
     }
   } else if ((regen?.timer || 0) <= 0) {
+    if ((regen?.textHealPool || 0) > 0 && typeof game.spawnFloatingText === "function") {
+      game.spawnFloatingText(
+        game.player.x,
+        game.player.y - 26,
+        `+${Math.max(1, Math.round(regen.textHealPool))}`,
+        typeof game.getHealingTextColor === "function" ? game.getHealingTextColor() : "#79e59a",
+        0.8,
+        14
+      );
+    }
     regen.healPool = 0;
+    regen.textHealPool = 0;
+    regen.textTimer = 0;
   }
 }
 
-export function applyConsumableOnHitEffects(game, enemy, ownerId = null) {
+function hasOilCharges(effect) {
+  return (effect?.attacksRemaining || 0) > 0 || (effect?.timer || 0) > 0;
+}
+
+export function getActiveConsumableAttackEffects(game) {
   const effects = ensureConsumableState(game).effects;
-  if ((effects.fireOil?.timer || 0) > 0) {
+  return {
+    fireOil: hasOilCharges(effects.fireOil),
+    frostOil: hasOilCharges(effects.frostOil)
+  };
+}
+
+export function consumeConsumableAttackCharge(game, attackEffects = null) {
+  const effects = ensureConsumableState(game).effects;
+  const active = attackEffects || getActiveConsumableAttackEffects(game);
+  if (active.fireOil && (effects.fireOil?.attacksRemaining || 0) > 0) {
+    effects.fireOil.attacksRemaining = Math.max(0, Math.floor(effects.fireOil.attacksRemaining || 0) - 1);
+  }
+  if (active.frostOil && (effects.frostOil?.attacksRemaining || 0) > 0) {
+    effects.frostOil.attacksRemaining = Math.max(0, Math.floor(effects.frostOil.attacksRemaining || 0) - 1);
+  }
+}
+
+export function applyConsumableOnHitEffects(game, enemy, ownerId = null, attackEffects = null) {
+  const active = attackEffects || getActiveConsumableAttackEffects(game);
+  if (active.fireOil) {
     enemy.burningTimer = Math.max(enemy.burningTimer || 0, 2);
     enemy.burningDps = Math.max(enemy.burningDps || 0, 1.5);
     enemy.lastDamageOwnerId = ownerId || enemy.lastDamageOwnerId || null;
   }
-  if ((effects.frostOil?.timer || 0) > 0) {
+  if (active.frostOil) {
     enemy.slowPct = Math.max(enemy.slowPct || 0, 0.15);
     enemy.slowTimer = Math.max(enemy.slowTimer || 0, 3);
   }
@@ -254,8 +317,8 @@ export function applyConsumableOnHitEffects(game, enemy, ownerId = null) {
 export function getConsumableBonusDamage(game) {
   const effects = ensureConsumableState(game).effects;
   let bonus = 0;
-  if ((effects.fireOil?.timer || 0) > 0) bonus += 2;
-  if ((effects.frostOil?.timer || 0) > 0) bonus += 2;
+  if (hasOilCharges(effects.fireOil)) bonus += 2;
+  if (hasOilCharges(effects.frostOil)) bonus += 2;
   return bonus;
 }
 
@@ -280,9 +343,7 @@ export function applyPassiveConsumableEvent(game, eventKey, payload = {}) {
       game.player.health = game.player.maxHealth;
       if (typeof game.gainExperience === "function") game.gainExperience(game.expToNextLevel);
       showConsumableConsumedText(game, def);
-      consumables.activeSlots = [];
-      consumables.passiveSlots = [];
-      consumables.sharedCooldown = 0;
+      clearConsumableStateForRemoval(game, consumables);
       pushConsumableMessage(game, "Monkey Paw triggered");
       changed = true;
       break;

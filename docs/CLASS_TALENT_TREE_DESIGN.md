@@ -97,6 +97,23 @@ Rather than from:
 - multiple unrelated active buttons
 - lane-exclusive hotbar kits
 
+## Skill Description Convention
+
+Every class talent definition should document player-facing behavior with the same tooltip style used by the implemented skill trees.
+
+- Start the first description line with the user-facing category and a period, not the skill name. The node title already supplies the name.
+- Use the class' row categories consistently:
+  - Ranger: `Weapon`, `Mode`, `Modifier`, `Path`, `General`, `Capstone`
+  - Warrior: `Weapon`, `Stance`, `Stance`, `Doctrine`, `General`, `Capstone`
+  - Mage: `Cantrip`, `Spell`, `Style`, `Path`, `General`, `Capstone`
+- Keep the category label aligned with the rendered tier label when possible. If the internal data group has a different name, the description should still use the user-facing category.
+- Write descriptions like RPG talent tooltips: concise, mechanical, and specific. Include damage types, status effects, conditions, cooldowns, internal cooldowns, proc chances, durations, stack limits, rank scaling, targeting rules, and multiplayer-visible effects when they matter.
+- Prefer concrete values over flavor-only copy. Use terms such as `fire damage`, `cold damage`, `physical damage`, `burning`, `chilled`, `knockback`, `combo tier`, `internal cooldown`, and `per rank` when those are the actual rules.
+- Mention prerequisites or activation conditions in the effect text when the behavior depends on another state, such as a stance, path, weapon mode, controlled undead, combo threshold, health threshold, or capstone.
+- Do not repeat the skill name in its own description unless the name is also the only clear name of a separate ability or status being modified.
+- Keep each line readable on its own. Skill-tree tooltip renderers support wrapped long lines, but source descriptions should still be short enough to scan.
+- When a skill's behavior changes, update its tooltip description in the same patch as the gameplay change and run the relevant class validation.
+
 ## Universal Utility Package
 
 The current shop's four generic stat upgrades should move into the tree as a shared utility package available to every class at Row 0.

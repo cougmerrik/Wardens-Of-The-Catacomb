@@ -143,6 +143,8 @@ Each active slot should show:
 
 Because the active cooldown is shared globally, all active consumables should visually indicate cooldown when any active consumable has been used.
 
+Active consumables with ongoing effects should also appear in the class status area while active. The class status area reserves enough space for the full effect icon set instead of resizing when effects start or expire. Timed effects such as Regeneration Potion, Speed Potion, and Spike Growth show the item icon with remaining seconds, Shield shows remaining temporary HP, and weapon coatings such as Fire Oil and Frost Oil show the item icon with remaining attack charges.
+
 ### Passive HUD
 
 Passive consumables appear to the right of the active hotbar area.
@@ -203,6 +205,7 @@ Recommended order:
 - Failed use consumes no charge
 - Any successful active use triggers the shared `2s` active cooldown
 - If an active consumable applies a timed effect that is already active, using it again refreshes the duration instead of stacking the effect
+- Weapon-coating consumables can use attack charges instead of time. Fire Oil and Frost Oil grant `15` charged attacks, do not decay over time, and show their item icon plus remaining attack count in the class status area while active.
 
 ### Passive Triggering
 
@@ -303,7 +306,7 @@ The schema should be treated as the canonical starting point for new item design
 - `Price`: 100
 - `Max Stack`: 3
 - `Max Inventory`: 2
-- `Effect`: The player regenerates `20%` of health over `10s`
+- `Effect`: The player regenerates `20%` of health over `10s`; healing gain appears as floating text while active
 
 ### Speed Potion
 
@@ -329,7 +332,7 @@ The schema should be treated as the canonical starting point for new item design
 - `Price`: 50
 - `Max Stack`: 3
 - `Max Inventory`: 2
-- `Effect`: For the next `5s`, attacks deal `+2` cold damage and enemies struck are slowed by `15%` for `3s`
+- `Effect`: For the next `15` attacks, attacks deal `+2` cold damage and enemies struck are slowed by `15%` for `3s`
 
 ### Fire Oil
 
@@ -342,7 +345,7 @@ The schema should be treated as the canonical starting point for new item design
 - `Price`: 50
 - `Max Stack`: 3
 - `Max Inventory`: 2
-- `Effect`: For the next `5s`, attacks deal `+2` fire damage and enemies struck burn for `2s`
+- `Effect`: For the next `15` attacks, attacks deal `+2` fire damage and enemies struck burn for `2s`
 
 ### Spike Growth
 

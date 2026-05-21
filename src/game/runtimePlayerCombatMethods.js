@@ -10,6 +10,7 @@ import {
 } from "./enemySystems.js";
 import { getRangerMaxHealthBonusPct } from "./rangerTalentTree.js";
 import { getXpToNextLevelForLevel } from "./xpProgression.js";
+import { triggerGameplayTip } from "./gameplayTips.js";
 export const runtimePlayerCombatMethods = {
   xpFromEnemy(enemy) {
     return xpFromEnemyEntity(this, enemy);
@@ -21,6 +22,7 @@ export const runtimePlayerCombatMethods = {
     while (this.experience >= this.expToNextLevel) {
       this.experience -= this.expToNextLevel;
       this.level += 1;
+      triggerGameplayTip(this, "level2");
       this.skillPoints += this.getSkillPointGainForLevel(this.level, this.classType);
       const hpGain = Number.isFinite(this.classSpec.levelHpGain) ? this.classSpec.levelHpGain : 10;
       const adjustedHpGain = this.classType === "archer" ? hpGain * (1 + getRangerMaxHealthBonusPct(this)) : hpGain;

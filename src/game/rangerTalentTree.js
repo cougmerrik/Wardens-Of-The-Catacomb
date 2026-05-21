@@ -242,15 +242,11 @@ export function formatLaneLabel(lane) {
 export function getRangerTooltip(game, entry) {
   if (!entry) return null;
   if (entry.kind === "utility") {
-    const labelMap = {
-      moveSpeed: "Move Speed Training",
-      attackSpeed: "Attack Speed Training",
-      damage: "Damage Training",
-      defense: "Defense Training"
-    };
+    const labelMap = { moveSpeed: "Move Speed Training", attackSpeed: "Attack Speed Training", damage: "Damage Training", defense: "Defense Training" };
+    const effect = { moveSpeed: "Each rank increases movement speed by 6%.", attackSpeed: "Each rank increases attack speed by 6%.", damage: "Each rank increases all damage by 8%.", defense: "Each rank adds 1.5 flat damage reduction." }[entry.key];
     return {
       title: labelMap[entry.key] || entry.key,
-      lines: ["Training node. Counts toward total spent SP."],
+      lines: effect ? ["Training. Counts toward total spent SP.", effect] : ["Training. Counts toward total spent SP."],
       requirement: entry.locked ? "Requires at least 1 available skill point and a weapon style." : ""
     };
   }
@@ -281,6 +277,11 @@ export function getRangerComboAttackSpeedBonus(game) {
   let bonus = tier === 3 ? 0.18 : tier === 2 ? 0.11 : tier === 1 ? 0.05 : 0;
   if (hasRangerTalent(game, "apexPredator")) bonus += tier === 3 ? 0.08 : tier === 2 ? 0.05 : tier === 1 ? 0.03 : 0;
   return bonus;
+}
+
+export function getRangerFlurryAttackSpeedBonus(game) {
+  if (!hasRangerTalent(game, "flurry")) return 0;
+  return [0, 0.06, 0.12, 0.18][getRangerComboTier(game)] || 0;
 }
 
 export function getRangerComboDamageBonus(game) {

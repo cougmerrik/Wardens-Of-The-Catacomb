@@ -40,7 +40,7 @@ export const CONSUMABLE_DEFS = {
     price: 50,
     maxStack: 3,
     maxInventory: 2,
-    effect: "For the next 5s, attacks deal +2 cold damage and enemies struck are slowed by 15% for 3s"
+    effect: "For the next 15 attacks, attacks deal +2 cold damage and enemies struck are slowed by 15% for 3s"
   },
   fireOil: {
     key: "fireOil",
@@ -53,7 +53,7 @@ export const CONSUMABLE_DEFS = {
     price: 50,
     maxStack: 3,
     maxInventory: 2,
-    effect: "For the next 5s, attacks deal +2 fire damage and enemies struck burn for 2s"
+    effect: "For the next 15 attacks, attacks deal +2 fire damage and enemies struck burn for 2s"
   },
   spikeGrowth: {
     key: "spikeGrowth",
@@ -119,10 +119,10 @@ export function getConsumableCatalog() {
 
 export function createConsumableEffectState() {
   return {
-    regenerationPotion: { timer: 0, total: 0, healPool: 0 },
+    regenerationPotion: { timer: 0, total: 0, healPool: 0, textTimer: 0, textHealPool: 0 },
     speedPotion: { timer: 0 },
-    frostOil: { timer: 0 },
-    fireOil: { timer: 0 },
+    frostOil: { timer: 0, attacksRemaining: 0 },
+    fireOil: { timer: 0, attacksRemaining: 0 },
     spikeGrowth: { timer: 0 }
   };
 }
@@ -223,4 +223,3 @@ export function getConsumablePriceForFloor(def, floor) {
   const scale = 1 + Math.max(0, floor - 1) * 0.15;
   return Math.max(1, Math.floor(base * scale));
 }
-

@@ -386,7 +386,12 @@ export function resolveCombatAndDrops({
             if (owner && typeof game.applyWarriorMark === "function") game.applyWarriorMark(enemy, b.markDuration || 5);
           }
         }
-        if (typeof game.applyConsumableOnHitEffects === "function") game.applyConsumableOnHitEffects(enemy, b.ownerId || null);
+        if (typeof game.applyConsumableOnHitEffects === "function") {
+          game.applyConsumableOnHitEffects(enemy, b.ownerId || null, {
+            fireOil: !!b.consumableFireOil,
+            frostOil: !!b.consumableFrostOil
+          });
+        }
         if (b.projectileType && String(b.projectileType).startsWith("mage_")) {
           if (b.mageCantrip && (projectileOwnerContext.necromancerTalents?.battlemage?.points || 0) > 0) {
             const owner = projectileOwnerContext.player || (typeof game.getPlayerEntityById === "function" ? game.getPlayerEntityById(b.ownerId || null) : game.player);
