@@ -22,9 +22,7 @@ const ROOM_ID = "validate-network-floor-movement";
 const GAME_URL = `http://127.0.0.1:${HTTP_PORT}/?dev=1`;
 const CLASS_TYPES = ["archer", "warrior", "necromancer"];
 const children = [];
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
+function assert(condition, message) { if (!condition) throw new Error(message); }
 async function captureFailure(page, error, details = null) {
   const state = await getDebugState(page).catch(() => null);
   return capturePageFailure(
@@ -139,6 +137,13 @@ async function getCanvasState(page) {
     };
   });
 }
+async function clickCanvasRect(page, rect) {
+  const box = await page.locator("#game").boundingBox();
+  assert(box, "game canvas bounding box unavailable");
+  const metrics = await page.evaluate(() => { const canvas = document.getElementById("game"); return canvas instanceof HTMLCanvasElement ? { width: canvas.width, height: canvas.height } : null; });
+  assert(metrics?.width > 0 && metrics?.height > 0, "game canvas metrics unavailable");
+  await page.mouse.click(box.x + (rect.x + rect.w / 2) * box.width / metrics.width, box.y + (rect.y + rect.h / 2) * box.height / metrics.height);
+}
 async function sampleMovementAfterFloorLoad(page, key, durationMs = 900) {
   return page.evaluate(({ movementKey, duration }) => new Promise((resolve) => {
     const samples = [];
@@ -236,17 +241,17 @@ function summarizePlayableState(samples) {
 }
 async function assertPauseRoundTrip(page) {
   await page.keyboard.press("Escape");
-  await page.waitForFunction(() => window.__WOTC_DEBUG__?.getState?.()?.ui?.paused === true, { timeout: 2000 });
+  await delay(250);
+  const afterEscape = await getDebugState(page);
+  assert(afterEscape?.ui?.paused === false, `Escape unexpectedly paused gameplay: ${JSON.stringify(afterEscape?.ui || null)}`);
+  assert(afterEscape?.ui?.pauseButton, "pause button unavailable for pause round trip");
+  await clickCanvasRect(page, afterEscape.ui.pauseButton);
+  await page.waitForFunction(() => window.__WOTC_DEBUG__?.getState?.()?.ui?.paused === true, undefined, { timeout: 2000 });
   const paused = await getDebugState(page);
-  await page.keyboard.press("Escape");
-  await page.waitForFunction(() => window.__WOTC_DEBUG__?.getState?.()?.ui?.paused === false, { timeout: 2000 });
-  const resumed = await getDebugState(page);
-  return {
-    paused: !!paused?.ui?.paused,
-    resumed: resumed?.ui?.paused === false,
-    pauseOwnerId: paused?.net?.pauseOwnerId || null,
-    localPlayerId: paused?.net?.playerId || null
-  };
+  assert(paused?.ui?.pauseOverlayResume, "pause overlay resume button unavailable for pause round trip");
+  await clickCanvasRect(page, paused.ui.pauseOverlayResume);
+  await page.waitForFunction(() => window.__WOTC_DEBUG__?.getState?.()?.ui?.paused === false, undefined, { timeout: 2000 });
+  return { escapeDidNotPause: true, paused: !!paused?.ui?.paused, resumed: true, pauseOwnerId: paused?.net?.pauseOwnerId || null, localPlayerId: paused?.net?.playerId || null };
 }
 async function tryMovementKey(page, key) {
   const canvas = page.locator("#game");
@@ -357,7 +362,9 @@ async function assertActiveRunTransfersDeadOwner(browser, wsUrl) {
       }
       await delay(120);
     }
-    await joinerPage.keyboard.press("Escape");
+    const pauseRect = (await getDebugState(joinerPage))?.ui?.pauseButton;
+    assert(pauseRect, "joiner pause button unavailable after owner transfer");
+    await clickCanvasRect(joinerPage, pauseRect);
     await joinerPage.waitForFunction(() => window.__WOTC_DEBUG__?.getState?.()?.ui?.paused === true, undefined, { timeout: 3000 });
     const paused = await getDebugState(joinerPage);
     assert(movement, `joiner could not move after owner transfer: ${JSON.stringify(movementAttempts.map((attempt) => ({
@@ -390,7 +397,6 @@ async function assertActiveRunTransfersDeadOwner(browser, wsUrl) {
     await joinerPage.close().catch(() => {});
   }
 }
-
 async function main() {
   await ensurePortAvailable(HTTP_PORT, "HTTP");
   await ensurePortAvailable(WS_PORT, "WS");

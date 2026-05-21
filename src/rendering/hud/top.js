@@ -215,11 +215,14 @@ export function drawHud(renderer, game, layout) {
 function drawResumeButton(ctx, game, layout, canvasHeight) {
   const rect = { x: layout.playW / 2 - 76, y: canvasHeight / 2 + 18, w: 152, h: 34 };
   if (game?.uiRects) game.uiRects.pauseOverlayResume = rect;
-  ctx.fillStyle = "rgba(39, 53, 79, 0.96)";
+  const localPlayerId = typeof game?.networkLocalPlayerId === "string" ? game.networkLocalPlayerId : null;
+  const pauseOwnerId = typeof game?.networkPauseOwnerId === "string" ? game.networkPauseOwnerId : null;
+  const disabled = !!(game?.networkEnabled && localPlayerId && pauseOwnerId && localPlayerId !== pauseOwnerId);
+  ctx.fillStyle = disabled ? "rgba(42, 47, 58, 0.72)" : "rgba(39, 53, 79, 0.96)";
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = "rgba(210, 190, 145, 0.86)";
+  ctx.strokeStyle = disabled ? "rgba(111, 119, 136, 0.44)" : "rgba(210, 190, 145, 0.86)";
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
-  ctx.fillStyle = "#f2efe3";
+  ctx.fillStyle = disabled ? "#8992a4" : "#f2efe3";
   ctx.font = "bold 15px Trebuchet MS";
   ctx.textAlign = "center";
   ctx.fillText("Resume", layout.playW / 2, rect.y + 22);

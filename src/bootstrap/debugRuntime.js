@@ -326,6 +326,7 @@ export function installDebugRuntime({ getCurrentGame, getMusicDebugState, getNet
           skillTreeButton: game.uiRects?.skillTreeButton || null,
           optionsButton: game.uiRects?.optionsButton || null,
           pauseButton: game.uiRects?.pauseButton || null,
+          pauseOverlayResume: game.uiRects?.pauseOverlayResume || null,
           shopClose: game.uiRects?.shopClose || null,
           skillTreeClose: game.uiRects?.skillTreeClose || null,
           refundButton: game.uiRects?.skillRefundButton || null,

@@ -59,6 +59,7 @@ function main() {
   assertIncludes(classPanel, "const barY = y + 6;", "group rows should use compact one-line health bars");
   assertIncludes(classPanel, 'drawHudButton(ctx, pauseRect, game.paused ? "Resume" : "Pause"', "HUD should draw a Pause/Resume button");
   assertIncludes(pauseOverlay, "game.uiRects.pauseOverlayResume = rect;", "pause overlay should publish a resume button rect");
+  assertIncludes(pauseOverlay, "const disabled = !!(game?.networkEnabled", "pause overlay resume should support disabled multiplayer state");
   assertIncludes(pauseOverlay, 'ctx.fillText("Resume"', "pause overlay should draw a Resume button");
   assertNotIncludes(pauseOverlay, "Press Esc to resume", "pause overlay should not reference Esc");
   assertNotIncludes(pauseOverlay, "Use Pause to resume", "pause overlay should use the Resume button instead of instructional text");

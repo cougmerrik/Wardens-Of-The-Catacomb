@@ -128,6 +128,19 @@ async function getDebugState(page) {
   return page.evaluate(() => window.__WOTC_DEBUG__?.getState?.() || null);
 }
 
+async function sampleCanvasCenter(page, rect) {
+  return page.evaluate(({ rect }) => {
+    const canvas = document.getElementById("game");
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(rect.x + 8)));
+    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(rect.y + 8)));
+    const [r, g, b, a] = ctx.getImageData(x, y, 1, 1).data;
+    return { r, g, b, a };
+  }, { rect });
+}
+
 async function openLobby(page, { wsUrl, roomId, playerName, classType }) {
   await page.goto(GAME_URL, { waitUntil: "networkidle" });
   await page.keyboard.press("Space");
@@ -221,6 +234,18 @@ async function main() {
 
     assert(ownerState?.ui?.shopButton, "pause owner shop button unavailable");
     assert(ownerState?.ui?.pauseButton, "pause owner pause button unavailable");
+    assert(otherState?.ui?.pauseButton, "non-owner pause button unavailable");
+    const nonOwnerPauseSample = await sampleCanvasCenter(otherPage, otherState.ui.pauseButton);
+    assert(
+      nonOwnerPauseSample && nonOwnerPauseSample.r < 150 && nonOwnerPauseSample.g < 150 && nonOwnerPauseSample.b < 150,
+      `non-owner pause button did not render muted: ${JSON.stringify(nonOwnerPauseSample)}`
+    );
+    await clickCanvasRect(otherPage, otherState.ui.pauseButton);
+    await delay(300);
+    ownerState = await getDebugState(ownerPage);
+    otherState = await getDebugState(otherPage);
+    assert(ownerState?.ui?.paused === false, "non-owner pause button paused the room");
+    assert(otherState?.ui?.paused === false, "non-owner pause button locally paused the client");
     await ownerPage.keyboard.press("b");
 
     await ownerPage.waitForFunction(() => {
@@ -238,6 +263,18 @@ async function main() {
     assert(ownerState?.ui?.shopOpen === true, "pause owner shop did not open");
     assert(otherState?.ui?.shopOpen === false, "non-owner unexpectedly opened the shop");
     assert(otherState?.ui?.skillTreeOpen === false, "non-owner unexpectedly opened the skill tree");
+    assert(otherState?.ui?.pauseOverlayResume, "non-owner pause overlay resume rect unavailable");
+    const nonOwnerResumeSample = await sampleCanvasCenter(otherPage, otherState.ui.pauseOverlayResume);
+    assert(
+      nonOwnerResumeSample && nonOwnerResumeSample.r < 150 && nonOwnerResumeSample.g < 150 && nonOwnerResumeSample.b < 150,
+      `non-owner resume button did not render muted: ${JSON.stringify(nonOwnerResumeSample)}`
+    );
+    await clickCanvasRect(otherPage, otherState.ui.pauseOverlayResume);
+    await delay(300);
+    ownerState = await getDebugState(ownerPage);
+    otherState = await getDebugState(otherPage);
+    assert(ownerState?.ui?.paused === true && ownerState?.ui?.shopOpen === true, "non-owner resume button changed owner pause state");
+    assert(otherState?.ui?.paused === true, "non-owner resume button changed local pause state");
 
     await clickCanvasRect(ownerPage, ownerState.ui.pauseButton);
 
