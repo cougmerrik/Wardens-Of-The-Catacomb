@@ -204,7 +204,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     const cameraY = camera.y;
     const biomePalette = typeof game.getBiomeAppearance === "function" ? game.getBiomeAppearance() : null;
     const isAndroidLayout = !!game?.isAndroidLayout;
-    const sidebarW = isAndroidLayout ? 0 : this.sidebarWidth;
+    const sidebarW = 0;
     const layout = {
       isAndroid: isAndroidLayout,
       sidebarX: this.canvas.width - sidebarW,
@@ -291,14 +291,13 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     this.drawVignette(game, cameraX, cameraY);
     ctx.restore();
 
-    this.drawExperienceBar(game, layout);
     this.drawBossSpeechCallout(game, cameraX, cameraY, layout);
     this.drawHud(game, layout);
     drawGameplayTipBubble(this, game, layout);
-    const classStatusBottom = this.drawClassStatusPanel(game, layout);
-    const minimapBottom = this.drawMinimap(game, layout, classStatusBottom + this.sidebarPadding);
-    const statsBottom = this.drawPlayerStatsPanel(game, layout, minimapBottom + this.sidebarPadding);
-    if (!game.statsPanelOpen) this.drawGroupPanel(game, layout, statsBottom + this.sidebarPadding);
+    const minimapBottom = this.drawMinimap(game, layout);
+    const classStatusBottom = this.drawClassStatusPanel(game, layout, minimapBottom + this.sidebarPadding);
+    this.drawPlayerStatsPanel(game, layout, classStatusBottom + this.sidebarPadding);
+    this.drawExperienceBar(game, layout);
     if (game.shopOpen) this.drawShopMenu(game, layout);
     if (game.skillTreeOpen) this.drawSkillTreeMenu(game, layout);
     if (game.paused && !game.shopOpen && !game.skillTreeOpen && !game.statsPanelOpen && !game.gameOver) this.drawPausedOverlay(layout);

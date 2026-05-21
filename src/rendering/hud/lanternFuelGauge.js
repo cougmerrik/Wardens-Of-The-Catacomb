@@ -6,8 +6,7 @@ export function drawLanternFuelGauge(renderer, game, layout, xpBarY, consumableB
   const ratio = fuel / maxFuel;
   const w = layout.isAndroid ? Math.min(154, Math.max(116, layout.playW * 0.26)) : 168;
   const h = 34;
-  const fallbackX = layout.isAndroid ? Math.floor((layout.playW - w) * 0.5) : 216;
-  const x = Math.min(layout.playW - w - 10, Math.max(10, Number.isFinite(consumableBounds?.right) ? consumableBounds.right + 12 : fallbackX));
+  const x = Math.floor((layout.playW - w) * 0.5);
   const y = xpBarY - h - 8;
   ctx.fillStyle = "rgba(8, 12, 18, 0.94)";
   ctx.fillRect(x, y, w, h);

@@ -84,8 +84,7 @@ export class GameRuntimeBase {
   }
 
   getPlayAreaWidth() {
-    if (this.isAndroidLayout) return this.canvas.width;
-    return this.canvas.width - this.config.hud.sidebarWidth;
+    return this.canvas.width;
   }
 
   shouldShowPlayerHealthBar() {

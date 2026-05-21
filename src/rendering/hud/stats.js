@@ -1,5 +1,4 @@
 import { drawStatsGameOverActions } from "./statsGameOverActions.js";
-import { getAndroidHudCardX } from "./androidLayout.js";
 import { drawPinnedAbilityTooltip } from "./abilityWidgetTooltip.js";
 import { getHudAbilityState } from "./abilityWidgetState.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
@@ -19,7 +18,7 @@ function isPointInRect(x, y, rect) {
   return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
 }
 
-function drawAbilityCooldownWidget(renderer, game, x, y, size) {
+export function drawAbilityCooldownWidget(renderer, game, x, y, size) {
   const ctx = renderer.ctx;
   const state = getHudAbilityState(game);
   const radius = size * 0.5;
@@ -82,7 +81,7 @@ function drawAbilityCooldownWidget(renderer, game, x, y, size) {
   if (game.isAndroidLayout && game.uiPinnedTooltip?.source === "abilityWidget") drawPinnedAbilityTooltip(renderer, rect, state);
 }
 
-function drawAndroidSwapWidget(renderer, game, abilityRect) {
+export function drawAndroidSwapWidget(renderer, game, abilityRect) {
   if (!game?.isAndroidLayout || !abilityRect) return;
   const canSwap = !!(game.isArcherClass?.() || game.isWarriorClass?.() || game.isNecromancerClass?.());
   if (!canSwap) {
@@ -120,18 +119,6 @@ function drawAndroidSwapWidget(renderer, game, abilityRect) {
   ctx.fillText("Q", rect.x + rect.w * 0.5, rect.y + 33);
   ctx.textAlign = "left";
   ctx.restore();
-}
-
-function drawHudButton(ctx, rect, label, active, activeFill) {
-  ctx.fillStyle = active ? activeFill : "rgba(95, 126, 189, 0.92)";
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = "rgba(232, 226, 211, 0.72)";
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.fillStyle = "#f3efe3";
-  ctx.font = "bold 13px Trebuchet MS";
-  ctx.textAlign = "center";
-  ctx.fillText(label, rect.x + rect.w * 0.5, rect.y + 18);
-  ctx.textAlign = "left";
 }
 
 function drawNecromancerPetOrbs(ctx, game, x, y) {
@@ -201,7 +188,6 @@ function buildRunColumns(game) {
     ["Healing Received", `${Math.round(runStats.healingReceived || 0)}`]
   ]);
   const difficulty = createSection("Difficulty", [
-    ["Pace", game.getEnemyOutpacingStatus().label],
     ["Spawn Scale", `x${game.getEnemySpawnRateScale().toFixed(2)}`],
     ["Enemy Cap", `${game.getActiveEnemyCap()}`],
     ["Enemy Speed", `x${game.getEnemySpeedScale().toFixed(2)}`],
@@ -386,75 +372,7 @@ function drawStatsTabs(ctx, game, x, y, panelW) {
 
 export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   const ctx = renderer.ctx;
-  const panelW = layout.isAndroid ? 220 : layout.sidebarW - renderer.sidebarPadding * 2;
-  const panelX = layout.isAndroid ? getAndroidHudCardX(layout, panelW) : layout.sidebarX + renderer.sidebarPadding;
-  const isNecromancer = game.isNecromancerClass && game.isNecromancerClass();
-  const panelH = layout.isAndroid ? (isNecromancer ? 132 : 118) : (isNecromancer ? 158 : 142);
-  const outpace = game.getEnemyOutpacingStatus();
-  const playerHandle = typeof game.playerHandle === "string" && game.playerHandle.trim()
-    ? game.playerHandle.trim()
-    : "Player";
-  const classLabel = getClassDisplayLabel(game);
-  ctx.fillStyle = "rgba(8, 12, 18, 0.9)";
-  ctx.fillRect(panelX, panelY, panelW, panelH);
-  ctx.strokeStyle = "rgba(126, 139, 171, 0.65)";
-  ctx.lineWidth = 1.2;
-  ctx.strokeRect(panelX, panelY, panelW, panelH);
-
-  ctx.fillStyle = "#f2efe3";
-  ctx.font = "bold 14px Trebuchet MS";
-  ctx.fillText(playerHandle, panelX + 10, panelY + 19);
-  ctx.fillStyle = "#aebbd8";
-  ctx.font = "12px Trebuchet MS";
-  ctx.fillText(classLabel, panelX + 10, panelY + 34);
-  if (isNecromancer && !layout.isAndroid) drawNecromancerPetOrbs(ctx, game, panelX + 10, panelY + 49);
-  if (game.hasKey) {
-    const badgeW = 132;
-    const badgeH = 18;
-    const badgeX = panelX + panelW - badgeW - 10;
-    const badgeY = panelY + 6;
-    const pulse = 0.75 + Math.sin(game.time * 5.2) * 0.25;
-    ctx.fillStyle = `rgba(80, 137, 96, ${0.72 + pulse * 0.18})`;
-    ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
-    ctx.strokeStyle = "rgba(202, 246, 186, 0.92)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(badgeX + 0.5, badgeY + 0.5, badgeW - 1, badgeH - 1);
-    ctx.fillStyle = "#f2ffe8";
-    ctx.font = "bold 11px Trebuchet MS";
-    ctx.fillText("KEY FOUND - EXIT OPEN", badgeX + 8, badgeY + 12);
-  }
-  ctx.font = "13px Trebuchet MS";
-  ctx.fillStyle = "#cfd6e7";
-  const statsRowY = layout.isAndroid ? panelY + 55 : (isNecromancer ? panelY + 70 : panelY + 56);
-  const enemyRowY = layout.isAndroid ? panelY + 74 : (isNecromancer ? panelY + 91 : panelY + 77);
-  const paceRowY = layout.isAndroid ? panelY + 93 : (isNecromancer ? panelY + 112 : panelY + 98);
-  ctx.fillText(`Gold ${game.gold}`, panelX + 10, statsRowY);
-  ctx.fillText(`Lvl ${game.level}`, panelX + 94, statsRowY);
-  if (!layout.isAndroid) ctx.fillText(`SP ${game.skillPoints}`, panelX + 152, statsRowY);
-  ctx.fillText(`Enemies ${game.enemies.length}`, panelX + 10, enemyRowY);
-  if (layout.isAndroid) ctx.fillText(`SP ${game.skillPoints}`, panelX + 120, enemyRowY);
-  ctx.fillText("Pace", panelX + 10, paceRowY);
-  ctx.fillStyle = outpace.color;
-  ctx.fillText(outpace.label, panelX + 42, paceRowY);
-  const abilityX = layout.isAndroid ? 18 : panelX + panelW - 64;
-  const abilityY = layout.isAndroid ? renderer.canvas.height - layout.xpBarH - 132 : (isNecromancer ? panelY + 58 : panelY + 44);
-  const abilitySize = layout.isAndroid ? 68 : 42;
-  drawAbilityCooldownWidget(renderer, game, abilityX, abilityY, abilitySize);
-  drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget);
-
-  if (!layout.isAndroid) {
-    const buttonW = Math.floor((panelW - 20) / 3), buttonH = 28, buttonX = panelX + 10, buttonGap = 5;
-    const skillButtonX = buttonX + buttonW + buttonGap, statsButtonX = skillButtonX + buttonW + buttonGap, buttonY = panelY + panelH - buttonH - 8;
-    game.uiRects.shopButton = { x: buttonX, y: buttonY, w: buttonW, h: buttonH };
-    game.uiRects.skillTreeButton = { x: skillButtonX, y: buttonY, w: buttonW, h: buttonH };
-    game.uiRects.statsButton = { x: statsButtonX, y: buttonY, w: buttonW, h: buttonH };
-    drawHudButton(ctx, game.uiRects.shopButton, game.shopOpen ? "Resume" : "Shop", game.shopOpen, "rgba(156, 113, 64, 0.95)");
-    drawHudButton(ctx, game.uiRects.skillTreeButton, game.skillTreeOpen ? "Resume" : "Skill Tree", game.skillTreeOpen, "rgba(133, 74, 122, 0.95)");
-    drawHudButton(ctx, game.uiRects.statsButton, game.statsPanelOpen ? "Hide" : "Stats", game.statsPanelOpen, "rgba(88, 130, 105, 0.95)");
-  }
-
-  const panelBottom = panelY + panelH;
-  if (!game.statsPanelOpen) return panelBottom;
+  if (!game.statsPanelOpen) return panelY;
   const overlayX = 16;
   const overlayY = layout.topHudH + 12;
   const overlayW = layout.playW + layout.sidebarW - 32;
@@ -492,5 +410,5 @@ export function drawPlayerStatsPanel(renderer, game, layout, panelY) {
   }
 
   if (game.gameOver) drawStatsGameOverActions(ctx, game, overlayX, overlayY, overlayW, overlayH);
-  return panelBottom;
+  return panelY;
 }

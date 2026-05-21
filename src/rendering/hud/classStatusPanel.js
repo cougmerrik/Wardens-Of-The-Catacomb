@@ -10,16 +10,50 @@ import {
 import { getClassDisplayLabel } from "../../game/classDisplay.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 import { drawConsumableItemIcon } from "./consumableItemIcons.js";
+import { drawAbilityCooldownWidget, drawAndroidSwapWidget } from "./stats.js";
+
+const HUD_PANEL_ALPHA = 0.8;
+const PANEL_CONTENT_TOP = 96;
+const PANEL_BAR_BLOCK_H = 24;
+const PANEL_CONSUMABLE_GAP = 4;
+const PANEL_BUTTON_BLOCK_H = 38;
+const PANEL_NETWORK_BLOCK_H = 48;
+const PANEL_GROUP_EMPTY_H = 30;
+const PANEL_GROUP_HEADER_H = 22;
+const PANEL_GROUP_ROW_H = 34;
+const PANEL_GROUP_BOTTOM_GAP = 4;
+const PANEL_BOTTOM_PADDING = 32;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 }
 
-function getPanelRect(renderer, layout) {
-  const w = layout.isAndroid ? 146 : Math.max(178, layout.sidebarW - renderer.sidebarPadding * 2);
-  const x = layout.isAndroid ? layout.playW - w - 12 : layout.sidebarX + renderer.sidebarPadding;
-  const y = layout.topHudH + renderer.sidebarPadding;
-  return { x, y, w, h: layout.isAndroid ? 82 : 88 };
+function getHudPanelWidth(renderer, layout) {
+  const minimapW = Number.isFinite(renderer?.config?.minimap?.width) ? renderer.config.minimap.width : 180;
+  return layout.isAndroid ? 176 : Math.min(240, Math.max(220, minimapW));
+}
+
+function getGroupListHeight(groupRows) {
+  return groupRows > 0
+    ? PANEL_GROUP_HEADER_H + groupRows * PANEL_GROUP_ROW_H + PANEL_GROUP_BOTTOM_GAP
+    : PANEL_GROUP_EMPTY_H;
+}
+
+function getPanelContentHeight(layout, width, hasStatusBar, groupRows, networkLines) {
+  let height = PANEL_CONTENT_TOP;
+  if (hasStatusBar) height += PANEL_BAR_BLOCK_H;
+  height += getConsumableStatusRows(width) * 28 + PANEL_CONSUMABLE_GAP;
+  height += PANEL_BUTTON_BLOCK_H;
+  if (networkLines > 0 && !layout.isAndroid) height += PANEL_NETWORK_BLOCK_H;
+  height += getGroupListHeight(groupRows);
+  return height + PANEL_BOTTOM_PADDING;
+}
+
+function getPanelRect(renderer, layout, panelY = null, groupRows = 0, networkLines = 0, hasStatusBar = false) {
+  const w = getHudPanelWidth(renderer, layout);
+  const x = layout.playW - w - (layout.isAndroid ? 12 : 16);
+  const y = Number.isFinite(panelY) ? Math.floor(panelY) : layout.topHudH + renderer.sidebarPadding;
+  return { x, y, w, h: getPanelContentHeight(layout, w, hasStatusBar, groupRows, networkLines) };
 }
 
 function formatMetric(value, suffix = "") {
@@ -38,8 +72,14 @@ function getNetworkStatusLines(game) {
   ];
 }
 
+function formatHudGold(value) {
+  const amount = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
+  if (amount > 1000) return `${(amount / 1000).toFixed(1)}K`;
+  return `${amount}`;
+}
+
 function drawPanelBase(ctx, rect, accent) {
-  ctx.fillStyle = "rgba(8, 12, 20, 0.94)";
+  ctx.fillStyle = `rgba(8, 12, 20, ${HUD_PANEL_ALPHA})`;
   ctx.fillRect(rect.x - 6, rect.y - 6, rect.w + 12, rect.h + 12);
   ctx.strokeStyle = accent;
   ctx.strokeRect(rect.x - 5.5, rect.y - 5.5, rect.w + 11, rect.h + 11);
@@ -101,7 +141,7 @@ function getConsumableStatusRows(width) {
 function drawConsumableStatuses(ctx, statuses, x, y, width) {
   const size = 20;
   const columns = getConsumableStatusColumns(width);
-  for (let i = 0; i < statuses.length; i += 1) {
+  for (let i = 0; i < Math.min(6, statuses.length); i += 1) {
     const status = statuses[i];
     const iconX = x + (i % columns) * 28;
     const iconY = y + Math.floor(i / columns) * 28;
@@ -118,6 +158,115 @@ function drawConsumableStatuses(ctx, statuses, x, y, width) {
     const label = `${status.count}`;
     ctx.fillText(label, iconX + size - 4 - ctx.measureText(label).width, iconY + size - 3);
   }
+}
+
+function drawHudButton(ctx, rect, label, options = {}) {
+  const { active = false, activeFill = "rgba(88, 130, 105, 0.95)", pulse = 0, goldAmount = null } = options;
+  if (pulse > 0) {
+    const green = Math.floor(118 + pulse * 96);
+    ctx.fillStyle = `rgba(32, ${green}, 72, 0.96)`;
+  } else {
+    ctx.fillStyle = active ? activeFill : "rgba(39, 53, 79, 0.94)";
+  }
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = pulse > 0 ? `rgba(120, 255, 156, ${0.56 + pulse * 0.3})` : "rgba(126, 139, 171, 0.72)";
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  ctx.fillStyle = "#f3efe3";
+  ctx.textAlign = "center";
+  if (Number.isFinite(goldAmount)) {
+    const cx = rect.x + rect.w * 0.5;
+    ctx.font = "bold 10px Trebuchet MS";
+    ctx.fillText(label, cx, rect.y + 11);
+    const amountText = formatHudGold(goldAmount);
+    const coinR = 4;
+    const coinGap = 4;
+    ctx.font = "bold 10px Trebuchet MS";
+    const amountW = ctx.measureText(amountText).width;
+    const coinX = cx - (coinR * 2 + coinGap + amountW) * 0.5 + coinR;
+    const coinY = rect.y + 21;
+    ctx.fillStyle = "#f6c84f";
+    ctx.beginPath();
+    ctx.arc(coinX, coinY, coinR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(102, 74, 19, 0.8)";
+    ctx.stroke();
+    ctx.fillStyle = "#fff3b3";
+    ctx.beginPath();
+    ctx.arc(coinX - 1.2, coinY - 1.2, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f3efe3";
+    ctx.fillText(amountText, coinX + coinR + coinGap + amountW * 0.5, rect.y + 24);
+  } else {
+    ctx.font = "bold 11px Trebuchet MS";
+    ctx.fillText(label, rect.x + rect.w * 0.5, rect.y + 17);
+  }
+  ctx.textAlign = "left";
+}
+
+function drawEmbeddedGroupList(ctx, game, rect, y, rowLimit) {
+  const remotePlayers = Array.isArray(game.remotePlayers) ? game.remotePlayers : [];
+  const rows = remotePlayers.slice(0, rowLimit);
+  game.uiRects.groupPanelRows = [];
+  if (rows.length === 0) {
+    ctx.fillStyle = "rgba(16, 22, 31, 0.72)";
+    ctx.fillRect(rect.x, y, rect.w, 24);
+    ctx.fillStyle = "#8f9bb2";
+    ctx.font = "11px Trebuchet MS";
+    ctx.fillText("Group", rect.x + 8, y + 16);
+    ctx.fillText("Solo", rect.x + rect.w - 32, y + 16);
+    return y + 30;
+  }
+
+  ctx.fillStyle = "#9fb0d6";
+  ctx.font = "bold 11px Trebuchet MS";
+  ctx.fillText("Group", rect.x, y + 14);
+  ctx.font = "10px Trebuchet MS";
+  ctx.fillText(`${rows.length} teammate${rows.length === 1 ? "" : "s"}`, rect.x + rect.w - 80, y + 14);
+  y += 22;
+
+  const pauseOwnerId = typeof game.networkPauseOwnerId === "string" ? game.networkPauseOwnerId : null;
+  for (const player of rows) {
+    const alive = player?.alive !== false;
+    const ratio = Number.isFinite(player?.maxHealth) && player.maxHealth > 0 ? Math.max(0, Math.min(1, player.health / player.maxHealth)) : 0;
+    const accent = typeof player?.color === "string" && player.color.trim() ? player.color.trim() : "#58a6ff";
+    const handle = typeof player?.handle === "string" && player.handle.trim() ? player.handle.trim() : "Player";
+    const level = Number.isFinite(player?.level) ? player.level : 1;
+    const classLabel = typeof player?.classLabel === "string" && player.classLabel.trim()
+      ? player.classLabel.trim()
+      : typeof player?.classType === "string" && player.classType.trim()
+      ? player.classType.trim()
+      : "";
+    const isPauseOwner = pauseOwnerId && player?.id === pauseOwnerId;
+    const isSpectateTarget = typeof game.spectateTargetId === "string" && player?.id === game.spectateTargetId;
+    const rowRect = { x: rect.x + 4, y, w: rect.w - 8, h: 30 };
+    game.uiRects.groupPanelRows.push({ id: player?.id || "", rect: rowRect, alive });
+
+    ctx.fillStyle = isSpectateTarget ? "rgba(31, 45, 68, 0.96)" : "rgba(16, 22, 31, 0.9)";
+    ctx.fillRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
+    ctx.fillStyle = accent;
+    ctx.fillRect(rowRect.x, rowRect.y, 4, rowRect.h);
+    ctx.fillStyle = accent;
+    ctx.font = "bold 11px Trebuchet MS";
+    const clipped = handle.length > 14 ? `${handle.slice(0, 13)}...` : handle;
+    ctx.fillText(clipped, rowRect.x + 9, y + 13);
+    if (isPauseOwner) {
+      ctx.fillStyle = "#f6d37a";
+      ctx.fillText("*", rowRect.x + rowRect.w - 14, y + 13);
+    }
+    ctx.fillStyle = "#b7c7e6";
+    ctx.font = "10px Trebuchet MS";
+    const detail = classLabel ? `Lvl ${level} ${classLabel}` : `Lvl ${level}`;
+    ctx.fillText(detail.length > 18 ? `${detail.slice(0, 17)}...` : detail, rowRect.x + 9, y + 25);
+    const barX = rowRect.x + 58;
+    const barY = y + 18;
+    const barW = rowRect.w - 68;
+    ctx.fillStyle = "rgba(41, 52, 72, 0.95)";
+    ctx.fillRect(barX, barY, barW, 7);
+    ctx.fillStyle = alive ? (ratio > 0.5 ? "#76db8d" : ratio > 0.25 ? "#e1bf63" : "#df6767") : "#5c6371";
+    ctx.fillRect(barX, barY, Math.floor(barW * ratio), 7);
+    y += 34;
+  }
+  return y + 4;
 }
 
 function getRangerStatus(game) {
@@ -198,37 +347,65 @@ function getClassStatus(game) {
   return null;
 }
 
-export function drawClassStatusPanel(renderer, game, layout) {
+export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
   const status = getClassStatus(game);
   if (!status) return layout.topHudH;
   const ctx = renderer.ctx;
-  const rect = getPanelRect(renderer, layout);
   const networkLines = getNetworkStatusLines(game);
   const consumableStatuses = getActiveConsumableStatuses(game);
-  const consumableRows = getConsumableStatusRows(rect.w);
-  rect.h += consumableRows * 28;
-  if (networkLines.length > 0 && !layout.isAndroid) rect.h += 42;
+  const remoteCount = Array.isArray(game.remotePlayers) ? game.remotePlayers.length : 0;
+  const groupRows = Math.min(layout.isAndroid ? 3 : 5, remoteCount);
+  const rect = getPanelRect(renderer, layout, panelY, groupRows, networkLines.length, !!status.barLabel);
   drawPanelBase(ctx, rect, status.accent);
 
+  const playerHandle = typeof game.playerHandle === "string" && game.playerHandle.trim()
+    ? game.playerHandle.trim()
+    : "Player";
   ctx.fillStyle = status.accent;
   ctx.font = "bold 12px Trebuchet MS";
-  ctx.fillText(status.title, rect.x, rect.y + 10);
+  ctx.fillText(playerHandle, rect.x, rect.y + 10);
+  ctx.fillStyle = "#f2efe7";
+  ctx.font = "11px Trebuchet MS";
+  ctx.fillText(status.title, rect.x, rect.y + 25);
+  const abilitySize = layout.isAndroid ? 42 : 36;
+  const abilityX = rect.x + rect.w - abilitySize;
+  drawAbilityCooldownWidget(renderer, game, abilityX, rect.y + 2, abilitySize);
+  drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget);
 
   const columnW = Math.floor((rect.w - 10) / 2);
-  drawLabelLine(ctx, status.primaryLabel, status.primary, rect.x, rect.y + 28, columnW);
-  drawLabelLine(ctx, status.stateLabel, status.state, rect.x + columnW + 10, rect.y + 28, columnW);
+  drawLabelLine(ctx, status.primaryLabel, status.primary, rect.x, rect.y + 56, columnW);
+  drawLabelLine(ctx, status.stateLabel, status.state, rect.x + columnW + 10, rect.y + 56, columnW);
 
+  let contentY = rect.y + PANEL_CONTENT_TOP;
   if (status.barLabel) {
     ctx.fillStyle = "#cbd5e6";
     ctx.font = "11px Trebuchet MS";
-    ctx.fillText(status.barLabel, rect.x, rect.y + 65);
-    drawSegmentedBar(ctx, { x: rect.x, y: rect.y + 70, w: rect.w, h: 8 }, status.barRatio, status.barColor, status.sections);
+    ctx.fillText(status.barLabel, rect.x, contentY);
+    drawSegmentedBar(ctx, { x: rect.x, y: contentY + 5, w: rect.w, h: 8 }, status.barRatio, status.barColor, status.sections);
+    contentY += PANEL_BAR_BLOCK_H;
   }
 
-  drawConsumableStatuses(ctx, consumableStatuses, rect.x, rect.y + 86, rect.w);
+  drawConsumableStatuses(ctx, consumableStatuses, rect.x, contentY, rect.w);
+  contentY += getConsumableStatusRows(rect.w) * 28 + PANEL_CONSUMABLE_GAP;
+
+  const gap = 6;
+  const buttonY = contentY;
+  const buttonW = Math.floor((rect.w - gap * 2) / 3);
+  const shopRect = { x: rect.x, y: buttonY, w: buttonW, h: 30 };
+  const skillRect = { x: rect.x + buttonW + gap, y: buttonY, w: buttonW, h: 30 };
+  const statsRect = { x: rect.x + (buttonW + gap) * 2, y: buttonY, w: rect.w - (buttonW + gap) * 2, h: 30 };
+  const availableSkillPoints = Math.max(0, Math.floor(game.skillPoints || 0));
+  const pulse = availableSkillPoints > 0 ? 0.5 + Math.sin((game.time || 0) * 3) * 0.5 : 0;
+  game.uiRects.shopButton = shopRect;
+  game.uiRects.skillTreeButton = skillRect;
+  game.uiRects.statsButton = statsRect;
+  drawHudButton(ctx, shopRect, "Shop", { active: game.shopOpen, activeFill: "rgba(113, 82, 44, 0.96)", goldAmount: game.gold || 0 });
+  drawHudButton(ctx, skillRect, "Skill Tree", { active: game.skillTreeOpen, activeFill: "rgba(68, 104, 78, 0.96)", pulse });
+  drawHudButton(ctx, statsRect, "Stats", { active: game.statsPanelOpen, activeFill: "rgba(92, 109, 153, 0.96)" });
+  contentY += PANEL_BUTTON_BLOCK_H;
 
   if (networkLines.length > 0 && !layout.isAndroid) {
-    const netY = rect.y + 92 + consumableRows * 28;
+    const netY = contentY + 2;
     ctx.strokeStyle = "rgba(126, 139, 171, 0.35)";
     ctx.beginPath();
     ctx.moveTo(rect.x, netY - 10.5);
@@ -240,9 +417,11 @@ export function drawClassStatusPanel(renderer, game, layout) {
       ctx.fillText(networkLines[i], rect.x, netY + i * 13);
     }
     game.networkStatsPanelRect = { x: rect.x, y: netY - 12, w: rect.w, h: 42 };
+    contentY += PANEL_NETWORK_BLOCK_H;
   } else {
     game.networkStatsPanelRect = null;
   }
 
+  drawEmbeddedGroupList(ctx, game, rect, contentY, layout.isAndroid ? 3 : 5);
   return rect.y + rect.h + 6;
 }
