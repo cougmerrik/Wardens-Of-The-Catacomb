@@ -10,6 +10,7 @@ import {
 } from "../consumables.js";
 
 const OIL_ATTACK_CHARGES = 15;
+const OIL_EFFECT_KEYS = ["fireOil", "frostOil"];
 
 export function ensureShopStock(game) {
   if (!Array.isArray(game.shopStock) || game.shopStock.length <= 0) {
@@ -34,10 +35,16 @@ function ensureConsumableState(game) {
   if (!game.consumables.effects || typeof game.consumables.effects !== "object") {
     game.consumables.effects = createConsumableEffectState();
   }
-  for (const key of ["fireOil", "frostOil"]) {
+  for (const key of OIL_EFFECT_KEYS) {
     const effect = game.consumables.effects[key];
-    if (!effect || typeof effect !== "object") game.consumables.effects[key] = { timer: 0, attacksRemaining: 0 };
-    else if (!Number.isFinite(effect.attacksRemaining)) effect.attacksRemaining = (effect.timer || 0) > 0 ? OIL_ATTACK_CHARGES : 0;
+    if (!effect || typeof effect !== "object") {
+      game.consumables.effects[key] = { timer: 0, attacksRemaining: 0 };
+      continue;
+    }
+    effect.timer = 0;
+    effect.attacksRemaining = Number.isFinite(effect.attacksRemaining)
+      ? Math.max(0, Math.floor(effect.attacksRemaining))
+      : 0;
   }
   return game.consumables;
 }
@@ -279,7 +286,7 @@ export function tickConsumables(game, dt) {
 }
 
 function hasOilCharges(effect) {
-  return (effect?.attacksRemaining || 0) > 0 || (effect?.timer || 0) > 0;
+  return (effect?.attacksRemaining || 0) > 0;
 }
 
 export function getActiveConsumableAttackEffects(game) {
