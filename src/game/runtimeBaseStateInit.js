@@ -52,6 +52,7 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
     returnTriggered: false
   };
   game.paused = false;
+  game.optionsOpen = false;
   game.shopOpen = false;
   game.skillTreeOpen = false;
   game.time = 0;

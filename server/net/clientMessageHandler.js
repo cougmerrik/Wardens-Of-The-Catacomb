@@ -11,7 +11,7 @@ export function handleActionMessage(room, clientId, action) {
     if (room.phase !== "active" || typeof room.syncPrimaryActivePlayerFromSim !== "function") return;
     room.syncPrimaryActivePlayerFromSim();
   };
-  if (kind === "escape") {
+  if (kind === "togglePause") {
     if (!isPauseOwner) return;
     if (sim.shopOpen) {
       sim.toggleShop(false);

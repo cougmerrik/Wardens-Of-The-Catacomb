@@ -26,8 +26,8 @@ export class Renderer extends RendererRuntimeEffects {
     drawSkillTreeMenu(this, game, layout);
   }
 
-  drawPausedOverlay(layout) {
-    drawPausedOverlay(this, layout);
+  drawPausedOverlay(game, layout) {
+    drawPausedOverlay(this, game, layout);
   }
 
   drawDebugStatsHud(game, layout) {

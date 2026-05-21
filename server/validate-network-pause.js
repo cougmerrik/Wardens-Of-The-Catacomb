@@ -107,8 +107,21 @@ function rectCenter(rect) {
 }
 
 async function clickCanvasRect(page, rect) {
+  const canvasBox = await page.locator("#game").boundingBox();
+  assert(canvasBox, "game canvas bounding box unavailable");
+  const canvasMetrics = await page.evaluate(() => {
+    const canvas = document.getElementById("game");
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    return {
+      width: canvas.width,
+      height: canvas.height
+    };
+  });
+  assert(canvasMetrics?.width > 0 && canvasMetrics?.height > 0, "game canvas metrics unavailable");
   const point = rectCenter(rect);
-  await page.mouse.click(point.x, point.y);
+  const scaleX = canvasBox.width / canvasMetrics.width;
+  const scaleY = canvasBox.height / canvasMetrics.height;
+  await page.mouse.click(canvasBox.x + point.x * scaleX, canvasBox.y + point.y * scaleY);
 }
 
 async function getDebugState(page) {
@@ -136,7 +149,7 @@ async function setReady(page) {
 async function waitForRole(page, expectedRole, timeoutMs = 25000) {
   await page.waitForFunction((role) => {
     const state = window.__WOTC_DEBUG__?.getState?.();
-    return !!state && state.networkReady === true && state.networkRole === role && !!state.ui?.shopButton;
+    return !!state && state.networkReady === true && state.networkRole === role && !!state.ui?.shopButton && !!state.ui?.pauseButton;
   }, expectedRole, { timeout: timeoutMs });
   return getDebugState(page);
 }
@@ -207,6 +220,7 @@ async function main() {
     otherState = await waitForRole(otherPage, "Active", 12000);
 
     assert(ownerState?.ui?.shopButton, "pause owner shop button unavailable");
+    assert(ownerState?.ui?.pauseButton, "pause owner pause button unavailable");
     await ownerPage.keyboard.press("b");
 
     await ownerPage.waitForFunction(() => {
@@ -225,7 +239,7 @@ async function main() {
     assert(otherState?.ui?.shopOpen === false, "non-owner unexpectedly opened the shop");
     assert(otherState?.ui?.skillTreeOpen === false, "non-owner unexpectedly opened the skill tree");
 
-    await ownerPage.keyboard.press("Escape");
+    await clickCanvasRect(ownerPage, ownerState.ui.pauseButton);
 
     await ownerPage.waitForFunction(() => {
       const state = window.__WOTC_DEBUG__?.getState?.();

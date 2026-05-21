@@ -13,6 +13,10 @@ import { drawConsumableItemIcon } from "./consumableItemIcons.js";
 import { drawAbilityCooldownWidget } from "./stats.js";
 
 const HUD_PANEL_ALPHA = 0.8;
+const DESKTOP_BASE_PANEL_H = 230;
+const ANDROID_BASE_PANEL_H = 252;
+const NETWORK_PANEL_H = 48;
+const GROUP_ROW_H = 22;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
@@ -27,9 +31,9 @@ function getPanelRect(renderer, layout, panelY = null, groupRows = 0, networkLin
   const w = getHudPanelWidth(renderer, layout);
   const x = layout.playW - w - (layout.isAndroid ? 12 : 16);
   const y = Number.isFinite(panelY) ? Math.floor(panelY) : layout.topHudH + renderer.sidebarPadding;
-  const baseH = layout.isAndroid ? 226 : 202;
-  const networkH = networkLines > 0 && !layout.isAndroid ? 46 : 0;
-  const groupH = groupRows > 0 ? 24 + groupRows * 34 + 6 : 32;
+  const baseH = layout.isAndroid ? ANDROID_BASE_PANEL_H : DESKTOP_BASE_PANEL_H;
+  const networkH = networkLines > 0 && !layout.isAndroid ? NETWORK_PANEL_H : 0;
+  const groupH = groupRows > 0 ? groupRows * GROUP_ROW_H : 0;
   return { x, y, w, h: baseH + networkH + groupH };
 }
 
@@ -138,17 +142,19 @@ function drawConsumableStatuses(ctx, statuses, x, y, width) {
 }
 
 function drawHudButton(ctx, rect, label, options = {}) {
-  const { active = false, activeFill = "rgba(88, 130, 105, 0.95)", pulse = 0, goldAmount = null } = options;
-  if (pulse > 0) {
+  const { active = false, activeFill = "rgba(88, 130, 105, 0.95)", disabled = false, pulse = 0, goldAmount = null } = options;
+  if (disabled) {
+    ctx.fillStyle = "rgba(42, 47, 58, 0.58)";
+  } else if (pulse > 0) {
     const green = Math.floor(118 + pulse * 96);
     ctx.fillStyle = `rgba(32, ${green}, 72, 0.96)`;
   } else {
     ctx.fillStyle = active ? activeFill : "rgba(39, 53, 79, 0.94)";
   }
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = pulse > 0 ? `rgba(120, 255, 156, ${0.56 + pulse * 0.3})` : "rgba(126, 139, 171, 0.72)";
+  ctx.strokeStyle = disabled ? "rgba(111, 119, 136, 0.34)" : pulse > 0 ? `rgba(120, 255, 156, ${0.56 + pulse * 0.3})` : "rgba(126, 139, 171, 0.72)";
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
-  ctx.fillStyle = "#f3efe3";
+  ctx.fillStyle = disabled ? "#8992a4" : "#f3efe3";
   ctx.textAlign = "center";
   if (Number.isFinite(goldAmount)) {
     const cx = rect.x + rect.w * 0.5;
@@ -180,68 +186,48 @@ function drawHudButton(ctx, rect, label, options = {}) {
   ctx.textAlign = "left";
 }
 
-function drawEmbeddedGroupList(ctx, game, rect, y, rowLimit) {
+function drawEmbeddedGroupList(ctx, game, rect, y) {
   const remotePlayers = Array.isArray(game.remotePlayers) ? game.remotePlayers : [];
-  const rows = remotePlayers.slice(0, rowLimit);
   game.uiRects.groupPanelRows = [];
-  if (rows.length === 0) {
-    ctx.fillStyle = "rgba(16, 22, 31, 0.72)";
-    ctx.fillRect(rect.x, y, rect.w, 24);
-    ctx.fillStyle = "#8f9bb2";
-    ctx.font = "11px Trebuchet MS";
-    ctx.fillText("Group", rect.x + 8, y + 16);
-    ctx.fillText("Solo", rect.x + rect.w - 32, y + 16);
-    return y + 30;
-  }
-
-  ctx.fillStyle = "#9fb0d6";
-  ctx.font = "bold 11px Trebuchet MS";
-  ctx.fillText("Group", rect.x, y + 14);
-  ctx.font = "10px Trebuchet MS";
-  ctx.fillText(`${rows.length} teammate${rows.length === 1 ? "" : "s"}`, rect.x + rect.w - 80, y + 14);
-  y += 22;
+  if (remotePlayers.length === 0) return y;
 
   const pauseOwnerId = typeof game.networkPauseOwnerId === "string" ? game.networkPauseOwnerId : null;
-  for (const player of rows) {
+  const roomOwnerId = typeof game.networkRoomOwnerId === "string" ? game.networkRoomOwnerId : null;
+  for (const player of remotePlayers) {
     const alive = player?.alive !== false;
     const ratio = Number.isFinite(player?.maxHealth) && player.maxHealth > 0 ? Math.max(0, Math.min(1, player.health / player.maxHealth)) : 0;
     const accent = typeof player?.color === "string" && player.color.trim() ? player.color.trim() : "#58a6ff";
     const handle = typeof player?.handle === "string" && player.handle.trim() ? player.handle.trim() : "Player";
-    const level = Number.isFinite(player?.level) ? player.level : 1;
-    const classLabel = typeof player?.classLabel === "string" && player.classLabel.trim()
-      ? player.classLabel.trim()
-      : typeof player?.classType === "string" && player.classType.trim()
-      ? player.classType.trim()
-      : "";
     const isPauseOwner = pauseOwnerId && player?.id === pauseOwnerId;
+    const isRoomOwner = roomOwnerId && player?.id === roomOwnerId;
     const isSpectateTarget = typeof game.spectateTargetId === "string" && player?.id === game.spectateTargetId;
-    const rowRect = { x: rect.x + 4, y, w: rect.w - 8, h: 30 };
+    const rowRect = { x: rect.x + 4, y, w: rect.w - 8, h: 18 };
     game.uiRects.groupPanelRows.push({ id: player?.id || "", rect: rowRect, alive });
 
     ctx.fillStyle = isSpectateTarget ? "rgba(31, 45, 68, 0.96)" : "rgba(16, 22, 31, 0.9)";
     ctx.fillRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h);
     ctx.fillStyle = accent;
-    ctx.fillRect(rowRect.x, rowRect.y, 4, rowRect.h);
+    ctx.fillRect(rowRect.x, rowRect.y, 3, rowRect.h);
     ctx.fillStyle = accent;
-    ctx.font = "bold 11px Trebuchet MS";
-    const clipped = handle.length > 14 ? `${handle.slice(0, 13)}...` : handle;
-    ctx.fillText(clipped, rowRect.x + 9, y + 13);
-    if (isPauseOwner) {
+    ctx.font = "bold 10px Trebuchet MS";
+    const prefix = isRoomOwner ? "★ " : "";
+    let clipped = `${prefix}${handle}`;
+    const nameMaxW = Math.max(46, Math.floor(rowRect.w * 0.42));
+    while (clipped.length > prefix.length + 3 && ctx.measureText(`${clipped.slice(0, -1)}...`).width > nameMaxW) clipped = clipped.slice(0, -1);
+    if (ctx.measureText(clipped).width > nameMaxW) clipped = `${clipped.slice(0, Math.max(prefix.length, clipped.length - 1))}...`;
+    ctx.fillText(clipped, rowRect.x + 7, y + 12);
+    if (isPauseOwner && !isRoomOwner) {
       ctx.fillStyle = "#f6d37a";
-      ctx.fillText("*", rowRect.x + rowRect.w - 14, y + 13);
+      ctx.fillText("*", rowRect.x + nameMaxW + 9, y + 12);
     }
-    ctx.fillStyle = "#b7c7e6";
-    ctx.font = "10px Trebuchet MS";
-    const detail = classLabel ? `Lvl ${level} ${classLabel}` : `Lvl ${level}`;
-    ctx.fillText(detail.length > 18 ? `${detail.slice(0, 17)}...` : detail, rowRect.x + 9, y + 25);
-    const barX = rowRect.x + 58;
-    const barY = y + 18;
-    const barW = rowRect.w - 68;
+    const barX = rowRect.x + nameMaxW + 18;
+    const barY = y + 6;
+    const barW = Math.max(48, rowRect.x + rowRect.w - barX - 6);
     ctx.fillStyle = "rgba(41, 52, 72, 0.95)";
-    ctx.fillRect(barX, barY, barW, 7);
+    ctx.fillRect(barX, barY, barW, 6);
     ctx.fillStyle = alive ? (ratio > 0.5 ? "#76db8d" : ratio > 0.25 ? "#e1bf63" : "#df6767") : "#5c6371";
-    ctx.fillRect(barX, barY, Math.floor(barW * ratio), 7);
-    y += 34;
+    ctx.fillRect(barX, barY, Math.floor(barW * ratio), 6);
+    y += GROUP_ROW_H;
   }
   return y + 4;
 }
@@ -331,8 +317,9 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
   const networkLines = getNetworkStatusLines(game);
   const consumableStatuses = getActiveConsumableStatuses(game);
   const remoteCount = Array.isArray(game.remotePlayers) ? game.remotePlayers.length : 0;
-  const groupRows = Math.min(layout.isAndroid ? 3 : 5, remoteCount);
+  const groupRows = remoteCount;
   const rect = getPanelRect(renderer, layout, panelY, groupRows, networkLines.length);
+  game.uiRects.pauseOverlayResume = null;
   drawPanelBase(ctx, rect, status.accent);
 
   const playerHandle = typeof game.playerHandle === "string" && game.playerHandle.trim()
@@ -366,19 +353,23 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
 
   const gap = 6;
   const buttonY = contentY;
-  const buttonW = Math.floor((rect.w - gap * 2) / 3);
-  const shopRect = { x: rect.x, y: buttonY, w: buttonW, h: 30 };
-  const skillRect = { x: rect.x + buttonW + gap, y: buttonY, w: buttonW, h: 30 };
-  const statsRect = { x: rect.x + (buttonW + gap) * 2, y: buttonY, w: rect.w - (buttonW + gap) * 2, h: 30 };
+  const buttonW = Math.floor((rect.w - gap) / 2);
+  const buttonH = 30;
+  const shopRect = { x: rect.x, y: buttonY, w: buttonW, h: buttonH };
+  const skillRect = { x: rect.x + buttonW + gap, y: buttonY, w: rect.w - buttonW - gap, h: buttonH };
+  const pauseRect = { x: rect.x, y: buttonY + buttonH + gap, w: rect.w, h: buttonH };
   const availableSkillPoints = Math.max(0, Math.floor(game.skillPoints || 0));
   const pulse = availableSkillPoints > 0 ? 0.5 + Math.sin((game.time || 0) * 3) * 0.5 : 0;
+  const localPlayerId = typeof game.networkLocalPlayerId === "string" ? game.networkLocalPlayerId : null;
+  const pauseOwnerId = typeof game.networkPauseOwnerId === "string" ? game.networkPauseOwnerId : null;
+  const pauseDisabled = !!(game.networkEnabled && localPlayerId && pauseOwnerId && localPlayerId !== pauseOwnerId);
   game.uiRects.shopButton = shopRect;
   game.uiRects.skillTreeButton = skillRect;
-  game.uiRects.statsButton = statsRect;
+  game.uiRects.pauseButton = pauseRect;
   drawHudButton(ctx, shopRect, "Shop", { active: game.shopOpen, activeFill: "rgba(113, 82, 44, 0.96)", goldAmount: game.gold || 0 });
   drawHudButton(ctx, skillRect, "Skill Tree", { active: game.skillTreeOpen, activeFill: "rgba(68, 104, 78, 0.96)", pulse });
-  drawHudButton(ctx, statsRect, "Stats", { active: game.statsPanelOpen, activeFill: "rgba(92, 109, 153, 0.96)" });
-  contentY += 38;
+  drawHudButton(ctx, pauseRect, game.paused ? "Resume" : "Pause", { active: game.paused, disabled: pauseDisabled, activeFill: "rgba(128, 80, 70, 0.96)" });
+  contentY += (buttonH + gap) * 2 + 2;
 
   if (networkLines.length > 0 && !layout.isAndroid) {
     const netY = contentY + 2;
@@ -398,6 +389,6 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
     game.networkStatsPanelRect = null;
   }
 
-  drawEmbeddedGroupList(ctx, game, rect, contentY, layout.isAndroid ? 3 : 5);
+  drawEmbeddedGroupList(ctx, game, rect, contentY);
   return rect.y + rect.h + 6;
 }

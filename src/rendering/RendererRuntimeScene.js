@@ -226,6 +226,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     game.uiRects.skillTreeScrollArea = null;
     game.uiRects.skillTreeScrollMax = 0;
     game.uiRects.statsButton = null;
+    game.uiRects.optionsButton = null;
+    game.uiRects.pauseButton = null;
     game.uiRects.statsClose = null;
     game.uiRects.statsRunTab = null;
     game.uiRects.statsCharacterTab = null;
@@ -300,7 +302,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     this.drawExperienceBar(game, layout);
     if (game.shopOpen) this.drawShopMenu(game, layout);
     if (game.skillTreeOpen) this.drawSkillTreeMenu(game, layout);
-    if (game.paused && !game.shopOpen && !game.skillTreeOpen && !game.statsPanelOpen && !game.gameOver) this.drawPausedOverlay(layout);
+    if (game.paused && !game.shopOpen && !game.skillTreeOpen && !game.statsPanelOpen && !game.gameOver) this.drawPausedOverlay(game, layout);
     if (game.gameOver && !game.statsPanelOpen) {
       const progress = typeof game.getDeathTransitionProgress === "function" ? game.getDeathTransitionProgress() : 1;
       const fadeAlpha = Math.min(1, progress / 0.45);

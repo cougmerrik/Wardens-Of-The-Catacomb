@@ -70,6 +70,7 @@ import {
   toggleShop,
   toggleSkillTree,
   toggleStatsPanel,
+  togglePause,
   setStatsPanelView,
   pointInRect,
   handleUiClicks
@@ -330,6 +331,10 @@ export class GameRuntimeWorld extends GameRuntimeBase {
 
   toggleStatsPanel(open) {
     toggleStatsPanel(this, open);
+  }
+
+  togglePause(open) {
+    togglePause(this, open);
   }
 
   setStatsPanelView(view) {

@@ -15,8 +15,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Move: `WASD` / Arrow Keys
 - Primary attack: left click
 - Secondary skill: right click
-- Pause / close menus: `Esc`
-- Gameplay Tips are enabled by default from the Options menu. Tips appear as a top-left help bubble for `5s`, are prefixed with `TIP:`, and fade out. The start tip explains movement, primary fire, and the class special; the level `2` tip explains swapping between class modes using `Q` on desktop or the Swap button on Android. Level `3` shows a class-specific tip, then additional tips from `tips.txt` appear at random after level `3`.
+- Pause / resume: HUD `Pause` button, then overlay `Resume` button. In multiplayer, pause controls are disabled for clients without pause authority.
+- Runtime options: top-right `Options` button opens the same persistent Options panel used by the main menu.
+- Gameplay Tips are enabled by default from the Options menu and can also be changed in-game. Tips appear as a top-left help bubble for `5s`, are prefixed with `TIP:`, and fade out. The start tip explains movement, primary fire, and the class special; the level `2` tip explains swapping between class modes using `Q` on desktop or the Swap button on Android. Level `3` shows a class-specific tip, then additional tips from `tips.txt` appear at random after level `3`.
 
 ## Classes
 
@@ -268,14 +269,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Remote players render as full in-world avatars.
 - Remote player handles appear below their characters using that player's stable run color.
 - The active-play HUD is rendered in-canvas instead of reserving a desktop sidebar. The minimap anchors to the top-right of the play canvas at `80%` opacity, and the combined player/class HUD aligns directly beneath it.
-- The combined HUD shows local player identity, gold, the class skill button, shop/skill tree/stats buttons, the class meter, active consumable effects, and the group list.
+- The top-right HUD strip exposes `Stats` and `Options`; the combined player/class HUD keeps local player identity, gold, the class skill button, shop/skill tree, pause, the class meter, active consumable effects, and the group list.
 - Unspent skill points are no longer displayed as an `SP` counter during active play. When points are available, the `Skill Tree` button slowly blinks green.
-- The group list is embedded at the bottom of the combined HUD and shows:
-  - handle
-  - class/color identity
-  - level
-  - health bar
-  - dead-state entries for connected dead spectators
+- The group list is embedded at the bottom of the combined HUD. It renders every teammate as a compact one-line owner marker/name plus health bar, including dead-state entries for connected dead spectators.
 - The minimap uses stable per-run player colors for teammates.
 - Multiplayer game over shows a shared team-results overlay with:
   - roster

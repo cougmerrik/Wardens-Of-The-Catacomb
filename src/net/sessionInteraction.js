@@ -3,7 +3,7 @@ export { applyPredictedTeleportAction } from "./teleportPrediction.js";
 
 export function collectInput(game, consumeQueued = true) {
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
-  const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen;
+  const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen || !!game?.optionsOpen;
   const input = game.input.getGameplayIntent({
     playerX: Number.isFinite(game?.player?.x) ? game.player.x : 0,
     playerY: Number.isFinite(game?.player?.y) ? game.player.y : 0,
@@ -62,6 +62,7 @@ export function handleNetworkUiActions(game, netClient, isController) {
   const localPlayerId = typeof game?.networkLocalPlayerId === "string" ? game.networkLocalPlayerId : null;
   const pauseOwnerId = typeof game?.networkPauseOwnerId === "string" ? game.networkPauseOwnerId : null;
   const isPauseOwner = !!(isActiveMultiplayer && localPlayerId && pauseOwnerId && localPlayerId === pauseOwnerId);
+  const canToggleNetworkPause = !isActiveMultiplayer || isPauseOwner;
   const canUseLocalPanels = !!game && isActiveMultiplayer;
   const canSendRoomAction = !!netClient && (isActiveMultiplayer || isController);
   const toggleLocalShop = (open) => {
@@ -172,17 +173,7 @@ export function handleNetworkUiActions(game, netClient, isController) {
     const next = (game.uiScroll?.[target.key] || 0) + step;
     game.uiScroll[target.key] = Math.max(0, Math.min(max, next));
   }
-  if (game.input.consumeKeyQueued("escape")) {
-    if (isActiveMultiplayer && !isPauseOwner) {
-      if (game.shopOpen) toggleLocalShop(false);
-      else if (game.skillTreeOpen) toggleLocalSkillTree(false);
-      else if (game.statsPanelOpen) toggleLocalStats(false);
-      recordAction(null, "key:escape", "localClose", "escape");
-    } else if (canSendRoomAction) {
-      recordAction(null, "key:escape", "escape", "escape");
-      netClient.sendAction({ kind: "escape" });
-    }
-  }
+  if (game.optionsOpen) return;
   if (playerAlive && game.input.consumeKeyQueued("b") && !game.gameOver) {
     if (isActiveMultiplayer && !isPauseOwner) {
       recordAction(null, "key:b", "toggleLocalShop", "b");
@@ -285,6 +276,24 @@ export function handleNetworkUiActions(game, netClient, isController) {
       recordAction(click, "statsButton", "toggleStats");
       if (canUseLocalPanels) toggleLocalStats();
       else if (canSendRoomAction) netClient.sendAction({ kind: "toggleStats" });
+      continue;
+    }
+    if (hit(click.x, click.y, game.uiRects.optionsButton)) {
+      clearPinnedUiTooltip();
+      recordAction(click, "optionsButton", "openOptions");
+      if (typeof game.onOpenOptions === "function") game.onOpenOptions(game);
+      continue;
+    }
+    if (hit(click.x, click.y, game.uiRects.pauseButton)) {
+      clearPinnedUiTooltip();
+      recordAction(click, "pauseButton", "togglePause");
+      if (canToggleNetworkPause && canSendRoomAction) netClient.sendAction({ kind: "togglePause" });
+      continue;
+    }
+    if (hit(click.x, click.y, game.uiRects.pauseOverlayResume)) {
+      clearPinnedUiTooltip();
+      recordAction(click, "pauseOverlayResume", "togglePause");
+      if (canToggleNetworkPause && canSendRoomAction) netClient.sendAction({ kind: "togglePause" });
       continue;
     }
     if (hit(click.x, click.y, game.uiRects.statsClose)) {

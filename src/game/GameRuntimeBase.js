@@ -53,6 +53,7 @@ export class GameRuntimeBase {
         : "archer";
     this.classSpec = this.config.classes[this.classType] || this.config.classes.archer;
     this.onReturnToMenu = typeof options.onReturnToMenu === "function" ? options.onReturnToMenu : null;
+    this.onOpenOptions = typeof options.onOpenOptions === "function" ? options.onOpenOptions : null;
     this.onPauseChanged = typeof options.onPauseChanged === "function" ? options.onPauseChanged : null;
     this.onFloorChanged = typeof options.onFloorChanged === "function" ? options.onFloorChanged : null;
     this.onGameOverChanged = typeof options.onGameOverChanged === "function" ? options.onGameOverChanged : null;
@@ -80,7 +81,7 @@ export class GameRuntimeBase {
   }
 
   isActive() {
-    return !this.gameOver && !this.shopOpen && !this.skillTreeOpen && !this.paused;
+    return !this.gameOver && !this.shopOpen && !this.skillTreeOpen && !this.paused && !this.optionsOpen;
   }
 
   getPlayAreaWidth() {
@@ -158,6 +159,7 @@ export class GameRuntimeBase {
     if (this.deathTransition.active) return;
     this.gameOver = true;
     this.paused = false;
+    this.optionsOpen = false;
     this.shopOpen = false; this.skillTreeOpen = false;
     this.statsPanelOpen = false; this.statsPanelPausedGame = false;
     this.deathTransition.active = true;

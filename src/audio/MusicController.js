@@ -38,7 +38,6 @@ export class MusicController {
     this.debug = createMusicDebugState();
 
     this.handleUnlock = this.handleUnlock.bind(this);
-    this.handleMuteToggle = this.handleMuteToggle.bind(this);
     this.handleInteraction = this.handleInteraction.bind(this);
     this.updateIdleLoop = this.updateIdleLoop.bind(this);
     this.handleWindowFocus = this.handleWindowFocus.bind(this);
@@ -47,7 +46,6 @@ export class MusicController {
     syncGlobalMasterVolume(this.masterVolume);
     window.addEventListener("pointerdown", this.handleUnlock, { passive: true });
     window.addEventListener("keydown", this.handleUnlock);
-    window.addEventListener("keydown", this.handleMuteToggle);
     window.addEventListener("pointerdown", this.handleInteraction, { passive: true });
     window.addEventListener("pointermove", this.handleInteraction, { passive: true });
     window.addEventListener("keydown", this.handleInteraction);
@@ -198,18 +196,14 @@ export class MusicController {
       this.fadeRaf = 0;
     }
   }
-  handleUnlock() {
+  handleUnlock(event = null) {
+    if (event?.type === "keydown" && typeof event.key === "string" && event.key.toLowerCase() === "escape") return;
     if (this.muted) return;
     if (this.currentMode === "death" && this.deathAudio.paused && !this.deathPlaybackStarted) {
       this.attemptAudioPlay(this.deathAudio, "unlock-death");
       return;
     }
     if (this.currentTrack?.audio?.paused) this.playCurrentTrack();
-  }
-  handleMuteToggle(event) {
-    if (!event || typeof event.key !== "string") return;
-    if (event.key.toLowerCase() !== "m" || event.repeat) return;
-    this.setMuted(!this.muted);
   }
   handleInteraction() {
     this.resetIdleTimer();

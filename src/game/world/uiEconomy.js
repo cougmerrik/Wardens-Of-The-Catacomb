@@ -285,6 +285,19 @@ export function toggleStatsPanel(game, open) {
   }
 }
 
+export function togglePause(game, open) {
+  if (!game || game.gameOver) return;
+  const nextPaused = typeof open === "boolean" ? open : !game.paused;
+  game.paused = nextPaused;
+  if (nextPaused) {
+    game.shopOpen = false;
+    game.skillTreeOpen = false;
+    game.statsPanelOpen = false;
+    game.statsPanelPausedGame = false;
+  }
+  if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
+}
+
 export function setStatsPanelView(game, view) {
   if (view !== "run" && view !== "character") return false;
   game.statsPanelView = view;
@@ -339,18 +352,7 @@ export function handleUiClicks(game) {
     const next = (game.uiScroll?.[target.key] || 0) + step;
     game.uiScroll[target.key] = Math.max(0, Math.min(max, next));
   }
-  if (game.input.consumeKeyQueued("escape")) {
-    if (game.gameOver) {
-      if (game.statsPanelOpen && typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
-      else if (game.onReturnToMenu) game.onReturnToMenu();
-    } else if (game.shopOpen) toggleShop(game, false);
-    else if (game.skillTreeOpen) toggleSkillTree(game, false);
-    else if (game.statsPanelOpen) toggleStatsPanel(game, false);
-    else {
-      game.paused = !game.paused;
-      if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
-    }
-  }
+  if (game.optionsOpen) return;
   if (playerAlive && game.input.consumeKeyQueued("b") && !game.gameOver) {
     toggleShop(game);
   }
@@ -406,6 +408,17 @@ export function handleUiClicks(game) {
       if (game.gameOver && game.statsPanelOpen && typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
       else toggleStatsPanel(game);
       continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.optionsButton)) {
+      clearPinnedUiTooltip(game); if (typeof game.onOpenOptions === "function") game.onOpenOptions(game);
+      continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.pauseButton)) {
+      clearPinnedUiTooltip(game); togglePause(game); continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.pauseOverlayResume)) {
+      clearPinnedUiTooltip(game);
+      togglePause(game, false); continue;
     }
     if (pointInRect(game, click.x, click.y, game.uiRects.gameOverLeaderboardButton)) {
       clearPinnedUiTooltip(game);

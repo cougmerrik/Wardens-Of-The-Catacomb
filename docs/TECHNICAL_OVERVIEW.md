@@ -39,6 +39,7 @@ This document summarizes the current high-level architecture and validation work
   - tap-to-UI hit routing for HUD/overlay actions
 - Android HUD layout helpers live under `src/rendering/hud/androidLayout.js`. They provide touch regions, draw active stick guides, and keep compact HUD panels away from the lower movement/aim zones.
 - Browser bootstrap owns Android-specific menu/gameplay chrome such as utility buttons, gameplay-control visibility, Android canvas sizing, and Android dev-mode unlock handling.
+- The in-canvas HUD exposes top-right `Stats` and `Options` rects plus class-panel `Shop`, `Skill Tree`, and `Pause` rects. `Options` opens the existing DOM Options panel as an overlay so master volume, voice chat, ads, and gameplay tips continue to use the main-menu persistence logic. `Pause` uses explicit HUD click/action routing, is greyed out for multiplayer clients without pause authority, and the pause overlay publishes its own `Resume` rect. `Esc` no longer toggles pause or unlocks music playback, music mute is controlled through options volume rather than an `M` keybind, and the embedded group list renders every teammate as a compact owner/name plus health bar row.
 - Android build commands:
   - `npm run build:android:web` prepares `www/`
   - `npm run cap:sync:android` rebuilds and syncs the Capacitor Android project
