@@ -32,13 +32,14 @@ function validatePopupQueue() {
   assert.equal(game.skillPointPopup.queue.length, 2, "extra skill point gains should queue behind the active popup");
   game.time = SKILL_POINT_POPUP_DURATION + 0.1;
   updateSkillPointPopup(game);
-  assert.equal(game.skillPointPopup.active, null, "expired popup should close when no skill is selected");
-  assert.equal(game.skillPointPopup.queue.length, 0, "expired popup should drop queued popup backlog");
+  assert(game.skillPointPopup.active, "expired popup should advance to the next queued popup");
+  assert.equal(game.skillPointPopup.active.id, firstId + 1, "timeout should not skip the next queued popup");
+  assert.equal(game.skillPointPopup.queue.length, 1, "timeout should preserve later queued popups");
 
   game.time += 1;
   game.skillPoints = 4;
   syncSkillPointPopupQueue(game);
-  assert(game.skillPointPopup.active, "new skill point gain should open a fresh popup after a timeout");
+  assert.equal(game.skillPointPopup.queue.length, 2, "new skill point gain should queue behind the advanced popup");
   dismissSkillPointPopup(game, { clearQueue: true });
 }
 

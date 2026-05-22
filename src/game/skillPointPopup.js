@@ -83,9 +83,8 @@ export function updateSkillPointPopup(game) {
   if (!state.active) return null;
   const elapsed = now(game) - state.active.startedAt;
   if (elapsed >= SKILL_POINT_POPUP_DURATION) {
-    state.active = null;
-    state.queue.length = 0;
-    return null;
+    dismissSkillPointPopup(game);
+    return state.active;
   }
   return state.active;
 }
