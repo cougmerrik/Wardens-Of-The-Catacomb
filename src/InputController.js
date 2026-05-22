@@ -163,7 +163,7 @@
     for (const key of rectKeys) {
       if (this.pointInRect(x, y, uiRects?.[key])) return true;
     }
-    const rectGroups = [uiRects?.shopItems, uiRects?.skillTreeNodes, uiRects?.consumableSlots, uiRects?.groupPanelRows];
+    const rectGroups = [uiRects?.shopItems, uiRects?.skillTreeNodes, uiRects?.skillPointPopupNodes, uiRects?.consumableSlots, uiRects?.groupPanelRows];
     for (const group of rectGroups) {
       for (const entry of Array.isArray(group) ? group : []) {
         if (this.pointInRect(x, y, entry?.rect || entry)) return true;

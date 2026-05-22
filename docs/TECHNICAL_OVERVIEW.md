@@ -9,6 +9,7 @@ This document summarizes the current high-level architecture and validation work
 - `src/mapGenerator.js`: biome-specific procedural map generators for catacomb and sewer floors
 - `src/rendering/*`: renderer, HUD, scene drawing, and effects
 - Class skill tree menus share layout sizing and row-splitting helpers in `src/rendering/hud/skillTreeMenuSections.js` so Scout, Warrior, and Necromancer progression views do not drift visually.
+- Skill-point popups use `src/game/skillPointPopup.js` for queue/tier selection state and `src/rendering/hud/skillPointPopup.js` for the bottom-canvas picker. Popup clicks route through the same local/network `spendSkillPoint` actions as the full skill tree.
 - `assets/images/skills/scout/*`: transparent Scout progression icons; new Scout talent icons should be generated from the canonical prompt in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#scout-progression-icon-assets)
 - `assets/images/skills/warrior/*` and `assets/images/skills/mage/*`: transparent Warrior and Mage progression icons; new Warrior or Mage talent icons should be generated from the canonical prompt in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#warrior-and-mage-progression-icon-assets)
 - `assets/images/items/*`: transparent consumable item icons; new consumable icons should be generated from the canonical prompt in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md#icon-generation-prompt)
@@ -277,6 +278,8 @@ This document summarizes the current high-level architecture and validation work
   - now fills the required local player handle, uses the solo character-select path, and spawns a deterministic hostile target so the check is not floor-generation dependent
 - `validate:skill-refund`
   - verifies local skill spend plus full refund flow, including gold cost, point restoration, and refund-count updates
+- `validate:skill-popup`
+  - verifies skill-point popup queueing, one-tier option filtering, timeout advancement, spend dismissal, and local/network click wiring
 - `validate:network-join`
   - verifies real browser room join, authoritative spawn adoption, and post-join movement
 - `validate:network-combat`

@@ -226,6 +226,11 @@ export class GameRuntimeBase {
     this.generateFloor(nextWidth, nextHeight);
     this.gold = persisted.gold;
     this.skillPoints = persisted.skillPoints;
+    if (this.skillPointPopup) {
+      this.skillPointPopup.active = null;
+      this.skillPointPopup.queue = [];
+      this.skillPointPopup.lastSkillPoints = this.skillPoints;
+    }
     this.player.maxHealth = persisted.maxHealth;
     this.player.health = Math.min(this.player.maxHealth, persisted.health);
     if (typeof this.refillShopForFloor === "function") this.refillShopForFloor();

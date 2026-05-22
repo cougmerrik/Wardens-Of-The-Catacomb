@@ -1,6 +1,7 @@
 import { vecLength, directionIndexFromVector } from "../utils.js";
 import { updateConfusedEnemy, updateFriendlyMageSummon } from "./gameStepMageSummons.js";
 import { resolveCombatAndDrops } from "./stepCombatResolution.js";
+import { syncSkillPointPopupQueue } from "./skillPointPopup.js";
 import { getWarriorPassiveRegenBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
 import {
   getNecromancerBlackCandleCursedBeamBonus,
@@ -16,6 +17,7 @@ import {
 } from "./necromancerTalentTree.js";
 
 export function stepGame(game, dt, controls = {}) {
+  syncSkillPointPopupQueue(game);
   const segmentRectHit = (x0, y0, x1, y1, left, top, right, bottom) => {
     // Liang-Barsky clipping against AABB.
     const dx = x1 - x0;

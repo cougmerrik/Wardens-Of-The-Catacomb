@@ -5,6 +5,7 @@ import { drawAndroidTouchControls, getAndroidTouchRegions } from "./hud/androidL
 import { drawConsumablesBar } from "./hud/consumablesBar.js";
 import { drawLanternFuelGauge } from "./hud/lanternFuelGauge.js";
 import { drawGameplayTipBubble } from "./hud/gameplayTipBubble.js";
+import { drawSkillPointPopup } from "./hud/skillPointPopup.js";
 import { runtimeSceneSkeletonWarriorDrawMethods } from "./runtimeSceneSkeletonWarriorDrawMethods.js";
 import { drawEnemyAdditionalStatusIcons, drawEnemyStatusBadge } from "./enemyStatusBadges.js";
 
@@ -97,7 +98,8 @@ export const runtimeSceneDrawMethods = {
     ctx.font = "12px Trebuchet MS";
     ctx.fillText(`XP ${game.experience}/${game.expToNextLevel} (${Math.round(ratio * 100)}%)`, barX, y + 22);
     const consumableBounds = drawConsumablesBar(this, game, layout, y);
-    drawLanternFuelGauge(this, game, layout, y, consumableBounds);
+    const lanternBounds = drawLanternFuelGauge(this, game, layout, y, consumableBounds);
+    drawSkillPointPopup(this, game, layout, lanternBounds);
     if (layout.isAndroid) {
       const regions = getAndroidTouchRegions(layout, y);
       layout.touchMoveRegion = game.uiRects.touchMoveRegion = regions.move;

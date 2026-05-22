@@ -13,6 +13,7 @@ import {
   getWarriorIronGuardDefenseBonusPct,
   isWarriorTalentGame
 } from "../warriorTalentTree.js";
+import { handleSkillPointPopupClick } from "../skillPointPopup.js";
 import { hasMageArcanePresenceActive, hasMageTalent, isNecromancerTalentGame } from "../necromancerTalentTree.js";
 import {
   ACTIVE_CONSUMABLE_SLOT_CAP,
@@ -55,10 +56,8 @@ function isActiveMultiplayer(game) {
 }
 
 export function getEnemySpawnInterval(game) {
-  const c = game.config.enemy;
-  const base = Number.isFinite(c.spawnIntervalStart) ? c.spawnIntervalStart : 2.6;
-  const min = Number.isFinite(c.spawnIntervalMin) ? c.spawnIntervalMin : 0.55;
-  const mult = game.getEnemySpawnRateScale();
+  const c = game.config.enemy, base = Number.isFinite(c.spawnIntervalStart) ? c.spawnIntervalStart : 2.6;
+  const min = Number.isFinite(c.spawnIntervalMin) ? c.spawnIntervalMin : 0.55, mult = game.getEnemySpawnRateScale();
   const interval = Math.max(min, base / Math.max(0.05, Number.isFinite(mult) ? mult : 1));
   return game.isPostFloorBossSpawnRateReduced?.() ? interval * 2 : interval;
 }
@@ -391,6 +390,7 @@ export function handleUiClicks(game) {
         continue;
       }
     }
+    if (playerAlive && handleSkillPointPopupClick(game, click.x, click.y, (node) => (clearPinnedUiTooltip(game), game.spendSkillPoint(node.key)))) continue;
     if (pointInRect(game, click.x, click.y, game.uiRects.shopButton)) {
       if (!playerAlive) continue;
       clearPinnedUiTooltip(game);

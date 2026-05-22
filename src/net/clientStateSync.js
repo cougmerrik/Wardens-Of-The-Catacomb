@@ -404,6 +404,9 @@ export function applySnapshotToGame({
       }
     }
     applyPlayerSnapshotToGameState(game, snapshotPlayer, { isNetworkController, syncNamedObject });
+    if ((game.networkPerf.appliedSnapshotCount || 0) === 1 && game.skillPointPopup && Number.isFinite(game.skillPoints)) {
+      game.skillPointPopup.lastSkillPoints = Math.max(0, Math.floor(game.skillPoints));
+    }
     recordNetworkFlightEvent(game, "snapshotApply", {
       snapshotCount: game.networkPerf.appliedSnapshotCount || 0,
       controller: !!controller,
