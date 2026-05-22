@@ -161,6 +161,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 
 ## Skills and Refunds
 - Skill points are earned from level-ups and spent per player.
+- When skill points increase during active play, a bottom-canvas skill popup appears above the lantern gauge for `8s`, showing only the currently spendable tier. Additional point gains queue additional popups behind the active one.
 - Each class skill tree now shows spent-point totals, current refund count, and the current refund gold cost.
 - Skill descriptions should follow the shared tooltip convention in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#skill-description-convention): start with the category, omit redundant skill-name repeats, and describe mechanical effects with damage types, conditions, cooldowns, internal cooldowns, durations, and statuses where relevant.
 - Full refunds reset all spent skill ranks for the acting player, restore the spent skill points, and increment that player's `refundCount`.
@@ -270,7 +271,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Remote player handles appear below their characters using that player's stable run color.
 - The active-play HUD is rendered in-canvas instead of reserving a desktop sidebar. The minimap anchors to the top-right of the play canvas at `80%` opacity, and the combined player/class HUD aligns directly beneath it.
 - The top-right HUD strip exposes `Stats` and `Options`; the combined player/class HUD keeps local player identity, gold, the class skill button, shop/skill tree, pause, the class meter, active consumable effects, and the group list.
-- Unspent skill points are no longer displayed as an `SP` counter during active play. When points are available, the `Skill Tree` button slowly blinks green.
+- Unspent skill points are no longer displayed as an `SP` counter during active play. Newly earned points open the tier-only skill popup, and the `Skill Tree` button slowly blinks green while points remain available.
 - The group list is embedded at the bottom of the combined HUD. It renders every teammate as a compact one-line owner marker/name plus health bar, including dead-state entries for connected dead spectators.
 - The minimap uses stable per-run player colors for teammates.
 - Multiplayer game over shows a shared team-results overlay with:
