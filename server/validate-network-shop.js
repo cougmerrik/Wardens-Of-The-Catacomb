@@ -131,6 +131,24 @@ function main() {
   assert(!getActiveSlot(peerState, "shield"), "peer shield charge was not consumed on use");
   assert((peerState.consumables?.sharedCooldown || 0) > 0, "peer shared consumable cooldown did not start");
 
+  peerState.health = 50;
+  peerState.maxHealth = 100;
+  peerState.consumables.sharedCooldown = 0;
+  peerState.consumables.activeSlots = [{ key: "regenerationPotion", count: 1, cooldownRemaining: 0 }];
+  handleActionMessage(room, peer.id, { kind: "useConsumableSlot", slot: 0 });
+  const regenAfterUse = peerState.consumables?.effects?.regenerationPotion || {};
+  assert(!getActiveSlot(peerState, "regenerationPotion"), "peer regeneration potion charge was not consumed on use");
+  assert((peerState.consumables?.sharedCooldown || 0) > 0, "peer regeneration potion cooldown did not start");
+  assert((regenAfterUse.timer || 0) > 0, "peer regeneration potion timer did not start");
+  const cooldownAfterUse = peerState.consumables.sharedCooldown;
+  const timerAfterUse = regenAfterUse.timer;
+  const healthAfterUse = peerState.health;
+  room.tick(room.lastTickMs + 1000);
+  const regenAfterTick = peerState.consumables?.effects?.regenerationPotion || {};
+  assert(peerState.consumables.sharedCooldown < cooldownAfterUse, "peer consumable cooldown did not tick down");
+  assert(regenAfterTick.timer < timerAfterUse, "peer regeneration potion timer did not tick down");
+  assert(peerState.health > healthAfterUse, "peer regeneration potion did not heal over time");
+
   console.log(JSON.stringify({
     ownerGold: ownerState.gold,
     peerGold: peerState.gold,

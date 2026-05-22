@@ -80,7 +80,7 @@ function validateStatusPanelCoverage() {
   for (const key of ["regenerationPotion", "speedPotion", "fireOil", "frostOil", "spikeGrowth", "shield"]) {
     assert.ok(source.includes(`key: "${key}"`), `class status panel should render ${key}`);
   }
-  assert.ok(source.includes("rect.h += consumableRows * 28"), "class status panel should reserve fixed consumable rows");
+  assert.ok(source.includes("getConsumableStatusRows(width) * 28"), "class status panel should reserve fixed consumable rows");
   assert.ok(!source.includes("if (consumableStatuses.length > 0) rect.h +="), "class status panel should not resize only when effects are active");
 }
 

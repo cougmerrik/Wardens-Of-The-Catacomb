@@ -56,7 +56,8 @@ function main() {
   assertIncludes(classPanel, "disabled: pauseDisabled", "HUD pause button should support a disabled multiplayer state");
   assertIncludes(classPanel, "localPlayerId !== pauseOwnerId", "HUD pause button should grey out for non-pause-owner clients");
   assertIncludes(classPanel, "const groupRows = remoteCount;", "HUD group list should render every teammate row");
-  assertIncludes(classPanel, "const DESKTOP_BASE_PANEL_H = 230;", "HUD backing panel should reserve enough height before teammate rows");
+  assertIncludes(classPanel, "getPanelContentHeight(layout, width, hasStatusBar, groupRows, networkLines)", "HUD backing panel should size dynamically for teammate rows");
+  assertIncludes(classPanel, "height += getGroupListHeight(groupRows);", "HUD backing panel should reserve group list height");
   assertIncludes(classPanel, 'const prefix = isRoomOwner ? "★ " : "";', "group rows should mark the room owner inline");
   assertIncludes(classPanel, "const barY = y + 6;", "group rows should use compact one-line health bars");
   assertIncludes(classPanel, 'drawHudButton(ctx, pauseRect, game.paused ? "Resume" : "Pause"', "HUD should draw a Pause/Resume button");
