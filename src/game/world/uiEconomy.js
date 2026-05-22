@@ -333,6 +333,7 @@ function isPinnedSkillNode(game, node) {
 
 export function handleUiClicks(game) {
   if (!game.input) return;
+  if (game.optionsOpen) return void game.input.discardQueuedActions?.();
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
   if (playerAlive && !game.gameOver && !game.shopOpen && !game.skillTreeOpen) {
     for (let i = 0; i < ACTIVE_CONSUMABLE_SLOT_CAP; i++) {
@@ -351,7 +352,6 @@ export function handleUiClicks(game) {
     const next = (game.uiScroll?.[target.key] || 0) + step;
     game.uiScroll[target.key] = Math.max(0, Math.min(max, next));
   }
-  if (game.optionsOpen) return;
   if (playerAlive && game.input.consumeKeyQueued("b") && !game.gameOver) {
     toggleShop(game);
   }

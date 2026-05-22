@@ -58,6 +58,10 @@ export function shouldSendNetworkInput(input, nowMs, previous, lastInputSendAt, 
 }
 
 export function handleNetworkUiActions(game, netClient, isController) {
+  if (game?.optionsOpen) {
+    game.input?.discardQueuedActions?.();
+    return;
+  }
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
   const isActiveMultiplayer = !!game?.networkEnabled && game.networkRoomPhase === "active";
   const localPlayerId = typeof game?.networkLocalPlayerId === "string" ? game.networkLocalPlayerId : null;
@@ -174,7 +178,6 @@ export function handleNetworkUiActions(game, netClient, isController) {
     const next = (game.uiScroll?.[target.key] || 0) + step;
     game.uiScroll[target.key] = Math.max(0, Math.min(max, next));
   }
-  if (game.optionsOpen) return;
   if (playerAlive && game.input.consumeKeyQueued("b") && !game.gameOver) {
     if (isActiveMultiplayer && !isPauseOwner) {
       recordAction(null, "key:b", "toggleLocalShop", "b");

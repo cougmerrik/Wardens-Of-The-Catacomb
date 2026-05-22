@@ -273,6 +273,14 @@
     return queued;
   }
 
+  discardQueuedActions() {
+    this.mouse.leftQueued = false;
+    this.mouse.rightQueued = false;
+    this.mouse.uiLeftClicks.length = 0;
+    this.mouse.wheelDelta = 0;
+    this.keyQueued.clear();
+  }
+
   queueKey(key) {
     if (typeof key !== "string" || !key) return;
     this.keyQueued.add(key.toLowerCase());

@@ -69,15 +69,18 @@ function main() {
   assertIncludes(input, '"optionsButton"', "input controller should treat options button as interactive UI");
   assertIncludes(input, '"pauseButton"', "input controller should treat pause button as interactive UI");
   assertIncludes(input, '"pauseOverlayResume"', "input controller should treat pause overlay resume as interactive UI");
+  assertIncludes(input, "discardQueuedActions()", "input controller should expose a queued-action drain for options overlays");
 
   assertIncludes(world, "export function togglePause", "local UI should expose shared pause toggle logic");
   assertIncludes(world, "game.onOpenOptions(game)", "local HUD options button should open in-game options");
+  assertIncludes(world, "game.input.discardQueuedActions?.();", "local options overlay should drop buffered gameplay UI input");
   assertIncludes(world, "togglePause(game);", "local HUD pause button should toggle pause");
   assertIncludes(world, "game.uiRects.pauseOverlayResume", "local pause overlay resume should route through UI clicks");
   assertNotIncludes(world, 'consumeKeyQueued("escape")', "local gameplay should not use Esc as a pause keybind");
 
   assertIncludes(networkUi, "!!game?.optionsOpen", "network input collection should block gameplay while options are open");
   assertIncludes(networkUi, "game.onOpenOptions(game)", "network HUD options button should open in-game options");
+  assertIncludes(networkUi, "game.input?.discardQueuedActions?.();", "network options overlay should drop buffered gameplay UI input");
   assertIncludes(networkUi, "const canToggleNetworkPause = !isActiveMultiplayer || isPauseOwner;", "network pause clicks should be gated by pause authority");
   assertIncludes(networkUi, 'netClient.sendAction({ kind: "togglePause" })', "network HUD pause button should use an explicit pause action");
   assertNotIncludes(networkUi, "toggleLocalPause", "non-owner network clients should not locally fake pause toggles");
