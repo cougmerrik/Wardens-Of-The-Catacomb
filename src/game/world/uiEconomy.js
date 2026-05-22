@@ -59,8 +59,8 @@ export function getEnemySpawnInterval(game) {
   const base = Number.isFinite(c.spawnIntervalStart) ? c.spawnIntervalStart : 2.6;
   const min = Number.isFinite(c.spawnIntervalMin) ? c.spawnIntervalMin : 0.55;
   const mult = game.getEnemySpawnRateScale();
-  const denom = Number.isFinite(mult) ? mult : 1;
-  return Math.max(min, base / Math.max(0.05, denom));
+  const interval = Math.max(min, base / Math.max(0.05, Number.isFinite(mult) ? mult : 1));
+  return game.isPostFloorBossSpawnRateReduced?.() ? interval * 2 : interval;
 }
 
 export function getMoveSpeedMultiplier(game) {

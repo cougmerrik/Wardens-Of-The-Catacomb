@@ -499,11 +499,13 @@ export function stepGame(game, dt, controls = {}) {
       }
     }
   }
-  game.enemySpawnTimer -= dt;
+  const postBossSpawnSuppressed = typeof game.isPostFloorBossSpawnSuppressed === "function" && game.isPostFloorBossSpawnSuppressed();
+  if (postBossSpawnSuppressed) game.enemySpawnTimer = Math.max(game.enemySpawnTimer, 0.25);
+  else game.enemySpawnTimer -= dt;
   let spawnIterations = 0;
   const activeEnemyCap = typeof game.getActiveEnemyCap === "function" ? game.getActiveEnemyCap() : game.config.enemy.maxCount;
   const floorBossActive = typeof game.isFloorBossActive === "function" ? game.isFloorBossActive() : false;
-  while (!floorBossActive && game.enemySpawnTimer <= 0 && game.enemies.length < activeEnemyCap && spawnIterations < 6) {
+  while (!floorBossActive && !postBossSpawnSuppressed && game.enemySpawnTimer <= 0 && game.enemies.length < activeEnemyCap && spawnIterations < 6) {
     const packSize = game.getEnemyPackSize();
     for (let i = 0; i < packSize && game.enemies.length < activeEnemyCap; i++) {
       const point = game.randomEnemySpawnPoint();

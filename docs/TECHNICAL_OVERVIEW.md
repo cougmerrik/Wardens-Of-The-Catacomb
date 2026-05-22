@@ -250,7 +250,7 @@ This document summarizes the current high-level architecture and validation work
   - lightweight phase state on each enemy
   - a central dispatch seam for per-enemy behavior
 - Shared movement/pathing now uses target-point steering plus corner-assist probes in `src/game/world/navigationCollision.js`.
-- Floor-boss state in `src/game/runtimeFloorBossMethods.js` is now boss-type aware instead of necromancer-specific, which allows the same progression flow to drive both necromancer and minotaur encounters.
+- Floor-boss state in `src/game/runtimeFloorBossMethods.js` is boss-type aware and owns post-defeat cleanup state. Boss defeat stamps a `10s` same-floor spawn suppression window, queues a one-shot hidden-hostile cleanup using the union of living player viewports, then lets the spawn interval helper run at half rate for the rest of that floor. Combat resolution suppresses non-boss post-boss loot without treating silently removed enemies as deaths.
 - Safe spawn and teleport placement now validate full movement footprints instead of trusting tile centers, which hardens player starts and boss teleports against blocked placements.
 
 ## Validation and Quality Gates

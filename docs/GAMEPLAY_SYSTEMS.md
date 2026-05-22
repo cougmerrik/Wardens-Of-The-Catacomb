@@ -174,7 +174,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - `activeCapBase = 30`
   - `activeCapPerFloor = 10`
   - `activeCapMax = 200`
-- Floor boss encounters stop normal enemy spawning and armor-stand activations while the boss is active.
+- Floor boss encounters stop normal enemy spawning and armor-stand activations while the boss is active. After the boss dies, off-screen hostile enemies are silently removed, ambient spawning stays suppressed for `10s` or until the next floor, then resumes at half rate for the rest of that floor. Non-boss enemies killed after the floor boss dies do not drop loot.
 - Enemies now run through a tactics framework instead of only type-based chase logic.
 - Current enemy-tactics highlights:
   - Ghosts orbit close to targets, maintain a purple siphon stream, and occasionally dive in for melee hits.
@@ -294,7 +294,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - ambient spawning stops
   - armor stand activations stop
   - XP gain is blocked
-- Boss defeat opens the exit portal and ends the encounter state.
+- Boss defeat opens the exit portal and starts a quiet cleanup window: hostiles outside every living player's current view disappear without death rewards or drops, ambient spawning stays at `0` for `10s` on that floor, then resumes at half rate. Remaining non-boss enemy deaths on that floor do not create loot.
 - Boss behavior highlights:
   - `Necromancer`: ranged pressure, skeleton summons, and anti-kite blink pressure
   - `Minotaur`: rush-down charge, stomp pressure, player shove on contact, minimap boss marker, and direction/distance objective hints

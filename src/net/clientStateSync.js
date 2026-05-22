@@ -467,7 +467,8 @@ export function applySnapshotToGame({
     });
     game.fireZones = applyDeltaCollection(game.fireZones, state.delta.fireZones, { keyframe, positionAlpha: 1 });
     game.meleeSwings = applyDeltaCollection(game.meleeSwings, state.delta.meleeSwings, { keyframe, positionAlpha: 1 });
-    synthesizeDespawnDamageFloatingTexts(game, previousEnemyStateById, enemyDespawns, { skip: keyframe });
+    const bossCleanupPhase = state.floorBoss && ["defeated", "portal", "completed"].includes(state.floorBoss.phase);
+    synthesizeDespawnDamageFloatingTexts(game, previousEnemyStateById, enemyDespawns, { skip: keyframe || bossCleanupPhase });
     synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: false });
     recordSuspiciousNetworkState(game, { keyframe, ackSeq });
   } else {

@@ -577,6 +577,7 @@ export function resolveCombatAndDrops({
 
   let removeBossSummons = false;
   const pendingRaisedEnemies = [];
+  let suppressRemainingPostBossDrops = !!(game.floorBoss && ["defeated", "portal", "completed"].includes(game.floorBoss.phase));
   game.enemies = game.enemies.filter((enemy) => {
     if (enemy.type === "skeleton_warrior" && enemy.collapsed && ((enemy.collapseTimer > 0) || (enemy.reanimateTimer > 0))) return true;
     if (enemy.deathProcessed && enemy.hp <= 0) return (enemy.corpseTimer || 0) > 0;
@@ -774,13 +775,16 @@ export function resolveCombatAndDrops({
         if (typeof game.gainExperienceForPlayerEntity === "function") game.gainExperienceForPlayerEntity(rewardOwner, game.xpFromEnemy(enemy));
         else game.gainExperience(game.xpFromEnemy(enemy));
       }
-      if (enemy.type === "goblin") game.dropTreasureBag(enemy.x, enemy.y, enemy.goldEaten);
+      if (suppressRemainingPostBossDrops && !enemy.isFloorBoss) {
+        // The floor is in cleanup time after a boss kill; remaining enemies still count for combat stats but do not create loot.
+      } else if (enemy.type === "goblin") game.dropTreasureBag(enemy.x, enemy.y, enemy.goldEaten);
       else if (enemy.type === "armor") game.dropArmorLoot(enemy.x, enemy.y);
       else if (enemy.type === "mimic") game.dropTreasureBag(enemy.x, enemy.y, 24);
       else if (enemy.type === "mummy") game.maybeSpawnDrop(enemy.x, enemy.y);
       else if (enemy.type === "prisoner" || enemy.type === "rat_archer" || enemy.type === "skeleton_warrior" || enemy.type === "skeleton" || enemy.type === "shardling") game.maybeSpawnDrop(enemy.x, enemy.y);
       else if (enemy.type === "necromancer" || enemy.type === "sonya" || enemy.type === "leprechaun") {
         if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
+        suppressRemainingPostBossDrops = true;
         removeBossSummons = true;
         if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
         if (enemy.type === "leprechaun") game.dropLeprechaunLoot(enemy.x, enemy.y);
@@ -789,6 +793,7 @@ export function resolveCombatAndDrops({
         game.spawnFloatingText(enemy.x, enemy.y - 62, "Portal Open", "#90f0ff", 1.5, 18);
       } else if (enemy.type === "minotaur") {
         if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
+        suppressRemainingPostBossDrops = true;
         if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
         game.dropMinotaurLoot(enemy.x, enemy.y);
         game.spawnFloatingText(enemy.x, enemy.y - 42, "Boss Defeated", "#f2bf7b", 1.5, 18);
@@ -796,6 +801,7 @@ export function resolveCombatAndDrops({
       } else if (enemy.type === "golem") {
         if (isFinalGolemBossDeath) {
           if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
+          suppressRemainingPostBossDrops = true;
           if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
           game.dropGolemLoot(enemy.x, enemy.y);
           game.spawnFloatingText(enemy.x, enemy.y - 42, "Boss Defeated", "#f2bf7b", 1.5, 18);
@@ -811,6 +817,7 @@ export function resolveCombatAndDrops({
   if (removeBossSummons) {
     game.enemies = game.enemies.filter((enemy) => !(enemy.type === "skeleton" && enemy.summonerBoss));
   }
+  if (typeof game.clearHiddenEnemiesAfterFloorBossDefeat === "function") game.clearHiddenEnemiesAfterFloorBossDefeat();
   game.breakables = (game.breakables || []).filter((br) => {
     if ((br.hp || 0) <= 0) {
       game.dropBreakableLoot(br.x, br.y);
