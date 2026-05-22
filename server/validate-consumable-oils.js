@@ -84,11 +84,35 @@ function validateStatusPanelCoverage() {
   assert.ok(!source.includes("if (consumableStatuses.length > 0) rect.h +="), "class status panel should not resize only when effects are active");
 }
 
+function getMethodSource(source, methodName, endMarker) {
+  const start = source.indexOf(`  ${methodName}(`);
+  const end = source.indexOf(endMarker, start + 1);
+  assert.ok(start >= 0, `${methodName} source should be present`);
+  assert.ok(end > start, `${methodName} source end marker should be present`);
+  return source.slice(start, end);
+}
+
+function validateMeleeOilsSpendOnUse() {
+  const warriorSource = readFileSync("src/game/runtimePlayerAttackMethods.js", "utf8");
+  const mageSource = readFileSync("src/game/playerAttack/runtimeMageCoreAttackMethods.js", "utf8");
+  const warriorMelee = getMethodSource(warriorSource, "performMeleeAttack", "\n\n  ...runtimeRangerActiveAttackMethods");
+  const mimicTongue = getMethodSource(mageSource, "performMageMimicTongue", "\n  performMageGreenFlameBlade(");
+  const greenFlameBlade = getMethodSource(mageSource, "performMageGreenFlameBlade", "\n\n};");
+
+  assert.ok(!/hitAnyEnemy\s*&&\s*\(consumableAttackEffects\?\.fireOil/.test(warriorMelee), "warrior melee oils should spend on swing, not only on hit");
+  assert.ok(!/hitAnyEnemy\s*&&\s*\(consumableAttackEffects\?\.fireOil/.test(greenFlameBlade), "green-flame blade oils should spend on swing, not only on hit");
+  assert.ok(
+    mimicTongue.indexOf("this.consumeConsumableAttackCharge(consumableAttackEffects)") > mimicTongue.lastIndexOf("break;"),
+    "mimic tongue oils should spend after the attack resolves, including whiffs"
+  );
+}
+
 function main() {
   validateOilCharges("fireOil", "burningTimer");
   validateOilCharges("frostOil", "slowTimer");
   validateRegenerationPotionFeedback();
   validateStatusPanelCoverage();
+  validateMeleeOilsSpendOnUse();
   console.log(JSON.stringify({ consumableEffects: "ok" }, null, 2));
 }
 

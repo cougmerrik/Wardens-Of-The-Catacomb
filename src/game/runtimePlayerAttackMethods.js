@@ -878,7 +878,6 @@ export const runtimePlayerAttackMethods = {
       }
     }
     if (
-      hitAnyEnemy &&
       (consumableAttackEffects?.fireOil || consumableAttackEffects?.frostOil) &&
       typeof this.consumeConsumableAttackCharge === "function"
     ) {

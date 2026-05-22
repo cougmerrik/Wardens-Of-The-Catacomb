@@ -44,9 +44,12 @@ function main() {
   assertIncludes(minimap, "return miniY + miniH + 6;", "combined HUD anchor should use the full minimap frame bottom");
 
   assertIncludes(classPanel, "drawAbilityCooldownWidget", "combined HUD should include the class skill widget");
+  assertIncludes(classPanel, "drawAndroidSwapWidget", "combined HUD should include the Android swap widget");
   assertIncludes(classPanel, "const HUD_PANEL_ALPHA = 0.8;", "combined HUD panel opacity should match the minimap");
+  assertIncludes(classPanel, "const PANEL_BOTTOM_PADDING = 32;", "combined HUD should reserve bottom padding for the full group list");
+  assertIncludes(classPanel, "getPanelContentHeight", "combined HUD height should be derived from rendered content blocks");
   assertIncludes(classPanel, "const abilitySize = layout.isAndroid ? 42 : 36;", "desktop class skill widget should stay compact");
-  assertIncludes(classPanel, "let contentY = rect.y + 96;", "class status content should avoid excessive header gap");
+  assertIncludes(classPanel, "let contentY = rect.y + PANEL_CONTENT_TOP;", "class status content should avoid excessive header gap");
   assertIncludes(classPanel, "game.uiRects.shopButton = shopRect;", "combined HUD should own the shop button rect");
   assertIncludes(classPanel, "function formatHudGold", "combined HUD should compact large gold amounts");
   assertIncludes(classPanel, "goldAmount: game.gold || 0", "shop button should include the current gold amount");
@@ -59,6 +62,7 @@ function main() {
   assertIncludes(classPanel, "drawEmbeddedGroupList", "combined HUD should include the multiplayer group list");
   assertIncludes(classPanel, "const groupRows = remoteCount;", "combined HUD should keep every teammate visible");
   assertIncludes(classPanel, "getConsumableStatusRows(rect.w) * 28", "consumable status area should reserve fixed icon space");
+  assertIncludes(classPanel, "drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget)", "Android swap button rect should be populated from the combined HUD");
   assert.ok(!classPanel.includes("drawModeSwapButton"), "combined HUD should not draw a swap button");
 
   assert.ok(!stats.includes('["Pace",'), "stats overlay should not show pace after HUD cleanup");

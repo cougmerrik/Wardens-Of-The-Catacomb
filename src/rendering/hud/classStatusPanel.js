@@ -10,13 +10,18 @@ import {
 import { getClassDisplayLabel } from "../../game/classDisplay.js";
 import { getMageAttackLabel, getMageEfficiencyState } from "./mageHudState.js";
 import { drawConsumableItemIcon } from "./consumableItemIcons.js";
-import { drawAbilityCooldownWidget } from "./stats.js";
+import { drawAbilityCooldownWidget, drawAndroidSwapWidget } from "./stats.js";
 
 const HUD_PANEL_ALPHA = 0.8;
-const DESKTOP_BASE_PANEL_H = 230;
-const ANDROID_BASE_PANEL_H = 252;
-const NETWORK_PANEL_H = 48;
-const GROUP_ROW_H = 22;
+const PANEL_CONTENT_TOP = 96;
+const PANEL_BAR_BLOCK_H = 24;
+const PANEL_CONSUMABLE_GAP = 4;
+const PANEL_BUTTON_BLOCK_H = 74;
+const PANEL_NETWORK_BLOCK_H = 48;
+const PANEL_GROUP_EMPTY_H = 30;
+const PANEL_GROUP_ROW_H = 22;
+const PANEL_GROUP_BOTTOM_GAP = 4;
+const PANEL_BOTTOM_PADDING = 32;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
@@ -27,14 +32,27 @@ function getHudPanelWidth(renderer, layout) {
   return layout.isAndroid ? 176 : Math.min(240, Math.max(220, minimapW));
 }
 
-function getPanelRect(renderer, layout, panelY = null, groupRows = 0, networkLines = 0) {
+function getGroupListHeight(groupRows) {
+  return groupRows > 0
+    ? groupRows * PANEL_GROUP_ROW_H + PANEL_GROUP_BOTTOM_GAP
+    : PANEL_GROUP_EMPTY_H;
+}
+
+function getPanelContentHeight(layout, width, hasStatusBar, groupRows, networkLines) {
+  let height = PANEL_CONTENT_TOP;
+  if (hasStatusBar) height += PANEL_BAR_BLOCK_H;
+  height += getConsumableStatusRows(width) * 28 + PANEL_CONSUMABLE_GAP;
+  height += PANEL_BUTTON_BLOCK_H;
+  if (networkLines > 0 && !layout.isAndroid) height += PANEL_NETWORK_BLOCK_H;
+  height += getGroupListHeight(groupRows);
+  return height + PANEL_BOTTOM_PADDING;
+}
+
+function getPanelRect(renderer, layout, panelY = null, groupRows = 0, networkLines = 0, hasStatusBar = false) {
   const w = getHudPanelWidth(renderer, layout);
   const x = layout.playW - w - (layout.isAndroid ? 12 : 16);
   const y = Number.isFinite(panelY) ? Math.floor(panelY) : layout.topHudH + renderer.sidebarPadding;
-  const baseH = layout.isAndroid ? ANDROID_BASE_PANEL_H : DESKTOP_BASE_PANEL_H;
-  const networkH = networkLines > 0 && !layout.isAndroid ? NETWORK_PANEL_H : 0;
-  const groupH = groupRows > 0 ? groupRows * GROUP_ROW_H : 0;
-  return { x, y, w, h: baseH + networkH + groupH };
+  return { x, y, w, h: getPanelContentHeight(layout, w, hasStatusBar, groupRows, networkLines) };
 }
 
 function formatMetric(value, suffix = "") {
@@ -227,7 +245,7 @@ function drawEmbeddedGroupList(ctx, game, rect, y) {
     ctx.fillRect(barX, barY, barW, 6);
     ctx.fillStyle = alive ? (ratio > 0.5 ? "#76db8d" : ratio > 0.25 ? "#e1bf63" : "#df6767") : "#5c6371";
     ctx.fillRect(barX, barY, Math.floor(barW * ratio), 6);
-    y += GROUP_ROW_H;
+    y += PANEL_GROUP_ROW_H;
   }
   return y + 4;
 }
@@ -318,7 +336,7 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
   const consumableStatuses = getActiveConsumableStatuses(game);
   const remoteCount = Array.isArray(game.remotePlayers) ? game.remotePlayers.length : 0;
   const groupRows = remoteCount;
-  const rect = getPanelRect(renderer, layout, panelY, groupRows, networkLines.length);
+  const rect = getPanelRect(renderer, layout, panelY, groupRows, networkLines.length, !!status.barLabel);
   game.uiRects.pauseOverlayResume = null;
   drawPanelBase(ctx, rect, status.accent);
 
@@ -334,22 +352,23 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
   const abilitySize = layout.isAndroid ? 42 : 36;
   const abilityX = rect.x + rect.w - abilitySize;
   drawAbilityCooldownWidget(renderer, game, abilityX, rect.y + 2, abilitySize);
+  drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget);
 
   const columnW = Math.floor((rect.w - 10) / 2);
   drawLabelLine(ctx, status.primaryLabel, status.primary, rect.x, rect.y + 56, columnW);
   drawLabelLine(ctx, status.stateLabel, status.state, rect.x + columnW + 10, rect.y + 56, columnW);
 
-  let contentY = rect.y + 96;
+  let contentY = rect.y + PANEL_CONTENT_TOP;
   if (status.barLabel) {
     ctx.fillStyle = "#cbd5e6";
     ctx.font = "11px Trebuchet MS";
     ctx.fillText(status.barLabel, rect.x, contentY);
     drawSegmentedBar(ctx, { x: rect.x, y: contentY + 5, w: rect.w, h: 8 }, status.barRatio, status.barColor, status.sections);
-    contentY += 24;
+    contentY += PANEL_BAR_BLOCK_H;
   }
 
   drawConsumableStatuses(ctx, consumableStatuses, rect.x, contentY, rect.w);
-  contentY += getConsumableStatusRows(rect.w) * 28 + 4;
+  contentY += getConsumableStatusRows(rect.w) * 28 + PANEL_CONSUMABLE_GAP;
 
   const gap = 6;
   const buttonY = contentY;
@@ -369,7 +388,7 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
   drawHudButton(ctx, shopRect, "Shop", { active: game.shopOpen, activeFill: "rgba(113, 82, 44, 0.96)", goldAmount: game.gold || 0 });
   drawHudButton(ctx, skillRect, "Skill Tree", { active: game.skillTreeOpen, activeFill: "rgba(68, 104, 78, 0.96)", pulse });
   drawHudButton(ctx, pauseRect, game.paused ? "Resume" : "Pause", { active: game.paused, disabled: pauseDisabled, activeFill: "rgba(128, 80, 70, 0.96)" });
-  contentY += (buttonH + gap) * 2 + 2;
+  contentY += PANEL_BUTTON_BLOCK_H;
 
   if (networkLines.length > 0 && !layout.isAndroid) {
     const netY = contentY + 2;
@@ -384,7 +403,7 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
       ctx.fillText(networkLines[i], rect.x, netY + i * 13);
     }
     game.networkStatsPanelRect = { x: rect.x, y: netY - 12, w: rect.w, h: 42 };
-    contentY += 48;
+    contentY += PANEL_NETWORK_BLOCK_H;
   } else {
     game.networkStatsPanelRect = null;
   }
