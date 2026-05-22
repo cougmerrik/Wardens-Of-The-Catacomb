@@ -23,6 +23,13 @@ export function isEnemyVisibleToAnyLivingPlayer(game, enemy) {
 export function clearHiddenEnemiesAfterFloorBossDefeat(game) {
   const boss = typeof game?.syncFloorBossState === "function" ? game.syncFloorBossState() : game?.floorBoss;
   if (!game || !boss?.hiddenEnemyCleanupPending || !["defeated", "portal"].includes(boss.phase)) return 0;
+  const cleanupWindowEnded = Number.isFinite(boss.postDefeatSpawnSuppressedUntil) &&
+    Number.isFinite(game.time) &&
+    game.time >= boss.postDefeatSpawnSuppressedUntil;
+  if (cleanupWindowEnded) {
+    boss.hiddenEnemyCleanupPending = false;
+    return 0;
+  }
   const before = Array.isArray(game.enemies) ? game.enemies.length : 0;
   game.enemies = (game.enemies || []).filter((enemy) => {
     if (!enemy || (enemy.hp || 0) <= 0 || enemy.isFloorBoss) return true;
@@ -30,7 +37,7 @@ export function clearHiddenEnemiesAfterFloorBossDefeat(game) {
     return isEnemyVisibleToAnyLivingPlayer(game, enemy);
   });
   const removed = Math.max(0, before - game.enemies.length);
-  boss.hiddenEnemyCleanupPending = false;
-  boss.hiddenEnemyCleanupCount = removed;
+  boss.hiddenEnemyCleanupPending = removed <= 0;
+  boss.hiddenEnemyCleanupCount = (boss.hiddenEnemyCleanupCount || 0) + removed;
   return removed;
 }

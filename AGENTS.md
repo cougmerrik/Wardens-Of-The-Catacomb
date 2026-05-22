@@ -52,6 +52,8 @@ These instructions apply to the whole repository.
 - Prefer focused validation first, then broader validation before staging or commit.
 - Run `npm run validate:core` for quick syntax and LOC checks.
 - Run feature-specific validators when touching gameplay, networking, rendering, or validation harnesses.
+- Prefer behavior assertions over source-text wiring assertions for state machines, input blocking/draining, queue lifecycles, cleanup retries, local/network parity, and other regressions that depend on order or time.
+- Use source-text wiring assertions only as supplements when a runtime validator cannot cover the integration seam cheaply.
 - When adding or changing gameplay statuses, progression effects, floating text, damage indicators, summons, class procs, or other player-visible combat feedback, update targeted validation so local and multiplayer presentation remain in sync.
 - Add or update unit-style validation when behavior changes. If a suitable test does not exist, create the smallest appropriate validator.
 - Rerun failed validations after fixes. If a test appears flaky, improve the logging or assertions before treating it as flaky.
@@ -100,6 +102,8 @@ These instructions apply to the whole repository.
 
 ## Code Review
 
-- Use `codex review --base main` for local branch review.
-- Use `codex review --uncommitted` for unstaged or staged local changes.
+- Use `codex review --uncommitted` while a risky local diff is still cheap to revise.
+- Use `codex review --base main` before pushing broad branch work or requesting GitHub PR review.
+- Batch local review findings, fixes, and focused validation before rerunning remote PR review. Do not use GitHub Action review as an iterative per-fix defect finder unless the user explicitly asks.
+- Reserve manual GitHub Action PR review for closeout after local review and relevant validation have covered the changed behavior.
 - Prioritize bugs, regressions, missing tests, and staging risks over style-only comments.

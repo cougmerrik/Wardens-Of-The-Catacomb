@@ -371,6 +371,37 @@ function validatePostBossCleanupWindow() {
   };
 }
 
+function validatePostBossCleanupRetry() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  game.level = game.getFloorBossTriggerLevel();
+  assert(game.updateFloorBossTrigger() === true, "post-boss cleanup retry test did not queue boss");
+  const boss = spawnBossForCurrentFloor(game, game.player.x + 96, game.player.y);
+  const visible = game.spawnGhost(game.player.x + 128, game.player.y);
+  game.enemies.push(boss, visible);
+  game.markFloorBossActive();
+  killFloorBoss(game);
+  assert(game.floorBoss.hiddenEnemyCleanupCount === 0, "visible-only boss defeat cleanup removed an enemy");
+  assert(game.floorBoss.hiddenEnemyCleanupPending, "visible-only boss defeat cleanup stopped retrying early");
+  visible.x = game.player.x + game.getPlayAreaWidth() + 320;
+  visible.y = game.player.y + game.canvas.height + 320;
+  assert(game.clearHiddenEnemiesAfterFloorBossDefeat() === 1, "cleanup retry did not silently remove hidden hostile");
+  assert(!game.enemies.includes(visible), "cleanup retry left the hidden hostile active");
+  assert(!game.floorBoss.hiddenEnemyCleanupPending, "cleanup retry stayed pending after removing a hidden hostile");
+  const expiredVisible = game.spawnGhost(game.player.x + 128, game.player.y + 32);
+  game.enemies.push(expiredVisible);
+  game.floorBoss.hiddenEnemyCleanupPending = true;
+  expiredVisible.x = game.player.x + game.getPlayAreaWidth() + 320;
+  expiredVisible.y = game.player.y + game.canvas.height + 320;
+  game.time = game.floorBoss.postDefeatSpawnSuppressedUntil;
+  assert(game.clearHiddenEnemiesAfterFloorBossDefeat() === 0, "cleanup retry removed hostile after the cleanup window");
+  assert(game.enemies.includes(expiredVisible), "cleanup retry deleted hostile after the cleanup window");
+  assert(!game.floorBoss.hiddenEnemyCleanupPending, "expired cleanup retry stayed pending");
+  return {
+    removedHidden: game.floorBoss.hiddenEnemyCleanupCount,
+    pending: game.floorBoss.hiddenEnemyCleanupPending
+  };
+}
+
 function validateNecromancerTeleportSafety() {
   const game = new GameSim({ classType: "fighter", viewportWidth: 960, viewportHeight: 640 });
   const boss = game.spawnNecromancer(game.player.x + 360, game.player.y + 220);
@@ -439,6 +470,7 @@ function main() {
     controllerJoinSpawnSync: validateControllerJoinSpawnSync(),
     bossSpawnLockout: validateBossLocksAmbientSpawns(),
     postBossCleanupWindow: validatePostBossCleanupWindow(),
+    postBossCleanupRetry: validatePostBossCleanupRetry(),
     necromancerTeleportSafety: validateNecromancerTeleportSafety(),
     golemSplitMechanics: validateGolemSplitMechanics(),
     regressionSurface: validateRegressionSurface()

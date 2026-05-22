@@ -47,6 +47,9 @@ jobs:
             echo
             echo "Do not perform a whole-repository review. Inspect only files changed by this PR and nearby code needed to validate those changes."
             echo "Focus on correctness, regressions, missing validation, security, and maintainability."
+            echo "Prefer one pass that batches material findings over a narrow first finding."
+            echo "Inspect changed validators for behavioral coverage when changed code adds queues, timers, input gating, cleanup retries, state lifecycles, or local/network behavior."
+            echo "Treat source-text wiring assertions as supplemental; report missing behavior coverage when it can hide a regression."
             echo "Return findings only. If there are no material findings, write: No findings."
             echo "Keep output concise and reference files/lines when possible."
             echo
