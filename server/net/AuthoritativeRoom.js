@@ -1,5 +1,6 @@
 import { GameSim } from "../../src/sim/GameSim.js";
 import { getClassDisplayLabel } from "../../src/game/classDisplay.js";
+import { tickConsumables } from "../../src/game/world/consumablesEconomy.js";
 import { buildAgoraVoiceUid, buildVoiceClientConfig } from "./voiceConfig.js";
 import { createRandomActivePlayerStates, placeActivePlayersAtRandomFloorSpawns } from "./floorTransitionHelpers.js";
 import {
@@ -472,6 +473,17 @@ export class AuthoritativeRoom {
     return result;
   }
 
+  tickRemoteActivePlayerConsumables(state, dt) {
+    if (!state || state.alive === false || (state.health || 0) <= 0 || dt <= 0) return;
+    const context = this.createPlayerSimulationContext(state);
+    if (!context) return;
+    tickConsumables(context, dt);
+    if (Number.isFinite(context.nextFloatingTextId)) {
+      this.sim.nextFloatingTextId = Math.max(this.sim.nextFloatingTextId || 0, context.nextFloatingTextId);
+    }
+    this.syncActivePlayerStateFromContext(state, context);
+  }
+
   getSimulationPlayerEntities() {
     this.syncSimPrimaryPlayerState();
     const primary = this.syncPrimaryActivePlayerFromSim();
@@ -512,6 +524,7 @@ export class AuthoritativeRoom {
         input.modeSwapQueued = false;
         continue;
       }
+      this.tickRemoteActivePlayerConsumables(state, dt);
       const mx = Number.isFinite(input.moveX) ? input.moveX : 0;
       const my = Number.isFinite(input.moveY) ? input.moveY : 0;
       if (mx || my) {
@@ -650,6 +663,14 @@ export class AuthoritativeRoom {
     const out = {};
     for (const client of this.clients.values()) {
       out[client.id] = getReceivedInputSeq(client);
+    }
+    return out;
+  }
+
+  getLastActionSeqByPlayer() {
+    const out = {};
+    for (const client of this.clients.values()) {
+      out[client.id] = Number.isFinite(client.lastActionSeq) ? Math.max(0, Math.floor(client.lastActionSeq)) : 0;
     }
     return out;
   }
@@ -1304,6 +1325,7 @@ export class AuthoritativeRoom {
       lastInputSeq: getProcessedInputSeq(controllerClient),
       lastInputSeqByPlayer: this.getLastInputSeqByPlayer(),
       lastReceivedInputSeqByPlayer: this.getLastReceivedInputSeqByPlayer(),
+      lastActionSeqByPlayer: this.getLastActionSeqByPlayer(),
       inputQueueDepthByPlayer: this.getInputQueueDepthByPlayer(),
       mapSignature: sig,
       state

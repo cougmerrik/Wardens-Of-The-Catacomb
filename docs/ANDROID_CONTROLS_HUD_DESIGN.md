@@ -31,8 +31,8 @@ The current runtime expects these control behaviors:
   - held left click for continuous necromancer beam behavior
 - Alternate or class active:
   - right click queued press
-- Pause or close top overlay:
-  - `Escape`
+- Pause or resume:
+  - HUD `Pause` / overlay `Resume`
 - Shop:
   - `B`
 - Skill tree:
@@ -121,6 +121,7 @@ Small touch buttons remain available at the screen edge for:
 - `Shop`
 - `Skill Tree`
 - `Stats`
+- `Options`
 
 Rules:
 
@@ -236,7 +237,8 @@ No information-heavy widgets should occupy those zones during active play.
 ### Pause
 
 - Tapping `Pause` pauses the game
-- The paused overlay should say `Tap Pause to resume` instead of `Press Esc to resume`
+- The paused overlay shows a `Resume` button
+- In multiplayer, pause controls are disabled for clients without pause authority
 - If an overlay is already open, the same button closes the active overlay first before returning to gameplay
 
 ### Shop
@@ -272,6 +274,7 @@ No information-heavy widgets should occupy those zones during active play.
 - Keep a compact group panel visible during gameplay
 - Each teammate row must remain tappable for spectate targeting
 - Pause-owner indicators must remain visible
+- Group rows should stay one-line and show all teammates before spending space on labels or counts
 - Remote pause banners and multiplayer notifications remain top-center, but should avoid overlapping the boss bar when possible
 
 For Android v1, the group panel should prioritize:

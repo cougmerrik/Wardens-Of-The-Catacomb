@@ -15,8 +15,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Move: `WASD` / Arrow Keys
 - Primary attack: left click
 - Secondary skill: right click
-- Pause / close menus: `Esc`
-- Gameplay Tips are enabled by default from the Options menu. Tips appear as a top-left help bubble for `5s`, are prefixed with `TIP:`, and fade out. The start tip explains movement, primary fire, and the class special; the level `2` tip explains swapping between class modes using `Q` on desktop or the Swap button on Android. Level `3` shows a class-specific tip, then additional tips from `tips.txt` appear at random after level `3`.
+- Pause / resume: HUD `Pause` button, then overlay `Resume` button. In multiplayer, pause controls are disabled for clients without pause authority.
+- Runtime options: top-right `Options` button opens the same persistent Options panel used by the main menu.
+- Gameplay Tips are enabled by default from the Options menu and can also be changed in-game. Tips appear as a top-left help bubble for `5s`, are prefixed with `TIP:`, and fade out. The start tip explains movement, primary fire, and the class special; the level `2` tip explains swapping between class modes using `Q` on desktop or the Swap button on Android. Level `3` shows a class-specific tip, then additional tips from `tips.txt` appear at random after level `3`.
 
 ## Classes
 
@@ -160,6 +161,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 
 ## Skills and Refunds
 - Skill points are earned from level-ups and spent per player.
+- When skill points increase during active play, a bottom-canvas skill popup appears above the lantern gauge for `8s`, showing only the currently spendable tier. Additional point gains queue additional popups behind the active one.
 - Each class skill tree now shows spent-point totals, current refund count, and the current refund gold cost.
 - Skill descriptions should follow the shared tooltip convention in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#skill-description-convention): start with the category, omit redundant skill-name repeats, and describe mechanical effects with damage types, conditions, cooldowns, internal cooldowns, durations, and statuses where relevant.
 - Full refunds reset all spent skill ranks for the acting player, restore the spent skill points, and increment that player's `refundCount`.
@@ -173,7 +175,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - `activeCapBase = 30`
   - `activeCapPerFloor = 10`
   - `activeCapMax = 200`
-- Floor boss encounters stop normal enemy spawning and armor-stand activations while the boss is active.
+- Floor boss encounters stop normal enemy spawning and armor-stand activations while the boss is active. After the boss dies, off-screen hostile enemies are silently removed, ambient spawning stays suppressed for `10s` or until the next floor, then resumes at half rate for the rest of that floor. Non-boss enemies killed after the floor boss dies do not drop loot.
 - Enemies now run through a tactics framework instead of only type-based chase logic.
 - Current enemy-tactics highlights:
   - Ghosts orbit close to targets, maintain a purple siphon stream, and occasionally dive in for melee hits.
@@ -268,14 +270,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Remote players render as full in-world avatars.
 - Remote player handles appear below their characters using that player's stable run color.
 - The active-play HUD is rendered in-canvas instead of reserving a desktop sidebar. The minimap anchors to the top-right of the play canvas at `80%` opacity, and the combined player/class HUD aligns directly beneath it.
-- The combined HUD shows local player identity, gold, the class skill button, shop/skill tree/stats buttons, the class meter, active consumable effects, and the group list.
-- Unspent skill points are no longer displayed as an `SP` counter during active play. When points are available, the `Skill Tree` button slowly blinks green.
-- The group list is embedded at the bottom of the combined HUD and shows:
-  - handle
-  - class/color identity
-  - level
-  - health bar
-  - dead-state entries for connected dead spectators
+- The top-right HUD strip exposes `Stats` and `Options`; the combined player/class HUD keeps local player identity, gold, the class skill button, shop/skill tree, pause, the class meter, active consumable effects, and the group list.
+- Unspent skill points are no longer displayed as an `SP` counter during active play. Newly earned points open the tier-only skill popup, and the `Skill Tree` button slowly blinks green while points remain available.
+- The group list is embedded at the bottom of the combined HUD. It renders every teammate as a compact one-line owner marker/name plus health bar, including dead-state entries for connected dead spectators.
 - The minimap uses stable per-run player colors for teammates.
 - Multiplayer game over shows a shared team-results overlay with:
   - roster
@@ -298,7 +295,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - ambient spawning stops
   - armor stand activations stop
   - XP gain is blocked
-- Boss defeat opens the exit portal and ends the encounter state.
+- Boss defeat opens the exit portal and starts a quiet cleanup window: hostiles outside every living player's current view disappear without death rewards or drops, ambient spawning stays at `0` for `10s` on that floor, then resumes at half rate. Remaining non-boss enemy deaths on that floor do not create loot.
 - Boss behavior highlights:
   - `Necromancer`: ranged pressure, skeleton summons, and anti-kite blink pressure
   - `Minotaur`: rush-down charge, stomp pressure, player shove on contact, minimap boss marker, and direction/distance objective hints

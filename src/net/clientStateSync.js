@@ -25,6 +25,7 @@ import {
 } from "./clientCorrectionMetrics.js";
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
 import { applyPredictedTeleportAction } from "./teleportPrediction.js";
+import { resolveSkillPointPopupPendingSpend } from "../game/skillPointPopup.js";
 export { applyMetaStateToGame, resetNetworkFloatingTextEventCache } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
@@ -404,6 +405,13 @@ export function applySnapshotToGame({
       }
     }
     applyPlayerSnapshotToGameState(game, snapshotPlayer, { isNetworkController, syncNamedObject });
+    if ((game.networkPerf.appliedSnapshotCount || 0) === 1 && game.skillPointPopup && Number.isFinite(game.skillPoints)) {
+      game.skillPointPopup.lastSkillPoints = Math.max(0, Math.floor(game.skillPoints));
+    }
+    const actionAckSeq = localPlayerId && state.lastActionSeqByPlayer && typeof state.lastActionSeqByPlayer === "object"
+      ? state.lastActionSeqByPlayer[localPlayerId]
+      : NaN;
+    resolveSkillPointPopupPendingSpend(game, { acknowledgedActionSeq: actionAckSeq });
     recordNetworkFlightEvent(game, "snapshotApply", {
       snapshotCount: game.networkPerf.appliedSnapshotCount || 0,
       controller: !!controller,
@@ -467,7 +475,8 @@ export function applySnapshotToGame({
     });
     game.fireZones = applyDeltaCollection(game.fireZones, state.delta.fireZones, { keyframe, positionAlpha: 1 });
     game.meleeSwings = applyDeltaCollection(game.meleeSwings, state.delta.meleeSwings, { keyframe, positionAlpha: 1 });
-    synthesizeDespawnDamageFloatingTexts(game, previousEnemyStateById, enemyDespawns, { skip: keyframe });
+    const bossCleanupPhase = state.floorBoss && ["defeated", "portal", "completed"].includes(state.floorBoss.phase);
+    synthesizeDespawnDamageFloatingTexts(game, previousEnemyStateById, enemyDespawns, { skip: keyframe || bossCleanupPhase });
     synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: false });
     recordSuspiciousNetworkState(game, { keyframe, ackSeq });
   } else {

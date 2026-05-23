@@ -30,6 +30,8 @@ Use [TASK_BOARD.md](TASK_BOARD.md) as the running task tracker. Each Codex sessi
 - Run targeted checks after each task, not only at the end of the feature.
 - Include both regression-oriented checks and performance-oriented checks when the project provides them.
 - Record the commands run and the outcome in `TASK_BOARD.md`.
+- When new behavior depends on sequencing or state over time, add a behavioral validator that exercises the transition. This includes popup or action queues, input gating and draining, cleanup retries, timers, post-boss state, and local/network parity.
+- Source-text assertions are useful for wiring checks, but they do not replace behavior coverage for a gameplay or input regression.
 
 ### Validation Command Groups
 - `npm run validate:core`
@@ -106,6 +108,7 @@ gh pr create --base main --title "<feature title>" --body "<summary>"
 - Start feature work on a dedicated branch instead of working directly on `main`.
 - Check the repository state with `git status -u` before and after meaningful changes.
 - Review the diff before committing so the commit matches the intended scope.
+- Run local Codex review before broad branch pushes or remote PR review so review findings can be fixed and validated in one batch.
 - Write focused commits with a clear message tied to the feature or fix.
 - Push the branch to the remote before opening or updating a pull request.
 - Use pull requests to summarize intent, validation, and review areas.
@@ -141,6 +144,7 @@ git commit -m "Tune gameplay difficulty and progression"
 ### 4. Push Branch
 - Example commands:
 ```bash
+codex review --base main
 git push -u origin feature/<short-feature-name>
 ```
 
@@ -157,10 +161,12 @@ gh pr view --web
 ```bash
 git status -u
 gh pr view --comments
+codex review --uncommitted
 git add <updated-files>
 git commit -m "Address pull request feedback"
 git push
 ```
+- Batch related review findings before pushing follow-up commits. Re-run focused validation and local review after the batch, then use remote PR review only when another closeout pass is worth the cost.
 
 ## Generic Prompt Examples For Repo Operations
 1. `Read docs/TASK_BOARD.md, inspect the current repo state with git status -u, and create a new feature branch for the task if one does not already exist.`
@@ -180,15 +186,18 @@ git push
 6. Perform the 500 LOC file audit and refactor oversized files when needed.
 7. Update the relevant sections of `README.md` with durable feature outcomes.
 8. Review changed binary assets intentionally before final merge or PR closeout.
-9. Commit with a message that matches the actual change set.
-10. Push the branch and open or update the pull request.
-11. Include a short PR description with purpose, major changes, validation, and known risks.
-12. After review, address feedback, re-run validation as needed, and push the follow-up commits.
+9. Run `codex review --base main` and batch any material local review findings with their validation before remote PR review.
+10. Commit with a message that matches the actual change set.
+11. Push the branch and open or update the pull request.
+12. Include a short PR description with purpose, major changes, validation, and known risks.
+13. After review, address feedback in a validated batch before deciding whether another remote review run is worth the cost.
 
 ## Automated PR Review
 - `.github/workflows/codex-pr-review.yml` is manually triggered through GitHub Actions with a pull request number and optional base branch.
 - The workflow checks out the pull request merge ref, builds a focused prompt from the changed file list and diff stat, runs `openai/codex-action@v1` with a mini model and low effort in a read-only sandbox, and posts findings as a pull request comment.
 - Keep the automated review scoped to changed files and nearby context; do not use it for full-repository review unless explicitly needed.
+- Treat the low-cost automated review as a closeout pass after local review, focused validation, and regression closeout for the branch. Do not rerun it after each individual finding unless a remote rerun is explicitly requested.
+- When the automated review finds a material issue, audit adjacent changed behavior locally, batch related fixes, add focused behavior validation where coverage was weak, and only then consider another automated review run.
 - The repository must define the GitHub Actions secret `OPENAI_API_KEY`; keep the key only in GitHub secrets, not in tracked files or local documentation.
 - Use `gh secret list` to confirm the secret exists and `gh run list --workflow "Codex PR Review"` to inspect recent workflow runs.
 

@@ -1,5 +1,37 @@
 import { vecLength } from "../utils.js";
 
+export function pulseMageFrozenOrb(game, orb, dt) {
+  if (!game || !orb || orb.projectileType !== "mage_frozenOrb" || orb.life <= 0) return;
+  const interval = Math.max(0.08, Number.isFinite(orb.frostPulseInterval) ? orb.frostPulseInterval : 0.18);
+  orb.frostPulseTimer = (Number.isFinite(orb.frostPulseTimer) ? orb.frostPulseTimer : interval) - dt;
+  if (orb.frostPulseTimer > 0) return;
+  orb.frostPulseTimer += interval;
+  const baseAngle = Number.isFinite(orb.angle) ? orb.angle : Math.atan2(orb.vy || 0, orb.vx || 1);
+  const speed = 205;
+  const shardDamage = Math.max(0.5, Number.isFinite(orb.frostPulseShardDamage) ? orb.frostPulseShardDamage : (orb.damage || 1) * 0.42);
+  for (const offset of [-Math.PI * 0.5, -Math.PI * 0.18, Math.PI * 0.18, Math.PI * 0.5]) {
+    const angle = baseAngle + offset;
+    game.bullets.push({
+      x: orb.x,
+      y: orb.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      angle,
+      life: 0.32,
+      size: 3.6,
+      damage: shardDamage,
+      projectileType: "mage_frozenOrbShard",
+      damageType: "cold",
+      ownerId: orb.ownerId || null,
+      slowDuration: 2.2,
+      knockback: 0,
+      mageCantrip: orb.mageCantrip || "frozenOrbCantrip",
+      frozenOrbPulseShard: true,
+      hitTargets: new Set()
+    });
+  }
+}
+
 function spawnStormcallerRicochetSplits(game, bullet) {
   if (!game || !Array.isArray(game.bullets) || !bullet?.stormcallerSplitOnRicochet || bullet.stormcallerSplitUsed) return;
   const speed = Math.max(160, Math.hypot(bullet.vx || 0, bullet.vy || 0));

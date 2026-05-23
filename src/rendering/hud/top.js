@@ -66,6 +66,18 @@ function formatNetworkDebugSummary(game) {
   ].join(" | ");
 }
 
+function drawTopHudButton(ctx, rect, label, active = false) {
+  ctx.fillStyle = active ? "rgba(92, 109, 153, 0.96)" : "rgba(39, 53, 79, 0.94)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = "rgba(126, 139, 171, 0.72)";
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  ctx.fillStyle = "#f3efe3";
+  ctx.font = "bold 11px Trebuchet MS";
+  ctx.textAlign = "center";
+  ctx.fillText(label, rect.x + rect.w * 0.5, rect.y + 17);
+  ctx.textAlign = "left";
+}
+
 function getDebugStatsHudRect(renderer, game, layout, lines) {
   const ctx = renderer.ctx;
   const padding = 8;
@@ -120,6 +132,12 @@ export function drawHud(renderer, game, layout) {
   const ctx = renderer.ctx;
   ctx.fillStyle = "rgba(5, 8, 14, 0.9)";
   ctx.fillRect(0, 0, layout.playW, layout.topHudH);
+  const topButtonW = 72;
+  const topButtonGap = 6;
+  const optionsRect = { x: layout.playW - 12 - topButtonW, y: 7, w: topButtonW, h: 24 };
+  const statsRect = { x: optionsRect.x - topButtonGap - topButtonW, y: 7, w: topButtonW, h: 24 };
+  game.uiRects.statsButton = statsRect;
+  game.uiRects.optionsButton = optionsRect;
   ctx.fillStyle = "#f2efe3";
   ctx.font = "16px Trebuchet MS";
   ctx.fillText(`Score: ${game.score}`, 14, 24);
@@ -138,6 +156,8 @@ export function drawHud(renderer, game, layout) {
       ctx.font = "16px Trebuchet MS";
     }
   }
+  drawTopHudButton(ctx, statsRect, "Stats", game.statsPanelOpen);
+  drawTopHudButton(ctx, optionsRect, "Options", game.optionsOpen);
   const objective = typeof game.getFloorObjectiveText === "function" ? game.getFloorObjectiveText() : "";
   const detail = typeof game.getFloorObjectiveDetail === "function" ? game.getFloorObjectiveDetail() : "";
   const boss = typeof game.getActiveFloorBossEnemy === "function" ? game.getActiveFloorBossEnemy() : null;
@@ -192,15 +212,30 @@ export function drawHud(renderer, game, layout) {
   drawMultiplayerNotifications(ctx, game, layout);
 }
 
-export function drawPausedOverlay(renderer, layout) {
+function drawResumeButton(ctx, game, layout, canvasHeight) {
+  const rect = { x: layout.playW / 2 - 76, y: canvasHeight / 2 + 18, w: 152, h: 34 };
+  if (game?.uiRects) game.uiRects.pauseOverlayResume = rect;
+  const localPlayerId = typeof game?.networkLocalPlayerId === "string" ? game.networkLocalPlayerId : null;
+  const pauseOwnerId = typeof game?.networkPauseOwnerId === "string" ? game.networkPauseOwnerId : null;
+  const disabled = !!(game?.networkEnabled && localPlayerId && pauseOwnerId && localPlayerId !== pauseOwnerId);
+  ctx.fillStyle = disabled ? "rgba(42, 47, 58, 0.72)" : "rgba(39, 53, 79, 0.96)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = disabled ? "rgba(111, 119, 136, 0.44)" : "rgba(210, 190, 145, 0.86)";
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+  ctx.fillStyle = disabled ? "#8992a4" : "#f2efe3";
+  ctx.font = "bold 15px Trebuchet MS";
+  ctx.textAlign = "center";
+  ctx.fillText("Resume", layout.playW / 2, rect.y + 22);
+}
+
+export function drawPausedOverlay(renderer, game, layout) {
   const ctx = renderer.ctx;
   ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
   ctx.fillRect(0, 0, layout.playW, renderer.canvas.height);
   ctx.fillStyle = "#f2efe3";
   ctx.font = "bold 42px Trebuchet MS";
   ctx.textAlign = "center";
-  ctx.fillText("Paused", layout.playW / 2, renderer.canvas.height / 2 - 4);
-  ctx.font = "16px Trebuchet MS";
-  ctx.fillText(layout.isAndroid ? "Use Pause to resume" : "Press Esc to resume", layout.playW / 2, renderer.canvas.height / 2 + 24);
+  ctx.fillText("Paused", layout.playW / 2, renderer.canvas.height / 2 - 14);
+  drawResumeButton(ctx, game, layout, renderer.canvas.height);
   ctx.textAlign = "left";
 }

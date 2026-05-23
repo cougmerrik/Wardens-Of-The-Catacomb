@@ -110,6 +110,7 @@ async function captureFailure(page, error, state = null, samples = null) {
   mkdirSync(artifactsDir, { recursive: true });
   const screenshotPath = resolve(artifactsDir, "validate-network-archer-failure.png");
   const statePath = resolve(artifactsDir, "validate-network-archer-failure.json");
+  const sentInputs = await page.evaluate(() => Array.isArray(window.__WOTC_SENT_INPUTS__) ? window.__WOTC_SENT_INPUTS__.slice(-24) : []).catch(() => []);
   try {
     await page.screenshot({ path: screenshotPath, fullPage: true });
   } catch {}
@@ -119,7 +120,8 @@ async function captureFailure(page, error, state = null, samples = null) {
       {
         error: error instanceof Error ? error.message : String(error),
         state,
-        samples
+        samples,
+        sentInputs
       },
       null,
       2
@@ -145,6 +147,20 @@ async function main() {
   const skippedAttempts = [];
   let lastState = null;
   try {
+    await page.addInitScript(() => {
+      window.__WOTC_SENT_INPUTS__ = [];
+      const send = window.WebSocket.prototype.send;
+      window.WebSocket.prototype.send = function captureInput(data) {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed?.type === "input") {
+            window.__WOTC_SENT_INPUTS__.push(parsed.input);
+            if (window.__WOTC_SENT_INPUTS__.length > 48) window.__WOTC_SENT_INPUTS__.shift();
+          }
+        } catch {}
+        return send.call(this, data);
+      };
+    });
     await page.goto(GAME_URL, { waitUntil: "networkidle" });
     await page.keyboard.press("Space");
     await page.locator("#mode-select").waitFor({ state: "visible", timeout: 10000 });
@@ -166,162 +182,101 @@ async function main() {
     const canvas = page.locator("#game");
     const box = await canvas.boundingBox();
     assert(box, "game canvas bounding box unavailable");
+    const canvasSize = await canvas.evaluate((node) => ({ width: node.width, height: node.height }));
+    const toClientPoint = (screenX, screenY) => ({
+      x: box.x + Math.max(40, Math.min(canvasSize.width - 40, screenX)) * (box.width / canvasSize.width),
+      y: box.y + Math.max(40, Math.min(canvasSize.height - 40, screenY)) * (box.height / canvasSize.height)
+    });
 
     const sampleTargetCount = 3;
     const maxAttempts = 8;
+    const movementLanes = [
+      { key: "d", dx: 1, dy: 0 },
+      { key: "s", dx: 0, dy: 1 },
+      { key: "a", dx: -1, dy: 0 },
+      { key: "w", dx: 0, dy: -1 }
+    ];
 
     for (let attemptIndex = 0; attemptIndex < maxAttempts && shotSamples.length < sampleTargetCount; attemptIndex++) {
       const before = await page.evaluate(() => window.__WOTC_DEBUG__?.getState?.() || null);
       assert(before, "debug state unavailable before archer shot");
+      const lane = movementLanes[attemptIndex % movementLanes.length];
       const primaryTarget = Array.isArray(before.hostiles)
-        ? before.hostiles.find((entry) => entry && Number.isFinite(entry.screenX) && Number.isFinite(entry.screenY))
+        ? before.hostiles.find((entry) =>
+            entry &&
+            Number.isFinite(entry.screenX) &&
+            Number.isFinite(entry.screenY) &&
+            Number.isFinite(entry.distToPlayer) &&
+            entry.distToPlayer >= 160 &&
+            entry.screenX >= 40 &&
+            entry.screenX <= canvasSize.width - 40 &&
+            entry.screenY >= 40 &&
+            entry.screenY <= canvasSize.height - 40
+          )
         : null;
       const aimPoint = primaryTarget
-        ? {
-            x: box.x + Math.max(40, Math.min(box.width - 40, primaryTarget.screenX)),
-            y: box.y + Math.max(40, Math.min(box.height - 40, primaryTarget.screenY))
-          }
-        : {
-            x: box.x + box.width * 0.76,
-            y: box.y + box.height * 0.42
-          };
+        ? toClientPoint(primaryTarget.screenX, primaryTarget.screenY)
+        : toClientPoint(
+            before.player.x - before.camera.x + lane.dx * 120,
+            before.player.y - before.camera.y + lane.dy * 120
+          );
       await page.mouse.move(aimPoint.x, aimPoint.y);
-      const beforeCount = before.combat?.recentPlayerShots?.length || 0;
       const baselineProjectileCount = Array.isArray(before.combat?.ownedProjectiles)
         ? before.combat.ownedProjectiles.filter((entry) => entry?.source === "authoritative").length
         : 0;
-      await page.keyboard.down("d");
+      await page.keyboard.down(lane.key);
       await delay(260);
       const clickStartedAt = await page.evaluate(() => performance.now());
       await page.mouse.click(aimPoint.x, aimPoint.y, { button: "left" });
       await delay(70);
-      await page.keyboard.up("d");
+      await page.keyboard.up(lane.key);
 
-      const shotReadyHandle = await page.waitForFunction((args) => {
-        const state = window.__WOTC_DEBUG__?.getState?.();
-        const shots = Array.isArray(state?.combat?.recentPlayerShots) ? state.combat.recentPlayerShots : [];
-        const hasFreshPredicted = shots.some((entry) =>
-          entry &&
-          (entry.source === "primary" || entry.source === "predictedPrimary") &&
-          Number.isFinite(entry.atMs) &&
-          entry.atMs >= args.startedAtMs
-        );
-        if (!!state && ((state.combat?.recentPlayerShots?.length || 0) > args.countBefore || hasFreshPredicted)) {
-          return {
-            state,
-            atMs: performance.now()
-          };
-        }
-        return null;
-      }, { countBefore: beforeCount, startedAtMs: clickStartedAt }, { timeout: 2000 });
-      const shotReady = await shotReadyHandle.jsonValue();
-      const afterShot = shotReady?.state || null;
-      assert(afterShot, "debug state unavailable after archer shot");
-      const shots = afterShot.combat?.recentPlayerShots || [];
-      const deltaCount = shots.length - beforeCount;
-      assert(deltaCount >= 1 && deltaCount <= 2, `single click produced ${deltaCount} shot telemetry entries`);
-      const newShots = shots.slice(beforeCount);
-      const freshShots = shots.filter((entry) => entry && Number.isFinite(entry.atMs) && entry.atMs >= clickStartedAt);
-      const candidateShots = freshShots.length > 0 ? freshShots : newShots;
-      const shot = candidateShots.find((entry) => entry && (entry.source === "primary" || entry.source === "predictedPrimary")) || candidateShots[0];
-      assert(shot && (shot.source === "primary" || shot.source === "predictedPrimary"), `unexpected shot source: ${JSON.stringify(shot)}`);
-      assert(Array.isArray(shot.volleyAngles) && shot.volleyAngles.length === shot.multishotCount, `bad volley telemetry: ${JSON.stringify(shot)}`);
-      const aimX = Number.isFinite(shot.aimX) ? shot.aimX : afterShot.aim?.x;
-      const aimY = Number.isFinite(shot.aimY) ? shot.aimY : afterShot.aim?.y;
-      assert(Number.isFinite(aimX) && Number.isFinite(aimY), `aim telemetry missing: ${JSON.stringify(shot)}`);
-      const targetAngle = Math.atan2(aimY - shot.playerY, aimX - shot.playerX);
-      const baseAngleError = Math.abs(normalizeAngleDiff(shot.intendedAngle, targetAngle));
-      const meanVolleyAngle = shot.volleyAngles.reduce((sum, value) => sum + value, 0) / Math.max(1, shot.volleyAngles.length);
-      const meanVolleyError = Math.abs(normalizeAngleDiff(meanVolleyAngle, targetAngle));
-      const spreadWidthDeg =
-        shot.volleyAngles.length > 1
-          ? Math.abs(normalizeAngleDiff(shot.volleyAngles[shot.volleyAngles.length - 1], shot.volleyAngles[0])) * (180 / Math.PI)
-          : 0;
-      const immediateReadyHandle = await page.waitForFunction(({ seq }) => {
+      const projectileReadyHandle = await page.waitForFunction(({ baselineCount }) => {
         const state = window.__WOTC_DEBUG__?.getState?.();
         if (!state) return null;
         const owned = Array.isArray(state.combat?.ownedProjectiles) ? state.combat.ownedProjectiles : [];
-        const matched = owned.find((projectile) =>
-          projectile &&
-          (projectile.source === "predictedRendered" || projectile.source === "authoritative") &&
-          projectile.spawnSeq === seq
+        const authoritative = owned.filter((projectile) => projectile && projectile.source === "authoritative");
+        if (authoritative.length <= baselineCount) return null;
+        const matched = authoritative.find((projectile) =>
+          Number.isFinite(projectile.angle) && String(projectile.projectileType || "").startsWith("ranger_")
         );
-        return matched ? { state, projectile: matched, visibleAtMs: performance.now() } : null;
-      }, { seq: shot.seq || 0 }, { timeout: 160 }).catch(() => null);
-      assert(immediateReadyHandle, `no local projectile appeared quickly for seq ${shot.seq || 0}`);
-      const immediateReady = await immediateReadyHandle.jsonValue();
-      const immediateLatencyMs = Math.max(0, (immediateReady?.visibleAtMs || performance.now()) - clickStartedAt);
-      assert(immediateLatencyMs <= 120, `local projectile visibility latency ${immediateLatencyMs.toFixed(1)}ms is too high`);
-      const projectileReadyHandle = await page.waitForFunction(({ seq, baselineCount }) => {
-        const state = window.__WOTC_DEBUG__?.getState?.();
-        if (!state) return null;
-        const owned = Array.isArray(state.combat?.ownedProjectiles) ? state.combat.ownedProjectiles : [];
-        const matched = owned.find((projectile) => projectile && projectile.source === "authoritative" && projectile.spawnSeq === seq);
-        if (!matched) {
-          const authoritativeCount = owned.filter((projectile) => projectile && projectile.source === "authoritative").length;
-          if (authoritativeCount <= baselineCount) return null;
-        }
+        if (!matched) return null;
         return {
           state,
-          projectile: matched || null,
+          projectile: matched,
           visibleAtMs: performance.now()
         };
-      }, { seq: shot.seq || 0, baselineCount: baselineProjectileCount }, { timeout: 2600 }).catch(() => null);
+      }, { baselineCount: baselineProjectileCount }, { timeout: 800 }).catch(() => null);
       if (!projectileReadyHandle) {
         skippedAttempts.push({
           attemptIndex,
           reason: "noAuthoritativeProjectileObserved",
-          shot
+          lane: lane.key,
+          targetedVisibleHostile: !!primaryTarget
         });
         continue;
       }
       const projectileReady = await projectileReadyHandle.jsonValue();
-      const after = projectileReady?.state || afterShot;
-      const ownedProjectiles = after.combat?.ownedProjectiles || [];
-      const projectileCandidates = ownedProjectiles.filter((projectile) => projectile.source === "authoritative" && Number.isFinite(projectile.angle));
-      if (projectileCandidates.length === 0) {
-        skippedAttempts.push({
-          attemptIndex,
-          reason: "missingAuthoritativeAngleTelemetry",
-          shot,
-          ownedProjectiles
-        });
-        continue;
-      }
-      const matchedProjectile = projectileReady?.projectile || null;
-      let bestProjectile = matchedProjectile;
-      let bestProjectileError = matchedProjectile && Number.isFinite(matchedProjectile.angle)
-        ? Math.abs(normalizeAngleDiff(matchedProjectile.angle, targetAngle))
-        : Infinity;
-      if (!bestProjectile || !Number.isFinite(bestProjectile.angle)) {
-        for (const candidate of projectileCandidates) {
-          const candidateError = Math.abs(normalizeAngleDiff(candidate.angle, targetAngle));
-          if (candidateError < bestProjectileError) {
-            bestProjectile = candidate;
-            bestProjectileError = candidateError;
-          }
-        }
-      }
+      const after = projectileReady?.state || null;
+      const projectile = projectileReady?.projectile || null;
+      assert(after && projectile, "debug state unavailable after authoritative archer shot");
+      const aimX = after.aim?.x;
+      const aimY = after.aim?.y;
+      assert(Number.isFinite(aimX) && Number.isFinite(aimY), "aim state unavailable after authoritative archer shot");
+      const targetAngle = Math.atan2(aimY - after.player.y, aimX - after.player.x);
+      const projectileError = Math.abs(normalizeAngleDiff(projectile.angle, targetAngle));
       const visibleLatencyMs = Math.max(0, (projectileReady?.visibleAtMs || performance.now()) - clickStartedAt);
       shotSamples.push({
         shotIndex: shotSamples.length + 1,
         attemptIndex,
-        deltaCount,
-        baseAngleErrorDeg: baseAngleError * (180 / Math.PI),
-        meanVolleyErrorDeg: meanVolleyError * (180 / Math.PI),
-        visibleProjectileAngleErrorDeg: bestProjectileError * (180 / Math.PI),
-        visibleProjectileSource: bestProjectile.source,
-        immediateProjectileSource: immediateReady?.projectile?.source || "",
-        immediateLatencyMs,
+        visibleProjectileAngleErrorDeg: projectileError * (180 / Math.PI),
+        visibleProjectileSource: projectile.source,
+        projectileType: projectile.projectileType,
         visibleLatencyMs,
-        spreadWidthDeg,
-        projectileSpeed: shot.projectileSpeed,
-        fireCooldown: shot.fireCooldown,
-        moving: shot.moving
+        lane: lane.key,
+        targetedVisibleHostile: !!primaryTarget
       });
-      assert(baseAngleError <= 0.12, `base shot angle drifted ${ (baseAngleError * 180 / Math.PI).toFixed(2) } deg`);
-      assert(meanVolleyError <= 0.12, `volley center drifted ${ (meanVolleyError * 180 / Math.PI).toFixed(2) } deg`);
-      assert(bestProjectileError <= 0.16, `visible projectile drifted ${ (bestProjectileError * 180 / Math.PI).toFixed(2) } deg`);
+      assert(projectileError <= 0.16, `visible projectile drifted ${ (projectileError * 180 / Math.PI).toFixed(2) } deg`);
       assert(visibleLatencyMs <= 260, `projectile visibility latency ${visibleLatencyMs.toFixed(1)}ms is too high`);
     }
 

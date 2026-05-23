@@ -1,43 +1,10 @@
 import { vecLength } from "../utils.js";
-import { finalizeProjectilesAndTransientState, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
+import { finalizeProjectilesAndTransientState, pulseMageFrozenOrb, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
 import { resolveFireZonesAndEnemyStatus } from "./stepCombatZoneAndEnemyStatus.js";
 import { getNecromancerPlaguecraftRiseChance, getNecromancerRotDps, getNecromancerRotDuration, hasNecromancerHarvester, hasNecromancerPlaguecraftRot, isNecromancerTalentGame } from "./necromancerTalentTree.js";
 import { hasWarriorSpellknight } from "./warriorTalentTree.js";
 import { hasRangerTalent } from "./rangerTalentTree.js";
 import { spawnGhost, spawnSkeleton } from "./enemySpawnFactories.js";
-
-function pulseMageFrozenOrb(game, orb, dt) {
-  if (!game || !orb || orb.projectileType !== "mage_frozenOrb" || orb.life <= 0) return;
-  const interval = Math.max(0.08, Number.isFinite(orb.frostPulseInterval) ? orb.frostPulseInterval : 0.18);
-  orb.frostPulseTimer = (Number.isFinite(orb.frostPulseTimer) ? orb.frostPulseTimer : interval) - dt;
-  if (orb.frostPulseTimer > 0) return;
-  orb.frostPulseTimer += interval;
-  const baseAngle = Number.isFinite(orb.angle) ? orb.angle : Math.atan2(orb.vy || 0, orb.vx || 1);
-  const speed = 205;
-  const shardDamage = Math.max(0.5, Number.isFinite(orb.frostPulseShardDamage) ? orb.frostPulseShardDamage : (orb.damage || 1) * 0.42);
-  const offsets = [-Math.PI * 0.5, -Math.PI * 0.18, Math.PI * 0.18, Math.PI * 0.5];
-  for (const offset of offsets) {
-    const angle = baseAngle + offset;
-    game.bullets.push({
-      x: orb.x,
-      y: orb.y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      angle,
-      life: 0.32,
-      size: 3.6,
-      damage: shardDamage,
-      projectileType: "mage_frozenOrbShard",
-      damageType: "cold",
-      ownerId: orb.ownerId || null,
-      slowDuration: 2.2,
-      knockback: 0,
-      mageCantrip: orb.mageCantrip || "frozenOrbCantrip",
-      frozenOrbPulseShard: true,
-      hitTargets: new Set()
-    });
-  }
-}
 
 export function resolveCombatAndDrops({
   game,
@@ -577,6 +544,7 @@ export function resolveCombatAndDrops({
 
   let removeBossSummons = false;
   const pendingRaisedEnemies = [];
+  let suppressRemainingPostBossDrops = !!(game.floorBoss && ["defeated", "portal", "completed"].includes(game.floorBoss.phase));
   game.enemies = game.enemies.filter((enemy) => {
     if (enemy.type === "skeleton_warrior" && enemy.collapsed && ((enemy.collapseTimer > 0) || (enemy.reanimateTimer > 0))) return true;
     if (enemy.deathProcessed && enemy.hp <= 0) return (enemy.corpseTimer || 0) > 0;
@@ -774,13 +742,16 @@ export function resolveCombatAndDrops({
         if (typeof game.gainExperienceForPlayerEntity === "function") game.gainExperienceForPlayerEntity(rewardOwner, game.xpFromEnemy(enemy));
         else game.gainExperience(game.xpFromEnemy(enemy));
       }
-      if (enemy.type === "goblin") game.dropTreasureBag(enemy.x, enemy.y, enemy.goldEaten);
+      if (suppressRemainingPostBossDrops && !enemy.isFloorBoss) {
+        // The floor is in cleanup time after a boss kill; remaining enemies still count for combat stats but do not create loot.
+      } else if (enemy.type === "goblin") game.dropTreasureBag(enemy.x, enemy.y, enemy.goldEaten);
       else if (enemy.type === "armor") game.dropArmorLoot(enemy.x, enemy.y);
       else if (enemy.type === "mimic") game.dropTreasureBag(enemy.x, enemy.y, 24);
       else if (enemy.type === "mummy") game.maybeSpawnDrop(enemy.x, enemy.y);
       else if (enemy.type === "prisoner" || enemy.type === "rat_archer" || enemy.type === "skeleton_warrior" || enemy.type === "skeleton" || enemy.type === "shardling") game.maybeSpawnDrop(enemy.x, enemy.y);
       else if (enemy.type === "necromancer" || enemy.type === "sonya" || enemy.type === "leprechaun") {
         if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
+        suppressRemainingPostBossDrops = true;
         removeBossSummons = true;
         if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
         if (enemy.type === "leprechaun") game.dropLeprechaunLoot(enemy.x, enemy.y);
@@ -789,6 +760,7 @@ export function resolveCombatAndDrops({
         game.spawnFloatingText(enemy.x, enemy.y - 62, "Portal Open", "#90f0ff", 1.5, 18);
       } else if (enemy.type === "minotaur") {
         if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
+        suppressRemainingPostBossDrops = true;
         if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
         game.dropMinotaurLoot(enemy.x, enemy.y);
         game.spawnFloatingText(enemy.x, enemy.y - 42, "Boss Defeated", "#f2bf7b", 1.5, 18);
@@ -796,6 +768,7 @@ export function resolveCombatAndDrops({
       } else if (enemy.type === "golem") {
         if (isFinalGolemBossDeath) {
           if (typeof game.markFloorBossDefeated === "function") game.markFloorBossDefeated();
+          suppressRemainingPostBossDrops = true;
           if (typeof game.spawnExitPortal === "function") game.spawnExitPortal(enemy.x, enemy.y);
           game.dropGolemLoot(enemy.x, enemy.y);
           game.spawnFloatingText(enemy.x, enemy.y - 42, "Boss Defeated", "#f2bf7b", 1.5, 18);
@@ -811,6 +784,7 @@ export function resolveCombatAndDrops({
   if (removeBossSummons) {
     game.enemies = game.enemies.filter((enemy) => !(enemy.type === "skeleton" && enemy.summonerBoss));
   }
+  if (typeof game.clearHiddenEnemiesAfterFloorBossDefeat === "function") game.clearHiddenEnemiesAfterFloorBossDefeat();
   game.breakables = (game.breakables || []).filter((br) => {
     if ((br.hp || 0) <= 0) {
       game.dropBreakableLoot(br.x, br.y);

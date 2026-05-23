@@ -313,6 +313,98 @@ function validateBossLocksAmbientSpawns() {
   };
 }
 
+function validatePostBossCleanupWindow() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  game.level = game.getFloorBossTriggerLevel();
+  assert(game.updateFloorBossTrigger() === true, "post-boss cleanup test did not queue boss");
+  const boss = spawnBossForCurrentFloor(game, game.player.x + 96, game.player.y);
+  const visible = game.spawnGhost(game.player.x + 128, game.player.y);
+  const hidden = game.spawnGhost(game.player.x + game.getPlayAreaWidth() + 320, game.player.y + game.canvas.height + 320);
+  const remoteVisible = game.spawnGhost(game.player.x + game.getPlayAreaWidth() + 620, game.player.y);
+  game.remotePlayers = [{
+    id: "p_remote_cleanup",
+    x: remoteVisible.x,
+    y: remoteVisible.y,
+    size: game.player.size,
+    health: 100,
+    maxHealth: 100,
+    alive: true
+  }];
+  game.enemies.push(boss, visible, hidden, remoteVisible);
+  game.markFloorBossActive();
+  const normalSpawnInterval = game.getEnemySpawnInterval();
+  killFloorBoss(game);
+  assert(!game.enemies.includes(hidden), "hidden hostile was not silently removed after boss defeat");
+  assert(game.enemies.includes(visible), "local visible hostile was removed after boss defeat");
+  assert(game.enemies.includes(remoteVisible), "remote visible hostile was removed after boss defeat");
+  assert(game.isPostFloorBossSpawnSuppressed(), "post-boss spawn suppression was not active after boss defeat");
+  assert(!game.isPostFloorBossSpawnRateReduced(), "post-boss spawn rate reduction started before suppression ended");
+  game.portal.active = false;
+  game.armorStands = [];
+  const dropsAfterBoss = game.drops.length;
+  const enemyCountAfterCleanup = game.enemies.length;
+  const enemiesAfterCleanup = new Set(game.enemies);
+  game.enemySpawnTimer = -5;
+  game.randomEnemySpawnPoint = () => ({ x: game.player.x + 256, y: game.player.y + 64 });
+  game.getEnemyPackSize = () => 1;
+  stepGame(game, 9.5, { processUi: false });
+  const newEnemiesDuringSuppression = game.enemies.filter((enemy) => !enemiesAfterCleanup.has(enemy));
+  assert(
+    newEnemiesDuringSuppression.length === 0,
+    `ambient enemy spawned during post-boss suppression window: ${newEnemiesDuringSuppression.map((enemy) => enemy?.type || "unknown").join(",")}`
+  );
+  assert(game.isPostFloorBossSpawnSuppressed(), "post-boss spawn suppression expired early");
+  stepGame(game, 0.7, { processUi: false });
+  assert(!game.isPostFloorBossSpawnSuppressed(), "post-boss spawn suppression did not expire");
+  assert(game.isPostFloorBossSpawnRateReduced(), "post-boss spawn rate reduction did not start after suppression");
+  const reducedSpawnInterval = game.getEnemySpawnInterval();
+  assert(
+    Math.abs(reducedSpawnInterval - normalSpawnInterval * 2) < 0.0001,
+    `post-boss spawn interval expected ${normalSpawnInterval * 2}, got ${reducedSpawnInterval}`
+  );
+  assert(game.enemies.some((enemy) => !enemiesAfterCleanup.has(enemy)), "ambient enemy did not resume after post-boss suppression window");
+  game.getGoldDropRate = () => 1;
+  game.getHealthDropRate = () => 1;
+  visible.hp = 0;
+  stepGame(game, 0.016, { processUi: false });
+  assert(game.drops.length === dropsAfterBoss, "post-boss non-boss enemy death created loot");
+  return {
+    removedHidden: game.floorBoss.hiddenEnemyCleanupCount,
+    enemiesAfterCleanup: enemyCountAfterCleanup,
+    enemiesAfterResume: game.enemies.length,
+    dropsAfterBoss,
+    normalSpawnInterval,
+    reducedSpawnInterval
+  };
+}
+
+function validatePostBossCleanupRetry() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  game.level = game.getFloorBossTriggerLevel();
+  assert(game.updateFloorBossTrigger() === true, "post-boss cleanup retry test did not queue boss");
+  const boss = spawnBossForCurrentFloor(game, game.player.x + 96, game.player.y);
+  const visible = game.spawnGhost(game.player.x + 128, game.player.y);
+  game.enemies.push(boss, visible);
+  game.markFloorBossActive();
+  killFloorBoss(game);
+  assert(game.floorBoss.hiddenEnemyCleanupCount === 0, "visible-only boss defeat cleanup removed an enemy");
+  assert(game.floorBoss.hiddenEnemyCleanupPending, "visible-only boss defeat cleanup stopped retrying early");
+  assert(visible.postFloorBossCleanupEligible === true, "visible hostile was not marked for retry cleanup at boss defeat");
+  const postBossSpawn = game.spawnGhost(game.player.x + game.getPlayAreaWidth() + 420, game.player.y + game.canvas.height + 420);
+  game.enemies.push(postBossSpawn);
+  visible.x = game.player.x + game.getPlayAreaWidth() + 320;
+  visible.y = game.player.y + game.canvas.height + 320;
+  game.time = game.floorBoss.postDefeatSpawnSuppressedUntil + 2;
+  assert(game.clearHiddenEnemiesAfterFloorBossDefeat() === 1, "cleanup retry did not silently remove hidden hostile");
+  assert(!game.enemies.includes(visible), "cleanup retry left the hidden hostile active");
+  assert(game.enemies.includes(postBossSpawn), "cleanup retry deleted post-boss spawn");
+  assert(!game.floorBoss.hiddenEnemyCleanupPending, "cleanup retry stayed pending after removing a hidden hostile");
+  return {
+    removedHidden: game.floorBoss.hiddenEnemyCleanupCount,
+    pending: game.floorBoss.hiddenEnemyCleanupPending
+  };
+}
+
 function validateNecromancerTeleportSafety() {
   const game = new GameSim({ classType: "fighter", viewportWidth: 960, viewportHeight: 640 });
   const boss = game.spawnNecromancer(game.player.x + 360, game.player.y + 220);
@@ -380,6 +472,8 @@ function main() {
     networkReconciliation: validateNetworkReconciliation(),
     controllerJoinSpawnSync: validateControllerJoinSpawnSync(),
     bossSpawnLockout: validateBossLocksAmbientSpawns(),
+    postBossCleanupWindow: validatePostBossCleanupWindow(),
+    postBossCleanupRetry: validatePostBossCleanupRetry(),
     necromancerTeleportSafety: validateNecromancerTeleportSafety(),
     golemSplitMechanics: validateGolemSplitMechanics(),
     regressionSurface: validateRegressionSurface()

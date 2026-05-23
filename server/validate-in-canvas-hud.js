@@ -13,6 +13,7 @@ function main() {
   const scene = read("src/rendering/RendererRuntimeScene.js");
   const pendingScene = read("src/rendering/runtimeSceneDrawMethods.js");
   const classPanel = read("src/rendering/hud/classStatusPanel.js");
+  const topHud = read("src/rendering/hud/top.js");
   const minimap = read("src/rendering/rendererEffectsPlayerMethods.js");
   const stats = read("src/rendering/hud/stats.js");
   const gameRuntime = read("src/game/GameRuntimeBase.js");
@@ -54,10 +55,12 @@ function main() {
   assertIncludes(classPanel, "goldAmount: game.gold || 0", "shop button should include the current gold amount");
   assertIncludes(classPanel, "ctx.arc(coinX, coinY, coinR", "shop button should draw a gold coin indicator");
   assertIncludes(classPanel, "game.uiRects.skillTreeButton = skillRect;", "combined HUD should own the skill tree button rect");
-  assertIncludes(classPanel, "game.uiRects.statsButton = statsRect;", "combined HUD should own the stats button rect");
+  assertIncludes(topHud, "game.uiRects.statsButton = statsRect;", "top HUD should own the stats button rect");
+  assertIncludes(topHud, "game.uiRects.optionsButton = optionsRect;", "top HUD should own the options button rect");
   assertIncludes(classPanel, "availableSkillPoints > 0", "skill tree button should react to unspent skill points");
   assertIncludes(classPanel, "Math.sin((game.time || 0) * 3)", "skill tree button should blink slowly while points are available");
   assertIncludes(classPanel, "drawEmbeddedGroupList", "combined HUD should include the multiplayer group list");
+  assertIncludes(classPanel, "const groupRows = remoteCount;", "combined HUD should keep every teammate visible");
   assertIncludes(classPanel, "getConsumableStatusRows(rect.w) * 28", "consumable status area should reserve fixed icon space");
   assertIncludes(classPanel, "drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget)", "Android swap button rect should be populated from the combined HUD");
   assert.ok(!classPanel.includes("drawModeSwapButton"), "combined HUD should not draw a swap button");

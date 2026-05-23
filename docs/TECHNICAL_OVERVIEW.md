@@ -9,6 +9,7 @@ This document summarizes the current high-level architecture and validation work
 - `src/mapGenerator.js`: biome-specific procedural map generators for catacomb and sewer floors
 - `src/rendering/*`: renderer, HUD, scene drawing, and effects
 - Class skill tree menus share layout sizing and row-splitting helpers in `src/rendering/hud/skillTreeMenuSections.js` so Scout, Warrior, and Necromancer progression views do not drift visually.
+- Skill-point popups use `src/game/skillPointPopup.js` for queue/tier selection state and `src/rendering/hud/skillPointPopup.js` for the bottom-canvas picker. Popup clicks route through the same local/network `spendSkillPoint` actions as the full skill tree.
 - `assets/images/skills/scout/*`: transparent Scout progression icons; new Scout talent icons should be generated from the canonical prompt in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#scout-progression-icon-assets)
 - `assets/images/skills/warrior/*` and `assets/images/skills/mage/*`: transparent Warrior and Mage progression icons; new Warrior or Mage talent icons should be generated from the canonical prompt in [CLASS_TALENT_TREE_DESIGN.md](CLASS_TALENT_TREE_DESIGN.md#warrior-and-mage-progression-icon-assets)
 - `assets/images/items/*`: transparent consumable item icons; new consumable icons should be generated from the canonical prompt in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md#icon-generation-prompt)
@@ -39,6 +40,7 @@ This document summarizes the current high-level architecture and validation work
   - tap-to-UI hit routing for HUD/overlay actions
 - Android HUD layout helpers live under `src/rendering/hud/androidLayout.js`. They provide touch regions, draw active stick guides, and keep compact HUD panels away from the lower movement/aim zones.
 - Browser bootstrap owns Android-specific menu/gameplay chrome such as utility buttons, gameplay-control visibility, Android canvas sizing, and Android dev-mode unlock handling.
+- The in-canvas HUD exposes top-right `Stats` and `Options` rects plus class-panel `Shop`, `Skill Tree`, and `Pause` rects. `Options` opens the existing DOM Options panel as an overlay so master volume, voice chat, ads, and gameplay tips continue to use the main-menu persistence logic. `Pause` uses explicit HUD click/action routing, is greyed out for multiplayer clients without pause authority, and the pause overlay publishes its own `Resume` rect. `Esc` no longer toggles pause or unlocks music playback, music mute is controlled through options volume rather than an `M` keybind, and the embedded group list renders every teammate as a compact owner/name plus health bar row.
 - Android build commands:
   - `npm run build:android:web` prepares `www/`
   - `npm run cap:sync:android` rebuilds and syncs the Capacitor Android project
@@ -249,7 +251,7 @@ This document summarizes the current high-level architecture and validation work
   - lightweight phase state on each enemy
   - a central dispatch seam for per-enemy behavior
 - Shared movement/pathing now uses target-point steering plus corner-assist probes in `src/game/world/navigationCollision.js`.
-- Floor-boss state in `src/game/runtimeFloorBossMethods.js` is now boss-type aware instead of necromancer-specific, which allows the same progression flow to drive both necromancer and minotaur encounters.
+- Floor-boss state in `src/game/runtimeFloorBossMethods.js` is boss-type aware and owns post-defeat cleanup state. Boss defeat stamps a `10s` same-floor spawn suppression window, marks existing hostiles as cleanup-eligible, retries hidden-hostile cleanup against the union of living player viewports until those pre-existing hostiles are removed or die, then lets the spawn interval helper run at half rate for the rest of that floor. Combat resolution suppresses non-boss post-boss loot without treating silently removed enemies as deaths.
 - Safe spawn and teleport placement now validate full movement footprints instead of trusting tile centers, which hardens player starts and boss teleports against blocked placements.
 
 ## Validation and Quality Gates
@@ -276,6 +278,8 @@ This document summarizes the current high-level architecture and validation work
   - now fills the required local player handle, uses the solo character-select path, and spawns a deterministic hostile target so the check is not floor-generation dependent
 - `validate:skill-refund`
   - verifies local skill spend plus full refund flow, including gold cost, point restoration, and refund-count updates
+- `validate:skill-popup`
+  - verifies skill-point popup queueing, one-tier option filtering, timeout advancement, spend dismissal, and local/network click wiring
 - `validate:network-join`
   - verifies real browser room join, authoritative spawn adoption, and post-join movement
 - `validate:network-combat`

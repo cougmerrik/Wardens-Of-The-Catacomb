@@ -83,6 +83,28 @@ function validateStepIgnoresCorpseContact() {
   return { healthBefore, healthAfter: game.player.health };
 }
 
+function validateCorpseDoesNotConsumeSpawnCapacity() {
+  const game = new GameSim({ classType: "fighter", viewportWidth: 960, viewportHeight: 640 });
+  const corpse = placeEntityAtPlayer(game, {
+    id: "dead-capacity",
+    type: "goblin",
+    hp: 0,
+    deathProcessed: true,
+    corpseTimer: 10
+  });
+  game.enemies = [corpse];
+  game.armorStands = [];
+  game.enemySpawnTimer = -1;
+  game.getActiveEnemyCap = () => 1;
+  game.getEnemyPackSize = () => 1;
+  game.getEnemySpawnInterval = () => 999;
+  game.randomEnemySpawnPoint = () => ({ x: game.player.x + 128, y: game.player.y });
+  stepGame(game, 0.016, { processUi: false });
+  assert.ok(game.enemies.includes(corpse), "corpse should remain visible during spawn-cap check");
+  assert.ok(game.enemies.some((enemy) => enemy !== corpse && (enemy.hp || 0) > 0), "dead bodies should not prevent replacement spawns");
+  return { enemyCount: game.enemies.length, living: game.enemies.filter((enemy) => (enemy.hp || 0) > 0).length };
+}
+
 function validateNetworkCorpseSnapshotDoesNotBlock() {
   const game = new GameSim({ classType: "fighter", viewportWidth: 960, viewportHeight: 640 });
   game.enemySpawnTimer = 999;
@@ -314,6 +336,7 @@ function main() {
     livingEnemySeparation: validateLivingEnemiesStillSeparateFromPlayer(),
     collapsedSkeletonSeparation: validateCollapsedSkeletonDoesNotSeparateFromPlayer(),
     corpseContact: validateStepIgnoresCorpseContact(),
+    corpseSpawnCapacity: validateCorpseDoesNotConsumeSpawnCapacity(),
     networkCorpseSnapshot: validateNetworkCorpseSnapshotDoesNotBlock(),
     projectileCorpsePassThrough: validateProjectilesIgnoreSlainBodies(),
     specialProjectileCorpsePassThrough: validateSpecialProjectilesIgnoreSlainBodies(),

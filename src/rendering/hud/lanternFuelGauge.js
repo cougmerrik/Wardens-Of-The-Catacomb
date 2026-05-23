@@ -30,4 +30,5 @@ export function drawLanternFuelGauge(renderer, game, layout, xpBarY, consumableB
   ctx.textAlign = "right";
   ctx.fillText(`${Math.round(ratio * 100)}%`, x + w - 8, y + 12);
   ctx.textAlign = "left";
+  return { x, y, w, h };
 }

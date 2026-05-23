@@ -131,12 +131,40 @@ function main() {
   assert(!getActiveSlot(peerState, "shield"), "peer shield charge was not consumed on use");
   assert((peerState.consumables?.sharedCooldown || 0) > 0, "peer shared consumable cooldown did not start");
 
+  peerState.health = 50;
+  peerState.maxHealth = 100;
+  peerState.consumables.sharedCooldown = 0;
+  peerState.consumables.activeSlots = [{ key: "regenerationPotion", count: 1, cooldownRemaining: 0 }];
+  handleActionMessage(room, peer.id, { kind: "useConsumableSlot", slot: 0 });
+  const regenAfterUse = peerState.consumables?.effects?.regenerationPotion || {};
+  assert(!getActiveSlot(peerState, "regenerationPotion"), "peer regeneration potion charge was not consumed on use");
+  assert((peerState.consumables?.sharedCooldown || 0) > 0, "peer regeneration potion cooldown did not start");
+  assert((regenAfterUse.timer || 0) > 0, "peer regeneration potion timer did not start");
+  const cooldownAfterUse = peerState.consumables.sharedCooldown;
+  const timerAfterUse = regenAfterUse.timer;
+  const healthAfterUse = peerState.health;
+  room.tick(room.lastTickMs + 1000);
+  const regenAfterTick = peerState.consumables?.effects?.regenerationPotion || {};
+  assert(peerState.consumables.sharedCooldown < cooldownAfterUse, "peer consumable cooldown did not tick down");
+  assert(regenAfterTick.timer < timerAfterUse, "peer regeneration potion timer did not tick down");
+  assert(peerState.health > healthAfterUse, "peer regeneration potion did not heal over time");
+  room.sim.networkFloatingTextEvents = [];
+  room.sim.nextFloatingTextId = 0;
+  room.tickRemoteActivePlayerConsumables(peerState, 1);
+  room.tickRemoteActivePlayerConsumables(peerState, 1);
+  const regenTextIds = room.sim.networkFloatingTextEvents
+    .filter((entry) => typeof entry?.text === "string" && entry.text.startsWith("+"))
+    .map((entry) => entry.id);
+  assert(regenTextIds.length >= 2, "peer regeneration potion should publish repeated healing feedback");
+  assert(new Set(regenTextIds).size === regenTextIds.length, "peer regeneration potion feedback should allocate unique floating text ids");
+
   console.log(JSON.stringify({
     ownerGold: ownerState.gold,
     peerGold: peerState.gold,
     remainingStock: room.sim.shopStock,
     ownerConsumables: ownerState.consumables,
-    peerConsumables: peerState.consumables
+    peerConsumables: peerState.consumables,
+    regenTextIds
   }, null, 2));
 }
 

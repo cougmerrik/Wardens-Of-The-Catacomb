@@ -871,6 +871,7 @@ export const runtimeBaseSupportMethods = {
     if (this.deathTransition.active) return;
     this.gameOver = true;
     this.paused = false;
+    this.optionsOpen = false;
     this.shopOpen = false;
     this.skillTreeOpen = false;
     this.statsPanelOpen = false;

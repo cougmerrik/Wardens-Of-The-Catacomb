@@ -13,6 +13,7 @@ import {
   getWarriorIronGuardDefenseBonusPct,
   isWarriorTalentGame
 } from "../warriorTalentTree.js";
+import { handleSkillPointPopupClick } from "../skillPointPopup.js";
 import { hasMageArcanePresenceActive, hasMageTalent, isNecromancerTalentGame } from "../necromancerTalentTree.js";
 import {
   ACTIVE_CONSUMABLE_SLOT_CAP,
@@ -55,12 +56,10 @@ function isActiveMultiplayer(game) {
 }
 
 export function getEnemySpawnInterval(game) {
-  const c = game.config.enemy;
-  const base = Number.isFinite(c.spawnIntervalStart) ? c.spawnIntervalStart : 2.6;
-  const min = Number.isFinite(c.spawnIntervalMin) ? c.spawnIntervalMin : 0.55;
-  const mult = game.getEnemySpawnRateScale();
-  const denom = Number.isFinite(mult) ? mult : 1;
-  return Math.max(min, base / Math.max(0.05, denom));
+  const c = game.config.enemy, base = Number.isFinite(c.spawnIntervalStart) ? c.spawnIntervalStart : 2.6;
+  const min = Number.isFinite(c.spawnIntervalMin) ? c.spawnIntervalMin : 0.55, mult = game.getEnemySpawnRateScale();
+  const interval = Math.max(min, base / Math.max(0.05, Number.isFinite(mult) ? mult : 1));
+  return game.isPostFloorBossSpawnRateReduced?.() ? interval * 2 : interval;
 }
 
 export function getMoveSpeedMultiplier(game) {
@@ -285,6 +284,19 @@ export function toggleStatsPanel(game, open) {
   }
 }
 
+export function togglePause(game, open) {
+  if (!game || game.gameOver) return;
+  const nextPaused = typeof open === "boolean" ? open : !game.paused;
+  game.paused = nextPaused;
+  if (nextPaused) {
+    game.shopOpen = false;
+    game.skillTreeOpen = false;
+    game.statsPanelOpen = false;
+    game.statsPanelPausedGame = false;
+  }
+  if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
+}
+
 export function setStatsPanelView(game, view) {
   if (view !== "run" && view !== "character") return false;
   game.statsPanelView = view;
@@ -321,6 +333,7 @@ function isPinnedSkillNode(game, node) {
 
 export function handleUiClicks(game) {
   if (!game.input) return;
+  if (game.optionsOpen) return void game.input.discardQueuedActions?.();
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
   if (playerAlive && !game.gameOver && !game.shopOpen && !game.skillTreeOpen) {
     for (let i = 0; i < ACTIVE_CONSUMABLE_SLOT_CAP; i++) {
@@ -338,18 +351,6 @@ export function handleUiClicks(game) {
     const step = Math.sign(wheelDelta) * Math.max(36, Math.abs(wheelDelta));
     const next = (game.uiScroll?.[target.key] || 0) + step;
     game.uiScroll[target.key] = Math.max(0, Math.min(max, next));
-  }
-  if (game.input.consumeKeyQueued("escape")) {
-    if (game.gameOver) {
-      if (game.statsPanelOpen && typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
-      else if (game.onReturnToMenu) game.onReturnToMenu();
-    } else if (game.shopOpen) toggleShop(game, false);
-    else if (game.skillTreeOpen) toggleSkillTree(game, false);
-    else if (game.statsPanelOpen) toggleStatsPanel(game, false);
-    else {
-      game.paused = !game.paused;
-      if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
-    }
   }
   if (playerAlive && game.input.consumeKeyQueued("b") && !game.gameOver) {
     toggleShop(game);
@@ -389,6 +390,7 @@ export function handleUiClicks(game) {
         continue;
       }
     }
+    if (playerAlive && handleSkillPointPopupClick(game, click.x, click.y, (node) => (clearPinnedUiTooltip(game), game.spendSkillPoint(node.key)))) continue;
     if (pointInRect(game, click.x, click.y, game.uiRects.shopButton)) {
       if (!playerAlive) continue;
       clearPinnedUiTooltip(game);
@@ -406,6 +408,17 @@ export function handleUiClicks(game) {
       if (game.gameOver && game.statsPanelOpen && typeof game.onDeathStatsBackToLeaderboard === "function") game.onDeathStatsBackToLeaderboard();
       else toggleStatsPanel(game);
       continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.optionsButton)) {
+      clearPinnedUiTooltip(game); if (typeof game.onOpenOptions === "function") game.onOpenOptions(game);
+      continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.pauseButton)) {
+      clearPinnedUiTooltip(game); togglePause(game); continue;
+    }
+    if (pointInRect(game, click.x, click.y, game.uiRects.pauseOverlayResume)) {
+      clearPinnedUiTooltip(game);
+      togglePause(game, false); continue;
     }
     if (pointInRect(game, click.x, click.y, game.uiRects.gameOverLeaderboardButton)) {
       clearPinnedUiTooltip(game);

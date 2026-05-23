@@ -228,6 +228,8 @@ const menuState = {
   mode: null,
   screen: "mode"
 };
+let inGameOptionsOpen = false;
+let inGameOptionsPausedGame = false;
 const leaderboardState = {
   activeBoard: LEADERBOARD_BOARD_SOLO,
   activeTab: "global",
@@ -373,6 +375,14 @@ function syncDisableAdsControl() {
 function syncGameplayTipsControl() {
   if (!gameplayTipsEnabledInput) return;
   gameplayTipsEnabledInput.checked = !!gameplayTipsEnabled;
+}
+
+function syncOptionsControls() {
+  syncMenuVolumeControl();
+  syncVoiceChatControls();
+  syncDisableAdsControl();
+  syncGameplayTipsControl();
+  syncDevBossOverrideControl();
 }
 
 function rotateTopAd(force = false) {
@@ -597,10 +607,7 @@ if (serverUrlInput) {
 syncCanvasMetrics();
 syncAndroidGameplayControls();
 syncDevModeUi();
-syncMenuVolumeControl();
-syncVoiceChatControls();
-syncDisableAdsControl();
-syncGameplayTipsControl();
+syncOptionsControls();
 if (topAdImage && AD_IMAGE_SOURCES.length > 0) rotateTopAd(true);
 syncTopAdVisibility();
 
@@ -655,7 +662,27 @@ function renderMenuScreen() {
   requestAnimationFrame(syncMenuScrollIndicator);
 }
 
+function closeInGameOptions({ restorePause = true } = {}) {
+  if (!inGameOptionsOpen) return;
+  inGameOptionsOpen = false;
+  if (currentGame) {
+    currentGame.optionsOpen = false;
+    if (restorePause && inGameOptionsPausedGame && currentGame.paused && !currentGame.gameOver && !currentGame.networkEnabled) {
+      currentGame.paused = false;
+      if (typeof currentGame.onPauseChanged === "function") currentGame.onPauseChanged(false, currentGame);
+    }
+  }
+  inGameOptionsPausedGame = false;
+  if (layout) layout.classList.remove("is-in-game-options");
+  if (menuPanel) menuPanel.hidden = true;
+  if (optionsBackButton) optionsBackButton.textContent = "Back";
+  setCanvasVisible(true);
+  syncTopAdVisibility();
+  syncAndroidGameplayControls();
+}
+
 function showModeSelect() {
+  closeInGameOptions({ restorePause: false });
   menuState.mode = null;
   menuState.screen = "mode";
   if (menuPanel) menuPanel.hidden = false;
@@ -666,6 +693,7 @@ function showModeSelect() {
 }
 
 function showNetworkSetup() {
+  closeInGameOptions({ restorePause: false });
   menuState.mode = MENU_MODE_NETWORK;
   menuState.screen = "network";
   if (menuPanel) menuPanel.hidden = false;
@@ -676,17 +704,28 @@ function showNetworkSetup() {
   syncTopAdVisibility();
 }
 
-function showOptionsScreen() {
+function showOptionsScreen({ inGame = false } = {}) {
+  if (inGame && currentGame) {
+    inGameOptionsOpen = true;
+    inGameOptionsPausedGame = !currentGame.networkEnabled && !currentGame.paused && !currentGame.gameOver;
+    currentGame.optionsOpen = true;
+    if (inGameOptionsPausedGame && typeof currentGame.togglePause === "function") currentGame.togglePause(true);
+    if (layout) layout.classList.add("is-in-game-options");
+    if (optionsBackButton) optionsBackButton.textContent = "Resume";
+  } else {
+    closeInGameOptions({ restorePause: false });
+  }
   menuState.screen = "options";
-  syncVoiceChatControls();
+  syncOptionsControls();
   if (menuPanel) menuPanel.hidden = false;
   if (networkSession) networkSession.hidden = true;
-  setCanvasVisible(false);
+  setCanvasVisible(!!inGame);
   renderMenuScreen();
   syncTopAdVisibility();
 }
 
 function showCharacterSelect(mode) {
+  closeInGameOptions({ restorePause: false });
   menuState.mode = mode;
   menuState.screen = "character";
   if (menuPanel) menuPanel.hidden = false;
@@ -697,6 +736,7 @@ function showCharacterSelect(mode) {
 }
 
 function showNetworkLobby() {
+  closeInGameOptions({ restorePause: false });
   menuState.mode = MENU_MODE_NETWORK;
   menuState.screen = "lobby";
   if (menuPanel) menuPanel.hidden = false;
@@ -1557,6 +1597,9 @@ if (typeof window !== "undefined") {
           refundCost: typeof game.getSkillRefundCost === "function" ? game.getSkillRefundCost() : 0,
           shopButton: game.uiRects?.shopButton || null,
           skillTreeButton: game.uiRects?.skillTreeButton || null,
+          optionsButton: game.uiRects?.optionsButton || null,
+          pauseButton: game.uiRects?.pauseButton || null,
+          pauseOverlayResume: game.uiRects?.pauseOverlayResume || null,
           shopClose: game.uiRects?.shopClose || null,
           skillTreeClose: game.uiRects?.skillTreeClose || null,
           refundButton: game.uiRects?.skillRefundButton || null,
@@ -1794,6 +1837,7 @@ const dismissSplash = () => {
           selectedClass: "archer",
           playerHandle: currentPlayerHandle || "Player",
           returnToMenu,
+          onOpenOptions: () => showOptionsScreen({ inGame: true }),
           syncMusicForGame,
           startingFloor: 1,
           debugHudEnabled: isDevMode,
@@ -1978,6 +2022,7 @@ function startLocalGame() {
     selectedClass,
     playerHandle: currentPlayerHandle || "Player",
     returnToMenu,
+    onOpenOptions: () => showOptionsScreen({ inGame: true }),
     syncMusicForGame,
     startingFloor: requestedStartFloor,
     bossOverride: selectedBossOverride,
@@ -2008,6 +2053,7 @@ function startNetworkGameplay() {
     debugHudEnabled: isDevMode,
     gameplayTipsEnabled,
     onReturnToMenu: returnToMenu,
+    onOpenOptions: () => showOptionsScreen({ inGame: true }),
     onPauseChanged: (_paused, nextGame) => syncMusicForGame(nextGame),
     onFloorChanged: (_floor, nextGame) => syncMusicForGame(nextGame),
     onGameOverChanged: (gameOver, nextGame) => {
@@ -2322,6 +2368,7 @@ function startNetworkGame() {
     const prevTrackSrc = game.musicTrack?.src || "";
     const meta = msg && msg.meta && typeof msg.meta === "object" ? msg.meta : msg;
     applyMetaStateToGame(game, meta);
+    if (!prevGameOver && game.gameOver && inGameOptionsOpen) closeInGameOptions({ restorePause: false });
     netRoomPhase = typeof game.networkRoomPhase === "string" ? game.networkRoomPhase : netRoomPhase;
     netRoomOwnerId = game.networkRoomOwnerId || netRoomOwnerId;
     netPauseOwnerId = game.networkPauseOwnerId || netPauseOwnerId;
@@ -2681,7 +2728,8 @@ if (devBossOverrideSelect) {
 
 if (optionsBackButton) {
   optionsBackButton.addEventListener("click", () => {
-    showModeSelect();
+    if (inGameOptionsOpen) closeInGameOptions();
+    else showModeSelect();
   });
 }
 

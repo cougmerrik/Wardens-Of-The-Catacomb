@@ -52,10 +52,12 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
     returnTriggered: false
   };
   game.paused = false;
+  game.optionsOpen = false;
   game.shopOpen = false;
   game.skillTreeOpen = false;
   game.time = 0;
   game.skillPoints = 0;
+  game.skillPointPopup = { active: null, queue: [], nextId: 1, lastSkillPoints: 0 };
   game.refundCount = 0;
   game.statsPanelOpen = false;
   game.statsPanelView = "run";

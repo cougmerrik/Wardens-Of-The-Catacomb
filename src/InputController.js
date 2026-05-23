@@ -145,6 +145,9 @@
       "shopButton",
       "skillTreeButton",
       "statsButton",
+      "optionsButton",
+      "pauseButton",
+      "pauseOverlayResume",
       "statsClose",
       "statsRunTab",
       "statsCharacterTab",
@@ -160,7 +163,7 @@
     for (const key of rectKeys) {
       if (this.pointInRect(x, y, uiRects?.[key])) return true;
     }
-    const rectGroups = [uiRects?.shopItems, uiRects?.skillTreeNodes, uiRects?.consumableSlots, uiRects?.groupPanelRows];
+    const rectGroups = [uiRects?.shopItems, uiRects?.skillTreeNodes, uiRects?.skillPointPopupNodes, uiRects?.consumableSlots, uiRects?.groupPanelRows];
     for (const group of rectGroups) {
       for (const entry of Array.isArray(group) ? group : []) {
         if (this.pointInRect(x, y, entry?.rect || entry)) return true;
@@ -268,6 +271,14 @@
     const queued = this.keyQueued.has(lower);
     this.keyQueued.delete(lower);
     return queued;
+  }
+
+  discardQueuedActions() {
+    this.mouse.leftQueued = false;
+    this.mouse.rightQueued = false;
+    this.mouse.uiLeftClicks.length = 0;
+    this.mouse.wheelDelta = 0;
+    this.keyQueued.clear();
   }
 
   queueKey(key) {

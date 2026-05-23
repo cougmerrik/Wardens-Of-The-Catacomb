@@ -1,4 +1,5 @@
 import { getEffectiveMasterVolume, getStoredMasterVolume, normalizeMasterVolume } from "../audio/audioSettings.js";
+import { clearHiddenEnemiesAfterFloorBossDefeat, isEnemyVisibleToAnyLivingPlayer, isPointVisibleToAnyLivingPlayer } from "./floorBossCleanup.js";
 import { FLOOR_BOSS_OVERRIDE_AUTO, getForcedFloorBossVariant, normalizeFloorBossOverride } from "./floorBossDebugOverride.js";
 
 export const runtimeFloorBossMethods = {
@@ -98,6 +99,9 @@ export const runtimeFloorBossMethods = {
       speechSourceY: null,
       speechExpiresAt: null,
       defeatedAtTime: null,
+      postDefeatSpawnSuppressedUntil: null,
+      hiddenEnemyCleanupPending: false,
+      hiddenEnemyCleanupCount: 0,
       portalSpawnedAtTime: null,
       completedAtTime: null
     };
@@ -175,6 +179,39 @@ export const runtimeFloorBossMethods = {
     boss.speechText = "";
     boss.speechExpiresAt = null;
     boss.defeatedAtTime = this.time;
+    boss.postDefeatSpawnSuppressedUntil = this.time + 10;
+    boss.hiddenEnemyCleanupPending = true;
+    for (const enemy of this.enemies || []) {
+      if (!enemy || (enemy.hp || 0) <= 0 || enemy.isFloorBoss) continue;
+      if (this.isEnemyFriendlyToPlayer?.(enemy)) continue;
+      enemy.postFloorBossCleanupEligible = true;
+    }
+  },
+
+  isPostFloorBossSpawnSuppressed() {
+    const boss = this.syncFloorBossState();
+    return ["defeated", "portal"].includes(boss.phase) &&
+      Number.isFinite(boss.postDefeatSpawnSuppressedUntil) &&
+      this.time < boss.postDefeatSpawnSuppressedUntil;
+  },
+
+  isPostFloorBossSpawnRateReduced() {
+    const boss = this.syncFloorBossState();
+    return ["defeated", "portal"].includes(boss.phase) &&
+      Number.isFinite(boss.postDefeatSpawnSuppressedUntil) &&
+      this.time >= boss.postDefeatSpawnSuppressedUntil;
+  },
+
+  isPointVisibleToAnyLivingPlayer(x, y, radius = 0) {
+    return isPointVisibleToAnyLivingPlayer(this, x, y, radius);
+  },
+
+  isEnemyVisibleToAnyLivingPlayer(enemy) {
+    return isEnemyVisibleToAnyLivingPlayer(this, enemy);
+  },
+
+  clearHiddenEnemiesAfterFloorBossDefeat() {
+    return clearHiddenEnemiesAfterFloorBossDefeat(this);
   },
 
   markFloorBossPortalSpawned() {

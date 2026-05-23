@@ -1,6 +1,7 @@
 import { vecLength, directionIndexFromVector } from "../utils.js";
 import { updateConfusedEnemy, updateFriendlyMageSummon } from "./gameStepMageSummons.js";
 import { resolveCombatAndDrops } from "./stepCombatResolution.js";
+import { syncSkillPointPopupQueue } from "./skillPointPopup.js";
 import { getWarriorPassiveRegenBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
 import {
   getNecromancerBlackCandleCursedBeamBonus,
@@ -16,6 +17,7 @@ import {
 } from "./necromancerTalentTree.js";
 
 export function stepGame(game, dt, controls = {}) {
+  syncSkillPointPopupQueue(game);
   const segmentRectHit = (x0, y0, x1, y1, left, top, right, bottom) => {
     // Liang-Barsky clipping against AABB.
     const dx = x1 - x0;
@@ -499,19 +501,23 @@ export function stepGame(game, dt, controls = {}) {
       }
     }
   }
-  game.enemySpawnTimer -= dt;
+  const postBossSpawnSuppressed = typeof game.isPostFloorBossSpawnSuppressed === "function" && game.isPostFloorBossSpawnSuppressed();
+  if (postBossSpawnSuppressed) game.enemySpawnTimer = Math.max(game.enemySpawnTimer, 0.25);
+  else game.enemySpawnTimer -= dt;
   let spawnIterations = 0;
   const activeEnemyCap = typeof game.getActiveEnemyCap === "function" ? game.getActiveEnemyCap() : game.config.enemy.maxCount;
+  const countLivingEnemies = () => game.enemies.reduce((count, enemy) => count + ((enemy?.hp || 0) > 0 ? 1 : 0), 0);
   const floorBossActive = typeof game.isFloorBossActive === "function" ? game.isFloorBossActive() : false;
-  while (!floorBossActive && game.enemySpawnTimer <= 0 && game.enemies.length < activeEnemyCap && spawnIterations < 6) {
+  while (!floorBossActive && !postBossSpawnSuppressed && game.enemySpawnTimer <= 0 && countLivingEnemies() < activeEnemyCap && spawnIterations < 6) {
     const packSize = game.getEnemyPackSize();
-    for (let i = 0; i < packSize && game.enemies.length < activeEnemyCap; i++) {
+    for (let i = 0; i < packSize && countLivingEnemies() < activeEnemyCap; i++) {
       const point = game.randomEnemySpawnPoint();
       if (!point) continue;
-      const activeGoblins = game.enemies.filter((enemy) => enemy.type === "goblin").length;
-      const activePrisoners = game.enemies.filter((enemy) => enemy.type === "prisoner").length;
-      const activeMummies = game.enemies.filter((enemy) => enemy.type === "mummy").length;
-      const activeRatArchers = game.enemies.filter((enemy) => enemy.type === "rat_archer").length;
+      const liveEnemies = game.enemies.filter((enemy) => (enemy?.hp || 0) > 0);
+      const activeGoblins = liveEnemies.filter((enemy) => enemy.type === "goblin").length;
+      const activePrisoners = liveEnemies.filter((enemy) => enemy.type === "prisoner").length;
+      const activeMummies = liveEnemies.filter((enemy) => enemy.type === "mummy").length;
+      const activeRatArchers = liveEnemies.filter((enemy) => enemy.type === "rat_archer").length;
       const prisonerMinFloor = Number.isFinite(game.config.enemy.prisonerMinFloor) ? game.config.enemy.prisonerMinFloor : 2;
       const skeletonMinFloor = Number.isFinite(game.config.enemy.skeletonWarriorMinFloor) ? game.config.enemy.skeletonWarriorMinFloor : 4;
       const spawnSkeleton = game.floor >= skeletonMinFloor && Math.random() < (game.config.enemy.skeletonWarriorSpawnChance || 0.25);
@@ -556,7 +562,7 @@ export function stepGame(game, dt, controls = {}) {
   for (const stand of game.armorStands) {
     if (!stand.animated || stand.activated) continue;
     if (floorBossActive) break;
-    if (game.enemies.length >= activeEnemyCap || armorActivations >= 4) break;
+    if (countLivingEnemies() >= activeEnemyCap || armorActivations >= 4) break;
     const shouldWake = livingPlayersForWake.some(
       (player) => player && vecLength((player.x || 0) - stand.x, (player.y || 0) - stand.y) < armorWakeRadius
     );

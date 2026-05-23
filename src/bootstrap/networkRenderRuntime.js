@@ -119,8 +119,8 @@ export function startNetworkRenderLoopRuntime({
         snapshotBuffer: netSnapshotBuffer.length
       });
       const stateWithServerTime =
-        pkt?.state && typeof pkt.state === "object" && Number.isFinite(pkt.serverTime)
-          ? { ...pkt.state, serverTime: pkt.serverTime }
+        pkt?.state && typeof pkt.state === "object" && (Number.isFinite(pkt.serverTime) || pkt.lastActionSeqByPlayer)
+          ? { ...pkt.state, serverTime: pkt.serverTime, lastActionSeqByPlayer: pkt.lastActionSeqByPlayer }
           : pkt.state;
       const ackSeq = typeof getAckSeqForPacket === "function"
         ? getAckSeqForPacket(pkt)

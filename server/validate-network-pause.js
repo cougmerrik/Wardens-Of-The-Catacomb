@@ -107,12 +107,38 @@ function rectCenter(rect) {
 }
 
 async function clickCanvasRect(page, rect) {
+  const canvasBox = await page.locator("#game").boundingBox();
+  assert(canvasBox, "game canvas bounding box unavailable");
+  const canvasMetrics = await page.evaluate(() => {
+    const canvas = document.getElementById("game");
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    return {
+      width: canvas.width,
+      height: canvas.height
+    };
+  });
+  assert(canvasMetrics?.width > 0 && canvasMetrics?.height > 0, "game canvas metrics unavailable");
   const point = rectCenter(rect);
-  await page.mouse.click(point.x, point.y);
+  const scaleX = canvasBox.width / canvasMetrics.width;
+  const scaleY = canvasBox.height / canvasMetrics.height;
+  await page.mouse.click(canvasBox.x + point.x * scaleX, canvasBox.y + point.y * scaleY);
 }
 
 async function getDebugState(page) {
   return page.evaluate(() => window.__WOTC_DEBUG__?.getState?.() || null);
+}
+
+async function sampleCanvasCenter(page, rect) {
+  return page.evaluate(({ rect }) => {
+    const canvas = document.getElementById("game");
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(rect.x + 8)));
+    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(rect.y + 8)));
+    const [r, g, b, a] = ctx.getImageData(x, y, 1, 1).data;
+    return { r, g, b, a };
+  }, { rect });
 }
 
 async function openLobby(page, { wsUrl, roomId, playerName, classType }) {
@@ -136,7 +162,7 @@ async function setReady(page) {
 async function waitForRole(page, expectedRole, timeoutMs = 25000) {
   await page.waitForFunction((role) => {
     const state = window.__WOTC_DEBUG__?.getState?.();
-    return !!state && state.networkReady === true && state.networkRole === role && !!state.ui?.shopButton;
+    return !!state && state.networkReady === true && state.networkRole === role && !!state.ui?.shopButton && !!state.ui?.pauseButton;
   }, expectedRole, { timeout: timeoutMs });
   return getDebugState(page);
 }
@@ -207,6 +233,19 @@ async function main() {
     otherState = await waitForRole(otherPage, "Active", 12000);
 
     assert(ownerState?.ui?.shopButton, "pause owner shop button unavailable");
+    assert(ownerState?.ui?.pauseButton, "pause owner pause button unavailable");
+    assert(otherState?.ui?.pauseButton, "non-owner pause button unavailable");
+    const nonOwnerPauseSample = await sampleCanvasCenter(otherPage, otherState.ui.pauseButton);
+    assert(
+      nonOwnerPauseSample && nonOwnerPauseSample.r < 150 && nonOwnerPauseSample.g < 150 && nonOwnerPauseSample.b < 150,
+      `non-owner pause button did not render muted: ${JSON.stringify(nonOwnerPauseSample)}`
+    );
+    await clickCanvasRect(otherPage, otherState.ui.pauseButton);
+    await delay(300);
+    ownerState = await getDebugState(ownerPage);
+    otherState = await getDebugState(otherPage);
+    assert(ownerState?.ui?.paused === false, "non-owner pause button paused the room");
+    assert(otherState?.ui?.paused === false, "non-owner pause button locally paused the client");
     await ownerPage.keyboard.press("b");
 
     await ownerPage.waitForFunction(() => {
@@ -224,8 +263,20 @@ async function main() {
     assert(ownerState?.ui?.shopOpen === true, "pause owner shop did not open");
     assert(otherState?.ui?.shopOpen === false, "non-owner unexpectedly opened the shop");
     assert(otherState?.ui?.skillTreeOpen === false, "non-owner unexpectedly opened the skill tree");
+    assert(otherState?.ui?.pauseOverlayResume, "non-owner pause overlay resume rect unavailable");
+    const nonOwnerResumeSample = await sampleCanvasCenter(otherPage, otherState.ui.pauseOverlayResume);
+    assert(
+      nonOwnerResumeSample && nonOwnerResumeSample.r < 150 && nonOwnerResumeSample.g < 150 && nonOwnerResumeSample.b < 150,
+      `non-owner resume button did not render muted: ${JSON.stringify(nonOwnerResumeSample)}`
+    );
+    await clickCanvasRect(otherPage, otherState.ui.pauseOverlayResume);
+    await delay(300);
+    ownerState = await getDebugState(ownerPage);
+    otherState = await getDebugState(otherPage);
+    assert(ownerState?.ui?.paused === true && ownerState?.ui?.shopOpen === true, "non-owner resume button changed owner pause state");
+    assert(otherState?.ui?.paused === true, "non-owner resume button changed local pause state");
 
-    await ownerPage.keyboard.press("Escape");
+    await clickCanvasRect(ownerPage, ownerState.ui.pauseButton);
 
     await ownerPage.waitForFunction(() => {
       const state = window.__WOTC_DEBUG__?.getState?.();

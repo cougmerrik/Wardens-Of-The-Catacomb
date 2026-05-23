@@ -83,6 +83,25 @@ body {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
 }
 
+.layout.is-in-game-options .menu-shell {
+  position: fixed;
+  z-index: 20;
+  top: 50%;
+  left: 50%;
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+}
+
+.layout.is-in-game-options .menu-shell::before {
+  content: "";
+  position: fixed;
+  inset: -100vh -100vw;
+  z-index: -1;
+  background: rgba(6, 8, 13, 0.62);
+}
+
 .menu-screen {
   animation: menu-screen-enter 180ms ease;
 }
