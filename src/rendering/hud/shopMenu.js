@@ -1,10 +1,10 @@
 import { drawConsumableItemIcon, getConsumableItemIconStatus } from "./consumableItemIcons.js";
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
+}
+
 function drawConsumablePlaceholder(ctx, key, x, y, size, accent = "rgba(126, 168, 255, 0.16)") {
-  ctx.fillStyle = "rgba(8, 12, 18, 0.94)";
-  ctx.fillRect(x, y, size, size);
-  ctx.strokeStyle = "rgba(198, 212, 246, 0.35)";
-  ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
   if (drawConsumableItemIcon(ctx, key, x, y, size, 2)) return;
   if (getConsumableItemIconStatus(key) === "loading") return;
   ctx.fillStyle = accent;
@@ -19,7 +19,7 @@ function wrapText(ctx, text, maxWidth) {
   if (words.length === 0) return [];
   const lines = [];
   let current = words[0];
-  for (let i = 1; i < words.length; i++) {
+  for (let i = 1; i < words.length; i += 1) {
     const next = `${current} ${words[i]}`;
     if (ctx.measureText(next).width <= maxWidth) current = next;
     else {
@@ -31,132 +31,180 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
-export function drawShopMenu(renderer, game, layout) {
-  const ctx = renderer.ctx;
-  const menuW = layout.isAndroid ? Math.min(layout.playW - 20, 760) : 620;
-  const menuH = layout.isAndroid ? Math.min(renderer.canvas.height - 18, 430) : 404;
-  const menuX = Math.floor((layout.playW - menuW) / 2);
-  const menuY = Math.floor((renderer.canvas.height - menuH) / 2);
-  const items = typeof game.getShopItems === "function" ? game.getShopItems() : [];
+function drawCoinGlyph(ctx, x, y, radius = 4) {
+  ctx.fillStyle = "#f6c84f";
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(102, 74, 19, 0.8)";
+  ctx.stroke();
+  ctx.fillStyle = "#fff3b3";
+  ctx.beginPath();
+  ctx.arc(x - radius * 0.3, y - radius * 0.3, Math.max(1, radius * 0.25), 0, Math.PI * 2);
+  ctx.fill();
+}
 
-  ctx.fillStyle = "rgba(4, 7, 11, 0.78)";
-  ctx.fillRect(0, 0, layout.playW, renderer.canvas.height);
+function pointInRect(x, y, rect) {
+  return !!rect && x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
+}
 
-  ctx.fillStyle = "rgba(10, 15, 24, 0.95)";
-  ctx.fillRect(menuX, menuY, menuW, menuH);
-  ctx.strokeStyle = "rgba(155, 173, 211, 0.8)";
-  ctx.lineWidth = 1.4;
-  ctx.strokeRect(menuX, menuY, menuW, menuH);
+function getPlayerScreenCenter(renderer, game, layout) {
+  const camera = typeof game.getCamera === "function" ? game.getCamera() : { x: 0, y: 0 };
+  const playerX = Number.isFinite(game?.player?.x) ? game.player.x : layout.playW * 0.5 + (camera.x || 0);
+  const playerY = Number.isFinite(game?.player?.y) ? game.player.y : renderer.canvas.height * 0.5 + (camera.y || 0);
+  const bottomLimit = renderer.canvas.height - layout.xpBarH - 28;
+  return {
+    x: clamp(playerX - (camera.x || 0), 72, layout.playW - 72),
+    y: clamp(playerY - (camera.y || 0), layout.topHudH + 72, bottomLimit)
+  };
+}
 
-  ctx.fillStyle = "#f3efe3";
-  ctx.font = "bold 20px Trebuchet MS";
-  ctx.fillText("Castle Quartermaster", menuX + 16, menuY + 30);
-  ctx.font = "14px Trebuchet MS";
-  ctx.fillStyle = "#d8dfef";
-  ctx.fillText(`Gold: ${game.gold}`, menuX + menuW - 120, menuY + 30);
+function getRadialPosition(index, count, center, radius, nodeSize, layout, canvasHeight) {
+  const step = count > 1 ? (Math.PI * 2) / count : 0;
+  const angle = -Math.PI / 2 + index * step;
+  const x = center.x + Math.cos(angle) * radius - nodeSize * 0.5;
+  const y = center.y + Math.sin(angle) * radius - nodeSize * 0.5;
+  return {
+    x: Math.floor(clamp(x, 10, layout.playW - nodeSize - 10)),
+    y: Math.floor(clamp(y, layout.topHudH + 10, canvasHeight - layout.xpBarH - nodeSize - 10)),
+    w: nodeSize,
+    h: nodeSize
+  };
+}
 
-  const closeRect = layout.isAndroid ? { x: menuX + menuW - 42, y: menuY + 8, w: 28, h: 28 } : { x: menuX + menuW - 34, y: menuY + 10, w: 20, h: 20 };
-  game.uiRects.shopClose = closeRect;
-  ctx.fillStyle = "rgba(140, 78, 78, 0.9)";
-  ctx.fillRect(closeRect.x, closeRect.y, closeRect.w, closeRect.h);
-  ctx.fillStyle = "#f4ece6";
-  ctx.font = layout.isAndroid ? "bold 18px Trebuchet MS" : "bold 14px Trebuchet MS";
-  ctx.fillText("X", closeRect.x + (layout.isAndroid ? 8 : 6), closeRect.y + (layout.isAndroid ? 20 : 15));
+function drawTexturedCircle(ctx, cx, cy, radius, disabled) {
+  const gradient = ctx.createRadialGradient(cx - radius * 0.35, cy - radius * 0.35, radius * 0.1, cx, cy, radius);
+  if (disabled) {
+    gradient.addColorStop(0, "#9aa0a8");
+    gradient.addColorStop(0.58, "#626a72");
+    gradient.addColorStop(1, "#353a42");
+  } else {
+    gradient.addColorStop(0, "#fff0a8");
+    gradient.addColorStop(0.48, "#d8a63e");
+    gradient.addColorStop(1, "#705018");
+  }
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = disabled ? "rgba(205, 211, 220, 0.38)" : "rgba(255, 239, 167, 0.74)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.strokeStyle = disabled ? "rgba(36, 39, 45, 0.26)" : "rgba(92, 61, 14, 0.24)";
+  ctx.lineWidth = 1;
+  for (let i = -1; i <= 1; i += 1) {
+    ctx.beginPath();
+    ctx.arc(cx + i * radius * 0.18, cy + i * radius * 0.1, radius * (0.54 + i * 0.08), Math.PI * 0.18, Math.PI * 1.25);
+    ctx.stroke();
+  }
+}
 
-  const rowH = layout.isAndroid ? 74 : 66;
-  const contentTop = menuY + 46;
-  const footerH = 48;
-  const contentBottom = menuY + menuH - footerH;
-  const visibleH = contentBottom - contentTop;
-  const contentHeight = items.length * rowH + 6;
-  const scrollMax = Math.max(0, contentHeight - visibleH);
-  const scroll = Math.max(0, Math.min(scrollMax, game.uiScroll?.shop || 0));
-  game.uiScroll.shop = scroll;
-  game.uiRects.shopScrollArea = { x: menuX + 10, y: contentTop, w: menuW - 20, h: visibleH };
-  game.uiRects.shopScrollMax = scrollMax;
+function drawShopNode(ctx, item, rect, canBuy) {
+  const disabled = !canBuy;
+  const circleRadius = Math.floor(Math.min(rect.w, rect.h - 16) * 0.38);
+  const cx = Math.floor(rect.x + rect.w * 0.5);
+  const cy = Math.floor(rect.y + circleRadius + 3);
+  const iconSize = Math.floor(circleRadius * 1.45);
+  const iconX = cx - Math.floor(iconSize * 0.5);
+  const iconY = cy - Math.floor(iconSize * 0.5);
+  const priceText = `${Math.max(0, Math.floor(item.priceForFloor || 0))}`;
+  const stockText = `${Math.max(0, Math.floor(item.stock || 0))}/${Math.max(0, Math.floor(item.maxInventory || 0))}`;
 
+  drawTexturedCircle(ctx, cx, cy, circleRadius, disabled);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(menuX + 10, contentTop, menuW - 20, visibleH);
+  ctx.arc(cx, cy, circleRadius - 3, 0, Math.PI * 2);
   ctx.clip();
-
-  let rowY = menuY + 48 - scroll;
-  for (const item of items) {
-    const owned = typeof game.getConsumableOwnedCount === "function" ? game.getConsumableOwnedCount(item.key) : 0;
-    const failure = typeof game.getShopFailureReason === "function" ? game.getShopFailureReason(item.key) : "";
-    const canBuy = !failure;
-    const rarityColor = item.rarity === "Legendary" ? "#f0ce63" : item.rarity === "Rare" ? "#c8a8ff" : "#8ec3ff";
-    const portraitX = menuX + 22;
-    const portraitY = rowY + 11;
-    const portraitSize = layout.isAndroid ? 42 : 36;
-    const buyRect = layout.isAndroid ? { x: menuX + menuW - 142, y: rowY + 14, w: 112, h: 36 } : { x: menuX + menuW - 126, y: rowY + 16, w: 96, h: 30 };
-    const textStartX = portraitX + portraitSize + 12;
-    const metaWidth = 156;
-    const effectStartX = textStartX + metaWidth;
-    const textMaxWidth = buyRect.x - effectStartX - 16;
-
-    ctx.fillStyle = "rgba(20, 28, 41, 0.92)";
-    ctx.fillRect(menuX + 12, rowY, menuW - 24, rowH - 6);
-    ctx.strokeStyle = "rgba(109, 125, 156, 0.52)";
-    ctx.strokeRect(menuX + 12, rowY, menuW - 24, rowH - 6);
-
-    drawConsumablePlaceholder(
-      ctx,
-      item.key,
-      portraitX,
-      portraitY,
-      portraitSize,
-      item.type === "Passive" ? "rgba(210, 168, 255, 0.16)" : "rgba(126, 168, 255, 0.16)"
-    );
-
-    ctx.fillStyle = "#f1ede0";
-    ctx.font = "bold 14px Trebuchet MS";
-    ctx.fillText(item.name, textStartX, rowY + 19);
-    ctx.fillStyle = rarityColor;
-    ctx.font = "12px Trebuchet MS";
-    ctx.fillText(`${item.type} • ${item.rarity}`, textStartX, rowY + 35);
-    ctx.fillStyle = "#b9c3d9";
-    ctx.fillText(`Owned ${owned}/${item.maxStack} • Stock ${item.stock}/${item.maxInventory}`, textStartX, rowY + 51);
-
-    ctx.fillStyle = "#9eb6df";
-    ctx.font = "12px Trebuchet MS";
-    const wrappedEffect = wrapText(ctx, item.effect, textMaxWidth);
-    for (let i = 0; i < Math.min(2, wrappedEffect.length); i++) {
-      ctx.fillText(wrappedEffect[i], effectStartX, rowY + 20 + i * 14);
-    }
-    if (failure && failure !== "Not enough gold") {
-      ctx.fillStyle = "#d8aa8e";
-      ctx.fillText(failure, effectStartX, rowY + 48);
-    }
-
-    game.uiRects.shopItems.push({ key: item.key, rect: buyRect });
-    ctx.fillStyle = canBuy ? "rgba(77, 132, 89, 0.95)" : "rgba(92, 76, 76, 0.95)";
-    ctx.fillRect(buyRect.x, buyRect.y, buyRect.w, buyRect.h);
-    ctx.strokeStyle = "rgba(220, 224, 233, 0.52)";
-    ctx.strokeRect(buyRect.x, buyRect.y, buyRect.w, buyRect.h);
-    ctx.fillStyle = "#f4efe1";
-    ctx.font = layout.isAndroid ? "bold 15px Trebuchet MS" : "bold 13px Trebuchet MS";
-    ctx.fillText(`${item.priceForFloor}g`, buyRect.x + (layout.isAndroid ? 32 : 28), buyRect.y + (layout.isAndroid ? 24 : 20));
-
-    rowY += rowH;
+  drawConsumablePlaceholder(ctx, item.key, iconX, iconY, iconSize, item.type === "Passive" ? "rgba(210, 168, 255, 0.16)" : "rgba(126, 168, 255, 0.16)");
+  if (disabled) {
+    ctx.fillStyle = "rgba(105, 111, 119, 0.58)";
+    ctx.fillRect(cx - circleRadius, cy - circleRadius, circleRadius * 2, circleRadius * 2);
   }
   ctx.restore();
 
-  if (scrollMax > 0) {
-    const trackX = menuX + menuW - 10;
-    const trackY = contentTop;
-    const trackH = visibleH;
-    const thumbH = Math.max(28, Math.floor((visibleH / contentHeight) * trackH));
-    const thumbY = trackY + Math.floor((scroll / scrollMax) * (trackH - thumbH));
-    ctx.fillStyle = "rgba(68, 76, 97, 0.7)";
-    ctx.fillRect(trackX, trackY, 4, trackH);
-    ctx.fillStyle = "rgba(180, 194, 228, 0.85)";
-    ctx.fillRect(trackX, thumbY, 4, thumbH);
+  ctx.font = "bold 12px Trebuchet MS";
+  const gap = 4;
+  const coinR = 4;
+  const priceW = ctx.measureText(priceText).width;
+  const stockW = ctx.measureText(stockText).width;
+  const totalW = priceW + gap + coinR * 2 + gap + stockW;
+  let x = rect.x + (rect.w - totalW) * 0.5;
+  const y = rect.y + rect.h - 4;
+  ctx.textAlign = "center";
+  ctx.fillStyle = disabled ? "#a0a6b0" : "#f4efe1";
+  ctx.fillText(priceText, x + priceW * 0.5, y);
+  x += priceW + gap + coinR;
+  drawCoinGlyph(ctx, x, y - 4, coinR);
+  x += coinR + gap;
+  ctx.fillText(stockText, x + stockW * 0.5, y);
+  ctx.textAlign = "left";
+}
+
+function drawShopTooltip(ctx, item, failure, mouseX, mouseY, layout, canvasHeight) {
+  const lines = [
+    { text: item.name, title: true },
+    { text: `${item.type} - ${item.rarity} - ${item.priceForFloor}g`, meta: true },
+    ...wrapText(ctx, item.effect, 238).map((text) => ({ text }))
+  ];
+  if (failure) lines.push({ text: failure, failure: true });
+
+  const width = 270;
+  const height = 18 + lines.length * 16;
+  const x = Math.floor(clamp(mouseX + 16, 8, layout.playW - width - 8));
+  const y = Math.floor(clamp(mouseY + 16, layout.topHudH + 8, canvasHeight - height - 8));
+
+  ctx.fillStyle = "rgba(7, 10, 16, 0.96)";
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeStyle = "rgba(176, 190, 220, 0.72)";
+  ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    ctx.font = line.title ? "bold 14px Trebuchet MS" : "12px Trebuchet MS";
+    ctx.fillStyle = line.title ? "#f4efe1" : line.failure ? "#d8aa8e" : line.meta ? "#9eb6df" : "#cbd5e6";
+    ctx.fillText(line.text, x + 10, y + 18 + i * 16);
+  }
+}
+
+export function drawShopMenu(renderer, game, layout) {
+  const ctx = renderer.ctx;
+  const items = typeof game.getShopItems === "function" ? game.getShopItems() : [];
+  const center = getPlayerScreenCenter(renderer, game, layout);
+  const nodeSize = layout.isAndroid ? 78 : 72;
+  const radius = layout.isAndroid ? 108 : 100;
+  const mouseX = Number.isFinite(game?.input?.mouse?.screenX) ? game.input.mouse.screenX : -1;
+  const mouseY = Number.isFinite(game?.input?.mouse?.screenY) ? game.input.mouse.screenY : -1;
+  let tooltip = null;
+  const pinned = game?.uiPinnedTooltip?.source === "shop" ? game.uiPinnedTooltip : null;
+
+  game.uiRects.shopClose = null;
+  game.uiRects.shopScrollArea = null;
+  game.uiRects.shopScrollMax = 0;
+  if (game.uiScroll?.shop) game.uiScroll.shop = 0;
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.fillRect(0, layout.topHudH, layout.playW, renderer.canvas.height - layout.topHudH - layout.xpBarH);
+
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    const failure = typeof game.getShopFailureReason === "function" ? game.getShopFailureReason(item.key) : "";
+    const rect = getRadialPosition(i, items.length, center, radius, nodeSize, layout, renderer.canvas.height);
+    const canBuy = !failure;
+    game.uiRects.shopItems.push({ key: item.key, rect });
+    drawShopNode(ctx, item, rect, canBuy);
+    if (pointInRect(mouseX, mouseY, rect)) tooltip = { item, failure };
+    if (pinned?.key === item.key) tooltip = { item, failure, x: rect.x + rect.w, y: rect.y };
   }
 
-  ctx.font = "12px Trebuchet MS";
-  ctx.fillStyle = "#8ea1c5";
-  const footerText = game.consumables?.message || (layout.isAndroid ? "Drag to scroll items." : "Mouse wheel to scroll items.");
-  ctx.fillText(footerText, menuX + 14, menuY + menuH - 28);
-  ctx.fillText("All shop entries are consumables.", menuX + 14, menuY + menuH - 12);
+  if (tooltip) {
+    drawShopTooltip(
+      ctx,
+      tooltip.item,
+      tooltip.failure,
+      Number.isFinite(tooltip.x) ? tooltip.x : mouseX,
+      Number.isFinite(tooltip.y) ? tooltip.y : mouseY,
+      layout,
+      renderer.canvas.height
+    );
+  }
 }

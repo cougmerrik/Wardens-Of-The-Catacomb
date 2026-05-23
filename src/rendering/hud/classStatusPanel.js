@@ -385,7 +385,7 @@ export function drawClassStatusPanel(renderer, game, layout, panelY = null) {
   game.uiRects.shopButton = shopRect;
   game.uiRects.skillTreeButton = skillRect;
   game.uiRects.pauseButton = pauseRect;
-  drawHudButton(ctx, shopRect, "Shop", { active: game.shopOpen, activeFill: "rgba(113, 82, 44, 0.96)", goldAmount: game.gold || 0 });
+  drawHudButton(ctx, shopRect, "Send for Aid", { active: game.shopOpen, activeFill: "rgba(113, 82, 44, 0.96)", goldAmount: game.gold || 0 });
   drawHudButton(ctx, skillRect, "Skill Tree", { active: game.skillTreeOpen, activeFill: "rgba(68, 104, 78, 0.96)", pulse });
   drawHudButton(ctx, pauseRect, game.paused ? "Resume" : "Pause", { active: game.paused, disabled: pauseDisabled, activeFill: "rgba(128, 80, 70, 0.96)" });
   contentY += PANEL_BUTTON_BLOCK_H;

@@ -9,7 +9,6 @@ export function syncIdleSoundState(music, splashActive, game) {
     !game.networkEnabled &&
     !game.paused &&
     !game.gameOver &&
-    !game.shopOpen &&
     !game.skillTreeOpen &&
     !game.statsPanelOpen
   );

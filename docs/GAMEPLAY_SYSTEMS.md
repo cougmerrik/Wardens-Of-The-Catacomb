@@ -153,6 +153,8 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Health pickups restore `25%` of max health.
 - Gold-find and spawn-rate shop upgrades were removed from the shop.
 - The current shop is consumable-only. Consumables are active or passive, have finite charges, appear in the HUD while owned, and follow the schema in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md).
+- Pressing `Send for Aid` opens an in-game radial aid menu around the player instead of a modal shop window. The menu does not pause local or multiplayer gameplay. Each radial entry shows the consumable icon and remaining stock; hover tooltips show the item name, type, rarity, price, effect, and purchase failure reason. On touch layouts, the first tap pins the tooltip and the second tap buys.
+- Radial shop entries with `0` stock or insufficient gold are greyed out. The existing finite stock rules still apply, including shared multiplayer stock depletion.
 - The class status area reserves fixed space for active consumable effect icons so the panel does not resize as effects start or expire.
 - Regeneration Potion shows its item icon with remaining seconds in the class status area while active and displays periodic healing gain text as health is restored.
 - Speed Potion, Spike Growth, Shield, Fire Oil, and Frost Oil also show active effect icons in the class status area. Timed effects count down seconds, Shield shows temporary HP, and oil coatings show remaining charged attacks.
@@ -244,8 +246,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - active status icons must use the same status-row presentation in multiplayer as local play
   - damage text must still show when a hit kills or despawns the target
   - class progression effects for Archer, Fighter, and Necromancer must have targeted network validation when they add statuses, procs, summons, resource changes, or player-visible text
-- Shop, skill tree, and stats overlays are per-player UI in multiplayer:
-  - pause-owner shop/skill actions pause the room globally
+- Send for Aid, skill tree, and stats overlays are per-player UI in multiplayer:
+  - Send for Aid never pauses the room
+  - pause-owner skill actions pause the room globally
   - other players can open their own local overlays without opening them on teammates' clients
 - Multiplayer skill spend and refund actions are authoritative:
   - local clicks send actions to the server
@@ -270,7 +273,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Remote players render as full in-world avatars.
 - Remote player handles appear below their characters using that player's stable run color.
 - The active-play HUD is rendered in-canvas instead of reserving a desktop sidebar. The minimap anchors to the top-right of the play canvas at `80%` opacity, and the combined player/class HUD aligns directly beneath it.
-- The top-right HUD strip exposes `Stats` and `Options`; the combined player/class HUD keeps local player identity, gold, the class skill button, shop/skill tree, pause, the class meter, active consumable effects, and the group list.
+- The top-right HUD strip exposes `Stats` and `Options`; the combined player/class HUD keeps local player identity, gold, the class skill button, Send for Aid/skill tree, pause, the class meter, active consumable effects, and the group list. The `Send for Aid` button toggles the player-centered radial aid menu open and closed.
 - Unspent skill points are no longer displayed as an `SP` counter during active play. Newly earned points open the tier-only skill popup, and the `Skill Tree` button slowly blinks green while points remain available.
 - The group list is embedded at the bottom of the combined HUD. It renders every teammate as a compact one-line owner marker/name plus health bar, including dead-state entries for connected dead spectators.
 - The minimap uses stable per-run player colors for teammates.

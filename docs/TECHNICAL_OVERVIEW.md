@@ -40,7 +40,7 @@ This document summarizes the current high-level architecture and validation work
   - tap-to-UI hit routing for HUD/overlay actions
 - Android HUD layout helpers live under `src/rendering/hud/androidLayout.js`. They provide touch regions, draw active stick guides, and keep compact HUD panels away from the lower movement/aim zones.
 - Browser bootstrap owns Android-specific menu/gameplay chrome such as utility buttons, gameplay-control visibility, Android canvas sizing, and Android dev-mode unlock handling.
-- The in-canvas HUD exposes top-right `Stats` and `Options` rects plus class-panel `Shop`, `Skill Tree`, and `Pause` rects. `Options` opens the existing DOM Options panel as an overlay so master volume, voice chat, ads, and gameplay tips continue to use the main-menu persistence logic. `Pause` uses explicit HUD click/action routing, is greyed out for multiplayer clients without pause authority, and the pause overlay publishes its own `Resume` rect. `Esc` no longer toggles pause or unlocks music playback, music mute is controlled through options volume rather than an `M` keybind, and the embedded group list renders every teammate as a compact owner/name plus health bar row.
+- The in-canvas HUD exposes top-right `Stats` and `Options` rects plus class-panel `Send for Aid`, `Skill Tree`, and `Pause` rects. `Send for Aid` toggles a player-anchored radial consumable aid menu that publishes item hit rects through `uiRects.shopItems`; the old modal close rect and central gold hub are intentionally absent. The aid menu does not set `paused` or block gameplay input. Desktop uses hover tooltips, while Android/touch routes the first item tap through `uiPinnedTooltip` and buys on the second tap. `Options` opens the existing DOM Options panel as an overlay so master volume, voice chat, ads, and gameplay tips continue to use the main-menu persistence logic. `Pause` uses explicit HUD click/action routing, is greyed out for multiplayer clients without pause authority, and the pause overlay publishes its own `Resume` rect. `Esc` no longer toggles pause or unlocks music playback, music mute is controlled through options volume rather than an `M` keybind, and the embedded group list renders every teammate as a compact owner/name plus health bar row.
 - Android build commands:
   - `npm run build:android:web` prepares `www/`
   - `npm run cap:sync:android` rebuilds and syncs the Capacitor Android project
@@ -318,10 +318,12 @@ This document summarizes the current high-level architecture and validation work
   - runs the audio validator in explicit focus-cycle mode and records focus/visibility telemetry; use `--headed` when a real desktop session is available and strict blur/focus assertions are desired
 - `validate:network-ui`
   - verifies that controller clients can open and interact with skill/shop UI paths in live network sessions
+- `validate:in-canvas-hud`
+  - verifies in-canvas HUD ownership and the radial shop rendering contract
 - `validate:network-refund`
   - verifies multiplayer-authoritative refund actions, snapshot propagation, and acting-player build-state resync
 - `validate:network-pause`
-  - verifies pause-owner shop flow pauses the room without opening overlays on other clients
+  - verifies Send for Aid does not pause the room or open overlays on other clients
   - checks that the passive `<handle> paused the game.` banner clears when the pause owner unpauses
 - `perf:network-browser`
   - captures active-tab frame cadence, snapshot backlog, correction pressure, and movement-latency proxies

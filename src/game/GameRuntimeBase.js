@@ -81,7 +81,7 @@ export class GameRuntimeBase {
   }
 
   isActive() {
-    return !this.gameOver && !this.shopOpen && !this.skillTreeOpen && !this.paused && !this.optionsOpen;
+    return !this.gameOver && !this.skillTreeOpen && !this.paused && !this.optionsOpen;
   }
 
   getPlayAreaWidth() {

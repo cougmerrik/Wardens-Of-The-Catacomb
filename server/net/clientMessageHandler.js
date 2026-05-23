@@ -13,10 +13,7 @@ export function handleActionMessage(room, clientId, action) {
   };
   if (kind === "togglePause") {
     if (!isPauseOwner) return;
-    if (sim.shopOpen) {
-      sim.toggleShop(false);
-      sim.paused = false;
-    } else if (sim.skillTreeOpen) {
+    if (sim.skillTreeOpen) {
       sim.toggleSkillTree(false);
       sim.paused = false;
     }
@@ -29,13 +26,11 @@ export function handleActionMessage(room, clientId, action) {
     if (!playerAlive) return;
     const nextOpen = !sim.shopOpen;
     sim.toggleShop(nextOpen);
-    sim.paused = nextOpen;
     return;
   }
   if (kind === "closeShop") {
     if (!isPauseOwner) return;
     sim.toggleShop(false);
-    sim.paused = false;
     return;
   }
   if (kind === "toggleSkillTree") {
