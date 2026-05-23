@@ -2368,6 +2368,7 @@ function startNetworkGame() {
     const prevTrackSrc = game.musicTrack?.src || "";
     const meta = msg && msg.meta && typeof msg.meta === "object" ? msg.meta : msg;
     applyMetaStateToGame(game, meta);
+    if (!prevGameOver && game.gameOver && inGameOptionsOpen) closeInGameOptions({ restorePause: false });
     netRoomPhase = typeof game.networkRoomPhase === "string" ? game.networkRoomPhase : netRoomPhase;
     netRoomOwnerId = game.networkRoomOwnerId || netRoomOwnerId;
     netPauseOwnerId = game.networkPauseOwnerId || netPauseOwnerId;

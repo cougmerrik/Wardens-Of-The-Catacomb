@@ -1,5 +1,5 @@
 import { applyPredictedTeleportAction } from "./teleportPrediction.js";
-import { dismissSkillPointPopup, handleSkillPointPopupClick } from "../game/skillPointPopup.js";
+import { handleSkillPointPopupClick, markSkillPointPopupSpendPending } from "../game/skillPointPopup.js";
 export { applyPredictedTeleportAction } from "./teleportPrediction.js";
 
 export function collectInput(game, consumeQueued = true) {
@@ -301,10 +301,15 @@ export function handleNetworkUiActions(game, netClient, isController) {
       continue;
     }
     if (playerAlive && handleSkillPointPopupClick(game, click.x, click.y, (node) => {
+      if (game.skillPointPopup?.active?.spendPending) return;
       clearPinnedUiTooltip();
-      dismissSkillPointPopup(game);
       recordAction(click, `skillPointPopup:${node.key}`, "spendSkill", node.key);
-      if (canSendRoomAction) netClient.sendAction({ kind: "spendSkill", key: node.key });
+      if (canSendRoomAction) {
+        const actionSeq = Math.max(1, Math.floor(Number.isFinite(game.networkActionSeq) ? game.networkActionSeq + 1 : 1));
+        game.networkActionSeq = actionSeq;
+        markSkillPointPopupSpendPending(game, { actionSeq });
+        netClient.sendAction({ kind: "spendSkill", key: node.key, clientActionSeq: actionSeq });
+      }
     })) continue;
     if (hit(click.x, click.y, game.uiRects.statsClose)) {
       clearPinnedUiTooltip();

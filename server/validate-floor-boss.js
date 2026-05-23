@@ -339,13 +339,20 @@ function validatePostBossCleanupWindow() {
   assert(game.enemies.includes(remoteVisible), "remote visible hostile was removed after boss defeat");
   assert(game.isPostFloorBossSpawnSuppressed(), "post-boss spawn suppression was not active after boss defeat");
   assert(!game.isPostFloorBossSpawnRateReduced(), "post-boss spawn rate reduction started before suppression ended");
+  game.portal.active = false;
+  game.armorStands = [];
   const dropsAfterBoss = game.drops.length;
   const enemyCountAfterCleanup = game.enemies.length;
+  const enemiesAfterCleanup = new Set(game.enemies);
   game.enemySpawnTimer = -5;
   game.randomEnemySpawnPoint = () => ({ x: game.player.x + 256, y: game.player.y + 64 });
   game.getEnemyPackSize = () => 1;
   stepGame(game, 9.5, { processUi: false });
-  assert(game.enemies.length === enemyCountAfterCleanup, "ambient enemy spawned during post-boss suppression window");
+  const newEnemiesDuringSuppression = game.enemies.filter((enemy) => !enemiesAfterCleanup.has(enemy));
+  assert(
+    newEnemiesDuringSuppression.length === 0,
+    `ambient enemy spawned during post-boss suppression window: ${newEnemiesDuringSuppression.map((enemy) => enemy?.type || "unknown").join(",")}`
+  );
   assert(game.isPostFloorBossSpawnSuppressed(), "post-boss spawn suppression expired early");
   stepGame(game, 0.7, { processUi: false });
   assert(!game.isPostFloorBossSpawnSuppressed(), "post-boss spawn suppression did not expire");
@@ -355,7 +362,7 @@ function validatePostBossCleanupWindow() {
     Math.abs(reducedSpawnInterval - normalSpawnInterval * 2) < 0.0001,
     `post-boss spawn interval expected ${normalSpawnInterval * 2}, got ${reducedSpawnInterval}`
   );
-  assert(game.enemies.length > enemyCountAfterCleanup, "ambient enemy did not resume after post-boss suppression window");
+  assert(game.enemies.some((enemy) => !enemiesAfterCleanup.has(enemy)), "ambient enemy did not resume after post-boss suppression window");
   game.getGoldDropRate = () => 1;
   game.getHealthDropRate = () => 1;
   visible.hp = 0;
@@ -382,20 +389,16 @@ function validatePostBossCleanupRetry() {
   killFloorBoss(game);
   assert(game.floorBoss.hiddenEnemyCleanupCount === 0, "visible-only boss defeat cleanup removed an enemy");
   assert(game.floorBoss.hiddenEnemyCleanupPending, "visible-only boss defeat cleanup stopped retrying early");
+  assert(visible.postFloorBossCleanupEligible === true, "visible hostile was not marked for retry cleanup at boss defeat");
+  const postBossSpawn = game.spawnGhost(game.player.x + game.getPlayAreaWidth() + 420, game.player.y + game.canvas.height + 420);
+  game.enemies.push(postBossSpawn);
   visible.x = game.player.x + game.getPlayAreaWidth() + 320;
   visible.y = game.player.y + game.canvas.height + 320;
+  game.time = game.floorBoss.postDefeatSpawnSuppressedUntil + 2;
   assert(game.clearHiddenEnemiesAfterFloorBossDefeat() === 1, "cleanup retry did not silently remove hidden hostile");
   assert(!game.enemies.includes(visible), "cleanup retry left the hidden hostile active");
+  assert(game.enemies.includes(postBossSpawn), "cleanup retry deleted post-boss spawn");
   assert(!game.floorBoss.hiddenEnemyCleanupPending, "cleanup retry stayed pending after removing a hidden hostile");
-  const expiredVisible = game.spawnGhost(game.player.x + 128, game.player.y + 32);
-  game.enemies.push(expiredVisible);
-  game.floorBoss.hiddenEnemyCleanupPending = true;
-  expiredVisible.x = game.player.x + game.getPlayAreaWidth() + 320;
-  expiredVisible.y = game.player.y + game.canvas.height + 320;
-  game.time = game.floorBoss.postDefeatSpawnSuppressedUntil;
-  assert(game.clearHiddenEnemiesAfterFloorBossDefeat() === 0, "cleanup retry removed hostile after the cleanup window");
-  assert(game.enemies.includes(expiredVisible), "cleanup retry deleted hostile after the cleanup window");
-  assert(!game.floorBoss.hiddenEnemyCleanupPending, "expired cleanup retry stayed pending");
   return {
     removedHidden: game.floorBoss.hiddenEnemyCleanupCount,
     pending: game.floorBoss.hiddenEnemyCleanupPending

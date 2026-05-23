@@ -746,14 +746,14 @@ export const runtimeCombatStatsMethods = {
   spendSkillPoint(skillKey) {
     if (this.isArcherClass && this.isArcherClass()) {
       if (spendRangerUtility(this, skillKey)) {
-        dismissSkillPointPopup(this);
+        dismissSkillPointPopup(this, { syncSkillPoints: true });
         if (skillKey === "defense") this.spawnFloatingText(this.player.x, this.player.y - 26, "Defense training improved", "#b7e38a", 0.85, 14);
         else this.spawnFloatingText(this.player.x, this.player.y - 26, "Training improved", "#b7e38a", 0.85, 14);
         return true;
       }
       if (!canSpendRangerNode(this, skillKey) && !canSpendRangerUtility(this, skillKey)) return false;
       if (spendRangerNode(this, skillKey)) {
-        dismissSkillPointPopup(this);
+        dismissSkillPointPopup(this, { syncSkillPoints: true });
         if (skillKey === "rangerPath") {
           this.spawnFloatingText(this.player.x, this.player.y - 26, "Fire Arrow Unlocked!", "#f6b36a", 1.0, 15);
         } else {
@@ -765,13 +765,13 @@ export const runtimeCombatStatsMethods = {
     }
     if (isNecromancerTalentGame(this)) {
       if (spendNecromancerUtility(this, skillKey)) {
-        dismissSkillPointPopup(this);
+        dismissSkillPointPopup(this, { syncSkillPoints: true });
         this.spawnFloatingText(this.player.x, this.player.y - 26, "Training improved", "#b7e38a", 0.85, 14);
         return true;
       }
       if (!canSpendNecromancerNode(this, skillKey) && !canSpendNecromancerUtility(this, skillKey)) return false;
       if (spendNecromancerNode(this, skillKey)) {
-        dismissSkillPointPopup(this);
+        dismissSkillPointPopup(this, { syncSkillPoints: true });
         this.spawnFloatingText(this.player.x, this.player.y - 26, "Mage talent selected", "#c4a0ff", 0.85, 14);
         return true;
       }
@@ -780,7 +780,7 @@ export const runtimeCombatStatsMethods = {
     if (isWarriorTalentGame(this)) {
       if (!canSpendWarriorNode(this, skillKey) && !canSpendWarriorUtility(this, skillKey)) return false;
       if (spendWarriorNode(this, skillKey)) {
-        dismissSkillPointPopup(this);
+        dismissSkillPointPopup(this, { syncSkillPoints: true });
         this.spawnFloatingText(this.player.x, this.player.y - 26, "Talent improved", "#ffcf9b", 0.85, 14);
         return true;
       }

@@ -39,6 +39,7 @@ function main() {
   assertIncludes(gameJs, "currentGame.optionsOpen = true;", "gameplay should know when options are open");
   assertIncludes(gameJs, "currentGame.togglePause(true)", "single-player in-game options should pause through runtime pause logic");
   assertIncludes(gameJs, "if (inGameOptionsOpen) closeInGameOptions();", "options Back button should resume gameplay when opened in-game");
+  assertIncludes(gameJs, "if (!prevGameOver && game.gameOver && inGameOptionsOpen) closeInGameOptions({ restorePause: false });", "network game-over transition should close an open options overlay");
   assertIncludes(css, ".layout.is-in-game-options .menu-shell", "in-game options panel should overlay the canvas");
   assertIncludes(css, ".layout.is-in-game-options .menu-shell {\n  position: fixed;", "in-game options panel should use the canvas overlay shell");
   assertNotIncludes(css, ".layout.is-in-game-options .menu-shell {\n  position: fixed;\n  z-index: 20;\n  top: 50%;\n  left: 50%;\n  width: min(920px, calc(100vw - 32px));\n  max-height: calc(100vh - 32px);\n  overflow: auto;", "in-game options shell should not show scrollbars");

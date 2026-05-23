@@ -25,6 +25,7 @@ import {
 } from "./clientCorrectionMetrics.js";
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
 import { applyPredictedTeleportAction } from "./teleportPrediction.js";
+import { resolveSkillPointPopupPendingSpend } from "../game/skillPointPopup.js";
 export { applyMetaStateToGame, resetNetworkFloatingTextEventCache } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
@@ -407,6 +408,10 @@ export function applySnapshotToGame({
     if ((game.networkPerf.appliedSnapshotCount || 0) === 1 && game.skillPointPopup && Number.isFinite(game.skillPoints)) {
       game.skillPointPopup.lastSkillPoints = Math.max(0, Math.floor(game.skillPoints));
     }
+    const actionAckSeq = localPlayerId && state.lastActionSeqByPlayer && typeof state.lastActionSeqByPlayer === "object"
+      ? state.lastActionSeqByPlayer[localPlayerId]
+      : NaN;
+    resolveSkillPointPopupPendingSpend(game, { acknowledgedActionSeq: actionAckSeq });
     recordNetworkFlightEvent(game, "snapshotApply", {
       snapshotCount: game.networkPerf.appliedSnapshotCount || 0,
       controller: !!controller,

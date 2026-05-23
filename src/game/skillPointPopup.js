@@ -63,6 +63,9 @@ export function syncSkillPointPopupQueue(game) {
   const current = Number.isFinite(game.skillPoints) ? Math.max(0, Math.floor(game.skillPoints)) : 0;
   if (!Number.isFinite(state.lastSkillPoints)) state.lastSkillPoints = current;
   if (current > state.lastSkillPoints) enqueueSkillPointPopup(game, current - state.lastSkillPoints);
+  if (current < state.lastSkillPoints) {
+    for (let i = current; i < state.lastSkillPoints; i++) dismissSkillPointPopup(game);
+  }
   state.lastSkillPoints = current;
   if (current <= 0) dismissSkillPointPopup(game, { clearQueue: true });
 }
@@ -73,6 +76,48 @@ export function dismissSkillPointPopup(game, options = {}) {
   state.active = null;
   if (options.clearQueue) state.queue.length = 0;
   else startNextPopup(game, state);
+  if (options.syncSkillPoints && Number.isFinite(game.skillPoints)) {
+    state.lastSkillPoints = Math.max(0, Math.floor(game.skillPoints));
+  }
+}
+
+export function markSkillPointPopupSpendPending(game, options = {}) {
+  const state = ensureSkillPointPopupState(game);
+  if (!state?.active) return false;
+  const current = Number.isFinite(game.skillPoints) ? Math.max(0, Math.floor(game.skillPoints)) : 0;
+  state.active.startedAt = now(game);
+  state.active.spendPending = true;
+  state.active.spendPendingSkillPoints = current;
+  if (Number.isFinite(options.actionSeq)) state.active.spendPendingActionSeq = Math.max(0, Math.floor(options.actionSeq));
+  return true;
+}
+
+export function resolveSkillPointPopupPendingSpend(game, options = {}) {
+  const state = ensureSkillPointPopupState(game);
+  if (!state?.active?.spendPending) return false;
+  const pendingActionSeq = Number.isFinite(state.active.spendPendingActionSeq)
+    ? Math.max(0, Math.floor(state.active.spendPendingActionSeq))
+    : 0;
+  const acknowledgedActionSeq = Number.isFinite(options.acknowledgedActionSeq)
+    ? Math.max(0, Math.floor(options.acknowledgedActionSeq))
+    : pendingActionSeq;
+  if (pendingActionSeq > 0 && acknowledgedActionSeq < pendingActionSeq) return false;
+  const current = Number.isFinite(game.skillPoints) ? Math.max(0, Math.floor(game.skillPoints)) : 0;
+  const pendingSkillPoints = Number.isFinite(state.active.spendPendingSkillPoints)
+    ? Math.max(0, Math.floor(state.active.spendPendingSkillPoints))
+    : Number.isFinite(state.lastSkillPoints)
+    ? Math.max(0, Math.floor(state.lastSkillPoints))
+    : current;
+  if (current < pendingSkillPoints) {
+    for (let i = current; i < pendingSkillPoints; i++) dismissSkillPointPopup(game);
+    state.lastSkillPoints = current;
+    return true;
+  }
+  state.active.spendPending = false;
+  delete state.active.spendPendingSkillPoints;
+  delete state.active.spendPendingActionSeq;
+  state.active.startedAt = now(game);
+  return true;
 }
 
 export function updateSkillPointPopup(game) {
@@ -81,6 +126,7 @@ export function updateSkillPointPopup(game) {
   syncSkillPointPopupQueue(game);
   startNextPopup(game, state);
   if (!state.active) return null;
+  if (state.active.spendPending) return state.active;
   const elapsed = now(game) - state.active.startedAt;
   if (elapsed >= SKILL_POINT_POPUP_DURATION) {
     dismissSkillPointPopup(game);

@@ -1,7 +1,7 @@
 import { Game } from "../src/Game.js";
 import { stepGame } from "../src/game/gameStep.js";
 import { vecLength } from "../src/utils.js";
-import { canSpendNecromancerNode } from "../src/game/necromancerTalentTree.js";
+import { canSpendNecromancerNode, getNecromancerTalentDef } from "../src/game/necromancerTalentTree.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -19,6 +19,7 @@ function makeMage() {
 }
 
 const game = makeMage();
+assert(getNecromancerTalentDef("frozenOrbCantrip")?.description?.some((line) => line.includes("30%")), "Frozen Orb tooltip should state its implemented 30% Chill slow");
 assert(canSpendNecromancerNode(game, "frozenOrbCantrip"), "Frozen Orb should be spendable as a tier-1 cantrip");
 assert(game.spendSkillPoint("frozenOrbCantrip"), "spendSkillPoint failed for Frozen Orb");
 game.input.mouse.worldX = game.player.x + 120;

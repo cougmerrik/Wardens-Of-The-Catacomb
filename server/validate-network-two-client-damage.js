@@ -196,34 +196,35 @@ async function roamForChunkStreaming(page, samples, minDistance = 900, maxSteps 
   let lastX = start.player?.x || 0;
   let lastY = start.player?.y || 0;
   let travelled = 0;
-  const pattern = [
-    { dx: 160, dy: 0 },
-    { dx: 160, dy: 0 },
-    { dx: 0, dy: 160 },
-    { dx: 0, dy: 160 },
-    { dx: -160, dy: 0 },
-    { dx: 0, dy: 160 },
-    { dx: 160, dy: 0 },
-    { dx: 0, dy: -160 }
+  const directions = [
+    { key: "d", dx: 160, dy: 0 },
+    { key: "s", dx: 0, dy: 160 },
+    { key: "a", dx: -160, dy: 0 },
+    { key: "w", dx: 0, dy: -160 }
   ];
+  let directionIndex = 0;
   for (let step = 0; step < maxSteps && travelled < minDistance; step++) {
-    const dir = pattern[step % pattern.length];
+    const dir = directions[directionIndex];
     await tapMovement(page, dir.dx, dir.dy, 140);
     await delay(80);
     const state = await getDebugState(page);
     assert(state, `debug state unavailable during roam step ${step}`);
     const px = state.player?.x || 0;
     const py = state.player?.y || 0;
-    travelled += Math.hypot(px - lastX, py - lastY);
+    const stepDistance = Math.hypot(px - lastX, py - lastY);
+    travelled += stepDistance;
     lastX = px;
     lastY = py;
     samples.push({
       phase: "roam",
       step,
+      direction: dir.key,
+      stepDistance,
       x: px,
       y: py,
       travelled
     });
+    if (stepDistance < 8) directionIndex = (directionIndex + 1) % directions.length;
   }
   return {
     start,

@@ -235,7 +235,7 @@ export function createNetworkSessionController({
         const initialPending = netPendingSnapshot;
         applySnapshot(
           game,
-          initialPending.state,
+          { ...initialPending.state, serverTime: initialPending.serverTime, lastActionSeqByPlayer: initialPending.lastActionSeqByPlayer },
           isNetworkController(),
           getAckSeqForPacket(initialPending)
         );
@@ -400,7 +400,7 @@ export function createNetworkSessionController({
         return;
       }
       if (game.networkHasMap && game.networkHasChunks && !game.networkReady && netSnapshotBuffer.length === 0) {
-        applySnapshot(game, msg.state, isNetworkController(), getAckSeqForPacket(msg));
+        applySnapshot(game, { ...msg.state, serverTime: msg.serverTime, lastActionSeqByPlayer: msg.lastActionSeqByPlayer }, isNetworkController(), getAckSeqForPacket(msg));
         if (netInitialSnapshotApplied) {
           updateNetworkRole(game, isNetworkController(), networkTakeControl);
           updateNetworkStatusRuntime(networkStatus, getCurrentGame(), `Room synced | Role: ${game.networkRole}`);

@@ -1,43 +1,10 @@
 import { vecLength } from "../utils.js";
-import { finalizeProjectilesAndTransientState, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
+import { finalizeProjectilesAndTransientState, pulseMageFrozenOrb, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
 import { resolveFireZonesAndEnemyStatus } from "./stepCombatZoneAndEnemyStatus.js";
 import { getNecromancerPlaguecraftRiseChance, getNecromancerRotDps, getNecromancerRotDuration, hasNecromancerHarvester, hasNecromancerPlaguecraftRot, isNecromancerTalentGame } from "./necromancerTalentTree.js";
 import { hasWarriorSpellknight } from "./warriorTalentTree.js";
 import { hasRangerTalent } from "./rangerTalentTree.js";
 import { spawnGhost, spawnSkeleton } from "./enemySpawnFactories.js";
-
-function pulseMageFrozenOrb(game, orb, dt) {
-  if (!game || !orb || orb.projectileType !== "mage_frozenOrb" || orb.life <= 0) return;
-  const interval = Math.max(0.08, Number.isFinite(orb.frostPulseInterval) ? orb.frostPulseInterval : 0.18);
-  orb.frostPulseTimer = (Number.isFinite(orb.frostPulseTimer) ? orb.frostPulseTimer : interval) - dt;
-  if (orb.frostPulseTimer > 0) return;
-  orb.frostPulseTimer += interval;
-  const baseAngle = Number.isFinite(orb.angle) ? orb.angle : Math.atan2(orb.vy || 0, orb.vx || 1);
-  const speed = 205;
-  const shardDamage = Math.max(0.5, Number.isFinite(orb.frostPulseShardDamage) ? orb.frostPulseShardDamage : (orb.damage || 1) * 0.42);
-  const offsets = [-Math.PI * 0.5, -Math.PI * 0.18, Math.PI * 0.18, Math.PI * 0.5];
-  for (const offset of offsets) {
-    const angle = baseAngle + offset;
-    game.bullets.push({
-      x: orb.x,
-      y: orb.y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      angle,
-      life: 0.32,
-      size: 3.6,
-      damage: shardDamage,
-      projectileType: "mage_frozenOrbShard",
-      damageType: "cold",
-      ownerId: orb.ownerId || null,
-      slowDuration: 2.2,
-      knockback: 0,
-      mageCantrip: orb.mageCantrip || "frozenOrbCantrip",
-      frozenOrbPulseShard: true,
-      hitTargets: new Set()
-    });
-  }
-}
 
 export function resolveCombatAndDrops({
   game,

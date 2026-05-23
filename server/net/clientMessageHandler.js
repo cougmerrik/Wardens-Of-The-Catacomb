@@ -367,6 +367,8 @@ export function handleClientMessage(raw, context) {
   if (msg.type === "action") {
     if (!client.roomId || !rooms.has(client.roomId)) return;
     const room = rooms.get(client.roomId);
+    const clientActionSeq = Number.isFinite(msg.action?.clientActionSeq) ? Math.max(0, Math.floor(msg.action.clientActionSeq)) : 0;
+    if (clientActionSeq > 0) client.lastActionSeq = Math.max(Number.isFinite(client.lastActionSeq) ? client.lastActionSeq : 0, clientActionSeq);
     handleActionMessage(room, client.id, msg.action);
     return;
   }

@@ -148,13 +148,23 @@ function main() {
   assert(peerState.consumables.sharedCooldown < cooldownAfterUse, "peer consumable cooldown did not tick down");
   assert(regenAfterTick.timer < timerAfterUse, "peer regeneration potion timer did not tick down");
   assert(peerState.health > healthAfterUse, "peer regeneration potion did not heal over time");
+  room.sim.networkFloatingTextEvents = [];
+  room.sim.nextFloatingTextId = 0;
+  room.tickRemoteActivePlayerConsumables(peerState, 1);
+  room.tickRemoteActivePlayerConsumables(peerState, 1);
+  const regenTextIds = room.sim.networkFloatingTextEvents
+    .filter((entry) => typeof entry?.text === "string" && entry.text.startsWith("+"))
+    .map((entry) => entry.id);
+  assert(regenTextIds.length >= 2, "peer regeneration potion should publish repeated healing feedback");
+  assert(new Set(regenTextIds).size === regenTextIds.length, "peer regeneration potion feedback should allocate unique floating text ids");
 
   console.log(JSON.stringify({
     ownerGold: ownerState.gold,
     peerGold: peerState.gold,
     remainingStock: room.sim.shopStock,
     ownerConsumables: ownerState.consumables,
-    peerConsumables: peerState.consumables
+    peerConsumables: peerState.consumables,
+    regenTextIds
   }, null, 2));
 }
 

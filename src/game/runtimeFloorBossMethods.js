@@ -181,6 +181,11 @@ export const runtimeFloorBossMethods = {
     boss.defeatedAtTime = this.time;
     boss.postDefeatSpawnSuppressedUntil = this.time + 10;
     boss.hiddenEnemyCleanupPending = true;
+    for (const enemy of this.enemies || []) {
+      if (!enemy || (enemy.hp || 0) <= 0 || enemy.isFloorBoss) continue;
+      if (this.isEnemyFriendlyToPlayer?.(enemy)) continue;
+      enemy.postFloorBossCleanupEligible = true;
+    }
   },
 
   isPostFloorBossSpawnSuppressed() {
