@@ -95,6 +95,16 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       }
       return true;
     };
+    if (!sourceFriendly) {
+      const owl = this.owlDelivery?.active;
+      if (owl && owl.state !== "portal" && (owl.hp || 0) > 0) {
+        const dist = vecLength(owl.x - sourceEnemy.x, owl.y - sourceEnemy.y);
+        if (dist <= this.config.map.tile * 8 && hasLineOfSight(sourceEnemy.x, sourceEnemy.y, owl.x, owl.y)) {
+          best = owl;
+          bestDist = dist;
+        }
+      }
+    }
     for (const enemy of this.enemies || []) {
       if (!enemy || enemy === sourceEnemy || (enemy.hp || 0) <= 0) continue;
       if (sourceFriendly && typeof this.isEnemyTargetedByAnyNecromancerBeam === "function" && this.isEnemyTargetedByAnyNecromancerBeam(enemy)) continue;

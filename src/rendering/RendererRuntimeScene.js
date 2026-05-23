@@ -285,6 +285,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     }
     this.drawLightingOverlay(game, cameraX, cameraY, layout);
     this.drawDrops(game, cameraX, cameraY);
+    this.drawOwlDelivery(game, cameraX, cameraY);
     for (const enemy of game.enemies) {
       if (this.isEnemyBodyLayer(enemy)) continue;
       if (this.drawEnemyDarkenedLayer(game, enemy, cameraX, cameraY, layout)) continue;

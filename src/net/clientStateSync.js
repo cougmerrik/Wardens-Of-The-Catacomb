@@ -26,6 +26,7 @@ import {
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
 import { applyPredictedTeleportAction } from "./teleportPrediction.js";
 import { resolveSkillPointPopupPendingSpend } from "../game/skillPointPopup.js";
+import { applyOwlDeliveryNotifications } from "./owlDeliveryNotifications.js";
 export { applyMetaStateToGame, resetNetworkFloatingTextEventCache } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
@@ -492,6 +493,10 @@ export function applySnapshotToGame({
     game.meleeSwings = syncByIdLerp(game.meleeSwings, state.meleeSwings, 1);
     synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: false });
     recordSuspiciousNetworkState(game, { keyframe: false, ackSeq });
+  }
+  if (Object.prototype.hasOwnProperty.call(state, "owlDelivery")) {
+    applyOwlDeliveryNotifications(game, state.owlDelivery);
+    game.owlDelivery = state.owlDelivery || null;
   }
 
   return { netPendingInputs, netLastAckSeq };

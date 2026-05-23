@@ -1290,6 +1290,7 @@ export class AuthoritativeRoom {
       player: fullState.player,
       players: fullState.players,
       serverStateAnomalies: this.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry })),
+      owlDelivery: fullState.owlDelivery,
       delta
     };
     if (Array.isArray(fullState.floatingTexts) && fullState.floatingTexts.length > 0) {

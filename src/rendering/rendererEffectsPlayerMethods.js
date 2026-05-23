@@ -418,11 +418,46 @@ export const rendererEffectsPlayerMethods = {
     if (this._minimapCache?.canvas) ctx.drawImage(this._minimapCache.canvas, miniX, miniY, drawW, drawH);
 
     for (const drop of game.drops || []) {
-      if (!drop || drop.life <= 0 || (drop.type !== "health" && drop.type !== "mushroom")) continue;
-      ctx.fillStyle = drop.type === "health" ? "#ff3f3f" : "#ff6a52";
+      if (!drop || drop.life <= 0 || (drop.type !== "health" && drop.type !== "mushroom" && drop.type !== "owl_item")) continue;
+      ctx.fillStyle = drop.type === "health" ? "#ff3f3f" : drop.type === "owl_item" ? "#71dfff" : "#ff6a52";
       ctx.beginPath();
       ctx.arc(miniX + (drop.x / this.config.map.tile) * scale, miniY + (drop.y / this.config.map.tile) * scale, Math.max(1.6, scale * 0.95), 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    const owlDelivery = game.owlDelivery;
+    const owl = owlDelivery?.active;
+    if (owl) {
+      const destX = miniX + (owl.destX / this.config.map.tile) * scale;
+      const destY = miniY + (owl.destY / this.config.map.tile) * scale;
+      const owlX = miniX + ((Number.isFinite(owl.displayX) ? owl.displayX : owl.x) / this.config.map.tile) * scale;
+      const owlY = miniY + ((Number.isFinite(owl.displayY) ? owl.displayY : owl.y) / this.config.map.tile) * scale;
+      ctx.save();
+      ctx.strokeStyle = "rgba(104, 220, 255, 0.85)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(destX, destY, Math.max(3.5, scale * 1.6), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#71dfff";
+      ctx.beginPath();
+      ctx.arc(owlX, owlY, Math.max(2.5, scale * 1.3), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (owlDelivery?.lastMarker) {
+      const marker = owlDelivery.lastMarker;
+      const mx = miniX + (marker.x / this.config.map.tile) * scale;
+      const my = miniY + (marker.y / this.config.map.tile) * scale;
+      ctx.save();
+      ctx.fillStyle = "#dff8ff";
+      ctx.strokeStyle = "#4ec9ef";
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.roundRect(mx - 4, my - 3, 8, 7, 1.5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#4ec9ef";
+      ctx.fillRect(mx - 3, my, 6, 1.3);
+      ctx.restore();
     }
 
     for (const player of Array.isArray(game.remotePlayers) ? game.remotePlayers : []) {

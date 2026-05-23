@@ -53,7 +53,7 @@ function main() {
   assertIncludes(classPanel, "let contentY = rect.y + PANEL_CONTENT_TOP;", "class status content should avoid excessive header gap");
   assertIncludes(classPanel, "game.uiRects.shopButton = shopRect;", "combined HUD should own the shop button rect");
   assertIncludes(classPanel, "function formatHudGold", "combined HUD should compact large gold amounts");
-  assertIncludes(classPanel, '"Send for Aid"', "shop button should be labeled Send for Aid");
+  assertIncludes(classPanel, '"Call for Aid"', "shop button should be labeled Call for Aid");
   assertIncludes(classPanel, "goldAmount: game.gold || 0", "send-for-aid button should include the current gold amount");
   assertIncludes(classPanel, "ctx.arc(coinX, coinY, coinR", "shop button should draw a gold coin indicator");
   assertIncludes(classPanel, "game.uiRects.skillTreeButton = skillRect;", "combined HUD should own the skill tree button rect");

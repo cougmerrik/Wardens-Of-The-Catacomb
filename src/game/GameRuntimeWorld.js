@@ -75,6 +75,8 @@ import {
   pointInRect,
   handleUiClicks
 } from "./world/uiEconomy.js";
+import { grantConsumableCharge } from "./world/consumablesEconomy.js";
+import { tickOwlDelivery } from "./world/owlDelivery.js";
 
 export class GameRuntimeWorld extends GameRuntimeBase {
   parseMap() {
@@ -291,6 +293,14 @@ export class GameRuntimeWorld extends GameRuntimeBase {
 
   tickConsumables(dt) {
     return tickConsumables(this, dt);
+  }
+
+  tickOwlDelivery(dt) {
+    return tickOwlDelivery(this, dt);
+  }
+
+  grantConsumableCharge(key) {
+    return grantConsumableCharge(this, key);
   }
 
   useConsumableSlot(slotIndex) {

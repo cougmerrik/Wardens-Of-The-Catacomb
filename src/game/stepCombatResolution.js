@@ -5,6 +5,7 @@ import { getNecromancerPlaguecraftRiseChance, getNecromancerRotDps, getNecromanc
 import { hasWarriorSpellknight } from "./warriorTalentTree.js";
 import { hasRangerTalent } from "./rangerTalentTree.js";
 import { spawnGhost, spawnSkeleton } from "./enemySpawnFactories.js";
+import { pickupOwlItemDrop } from "./world/owlDelivery.js";
 
 export function resolveCombatAndDrops({
   game,
@@ -807,6 +808,8 @@ export function resolveCombatAndDrops({
       } else if (game.isGoldDrop(drop)) {
         const amount = Math.max(1, Math.floor(drop.amount * game.getGoldFindMultiplier()));
         if (typeof game.awardGoldToPlayerEntity === "function") game.awardGoldToPlayerEntity(player, amount);
+      } else if (drop.type === "owl_item") {
+        if (!pickupOwlItemDrop(game, drop, player)) continue;
       }
       drop.life = 0;
       break;

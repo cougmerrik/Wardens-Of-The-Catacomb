@@ -6,6 +6,7 @@ import { getStableId, serializeMetaState, serializeState } from "./net/stateSeri
 import { average, monotonicNowMs, percentile } from "./net/telemetry.js";
 import { makeDefaultInput } from "./net/serverHelpers.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
+import { grantConsumableCharge } from "../src/game/world/consumablesEconomy.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -100,14 +101,19 @@ function main() {
   handleActionMessage(room, owner.id, { kind: "buyUpgrade", key: "shield" });
   ownerState = room.syncPrimaryActivePlayerFromSim();
   assert(ownerState.gold === 2997, `owner gold did not drop after shield purchase: ${ownerState.gold}`);
-  assert(getActiveSlot(ownerState, "shield")?.count === 1, "owner shield did not enter active inventory");
+  assert(!getActiveSlot(ownerState, "shield"), "owner shield should wait for owl delivery");
+  assert((room.sim.owlDelivery?.pendingOrders || []).some((order) => order.key === "shield" && order.playerId === owner.id), "owner shield order was not queued for owl delivery");
   assert(getStock(room, "shield")?.stock === 1, `shared shield stock did not decrement after owner purchase: ${getStock(room, "shield")?.stock}`);
   assert(!getActiveSlot(peerState, "shield"), "peer incorrectly received owner shield purchase");
+  grantConsumableCharge(room.sim, "shield");
+  ownerState = room.syncPrimaryActivePlayerFromSim();
 
   handleActionMessage(room, peer.id, { kind: "buyUpgrade", key: "shield" });
   assert(peerState.gold === 2997, `peer gold did not drop after shield purchase: ${peerState.gold}`);
-  assert(getActiveSlot(peerState, "shield")?.count === 1, "peer shield did not enter active inventory");
+  assert(!getActiveSlot(peerState, "shield"), "peer shield should wait for owl delivery");
+  assert((room.sim.owlDelivery?.pendingOrders || []).some((order) => order.key === "shield" && order.playerId === peer.id), "peer shield order was not queued for owl delivery");
   assert(getStock(room, "shield")?.stock === 0, `shared shield stock did not reach zero after peer purchase: ${getStock(room, "shield")?.stock}`);
+  grantConsumableCharge({ player: peerState, consumables: peerState.consumables }, "shield");
 
   handleActionMessage(room, owner.id, { kind: "buyUpgrade", key: "shield" });
   ownerState = room.syncPrimaryActivePlayerFromSim();
@@ -115,11 +121,11 @@ function main() {
 
   handleActionMessage(room, owner.id, { kind: "buyUpgrade", key: "angelRing" });
   ownerState = room.syncPrimaryActivePlayerFromSim();
-  assert(getPassiveSlot(ownerState, "angelRing")?.count === 1, "owner angel ring did not enter passive inventory");
+  assert(!getPassiveSlot(ownerState, "angelRing"), "owner angel ring should wait for owl delivery");
   assert(getStock(room, "angelRing")?.stock === 1, "angel ring stock did not decrement after owner purchase");
 
   handleActionMessage(room, peer.id, { kind: "buyUpgrade", key: "angelRing" });
-  assert(getPassiveSlot(peerState, "angelRing")?.count === 1, "peer angel ring did not enter passive inventory");
+  assert(!getPassiveSlot(peerState, "angelRing"), "peer angel ring should wait for owl delivery");
   assert(getStock(room, "angelRing")?.stock === 0, "angel ring stock did not reach zero after peer purchase");
 
   handleActionMessage(room, owner.id, { kind: "useConsumableSlot", slot: 0 });

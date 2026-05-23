@@ -228,7 +228,7 @@ function serializeFloatingText(room, text, activeEnemies) {
 }
 
 function serializeDrop(room, d) {
-  return {
+  const payload = {
     id: getStableId(room, "drop", "d", d),
     type: d.type,
     x: d.x,
@@ -236,6 +236,58 @@ function serializeDrop(room, d) {
     size: d.size,
     amount: d.amount,
     life: d.life
+  };
+  copyStringFields(payload, d, ["key", "playerId", "name"]);
+  copyFiniteFields(payload, d, ["quantity"]);
+  return payload;
+}
+
+function serializeOwlDelivery(source) {
+  if (!source || typeof source !== "object") return null;
+  const active = source.active && typeof source.active === "object"
+    ? {
+        id: "ticklecorn",
+        name: "Veronica",
+        x: source.active.x,
+        y: source.active.y,
+        displayX: source.active.displayX,
+        displayY: source.active.displayY,
+        destX: source.active.destX,
+        destY: source.active.destY,
+        hp: source.active.hp,
+        maxHp: source.active.maxHp,
+        size: source.active.size,
+        state: source.active.state,
+        waitTimer: source.active.waitTimer,
+        portalTimer: source.active.portalTimer,
+        portalSlain: !!source.active.portalSlain,
+        arrivalNotified: !!source.active.arrivalNotified,
+        underAttackTimer: source.active.underAttackTimer,
+        orders: Array.isArray(source.active.orders)
+          ? source.active.orders.map((order) => ({
+              id: order.id,
+              playerId: order.playerId,
+              key: order.key,
+              quantity: order.quantity,
+              purchasedAt: order.purchasedAt
+            }))
+          : [],
+        trail: Array.isArray(source.active.trail)
+          ? source.active.trail.slice(-48).map((mote) => ({ x: mote.x, y: mote.y, life: mote.life, maxLife: mote.maxLife }))
+          : []
+      }
+    : null;
+  return {
+    active,
+    pendingCount: Array.isArray(source.pendingOrders) ? source.pendingOrders.length : 0,
+    nextDispatchAt: source.nextDispatchAt,
+    audioEvents: Array.isArray(source.audioEvents)
+      ? source.audioEvents.slice(-12).map((event) => ({ id: event.id, kind: event.kind, at: event.at }))
+      : [],
+    notificationEvents: Array.isArray(source.notificationEvents)
+      ? source.notificationEvents.slice(-12).map((event) => ({ id: event.id, text: event.text, at: event.at }))
+      : [],
+    lastMarker: source.lastMarker ? { ...source.lastMarker } : null
   };
 }
 
@@ -415,6 +467,7 @@ export function serializeState(room) {
     door: { ...sim.door },
     pickup: { ...sim.pickup },
     portal: sim.portal ? { ...sim.portal } : null,
+    owlDelivery: serializeOwlDelivery(sim.owlDelivery),
     enemies: activeEnemies.map((e) => serializeEnemy(room, e)),
     drops: activeDrops.map((d) => serializeDrop(room, d)),
     lightSources: (sim.lightSources || []).map((light) => serializeLightSource(room, light)),

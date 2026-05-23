@@ -2,6 +2,7 @@ import { getEffectiveMasterVolume, getStoredMasterVolume, normalizeMasterVolume,
 import { crossfadeAudioVolumes, fadeAudioVolume } from "./audioTransitions.js";
 import { createMusicDebugState } from "./musicDebugState.js";
 import { ALL_MUSIC_TRACKS, GAMEPLAY_TRACKS, TITLE_TRACK, VICTORY_TRACK, getBossTrackDefinitionForBiome } from "./musicCatalog.js";
+import { VeronicaAudioEvents } from "./veronicaAudioEvents.js";
 const DEATH_TRACK = {
   title: "World's End",
   src: "./assets/sounds/world%27s%20end.mp3"
@@ -20,6 +21,7 @@ export class MusicController {
       audio: this.createAudio(track.src, { loop: track.loop !== false })
     }));
     this.deathAudio = this.createAudio(DEATH_TRACK.src, { loop: false });
+    this.veronicaAudio = new VeronicaAudioEvents((src, options) => this.createAudio(src, options));
     this.currentTrack = null;
     this.currentMode = "menu";
     this.currentFloor = null;
@@ -179,6 +181,7 @@ export class MusicController {
       this.setAudioBaseVolume(track.audio, this.getAudioBaseVolume(track.audio, 1));
     }
     this.setAudioBaseVolume(this.deathAudio, this.getAudioBaseVolume(this.deathAudio, 1));
+    this.veronicaAudio.refreshVolumes((audio, volume) => this.setAudioBaseVolume(audio, volume), (audio, fallback) => this.getAudioBaseVolume(audio, fallback));
     for (const audio of this.idleAudios) {
       this.setAudioBaseVolume(audio, this.getAudioBaseVolume(audio, 1));
     }
@@ -257,6 +260,7 @@ export class MusicController {
     this.muted = !!muted;
     for (const track of this.tracks) track.audio.muted = this.muted;
     this.deathAudio.muted = this.muted;
+    this.veronicaAudio.setMuted(this.muted);
     for (const audio of this.idleAudios) audio.muted = this.muted;
     if (this.muted) {
       this.cancelFade();
@@ -470,6 +474,7 @@ export class MusicController {
     this.transitionToTrack(nextTrack, { reset: true, immediate: !this.currentTrack, transitionMs: BOSS_FADE_DURATION_MS });
   }
   hasPlayedBossVictoryCue(victoryKey = "") { return !!victoryKey && victoryKey === this.lastVictoryCueKey; }
+  playVeronicaAudioEvents(events) { this.veronicaAudio.play(events, { muted: this.muted, attemptAudioPlay: (audio, reason) => this.attemptAudioPlay(audio, reason) }); }
   playDeathMusic({ reset = false } = {}) {
     this.cancelFade();
     this.stopIdleSounds();

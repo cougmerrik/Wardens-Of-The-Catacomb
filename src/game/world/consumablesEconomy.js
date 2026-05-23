@@ -8,6 +8,7 @@ import {
   getConsumablePriceForFloor,
   rollConsumableShopStock
 } from "../consumables.js";
+import { enqueueOwlDeliveryOrder, getPendingOwlOrderCount, getPendingOwlOrderKeys } from "./owlDelivery.js";
 
 const OIL_ATTACK_CHARGES = 15;
 const OIL_EFFECT_KEYS = ["fireOil", "frostOil"];
@@ -76,7 +77,14 @@ export function getConsumableOwnedCount(game, key) {
 export function canAcquireConsumableType(game, def) {
   const slots = getConsumableSlots(game, def.type);
   const cap = def.type === "Passive" ? PASSIVE_CONSUMABLE_SLOT_CAP : ACTIVE_CONSUMABLE_SLOT_CAP;
-  return slots.length < cap;
+  const playerId = typeof game.player?.id === "string" && game.player.id ? game.player.id : "player";
+  const pendingKeys = getPendingOwlOrderKeys(game, playerId);
+  let pendingNewSlots = 0;
+  for (const key of pendingKeys) {
+    const pendingDef = getConsumableDefinition(key);
+    if (pendingDef?.type === def.type && !slots.some((slot) => slot?.key === key)) pendingNewSlots++;
+  }
+  return slots.length + pendingNewSlots < cap;
 }
 
 export function getShopFailureReason(game, key) {
@@ -85,7 +93,8 @@ export function getShopFailureReason(game, key) {
   ensureShopStock(game);
   const entry = game.shopStock.find((item) => item?.key === key);
   if (!entry || entry.stock <= 0) return "Out of stock";
-  const ownedCount = getConsumableOwnedCount(game, key);
+  const playerId = typeof game.player?.id === "string" && game.player.id ? game.player.id : "player";
+  const ownedCount = getConsumableOwnedCount(game, key) + getPendingOwlOrderCount(game, key, playerId);
   if (ownedCount >= def.maxStack) return "At max stack";
   const existing = getConsumableSlot(game, key, def.type);
   if (!existing && !canAcquireConsumableType(game, def)) {
@@ -115,6 +124,12 @@ function addConsumableCharge(game, def) {
   return slot;
 }
 
+export function grantConsumableCharge(game, key) {
+  const def = getConsumableDefinition(key);
+  if (!def) return null;
+  return addConsumableCharge(game, def);
+}
+
 export function buyShopItem(game, key) {
   const def = getConsumableDefinition(key);
   if (!def) return false;
@@ -128,8 +143,7 @@ export function buyShopItem(game, key) {
   if (typeof game.recordRunGoldSpent === "function") game.recordRunGoldSpent(price);
   const entry = game.shopStock.find((item) => item?.key === key);
   if (entry) entry.stock = Math.max(0, (entry.stock || 0) - 1);
-  addConsumableCharge(game, def);
-  pushConsumableMessage(game, `${def.name} purchased`);
+  enqueueOwlDeliveryOrder(game, def.key, 1, typeof game.player?.id === "string" && game.player.id ? game.player.id : "player");
   return true;
 }
 
