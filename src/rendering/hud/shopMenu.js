@@ -79,18 +79,18 @@ function drawTexturedCircle(ctx, cx, cy, radius, disabled) {
     gradient.addColorStop(0.58, "#626a72");
     gradient.addColorStop(1, "#353a42");
   } else {
-    gradient.addColorStop(0, "#fff0a8");
-    gradient.addColorStop(0.48, "#d8a63e");
-    gradient.addColorStop(1, "#705018");
+    gradient.addColorStop(0, "#d8c695");
+    gradient.addColorStop(0.48, "#a9823a");
+    gradient.addColorStop(1, "#57431d");
   }
   ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = disabled ? "rgba(205, 211, 220, 0.38)" : "rgba(255, 239, 167, 0.74)";
+  ctx.strokeStyle = disabled ? "rgba(205, 211, 220, 0.38)" : "rgba(218, 198, 140, 0.62)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  ctx.strokeStyle = disabled ? "rgba(36, 39, 45, 0.26)" : "rgba(92, 61, 14, 0.24)";
+  ctx.strokeStyle = disabled ? "rgba(36, 39, 45, 0.26)" : "rgba(68, 53, 25, 0.24)";
   ctx.lineWidth = 1;
   for (let i = -1; i <= 1; i += 1) {
     ctx.beginPath();
@@ -103,8 +103,8 @@ function drawShopNode(ctx, item, rect, canBuy) {
   const disabled = !canBuy;
   const circleRadius = Math.floor(Math.min(rect.w, rect.h - 16) * 0.38);
   const cx = Math.floor(rect.x + rect.w * 0.5);
-  const cy = Math.floor(rect.y + circleRadius + 3);
-  const iconSize = Math.floor(circleRadius * 1.45);
+  const cy = Math.floor(rect.y + circleRadius + 2);
+  const iconSize = Math.floor(circleRadius * 1.74);
   const iconX = cx - Math.floor(iconSize * 0.5);
   const iconY = cy - Math.floor(iconSize * 0.5);
   const priceText = `${Math.max(0, Math.floor(item.priceForFloor || 0))}`;
@@ -129,7 +129,7 @@ function drawShopNode(ctx, item, rect, canBuy) {
   const stockW = ctx.measureText(stockText).width;
   const totalW = priceW + gap + coinR * 2 + gap + stockW;
   let x = rect.x + (rect.w - totalW) * 0.5;
-  const y = rect.y + rect.h - 4;
+  const y = cy + circleRadius + 9;
   ctx.textAlign = "center";
   ctx.fillStyle = disabled ? "#a0a6b0" : "#f4efe1";
   ctx.fillText(priceText, x + priceW * 0.5, y);
@@ -171,7 +171,7 @@ export function drawShopMenu(renderer, game, layout) {
   const items = typeof game.getShopItems === "function" ? game.getShopItems() : [];
   const center = getPlayerScreenCenter(renderer, game, layout);
   const nodeSize = layout.isAndroid ? 78 : 72;
-  const radius = layout.isAndroid ? 108 : 100;
+  const radius = layout.isAndroid ? 86 : 80;
   const mouseX = Number.isFinite(game?.input?.mouse?.screenX) ? game.input.mouse.screenX : -1;
   const mouseY = Number.isFinite(game?.input?.mouse?.screenY) ? game.input.mouse.screenY : -1;
   let tooltip = null;
