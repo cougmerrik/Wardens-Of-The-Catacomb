@@ -44,7 +44,34 @@ function main() {
   assertInactiveEffect(game.consumables.effects.speedPotion, ["timer"], "speedPotion");
   assertInactiveEffect(game.consumables.effects.frostOil, ["timer"], "frostOil");
   assertInactiveEffect(game.consumables.effects.fireOil, ["timer"], "fireOil");
-  assertInactiveEffect(game.consumables.effects.spikeGrowth, ["timer"], "spikeGrowth");
+  assertInactiveEffect(game.consumables.effects.spikeGrowth, ["timer", "attacksRemaining"], "spikeGrowth");
+
+  const itemGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  itemGame.player.maxHealth = 100;
+  itemGame.player.health = 50;
+  itemGame.player.lanternFuel = 0.25;
+  itemGame.consumables.activeSlots = [
+    { key: "lanternFuel", count: 1, cooldownRemaining: 0 },
+    { key: "darkvisionPotion", count: 1, cooldownRemaining: 0 },
+    { key: "holyCandle", count: 1, cooldownRemaining: 0 },
+    { key: "spikeGrowth", count: 1, cooldownRemaining: 0 }
+  ];
+  assert.equal(itemGame.useConsumableSlot(0), true, "Lantern Fuel should be usable below full fuel");
+  assert.equal(itemGame.player.lanternFuel, 0.45, "Lantern Fuel should add 20% fuel");
+  itemGame.consumables.sharedCooldown = 0;
+  assert.equal(itemGame.useConsumableSlot(0), true, "Darkvision Potion should be usable");
+  assert.equal(itemGame.consumables.effects.darkvisionPotion.timer, 30, "Darkvision Potion should last 30 seconds");
+  assert(itemGame.getPlayerLightRadius(itemGame.player) >= itemGame.config.map.tile * 10, "Darkvision should provide 10 tiles of sight");
+  itemGame.consumables.sharedCooldown = 0;
+  assert.equal(itemGame.useConsumableSlot(0), true, "Holy Candle should be usable");
+  const candle = itemGame.lightSources.find((light) => light.type === "holyCandle");
+  assert(candle, "Holy Candle should drop a ground light source");
+  assert.equal(candle.lightRadius, itemGame.config.map.tile * 3, "Holy Candle light should have a 3 tile radius");
+  itemGame.updateLightingInteractions(1);
+  assert(itemGame.player.health > 50, "Holy Candle should heal players inside its radius");
+  itemGame.consumables.sharedCooldown = 0;
+  assert.equal(itemGame.useConsumableSlot(0), true, "Spike Growth should be usable");
+  assert.equal(itemGame.consumables.effects.spikeGrowth.attacksRemaining, 25, "Spike Growth should use 25 hit charges");
 
   console.log(JSON.stringify({
     consumablesEconomy: "ok"

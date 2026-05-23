@@ -128,6 +128,19 @@ function main() {
   game.rangerTalents = {};
   assert(game.getPlayerLightRadius(game.player) === 0, "non-Beast Master empty lantern fuel should still have no player light radius");
 
+  game.consumables.effects.darkvisionPotion.timer = 30;
+  assert(game.getPlayerLightRadius(game.player) === 10 * CONFIG.map.tile, "Darkvision should privately provide the local player 10 tiles of sight");
+  const remoteDarkvisionPlayer = {
+    id: "remote-darkvision",
+    x: game.player.x + 64,
+    y: game.player.y,
+    health: 100,
+    lanternFuel: 0,
+    consumables: { effects: { darkvisionPotion: { timer: 30 } } }
+  };
+  game.consumables.effects.darkvisionPotion.timer = 0;
+  assert(game.getPlayerLightRadius(remoteDarkvisionPlayer) === 0, "remote player darkvision should not create local world light");
+
   game.bullets = [{
     x: game.player.x + 176,
     y: game.player.y,

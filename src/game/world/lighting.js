@@ -52,7 +52,7 @@ function ensureLanternFuel(game, player) {
   return player.lanternFuel;
 }
 
-function addLanternFuel(game, player, amount) {
+export function addLanternFuel(game, player, amount) {
   const cfg = getLightingConfig(game);
   if (!player || !Number.isFinite(amount) || amount <= 0) return 0;
   const before = ensureLanternFuel(game, player);
@@ -248,7 +248,9 @@ export function getPlayerLightRadius(game, player = game?.player) {
   const itemBonusTiles = Number.isFinite(player.lightRadiusBonusTiles) ? player.lightRadiusBonusTiles : 0;
   const fullFuelRadiusTiles = baseTiles + fuelRadiusTiles + perLevelTiles * Math.max(0, level - 1) + itemBonusTiles;
   const radiusTiles = fullFuelRadiusTiles * fuelRatio;
-  return Math.max(0, radiusTiles * tile + getBeastMasterDarkVisionRadius(game, player));
+  const darkvisionTiles = player === game?.player && (game?.consumables?.effects?.darkvisionPotion?.timer || 0) > 0 ? 10 : 0;
+  const darkvisionRadius = darkvisionTiles * tile;
+  return Math.max(darkvisionRadius, Math.max(0, radiusTiles * tile + getBeastMasterDarkVisionRadius(game, player)));
 }
 
 export function getEnemyLightRadius(game, enemy) {
@@ -350,6 +352,7 @@ export function updateLightingInteractions(game, dt = 0) {
   const livingPlayers = (Array.isArray(players) ? players : []).filter((player) => player && (player.health ?? 1) > 0);
   for (const player of livingPlayers) ensureLanternFuel(game, player);
   decayLanternFuel(game, livingPlayers, elapsed);
+  tickHolyCandles(game, livingPlayers, elapsed);
   if (!Array.isArray(game.lightSources) || game.lightSources.length === 0) return;
   const interval = Math.max(0, Number.isFinite(cfg.interactionInterval) ? cfg.interactionInterval : 0.25);
   const state = game._lightingInteractionState && typeof game._lightingInteractionState === "object"
@@ -429,5 +432,23 @@ export function updateLightingInteractions(game, dt = 0) {
       game.spawnFloatingText(light.x, light.y - tile * 0.45, "Relit", "#ffd978", 0.7, 13);
     }
   }
-  game.lightSources = game.lightSources.filter((light) => !light?.collected);
+  game.lightSources = game.lightSources.filter((light) => !light?.collected && (light.type !== "holyCandle" || (light.life || 0) > 0));
+}
+
+function tickHolyCandles(game, livingPlayers, dt) {
+  if (!Array.isArray(game.lightSources) || game.lightSources.length === 0 || dt <= 0) return;
+  for (const light of game.lightSources) {
+    if (!light || light.type !== "holyCandle") continue;
+    light.life = Math.max(0, (Number.isFinite(light.life) ? light.life : 10) - dt);
+    light.healTick = (Number.isFinite(light.healTick) ? light.healTick : 1) - dt;
+    if (light.life <= 0 || light.healTick > 0) continue;
+    light.healTick += 1;
+    const radius = Number.isFinite(light.lightRadius) ? light.lightRadius : getTileSize(game) * 3;
+    for (const player of livingPlayers) {
+      if (!player || distanceBetween(player.x, player.y, light.x, light.y) > radius) continue;
+      const amount = (Number.isFinite(player.maxHealth) ? player.maxHealth : 0) * (Number.isFinite(light.healPctPerSecond) ? light.healPctPerSecond : 0.05);
+      if (typeof game.applyHealingToPlayerEntity === "function") game.applyHealingToPlayerEntity(player, amount, { suppressText: true });
+      else if (player === game.player && typeof game.applyPlayerHealing === "function") game.applyPlayerHealing(amount, { suppressText: true });
+    }
+  }
 }

@@ -1,5 +1,6 @@
 import { getConsumableDefinition } from "../consumables.js";
 import { grantConsumableCharge, pushConsumableMessage } from "./consumablesEconomy.js";
+import { updateOwlTrail } from "./owlDeliveryTrail.js";
 
 const TILE_FALLBACK = 32;
 const DISPATCH_DELAY_MIN = 15;
@@ -11,13 +12,12 @@ const ENEMY_AVOID_TILES = 6;
 const PICKUP_TILES = 2;
 const OWL_HP = 26;
 const OWL_SPEED = 176;
-const OWL_SIZE = 22;
+const OWL_SIZE = 16.5;
 const OWL_DROP_LIFE = 30;
 const DEATH_MARKER_LIFE = 18;
-const TRAIL_LIFE = 2.4;
-const TRAIL_LIMIT = 72;
 const HURT_AUDIO_COOLDOWN = 5;
 const PORTAL_AWAY_TIME = 0.75;
+const SLAIN_CORPSE_TIME = 2.5;
 const SLAIN_NEXT_DELIVERY_DELAY = 60;
 
 function getTileSize(game) {
@@ -257,24 +257,17 @@ function spawnOwl(game, orders) {
   return {
     id: "ticklecorn",
     name: "Veronica",
-    x: spawn.x,
-    y: spawn.y,
-    displayX: spawn.x,
-    displayY: spawn.y,
-    destX: destination.x,
-    destY: destination.y,
-    hp: OWL_HP,
-    maxHp: OWL_HP,
-    size: OWL_SIZE,
+    x: spawn.x, y: spawn.y,
+    displayX: spawn.x, displayY: spawn.y,
+    destX: destination.x, destY: destination.y,
+    hp: OWL_HP, maxHp: OWL_HP, size: OWL_SIZE,
     speed: Number.isFinite(game?.config?.classes?.archer?.baseMoveSpeed) ? game.config.classes.archer.baseMoveSpeed : OWL_SPEED,
-    phase: 0,
-    state: "flying",
-    waitTimer: DELIVERY_WAIT_TIME,
-    portalTimer: 0,
-    underAttackTimer: 0,
-    attackWarningCooldown: 0,
+    phase: 0, state: "flying",
+    waitTimer: DELIVERY_WAIT_TIME, portalTimer: 0, slainTimer: 0,
+    underAttackTimer: 0, attackWarningCooldown: 0,
     orders: orders.map((order) => ({ ...order })),
-    trail: []
+    trail: [],
+    trailEmitAcc: 0
   };
 }
 
@@ -284,14 +277,10 @@ function dropOwlOrders(game, owl) {
     const def = getConsumableDefinition(order.key);
     if (!def) continue;
     game.drops.push({
-      type: "owl_item",
-      key: order.key,
-      playerId: order.playerId,
+      type: "owl_item", key: order.key, playerId: order.playerId,
       quantity: Math.max(1, Math.floor(order.quantity || 1)),
-      x: owl.x,
-      y: owl.y,
-      size: 22,
-      life: OWL_DROP_LIFE,
+      x: owl.x, y: owl.y,
+      size: 22, life: OWL_DROP_LIFE,
       name: def.name
     });
   }
@@ -323,10 +312,20 @@ function beginOwlPortalAway(game, slain) {
     return;
   }
   if (slain) markOwlDeath(game, owl);
-  owl.state = "portal";
-  owl.portalTimer = PORTAL_AWAY_TIME;
   owl.portalSlain = !!slain;
   owl.orders = [];
+  if (slain) {
+    owl.state = "slain";
+    owl.slainTimer = SLAIN_CORPSE_TIME;
+    return;
+  }
+  owl.state = "portal";
+  owl.portalTimer = PORTAL_AWAY_TIME;
+}
+
+function startOwlPortal(owl) {
+  owl.state = "portal";
+  owl.portalTimer = PORTAL_AWAY_TIME;
 }
 
 function grantOrdersNearOwl(game, owl) {
@@ -388,7 +387,7 @@ function moveOwlTowardDestination(game, owl, dt) {
 
 function updateOwlDisplay(owl, dt) {
   owl.phase = (owl.phase || 0) + dt * 3.2;
-  if (owl.state === "portal") {
+  if (owl.state === "portal" || owl.state === "slain") {
     owl.displayX = owl.x;
     owl.displayY = owl.y;
   } else if (owl.state === "waiting") {
@@ -398,10 +397,7 @@ function updateOwlDisplay(owl, dt) {
     owl.displayX = owl.x;
     owl.displayY = owl.y + Math.sin(owl.phase) * 4;
   }
-  if (!Array.isArray(owl.trail)) owl.trail = [];
-  owl.trail.push({ x: owl.displayX, y: owl.displayY, life: TRAIL_LIFE, maxLife: TRAIL_LIFE });
-  for (const mote of owl.trail) mote.life -= dt;
-  owl.trail = owl.trail.filter((mote) => mote.life > 0).slice(-TRAIL_LIMIT);
+  updateOwlTrail(owl, dt);
 }
 
 function damageOwlFromEnemies(game, owl, dt) {
@@ -452,6 +448,12 @@ export function tickOwlDelivery(game, dt) {
     if (owl.portalTimer <= 0) finishOwlRetire(game, !!owl.portalSlain);
     return;
   }
+  if (owl.state === "slain") {
+    owl.slainTimer = Math.max(0, (owl.slainTimer || 0) - dt);
+    updateOwlDisplay(owl, dt);
+    if (owl.slainTimer <= 0) startOwlPortal(owl);
+    return;
+  }
   damageOwlFromEnemies(game, owl, dt);
   if (owl.hp <= 0) {
     dropOwlOrders(game, owl);
@@ -487,5 +489,8 @@ export function pickupOwlItemDrop(game, drop, player = game.player) {
   for (let n = 0; n < Math.max(1, drop.quantity || 1); n++) grantConsumableCharge(grantContext, drop.key);
   const def = getConsumableDefinition(drop.key);
   pushConsumableMessage(game, `${def?.name || "Item"} recovered`);
+  const state = ensureOwlDeliveryState(game);
+  const hasOtherParcel = (game.drops || []).some((candidate) => candidate !== drop && candidate?.type === "owl_item" && (candidate.life ?? 1) > 0);
+  if (!hasOtherParcel) state.lastMarker = null;
   return true;
 }

@@ -66,7 +66,7 @@ export const CONSUMABLE_DEFS = {
     price: 50,
     maxStack: 3,
     maxInventory: 2,
-    effect: "For 5s after activation, enemies that attack the player take +3 retaliatory damage"
+    effect: "For the next 25 hits, enemies that attack the player take +3 retaliatory damage"
   },
   shield: {
     key: "shield",
@@ -76,10 +76,49 @@ export const CONSUMABLE_DEFS = {
     triggerCondition: "N/A",
     cooldown: "Default",
     unlockFloor: 1,
-    price: 3,
+    price: 15,
     maxStack: 2,
     maxInventory: 2,
     effect: "Gain 10 temporary HP"
+  },
+  lanternFuel: {
+    key: "lanternFuel",
+    name: "Lantern Fuel",
+    type: "Active",
+    rarity: "Common",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 1,
+    price: 20,
+    maxStack: 2,
+    maxInventory: 2,
+    effect: "Refills the player's lantern by 20%"
+  },
+  darkvisionPotion: {
+    key: "darkvisionPotion",
+    name: "Darkvision Potion",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 1,
+    price: 35,
+    maxStack: 3,
+    maxInventory: 2,
+    effect: "Privately see in the dark up to 10 tiles for 30s"
+  },
+  holyCandle: {
+    key: "holyCandle",
+    name: "Holy Candle",
+    type: "Active",
+    rarity: "Legendary",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 150,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Drops a 3-tile holy light for 10s that heals players inside for 5% max health each second"
   },
   angelRing: {
     key: "angelRing",
@@ -123,7 +162,8 @@ export function createConsumableEffectState() {
     speedPotion: { timer: 0 },
     frostOil: { timer: 0, attacksRemaining: 0 },
     fireOil: { timer: 0, attacksRemaining: 0 },
-    spikeGrowth: { timer: 0 }
+    spikeGrowth: { timer: 0, attacksRemaining: 0 },
+    darkvisionPotion: { timer: 0 }
   };
 }
 

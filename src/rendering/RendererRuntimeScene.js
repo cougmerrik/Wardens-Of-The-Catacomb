@@ -3,6 +3,7 @@ import { runtimeSceneDrawMethods } from "./runtimeSceneDrawMethods.js";
 import { drawChilledEnemyTint } from "./chilledEnemyTint.js";
 import { getNetworkDeathRulesLabel } from "../net/networkDeathRules.js";
 import { drawGameplayTipBubble } from "./hud/gameplayTipBubble.js";
+import { drawHolyCandleVisual } from "./holyCandleVisual.js";
 
 function drawArcaneMarkSigil(ctx, enemy, screenX, screenY, time = 0) {
   const timer = Number.isFinite(enemy?.arcaneMarkTimer) ? enemy.arcaneMarkTimer : 0;
@@ -264,8 +265,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       this.drawArmorStand(game, stand, stand.x - cameraX, stand.y - cameraY);
     }
     for (const light of game.lightSources || []) {
-      if (light?.type !== "torch") continue;
-      this.drawTorch(game, light, light.x - cameraX, light.y - cameraY);
+      if (light?.type === "torch") this.drawTorch(game, light, light.x - cameraX, light.y - cameraY);
+      else if (light?.type === "holyCandle") drawHolyCandleVisual(this.ctx, game, light.x - cameraX, light.y - cameraY);
     }
     for (const trap of game.wallTraps || []) {
       if (!trap.spotted) continue;

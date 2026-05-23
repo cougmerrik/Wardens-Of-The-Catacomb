@@ -9,9 +9,11 @@ import {
   rollConsumableShopStock
 } from "../consumables.js";
 import { enqueueOwlDeliveryOrder, getPendingOwlOrderCount, getPendingOwlOrderKeys } from "./owlDelivery.js";
+import { addLanternFuel } from "./lighting.js";
 
 const OIL_ATTACK_CHARGES = 15;
 const OIL_EFFECT_KEYS = ["fireOil", "frostOil"];
+const SPIKE_GROWTH_HITS = 25;
 
 export function ensureShopStock(game) {
   if (!Array.isArray(game.shopStock) || game.shopStock.length <= 0) {
@@ -36,6 +38,12 @@ function ensureConsumableState(game) {
   if (!game.consumables.effects || typeof game.consumables.effects !== "object") {
     game.consumables.effects = createConsumableEffectState();
   }
+  const defaults = createConsumableEffectState();
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!game.consumables.effects[key] || typeof game.consumables.effects[key] !== "object") {
+      game.consumables.effects[key] = { ...value };
+    }
+  }
   for (const key of OIL_EFFECT_KEYS) {
     const effect = game.consumables.effects[key];
     if (!effect || typeof effect !== "object") {
@@ -47,6 +55,8 @@ function ensureConsumableState(game) {
       ? Math.max(0, Math.floor(effect.attacksRemaining))
       : 0;
   }
+  const spike = game.consumables.effects.spikeGrowth;
+  if (!Number.isFinite(spike.attacksRemaining)) spike.attacksRemaining = (spike.timer || 0) > 0 ? SPIKE_GROWTH_HITS : 0;
   return game.consumables;
 }
 
@@ -185,7 +195,30 @@ function clearConsumableStateForRemoval(game, consumables) {
 function canUseConsumable(game, def) {
   if (!def) return false;
   if (def.key === "regenerationPotion") return (game.player?.health || 0) < (game.player?.maxHealth || 0);
+  if (def.key === "lanternFuel") {
+    const maxFuel = Number.isFinite(game.config?.lighting?.lanternMaxFuel) ? game.config.lighting.lanternMaxFuel : 1;
+    return (Number.isFinite(game.player?.lanternFuel) ? game.player.lanternFuel : 0) < maxFuel;
+  }
   return true;
+}
+
+function spawnHolyCandle(game) {
+  if (!Array.isArray(game.lightSources)) game.lightSources = [];
+  const tile = Number.isFinite(game.config?.map?.tile) ? game.config.map.tile : 32;
+  const time = Number.isFinite(game.time) ? game.time : 0;
+  game.lightSources.push({
+    id: `holy-candle-${Math.round(time * 1000)}-${game.lightSources.length}`,
+    type: "holyCandle",
+    x: Number.isFinite(game.player?.x) ? game.player.x : 0,
+    y: Number.isFinite(game.player?.y) ? game.player.y : 0,
+    size: 18,
+    lit: true,
+    life: 10,
+    healTick: 1,
+    healPctPerSecond: 0.05,
+    lightRadius: tile * 3,
+    lightIntensity: 0.45
+  });
 }
 
 function activateConsumableEffect(game, def) {
@@ -210,7 +243,17 @@ function activateConsumableEffect(game, def) {
       effects.fireOil.attacksRemaining = OIL_ATTACK_CHARGES;
       return true;
     case "spikeGrowth":
-      effects.spikeGrowth.timer = 5;
+      effects.spikeGrowth.timer = 0;
+      effects.spikeGrowth.attacksRemaining = SPIKE_GROWTH_HITS;
+      return true;
+    case "lanternFuel":
+      addLanternFuel(game, game.player, 0.2);
+      return true;
+    case "darkvisionPotion":
+      effects.darkvisionPotion.timer = 30;
+      return true;
+    case "holyCandle":
+      spawnHolyCandle(game);
       return true;
     case "shield":
       setConsumableTempHp(game, getConsumableTempHp(game) + 10);

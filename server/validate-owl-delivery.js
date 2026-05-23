@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { GameSim } from "../src/sim/GameSim.js";
-import { tickOwlDelivery } from "../src/game/world/owlDelivery.js";
+import { pickupOwlItemDrop, tickOwlDelivery } from "../src/game/world/owlDelivery.js";
 
 function activeSlot(game, key) {
   return game.consumables.activeSlots.find((slot) => slot?.key === key) || null;
@@ -14,7 +14,7 @@ function main() {
   game.shopStock = [{ key: "shield", stock: 1 }, { key: "speedPotion", stock: 1 }, { key: "fireOil", stock: 1 }];
 
   assert.equal(game.buyShopItem("shield"), true, "shield purchase should validate");
-  assert.equal(game.gold, 2997, "purchase should deduct gold immediately");
+  assert.equal(game.gold, 2985, "purchase should deduct gold immediately");
   assert.equal(game.shopStock[0].stock, 0, "purchase should reduce stock immediately");
   assert.equal(activeSlot(game, "shield"), null, "purchased item should not enter inventory instantly");
   assert.equal(game.owlDelivery.pendingOrders.length, 1, "purchase should create a pending owl order");
@@ -23,7 +23,7 @@ function main() {
   tickOwlDelivery(game, 0.1);
   assert(game.owlDelivery.active, "Veronica should spawn after dispatch delay");
   assert.equal(game.owlDelivery.active.name, "Veronica", "owl should use the Veronica name");
-  assert.equal(game.owlDelivery.active.size, 22, "Veronica should stay close to wolf size");
+  assert.equal(game.owlDelivery.active.size, 16.5, "Veronica should render at the reduced courier size");
   assert.equal(game.owlDelivery.active.speed, game.config.classes.archer.baseMoveSpeed, "Veronica should move at base Scout speed");
   assert.equal(game.owlDelivery.active.orders[0].playerId, "player", "order should remember purchaser id");
   assert.equal(game.consumables.message, "Veronica delivery incoming!", "incoming alert should be visible");
@@ -68,17 +68,23 @@ function main() {
   game.enemies[0].y = owl.y;
   game.enemies[0].damageMax = 20;
   tickOwlDelivery(game, 0.2);
-  assert.equal(game.owlDelivery.active?.state, "portal", "slain owl should show a portal before despawning");
-  assert.equal(game.owlDelivery.active?.portalTimer > 0, true, "slain owl portal should have a visible timer");
+  assert.equal(game.owlDelivery.active?.state, "slain", "slain owl corpse should linger before portaling away");
+  assert.equal(game.owlDelivery.active?.slainTimer > 0, true, "slain owl should have a visible corpse timer");
   assert.equal(game.owlDelivery.lastMarker?.markerType, "delivery_box", "slain owl marker should use the delivery box icon");
+  tickOwlDelivery(game, 2.6);
+  assert.equal(game.owlDelivery.active?.state, "portal", "slain owl should portal away after corpse linger");
+  assert.equal(game.owlDelivery.active?.portalTimer > 0, true, "slain owl portal should have a visible timer");
   tickOwlDelivery(game, 0.8);
   assert.equal(game.owlDelivery.active, null, "owl should despawn after lethal enemy damage");
   assert.equal(game.consumables.message, "Veronica was slain!", "slain alert should be visible");
   assert.equal(game.owlDelivery.audioEvents.at(-1)?.kind, "veronica_dead", "lethal damage should queue the dead clip");
   assert.equal(game.owlDelivery.pendingOrders.some((order) => order.key === "fireOil"), true, "queued next delivery should survive current owl death");
   assert(game.owlDelivery.nextDispatchAt >= game.time + 64.9, "slain owl should delay the next delivery window by one minute");
-  assert(game.drops.some((drop) => drop.type === "owl_item" && drop.key === "speedPotion"), "slain owl should drop unclaimed orders");
+  const parcel = game.drops.find((drop) => drop.type === "owl_item" && drop.key === "speedPotion");
+  assert(parcel, "slain owl should drop unclaimed orders");
   assert(game.owlDelivery.lastMarker, "slain owl should leave a minimap marker");
+  assert.equal(pickupOwlItemDrop(game, parcel, game.player), true, "purchaser should recover dropped owl parcel");
+  assert.equal(game.owlDelivery.lastMarker, null, "final recovered owl parcel should clear the minimap marker");
 
   console.log(JSON.stringify({
     owlDelivery: "ok",

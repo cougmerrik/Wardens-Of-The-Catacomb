@@ -260,6 +260,7 @@ function serializeOwlDelivery(source) {
         state: source.active.state,
         waitTimer: source.active.waitTimer,
         portalTimer: source.active.portalTimer,
+        slainTimer: source.active.slainTimer,
         portalSlain: !!source.active.portalSlain,
         arrivalNotified: !!source.active.arrivalNotified,
         underAttackTimer: source.active.underAttackTimer,
@@ -273,7 +274,17 @@ function serializeOwlDelivery(source) {
             }))
           : [],
         trail: Array.isArray(source.active.trail)
-          ? source.active.trail.slice(-48).map((mote) => ({ x: mote.x, y: mote.y, life: mote.life, maxLife: mote.maxLife }))
+          ? source.active.trail.slice(-48).map((mote) => ({
+              x: mote.x,
+              y: mote.y,
+              vx: mote.vx,
+              vy: mote.vy,
+              radius: mote.radius,
+              sparkle: !!mote.sparkle,
+              phase: mote.phase,
+              life: mote.life,
+              maxLife: mote.maxLife
+            }))
           : []
       }
     : null;

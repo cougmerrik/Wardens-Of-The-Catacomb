@@ -673,7 +673,8 @@ export const runtimeBaseSupportMethods = {
         if (target) this.applyEnemyDamage(target, Math.max(1, amount), "melee", entity.id || null);
       }
     }
-    if (this.isPrimaryPlayerEntity(entity) && (this.consumables?.effects?.spikeGrowth?.timer || 0) > 0) {
+    const spikeGrowth = this.isPrimaryPlayerEntity(entity) ? this.consumables?.effects?.spikeGrowth : null;
+    if ((spikeGrowth?.attacksRemaining || 0) > 0) {
       const target = (this.enemies || []).find((enemy) =>
         enemy &&
         (enemy.hp || 0) > 0 &&
@@ -681,6 +682,7 @@ export const runtimeBaseSupportMethods = {
         Math.hypot((enemy.x || 0) - (entity.x || 0), (enemy.y || 0) - (entity.y || 0)) <= ((enemy.size || 20) + (entity.size || 22)) * 0.9
       );
       if (target) this.applyEnemyDamage(target, 3, "physical", entity.id || null);
+      spikeGrowth.attacksRemaining = Math.max(0, Math.floor(spikeGrowth.attacksRemaining || 0) - 1);
     }
     if (entity.classType === "necromancer") {
       const retaliationDamage = entity === this.player ? getNecromancerRotTouchedRetaliationDamage(this) : ((entity?.necromancerTalents?.rotTouched?.points || 0) > 0 ? 5 : 0);

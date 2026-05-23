@@ -143,7 +143,7 @@ Each active slot should show:
 
 Because the active cooldown is shared globally, all active consumables should visually indicate cooldown when any active consumable has been used.
 
-Active consumables with ongoing effects should also appear in the class status area while active. The class status area reserves enough space for the full effect icon set instead of resizing when effects start or expire. Timed effects such as Regeneration Potion, Speed Potion, and Spike Growth show the item icon with remaining seconds, Shield shows remaining temporary HP, and weapon coatings such as Fire Oil and Frost Oil show the item icon with remaining attack charges.
+Active consumables with ongoing effects should also appear in the class status area while active. The class status area reserves enough space for the full effect icon set instead of resizing when effects start or expire. Timed effects such as Regeneration Potion, Speed Potion, and Darkvision Potion show the item icon with remaining seconds, Shield shows remaining temporary HP, and charge-based effects such as Fire Oil, Frost Oil, and Spike Growth show the item icon with remaining charges.
 
 ### Passive HUD
 
@@ -358,7 +358,7 @@ The schema should be treated as the canonical starting point for new item design
 - `Price`: 50
 - `Max Stack`: 3
 - `Max Inventory`: 2
-- `Effect`: For `5s` after activation, enemies that attack the player take `+3` retaliatory damage
+- `Effect`: For the next `25` hits, enemies that attack the player take `+3` retaliatory damage
 
 ### Shield
 
@@ -368,10 +368,49 @@ The schema should be treated as the canonical starting point for new item design
 - `Trigger Condition`: `N/A`
 - `Cooldown`: Default
 - `Unlock Floor`: 1
-- `Price`: 3
+- `Price`: 15
 - `Max Stack`: 2
 - `Max Inventory`: 2
 - `Effect`: Gain `10` temporary HP
+
+### Lantern Fuel
+
+- `Name`: Lantern Fuel
+- `Type`: Active
+- `Rarity`: Common
+- `Trigger Condition`: `N/A`
+- `Cooldown`: Default
+- `Unlock Floor`: 1
+- `Price`: 20
+- `Max Stack`: 3
+- `Max Inventory`: 2
+- `Effect`: Refills the player's lantern by `20%`
+
+### Darkvision Potion
+
+- `Name`: Darkvision Potion
+- `Type`: Active
+- `Rarity`: Rare
+- `Trigger Condition`: `N/A`
+- `Cooldown`: Default
+- `Unlock Floor`: 1
+- `Price`: 35
+- `Max Stack`: 3
+- `Max Inventory`: 2
+- `Effect`: The consuming player privately sees in the dark up to `10` tiles for `30s`
+
+### Holy Candle
+
+- `Name`: Holy Candle
+- `Type`: Active
+- `Rarity`: Legendary
+- `Trigger Condition`: `N/A`
+- `Cooldown`: Default
+- `Unlock Floor`: 1
+- `Price`: 150
+- `Max Stack`: 2
+- `Max Inventory`: 1
+- `Effect`: Drops a `3` tile holy light for `10s` that heals players inside for `5%` max health each second
 
 ### Monkey Paw
 

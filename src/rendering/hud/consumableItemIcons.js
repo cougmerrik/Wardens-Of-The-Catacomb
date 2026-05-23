@@ -5,6 +5,9 @@ const CONSUMABLE_ICON_SOURCES = {
   fireOil: "./assets/images/items/fireOil.png",
   spikeGrowth: "./assets/images/items/spikeGrowth.png",
   shield: "./assets/images/items/shield.png",
+  lanternFuel: "./assets/images/items/lanternFuel.png",
+  darkvisionPotion: "./assets/images/items/darkvisionPotion.png",
+  holyCandle: "./assets/images/items/holyCandle.png",
   angelRing: "./assets/images/items/angelRing.png",
   monkeyPaw: "./assets/images/items/monkeyPaw.png"
 };

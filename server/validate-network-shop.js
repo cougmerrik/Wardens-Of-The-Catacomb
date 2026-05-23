@@ -100,7 +100,7 @@ function main() {
 
   handleActionMessage(room, owner.id, { kind: "buyUpgrade", key: "shield" });
   ownerState = room.syncPrimaryActivePlayerFromSim();
-  assert(ownerState.gold === 2997, `owner gold did not drop after shield purchase: ${ownerState.gold}`);
+  assert(ownerState.gold === 2985, `owner gold did not drop after shield purchase: ${ownerState.gold}`);
   assert(!getActiveSlot(ownerState, "shield"), "owner shield should wait for owl delivery");
   assert((room.sim.owlDelivery?.pendingOrders || []).some((order) => order.key === "shield" && order.playerId === owner.id), "owner shield order was not queued for owl delivery");
   assert(getStock(room, "shield")?.stock === 1, `shared shield stock did not decrement after owner purchase: ${getStock(room, "shield")?.stock}`);
@@ -109,7 +109,7 @@ function main() {
   ownerState = room.syncPrimaryActivePlayerFromSim();
 
   handleActionMessage(room, peer.id, { kind: "buyUpgrade", key: "shield" });
-  assert(peerState.gold === 2997, `peer gold did not drop after shield purchase: ${peerState.gold}`);
+  assert(peerState.gold === 2985, `peer gold did not drop after shield purchase: ${peerState.gold}`);
   assert(!getActiveSlot(peerState, "shield"), "peer shield should wait for owl delivery");
   assert((room.sim.owlDelivery?.pendingOrders || []).some((order) => order.key === "shield" && order.playerId === peer.id), "peer shield order was not queued for owl delivery");
   assert(getStock(room, "shield")?.stock === 0, `shared shield stock did not reach zero after peer purchase: ${getStock(room, "shield")?.stock}`);

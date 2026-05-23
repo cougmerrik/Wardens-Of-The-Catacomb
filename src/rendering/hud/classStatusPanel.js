@@ -123,7 +123,8 @@ function getActiveConsumableStatuses(game) {
   if ((effects.speedPotion?.timer || 0) > 0) statuses.push({ key: "speedPotion", count: Math.ceil(effects.speedPotion.timer || 0), color: "#7fd7ff" });
   if ((effects.fireOil?.attacksRemaining || 0) > 0) statuses.push({ key: "fireOil", count: Math.floor(effects.fireOil.attacksRemaining || 0), color: "#ff9a54" });
   if ((effects.frostOil?.attacksRemaining || 0) > 0) statuses.push({ key: "frostOil", count: Math.floor(effects.frostOil.attacksRemaining || 0), color: "#93ddff" });
-  if ((effects.spikeGrowth?.timer || 0) > 0) statuses.push({ key: "spikeGrowth", count: Math.ceil(effects.spikeGrowth.timer || 0), color: "#c7f06a" });
+  if ((effects.spikeGrowth?.attacksRemaining || 0) > 0) statuses.push({ key: "spikeGrowth", count: Math.floor(effects.spikeGrowth.attacksRemaining || 0), color: "#c7f06a" });
+  if ((effects.darkvisionPotion?.timer || 0) > 0) statuses.push({ key: "darkvisionPotion", count: Math.ceil(effects.darkvisionPotion.timer || 0), color: "#b788ff" });
   const tempHp = Math.max(0, Number.isFinite(game?.player?.consumableRuntime?.tempHp) ? game.player.consumableRuntime.tempHp : 0);
   if (tempHp > 0) statuses.push({ key: "shield", count: Math.ceil(tempHp), color: "#b8c7ff" });
   return statuses;
