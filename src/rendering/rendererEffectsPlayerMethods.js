@@ -419,7 +419,7 @@ export const rendererEffectsPlayerMethods = {
 
     for (const drop of game.drops || []) {
       if (!drop || drop.life <= 0 || (drop.type !== "health" && drop.type !== "mushroom" && drop.type !== "owl_item")) continue;
-      ctx.fillStyle = drop.type === "health" ? "#ff3f3f" : drop.type === "owl_item" ? "#71dfff" : "#ff6a52";
+      ctx.fillStyle = drop.type === "health" ? "#ff3f3f" : drop.type === "owl_item" ? "#b9793d" : "#ff6a52";
       ctx.beginPath();
       ctx.arc(miniX + (drop.x / this.config.map.tile) * scale, miniY + (drop.y / this.config.map.tile) * scale, Math.max(1.6, scale * 0.95), 0, Math.PI * 2);
       ctx.fill();
@@ -433,12 +433,12 @@ export const rendererEffectsPlayerMethods = {
       const owlX = miniX + ((Number.isFinite(owl.displayX) ? owl.displayX : owl.x) / this.config.map.tile) * scale;
       const owlY = miniY + ((Number.isFinite(owl.displayY) ? owl.displayY : owl.y) / this.config.map.tile) * scale;
       ctx.save();
-      ctx.strokeStyle = "rgba(104, 220, 255, 0.85)";
+      ctx.strokeStyle = "rgba(255, 142, 42, 0.88)";
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.arc(destX, destY, Math.max(3.5, scale * 1.6), 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = "#71dfff";
+      ctx.fillStyle = "#ff8a24";
       ctx.beginPath();
       ctx.arc(owlX, owlY, Math.max(2.5, scale * 1.3), 0, Math.PI * 2);
       ctx.fill();
@@ -448,14 +448,14 @@ export const rendererEffectsPlayerMethods = {
       const mx = miniX + (marker.x / this.config.map.tile) * scale;
       const my = miniY + (marker.y / this.config.map.tile) * scale;
       ctx.save();
-      ctx.fillStyle = "#dff8ff";
-      ctx.strokeStyle = "#4ec9ef";
+      ctx.fillStyle = "#7a4a2a";
+      ctx.strokeStyle = "#d09052";
       ctx.lineWidth = 1.3;
       ctx.beginPath();
       ctx.roundRect(mx - 4, my - 3, 8, 7, 1.5);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#4ec9ef";
+      ctx.fillStyle = "#b9793d";
       ctx.fillRect(mx - 3, my, 6, 1.3);
       ctx.restore();
     }

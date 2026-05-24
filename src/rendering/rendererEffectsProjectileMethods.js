@@ -773,16 +773,16 @@ export const rendererEffectsProjectileMethods = {
       ctx.drawImage(this.goldBagSprite, x - 12, y - 12, 24, 24);
     } else if (drop.type === "owl_item") {
       ctx.save();
-      ctx.shadowColor = "#65d9ff";
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = "#dff8ff";
-      ctx.strokeStyle = "#4ec9ef";
+      ctx.shadowColor = "#c56d2d";
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = "#7a4a2a";
+      ctx.strokeStyle = "#d09052";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.roundRect(x - 9, y - 8, 18, 16, 4);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#4ec9ef";
+      ctx.fillStyle = "#b9793d";
       ctx.fillRect(x - 6, y - 1, 12, 2);
       ctx.restore();
     }

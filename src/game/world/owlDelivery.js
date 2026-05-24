@@ -1,5 +1,7 @@
 import { getConsumableDefinition } from "../consumables.js";
 import { grantConsumableCharge, pushConsumableMessage } from "./consumablesEconomy.js";
+import { buildOwlDistanceMap, getOwlTileSize, isOwlNavigableTile, owlTileCenter, reconstructOwlPathFromDistanceMap } from "./owlDeliveryNavigation.js";
+import { moveOwlTowardDestination } from "./owlDeliveryMovement.js";
 import { updateOwlTrail } from "./owlDeliveryTrail.js";
 
 const TILE_FALLBACK = 32;
@@ -8,6 +10,9 @@ const DISPATCH_DELAY_MAX = 30;
 const DELIVERY_WAIT_TIME = 15;
 const DELIVERY_MIN_TILES = 12;
 const DELIVERY_MAX_TILES = 24;
+const SPAWN_MIN_PATH_TILES = 28;
+const SPAWN_MAX_PATH_TILES = 56;
+const SPAWN_TARGET_PATH_TILES = 38;
 const ENEMY_AVOID_TILES = 6;
 const PICKUP_TILES = 2;
 const OWL_HP = 26;
@@ -21,9 +26,8 @@ const SLAIN_CORPSE_TIME = 2.5;
 const SLAIN_NEXT_DELIVERY_DELAY = 60;
 
 function getTileSize(game) {
-  return game?.config?.map?.tile || TILE_FALLBACK;
+  return getOwlTileSize(game) || TILE_FALLBACK;
 }
-
 function getDeliveryHost(game) {
   const proto = game && Object.getPrototypeOf(game);
   if (proto && proto !== Object.prototype && Array.isArray(proto.shopStock) && proto.shopStock === game.shopStock) return proto;
@@ -54,7 +58,6 @@ export function ensureOwlDeliveryState(game) {
   if (!Number.isFinite(state.notificationSeq)) state.notificationSeq = 1;
   return state;
 }
-
 function now(game) {
   return Number.isFinite(game?.time) ? game.time : 0;
 }
@@ -62,13 +65,11 @@ function now(game) {
 function getPlayerId(game) {
   return typeof game?.player?.id === "string" && game.player.id ? game.player.id : "player";
 }
-
 function queueOwlAudio(game, kind) {
   const state = ensureOwlDeliveryState(game);
   state.audioEvents.push({ id: `veronica_audio_${state.audioSeq++}`, kind, at: now(game) });
   if (state.audioEvents.length > 12) state.audioEvents.splice(0, state.audioEvents.length - 12);
 }
-
 function showOwlAlert(game, text, x = null, y = null) {
   pushConsumableMessage(game, text);
   const state = ensureOwlDeliveryState(game);
@@ -82,7 +83,6 @@ function showOwlAlert(game, text, x = null, y = null) {
   game.multiplayerNotificationQueue.push({ text, duration: 2.5, owlLocal: true });
   if (!game.multiplayerNotificationCurrent) game.multiplayerNotificationCurrent = game.multiplayerNotificationQueue.shift() || null;
 }
-
 function tickLocalOwlNotifications(game, dt) {
   if (typeof game.tickMultiplayerNotifications === "function") return;
   if (!game.multiplayerNotificationCurrent && Array.isArray(game.multiplayerNotificationQueue) && game.multiplayerNotificationQueue.length > 0) {
@@ -93,13 +93,11 @@ function tickLocalOwlNotifications(game, dt) {
   current.duration -= Math.max(0, Number.isFinite(dt) ? dt : 0);
   if (current.duration <= 0) game.multiplayerNotificationCurrent = game.multiplayerNotificationQueue?.shift?.() || null;
 }
-
 function randomDispatchDelay(game) {
   const override = game?.owlDeliveryDebugDelay;
   if (Number.isFinite(override)) return Math.max(0, override);
   return DISPATCH_DELAY_MIN + Math.random() * (DISPATCH_DELAY_MAX - DISPATCH_DELAY_MIN);
 }
-
 function schedulePendingDispatch(game, state, extraDelay = 0) {
   if (!state || state.active || state.pendingOrders.length <= 0) return;
   state.nextDispatchAt = now(game) + Math.max(0, extraDelay || 0) + randomDispatchDelay(game);
@@ -148,20 +146,8 @@ export function getPendingOwlOrderKeys(game, playerId = getPlayerId(game)) {
   return keys;
 }
 
-function isNavigableTile(game, tx, ty) {
-  if (!Number.isFinite(tx) || !Number.isFinite(ty)) return false;
-  tx = Math.floor(tx);
-  ty = Math.floor(ty);
-  if (tx < 0 || ty < 0 || ty >= (game.mapHeight || game.map?.length || 0) || tx >= (game.mapWidth || game.map?.[0]?.length || 0)) return false;
-  if (typeof game.isWalkableTile === "function") return !!game.isWalkableTile(tx, ty);
-  const row = game.map?.[ty];
-  const ch = Array.isArray(row) ? row[tx] : typeof row === "string" ? row[tx] : "#";
-  return ch !== "#" && ch !== "B" && ch !== "?";
-}
-
 function tileCenter(game, tx, ty) {
-  const tile = getTileSize(game);
-  return { x: tx * tile + tile * 0.5, y: ty * tile + tile * 0.5 };
+  return owlTileCenter(game, tx, ty);
 }
 
 function getPartyPlayers(game) {
@@ -195,6 +181,23 @@ function enemyDensityScore(game, x, y) {
   return score;
 }
 
+function findNearestNavigablePoint(game, target, preferAwayFrom = null) {
+  const width = Math.max(1, game.mapWidth || game.map?.[0]?.length || 1);
+  const height = Math.max(1, game.mapHeight || game.map?.length || 1);
+  let best = null;
+  for (let ty = 0; ty < height; ty++) {
+    for (let tx = 0; tx < width; tx++) {
+      if (!isOwlNavigableTile(game, tx, ty)) continue;
+      const point = tileCenter(game, tx, ty);
+      const targetDist = Math.hypot(point.x - target.x, point.y - target.y);
+      const awayBonus = preferAwayFrom ? Math.min(Math.hypot(point.x - preferAwayFrom.x, point.y - preferAwayFrom.y), getTileSize(game) * 24) * 0.25 : 0;
+      const score = targetDist - awayBonus;
+      if (!best || score < best.score) best = { ...point, score };
+    }
+  }
+  return best ? { x: best.x, y: best.y } : target;
+}
+
 function selectDeliveryPoint(game) {
   const tile = getTileSize(game);
   const center = getPartyCenter(game);
@@ -205,7 +208,7 @@ function selectDeliveryPoint(game) {
   let best = null;
   for (let ty = cty - max; ty <= cty + max; ty++) {
     for (let tx = ctx - max; tx <= ctx + max; tx++) {
-      if (!isNavigableTile(game, tx, ty)) continue;
+      if (!isOwlNavigableTile(game, tx, ty)) continue;
       const dx = tx - ctx;
       const dy = ty - cty;
       const distTiles = Math.hypot(dx, dy);
@@ -220,11 +223,11 @@ function selectDeliveryPoint(game) {
   for (let radius = 2; radius <= max; radius++) {
     for (let ty = cty - radius; ty <= cty + radius; ty++) {
       for (let tx = ctx - radius; tx <= ctx + radius; tx++) {
-        if (isNavigableTile(game, tx, ty)) return tileCenter(game, tx, ty);
+        if (isOwlNavigableTile(game, tx, ty)) return tileCenter(game, tx, ty);
       }
     }
   }
-  return center;
+  return findNearestNavigablePoint(game, center);
 }
 
 function selectSpawnPoint(game, dest) {
@@ -232,23 +235,40 @@ function selectSpawnPoint(game, dest) {
   const height = Math.max(1, game.mapHeight || game.map?.length || 1);
   const tile = getTileSize(game);
   const party = getPartyCenter(game);
+  const distances = buildOwlDistanceMap(game, dest.x, dest.y);
   let best = null;
-  for (const requireDistance of [true, false]) {
-    best = null;
-    for (let ty = 0; ty < height; ty++) {
-      for (let tx = 0; tx < width; tx++) {
-        const edge = tx <= 1 || ty <= 1 || tx >= width - 2 || ty >= height - 2;
-        if (!edge || !isNavigableTile(game, tx, ty)) continue;
-        const point = tileCenter(game, tx, ty);
-        const partyDist = Math.hypot(point.x - party.x, point.y - party.y);
-        if (requireDistance && partyDist < tile * 10) continue;
-        const score = Math.hypot(point.x - dest.x, point.y - dest.y) - Math.min(partyDist, tile * 24) * 0.35;
-        if (!best || score < best.score) best = { ...point, score };
-      }
-    }
-    if (best) return best;
+  const index = (tx, ty) => ty * width + tx;
+  const destTx = Math.floor(dest.x / tile);
+  const destTy = Math.floor(dest.y / tile);
+  const sameSidePenalty = (tx, ty) => {
+    const midX = width * 0.5;
+    const midY = height * 0.5;
+    let penalty = 0;
+    if ((destTx < midX && tx > midX) || (destTx > midX && tx < midX)) penalty += 18;
+    if ((destTy < midY && ty > midY) || (destTy > midY && ty < midY)) penalty += 10;
+    return penalty;
+  };
+  function consider(tx, ty, relaxed = false) {
+    if (!isOwlNavigableTile(game, tx, ty)) return;
+    const point = tileCenter(game, tx, ty);
+    const pathTiles = distances?.dist?.[index(tx, ty)] ?? -1;
+    if (pathTiles < SPAWN_MIN_PATH_TILES || (!relaxed && pathTiles > SPAWN_MAX_PATH_TILES)) return;
+    const partyDist = Math.hypot(point.x - party.x, point.y - party.y);
+    if (!relaxed && partyDist < tile * 8) return;
+    const edge = tx <= 2 || ty <= 2 || tx >= width - 3 || ty >= height - 3;
+    const score = Math.abs(pathTiles - SPAWN_TARGET_PATH_TILES) + sameSidePenalty(tx, ty) + (edge ? 3 : 0) - Math.min(partyDist / tile, 18) * 0.08;
+    if (!best || score < best.score) best = { ...point, score };
   }
-  return { x: dest.x - getTileSize(game) * 14, y: dest.y };
+  for (const relaxed of [false, true]) {
+    for (let ty = 0; ty < height; ty++) {
+      for (let tx = 0; tx < width; tx++) consider(tx, ty, relaxed);
+    }
+    if (best && distances) {
+      best.path = reconstructOwlPathFromDistanceMap(game, distances, best.x, best.y) || [];
+      return best;
+    }
+  }
+  return findNearestNavigablePoint(game, { x: dest.x - tile * 14, y: dest.y }, party);
 }
 
 function spawnOwl(game, orders) {
@@ -264,8 +284,12 @@ function spawnOwl(game, orders) {
     speed: Number.isFinite(game?.config?.classes?.archer?.baseMoveSpeed) ? game.config.classes.archer.baseMoveSpeed : OWL_SPEED,
     phase: 0, state: "flying",
     waitTimer: DELIVERY_WAIT_TIME, portalTimer: 0, slainTimer: 0,
+    pressureTimer: 0,
     underAttackTimer: 0, attackWarningCooldown: 0,
     orders: orders.map((order) => ({ ...order })),
+    path: Array.isArray(spawn.path) ? spawn.path.slice(1) : [],
+    pathDestX: destination.x,
+    pathDestY: destination.y,
     trail: [],
     trailEmitAcc: 0
   };
@@ -326,6 +350,7 @@ function beginOwlPortalAway(game, slain) {
 function startOwlPortal(owl) {
   owl.state = "portal";
   owl.portalTimer = PORTAL_AWAY_TIME;
+  owl.portalSmokeTimer = 1;
 }
 
 function grantOrdersNearOwl(game, owl) {
@@ -352,47 +377,14 @@ function grantOrdersNearOwl(game, owl) {
   }
 }
 
-function moveOwlTowardDestination(game, owl, dt) {
-  const tile = getTileSize(game);
-  let dx = owl.destX - owl.x;
-  let dy = owl.destY - owl.y;
-  let dist = Math.hypot(dx, dy);
-  if (dist <= tile * 0.8) {
-    owl.state = "waiting";
-    owl.x = owl.destX;
-    owl.y = owl.destY;
-    if (!owl.arrivalNotified) {
-      showOwlAlert(game, "Veronica has arrived!", owl.x, owl.y - 34);
-      owl.arrivalNotified = true;
-    }
-    return;
-  }
-  dx /= dist || 1;
-  dy /= dist || 1;
-  for (const enemy of Array.isArray(game.enemies) ? game.enemies : []) {
-    if (!enemy || (enemy.hp ?? 1) <= 0 || enemy.deathProcessed) continue;
-    const ex = owl.x - (enemy.x || 0);
-    const ey = owl.y - (enemy.y || 0);
-    const ed = Math.hypot(ex, ey);
-    if (ed > 0 && ed < tile * 6) {
-      const weight = (tile * 6 - ed) / (tile * 6);
-      dx += (ex / ed) * weight * 2.2;
-      dy += (ey / ed) * weight * 2.2;
-    }
-  }
-  const nd = Math.hypot(dx, dy) || 1;
-  owl.x += (dx / nd) * owl.speed * dt;
-  owl.y += (dy / nd) * owl.speed * dt;
-}
-
 function updateOwlDisplay(owl, dt) {
   owl.phase = (owl.phase || 0) + dt * 3.2;
   if (owl.state === "portal" || owl.state === "slain") {
     owl.displayX = owl.x;
     owl.displayY = owl.y;
   } else if (owl.state === "waiting") {
-    owl.displayX = owl.destX + Math.sin(owl.phase) * 18;
-    owl.displayY = owl.destY + Math.sin(owl.phase * 2) * 10;
+    owl.displayX = owl.x;
+    owl.displayY = owl.y;
   } else {
     owl.displayX = owl.x;
     owl.displayY = owl.y + Math.sin(owl.phase) * 4;
@@ -462,8 +454,14 @@ export function tickOwlDelivery(game, dt) {
     beginOwlPortalAway(game, true);
     return;
   }
-  if (owl.state === "flying") moveOwlTowardDestination(game, owl, dt);
-  else if (owl.state === "waiting") owl.waitTimer = Math.max(0, (owl.waitTimer || 0) - dt);
+  if (owl.state === "flying" || owl.state === "waiting") {
+    const arrived = moveOwlTowardDestination(game, owl, dt);
+    if (arrived && !owl.arrivalNotified) {
+      showOwlAlert(game, "Veronica has arrived!", owl.x, owl.y - 34);
+      owl.arrivalNotified = true;
+    }
+  }
+  if (owl.state === "waiting") owl.waitTimer = Math.max(0, (owl.waitTimer || 0) - dt);
   updateOwlDisplay(owl, dt);
   grantOrdersNearOwl(game, owl);
   if (owl.orders.length <= 0) {

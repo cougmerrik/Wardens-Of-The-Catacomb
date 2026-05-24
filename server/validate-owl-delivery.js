@@ -6,6 +6,22 @@ function activeSlot(game, key) {
   return game.consumables.activeSlots.find((slot) => slot?.key === key) || null;
 }
 
+function setMapTile(game, tx, ty, value) {
+  const row = game.map?.[ty];
+  if (typeof row === "string") {
+    const chars = row.split("");
+    chars[tx] = value;
+    game.map[ty] = chars.join("");
+  } else if (Array.isArray(row)) {
+    row[tx] = value;
+  }
+}
+
+function getMapTile(game, tx, ty) {
+  const row = game.map?.[ty];
+  return Array.isArray(row) ? row[tx] : typeof row === "string" ? row[tx] : "#";
+}
+
 function main() {
   const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   game.owlDeliveryDebugDelay = 0;
@@ -23,6 +39,9 @@ function main() {
   tickOwlDelivery(game, 0.1);
   assert(game.owlDelivery.active, "Veronica should spawn after dispatch delay");
   assert.equal(game.owlDelivery.active.name, "Veronica", "owl should use the Veronica name");
+  assert.equal(game.owlDelivery.active.state, "flying", "Veronica should enter the map flying");
+  assert(game.owlDelivery.active.path.length >= 20, "Veronica should spawn with a long navigable route to the target");
+  assert(game.owlDelivery.active.path.length <= 60, "Veronica should not spawn across the whole map from the target");
   assert.equal(game.owlDelivery.active.size, 16.5, "Veronica should render at the reduced courier size");
   assert.equal(game.owlDelivery.active.speed, game.config.classes.archer.baseMoveSpeed, "Veronica should move at base Scout speed");
   assert.equal(game.owlDelivery.active.orders[0].playerId, "player", "order should remember purchaser id");
@@ -85,6 +104,77 @@ function main() {
   assert(game.owlDelivery.lastMarker, "slain owl should leave a minimap marker");
   assert.equal(pickupOwlItemDrop(game, parcel, game.player), true, "purchaser should recover dropped owl parcel");
   assert.equal(game.owlDelivery.lastMarker, null, "final recovered owl parcel should clear the minimap marker");
+
+  const movementGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  movementGame.owlDeliveryDebugDelay = 0;
+  movementGame.gold = 3000;
+  movementGame.player.id = "player";
+  movementGame.shopStock = [{ key: "shield", stock: 1 }];
+  assert.equal(movementGame.buyShopItem("shield"), true, "movement purchase should validate");
+  tickOwlDelivery(movementGame, 0.1);
+  const movingOwl = movementGame.owlDelivery.active;
+  assert(movingOwl, "movement owl should spawn");
+  movingOwl.orders = [{ playerId: "other-player", key: "shield", quantity: 1 }];
+  const tile = movementGame.config.map.tile;
+  movingOwl.state = "waiting";
+  movingOwl.destX = movementGame.player.x;
+  movingOwl.destY = movementGame.player.y;
+  movingOwl.x = movingOwl.destX;
+  movingOwl.y = movingOwl.destY;
+  movingOwl.displayX = movingOwl.x;
+  movingOwl.displayY = movingOwl.y;
+  movementGame.enemies = [{ type: "skeleton", x: movingOwl.x - tile * 0.5, y: movingOwl.y, size: 24, hp: 10, maxHp: 10, damageMax: 0 }];
+  const beforeEvade = Math.hypot(movingOwl.x - movementGame.enemies[0].x, movingOwl.y - movementGame.enemies[0].y);
+  tickOwlDelivery(movementGame, 0.1);
+  const afterEvade = Math.hypot(movingOwl.x - movementGame.enemies[0].x, movingOwl.y - movementGame.enemies[0].y);
+  assert(afterEvade > beforeEvade, "Veronica should move away from enemies within one tile");
+
+  const tx = Math.floor(movementGame.player.x / tile) + 2;
+  const ty = Math.floor(movementGame.player.y / tile);
+  setMapTile(movementGame, tx, ty, "#");
+  movingOwl.state = "flying";
+  movingOwl.x = (tx - 1) * tile + tile * 0.5;
+  movingOwl.y = ty * tile + tile * 0.5;
+  movingOwl.destX = (tx + 1) * tile + tile * 0.5;
+  movingOwl.destY = movingOwl.y;
+  movementGame.enemies = [];
+  tickOwlDelivery(movementGame, 0.25);
+  assert.notEqual(Math.floor(movingOwl.x / tile), tx, "Veronica should not fly through wall tiles");
+
+  setMapTile(movementGame, tx, ty, ".");
+  movementGame.breakables = [{ type: "crate", x: tx * tile + tile * 0.5, y: ty * tile + tile * 0.5, size: 24, hp: 10 }];
+  movingOwl.x = (tx - 1) * tile + tile * 0.5;
+  movingOwl.y = ty * tile + tile * 0.5;
+  movingOwl.destX = (tx + 1) * tile + tile * 0.5;
+  movingOwl.destY = movingOwl.y;
+  movingOwl.path = [];
+  const beforeCrateX = movingOwl.x;
+  tickOwlDelivery(movementGame, 0.25);
+  assert(movingOwl.x > beforeCrateX, "Veronica should fly over crates and boxes");
+
+  const spawnGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  spawnGame.owlDeliveryDebugDelay = 0;
+  spawnGame.gold = 3000;
+  spawnGame.shopStock = [{ key: "shield", stock: 1 }];
+  spawnGame.isWalkableTile = () => true;
+  for (let x = 0; x < spawnGame.mapWidth; x++) {
+    setMapTile(spawnGame, x, 0, "#");
+    setMapTile(spawnGame, x, spawnGame.mapHeight - 1, "#");
+  }
+  for (let y = 0; y < spawnGame.mapHeight; y++) {
+    setMapTile(spawnGame, 0, y, "#");
+    setMapTile(spawnGame, spawnGame.mapWidth - 1, y, "#");
+  }
+  assert.equal(spawnGame.buyShopItem("shield"), true, "spawn purchase should validate");
+  tickOwlDelivery(spawnGame, 0.1);
+  const spawnedOwl = spawnGame.owlDelivery.active;
+  assert(spawnedOwl, "spawn regression owl should dispatch");
+  const spawnTile = spawnGame.config.map.tile;
+  assert.equal(
+    "#B?".includes(getMapTile(spawnGame, Math.floor(spawnedOwl.x / spawnTile), Math.floor(spawnedOwl.y / spawnTile))),
+    false,
+    "Veronica should not spawn inside blocked terrain even if generic walkability lies"
+  );
 
   console.log(JSON.stringify({
     owlDelivery: "ok",

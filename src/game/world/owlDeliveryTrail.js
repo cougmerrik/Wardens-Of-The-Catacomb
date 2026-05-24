@@ -1,14 +1,19 @@
-const TRAIL_LIFE = 12;
-const TRAIL_LIMIT = 260;
-const TRAIL_EMIT_INTERVAL = 0.1;
+const TRAIL_LIFE = 6;
+const TRAIL_LIMIT = 90;
+const TRAIL_EMIT_INTERVAL = 0.16;
+const WAIT_TRAIL_LIMIT = 12;
+const WAIT_TRAIL_EMIT_INTERVAL = 1.25;
 
 export function updateOwlTrail(owl, dt) {
   if (!Array.isArray(owl.trail)) owl.trail = [];
   if (owl.state !== "slain" && owl.state !== "portal") {
+    const waiting = owl.state === "waiting";
+    const emitInterval = waiting ? WAIT_TRAIL_EMIT_INTERVAL : TRAIL_EMIT_INTERVAL;
+    const motesPerEmit = 1;
     owl.trailEmitAcc = (owl.trailEmitAcc || 0) + dt;
-    while (owl.trailEmitAcc >= TRAIL_EMIT_INTERVAL) {
-      owl.trailEmitAcc -= TRAIL_EMIT_INTERVAL;
-      for (let i = 0; i < 2; i++) {
+    while (owl.trailEmitAcc >= emitInterval) {
+      owl.trailEmitAcc -= emitInterval;
+      for (let i = 0; i < motesPerEmit; i++) {
         const angle = Math.random() * Math.PI * 2;
         const offset = 3 + Math.random() * 9;
         const life = TRAIL_LIFE * (0.82 + Math.random() * 0.22);
@@ -31,5 +36,6 @@ export function updateOwlTrail(owl, dt) {
     mote.x += (mote.vx || 0) * dt;
     mote.y += (mote.vy || 0) * dt;
   }
-  owl.trail = owl.trail.filter((mote) => mote.life > 0).slice(-TRAIL_LIMIT);
+  const limit = owl.state === "waiting" ? WAIT_TRAIL_LIMIT : TRAIL_LIMIT;
+  owl.trail = owl.trail.filter((mote) => mote.life > 0).slice(-limit);
 }
