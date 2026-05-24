@@ -27,14 +27,16 @@ export class VeronicaAudioEvents {
     if (!Array.isArray(events) || muted) return;
     const nowMs = performance.now();
     for (const event of events) {
-      if (!event || typeof event.id !== "string" || this.playedEventIds.has(event.id)) continue;
+      if (!event || typeof event.id !== "string") continue;
+      const eventKey = `${event.id}:${event.kind || ""}:${Number.isFinite(event.at) ? event.at : ""}`;
+      if (this.playedEventIds.has(eventKey)) continue;
       const audio = this.audios?.[event.kind];
       if (!audio) continue;
       if (event.kind === "veronica_hurt" && nowMs - this.lastHurtAtMs < 5000) {
-        this.playedEventIds.add(event.id);
+        this.playedEventIds.add(eventKey);
         continue;
       }
-      this.playedEventIds.add(event.id);
+      this.playedEventIds.add(eventKey);
       if (this.playedEventIds.size > 80) this.playedEventIds = new Set(Array.from(this.playedEventIds).slice(-40));
       if (event.kind === "veronica_hurt") this.lastHurtAtMs = nowMs;
       audio.pause();

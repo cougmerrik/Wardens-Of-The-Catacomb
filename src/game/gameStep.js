@@ -562,7 +562,7 @@ export function stepGame(game, dt, controls = {}) {
   const livingPlayersForWake = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
   for (const stand of game.armorStands) {
     if (!stand.animated || stand.activated) continue;
-    if (floorBossActive) break;
+    if (floorBossActive || postBossSpawnSuppressed) break;
     if (countLivingEnemies() >= activeEnemyCap || armorActivations >= 4) break;
     const shouldWake = livingPlayersForWake.some(
       (player) => player && vecLength((player.x || 0) - stand.x, (player.y || 0) - stand.y) < armorWakeRadius

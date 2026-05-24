@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { VeronicaAudioEvents } from "../src/audio/veronicaAudioEvents.js";
 import { GameSim } from "../src/sim/GameSim.js";
 import { pickupOwlItemDrop, tickOwlDelivery } from "../src/game/world/owlDelivery.js";
 
@@ -22,7 +23,18 @@ function getMapTile(game, tx, ty) {
   return Array.isArray(row) ? row[tx] : typeof row === "string" ? row[tx] : "#";
 }
 
+function validateVeronicaAudioDedupe() {
+  const played = [];
+  const audioEvents = new VeronicaAudioEvents(() => ({ pause() {}, currentTime: 0, muted: false }));
+  const play = (event) => audioEvents.play([event], { muted: false, attemptAudioPlay: (_audio, kind) => played.push(kind) });
+  play({ id: "veronica_audio_1", kind: "veronica_entrance", at: 1 });
+  play({ id: "veronica_audio_1", kind: "veronica_entrance", at: 1 });
+  play({ id: "veronica_audio_1", kind: "veronica_entrance", at: 2 });
+  assert.deepEqual(played, ["veronica_entrance", "veronica_entrance"], "Veronica audio dedupe should allow restarted run ids");
+}
+
 function main() {
+  validateVeronicaAudioDedupe();
   const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   game.owlDeliveryDebugDelay = 0;
   game.gold = 3000;

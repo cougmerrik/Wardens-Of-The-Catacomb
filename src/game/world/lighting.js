@@ -167,6 +167,15 @@ function getPortalLightOptions(game) {
   };
 }
 
+function getOwlDeliveryLightOptions() {
+  return {
+    lightIntensity: 0.28,
+    lightDecay: 0.85,
+    brightRadiusRatio: 0.18,
+    dimRadiusRatio: 1
+  };
+}
+
 function decayLanternFuel(game, players, dt) {
   const cfg = getLightingConfig(game);
   const decay = Number.isFinite(cfg.lanternFuelDecayPerSecond) ? Math.max(0, cfg.lanternFuelDecayPerSecond) : 0;
@@ -291,6 +300,13 @@ export function getActiveLightSources(game) {
 
   if (game.portal?.active) {
     addSource({ ...game.portal, type: "exitPortal" }, "exitPortal", getPortalLightRadius(game), getPortalLightOptions(game));
+  }
+
+  const owl = game.owlDelivery?.active;
+  if (owl && owl.state !== "portal") {
+    const x = Number.isFinite(owl.displayX) ? owl.displayX : owl.x;
+    const y = Number.isFinite(owl.displayY) ? owl.displayY : owl.y;
+    addSource({ id: owl.id || "veronica", type: "veronica", x, y }, "veronica", getTileSize(game) * 2, getOwlDeliveryLightOptions());
   }
 
   for (const arrow of Array.isArray(game.fireArrows) ? game.fireArrows : []) {

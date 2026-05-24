@@ -114,6 +114,24 @@ function main() {
   assert(darknessLayerCtx.globalCompositeOperation === "source-over", "lighting overlay should restore source-over compositing");
   assert(overlayCtx.calls.some((call) => call[0] === "drawImage"), "lighting overlay should composite offscreen darkness over the world");
 
+  const darkvisionOverlayCtx = createStubContext();
+  const darkvisionLayerCtx = createStubContext();
+  runtimeSceneLightingMethods.drawLightingOverlay.call(
+    { ctx: darkvisionOverlayCtx, canvas: { width: 320, height: 240 }, _lightingOverlayCanvas: { width: 320, height: 240, getContext: () => darkvisionLayerCtx } },
+    {
+      config: { map: { tile: 32 }, lighting: { enabled: true, ambientDarknessAlpha: 0.64, maxDarknessAlpha: 0.87 } },
+      player: { x: 120, y: 140 },
+      consumables: { effects: { darkvisionPotion: { timer: 12 } } },
+      getActiveLightSources() {
+        return [{ sourceType: "player", x: 120, y: 140, radius: 320 }];
+      }
+    },
+    0,
+    0,
+    { playW: 300, topHudH: 24, xpBarH: 28 }
+  );
+  assert(darkvisionOverlayCtx.calls.some((call) => call[0] === "addColorStop" && typeof call[2] === "string" && call[2].includes("146, 84, 255")), "active darkvision should add a purple visibility tint");
+
   const fireOverlayCtx = createStubContext();
   const fireDarknessLayerCtx = createStubContext();
   const fireDarknessLayer = {
@@ -294,14 +312,14 @@ function main() {
   const overlayIndex = sceneSource.indexOf("this.drawLightingOverlay(game, cameraX, cameraY, layout);");
   const dropsIndex = sceneSource.indexOf("this.drawDrops(game, cameraX, cameraY);");
   const floatingTextIndex = sceneSource.indexOf("this.drawFloatingTexts(game, cameraX, cameraY);");
-  const enemyLayerIndex = sceneSource.indexOf("this.drawEnemyDarkenedLayer(game, enemy, cameraX, cameraY, layout)");
-  const fallbackEnemyIndex = sceneSource.indexOf("this.drawSceneEnemy(game, enemy, cameraX, cameraY);");
+  const enemyLayerIndex = sceneSource.lastIndexOf("this.drawEnemyDarkenedLayer(game, enemy, cameraX, cameraY, layout)");
+  const fallbackEnemyIndex = sceneSource.lastIndexOf("this.drawSceneEnemy(game, enemy, cameraX, cameraY);");
   assert(overlayIndex >= 0 && dropsIndex > overlayIndex, "drops should render after lighting overlay before sprite-level darkening");
   assert(overlayIndex >= 0 && floatingTextIndex > overlayIndex, "floating text should render after lighting overlay so it stays readable");
   assert(overlayIndex >= 0 && enemyLayerIndex > overlayIndex, "enemies should render through a darkened sprite layer after global lighting overlay");
   assert(fallbackEnemyIndex > enemyLayerIndex, "enemies should fall back to direct drawing only when the darkened layer is unavailable");
   assert(floatingTextIndex > fallbackEnemyIndex, "floating combat text should render after enemies so actors cannot paint over it");
-  assert(!sceneSource.slice(0, overlayIndex).includes("this.drawSceneEnemy(game, enemy, cameraX, cameraY);"), "enemies should not render before lighting overlay");
+  assert(sceneSource.slice(overlayIndex).includes("this.drawEnemyDarkenedLayer(game, enemy, cameraX, cameraY, layout)"), "post-overlay enemies should use sprite-level darkness");
 
   const drawSource = readFileSync(resolve("src", "rendering", "runtimeSceneDrawMethods.js"), "utf8");
   const projectileDrawSource = readFileSync(resolve("src", "rendering", "rendererEffectsProjectileMethods.js"), "utf8");

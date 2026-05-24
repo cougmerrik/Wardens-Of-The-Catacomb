@@ -362,7 +362,9 @@ function grantOrdersNearOwl(game, owl) {
     for (let i = owl.orders.length - 1; i >= 0; i--) {
       const order = owl.orders[i];
       if (order.playerId !== player.id && !(order.playerId === "player" && player === game.player)) continue;
-      if (!player.consumables || typeof player.consumables !== "object") {
+      if (player === game.player && game.consumables && typeof game.consumables === "object") {
+        player.consumables = game.consumables;
+      } else if (!player.consumables || typeof player.consumables !== "object") {
         player.consumables = player === game.player && game.consumables ? game.consumables : {};
       }
       const grantContext = { player, consumables: player.consumables || (player === game.player ? game.consumables : null) };
@@ -480,7 +482,9 @@ export function pickupOwlItemDrop(game, drop, player = game.player) {
   if (!drop || drop.type !== "owl_item") return false;
   const playerId = typeof player?.id === "string" && player.id ? player.id : "player";
   if (drop.playerId && drop.playerId !== playerId && !(drop.playerId === "player" && player === game.player)) return false;
-  if (!player.consumables || typeof player.consumables !== "object") {
+  if (player === game.player && game.consumables && typeof game.consumables === "object") {
+    player.consumables = game.consumables;
+  } else if (!player.consumables || typeof player.consumables !== "object") {
     player.consumables = player === game.player && game.consumables ? game.consumables : {};
   }
   const grantContext = { player, consumables: player.consumables || (player === game.player ? game.consumables : null) };
