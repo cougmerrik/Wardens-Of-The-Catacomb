@@ -19,6 +19,7 @@ function main() {
   const stats = read("src/rendering/hud/stats.js");
   const gameRuntime = read("src/game/GameRuntimeBase.js");
   const renderer = read("src/rendering/RendererRuntime.js");
+  const holyCandleVisual = read("src/rendering/holyCandleVisual.js");
 
   assertIncludes(scene, "const sidebarW = 0;", "desktop play area should no longer reserve sidebar width");
   assertIncludes(gameRuntime, "return this.canvas.width;", "gameplay camera width should use the full canvas");
@@ -72,6 +73,9 @@ function main() {
   assertIncludes(shopMenu, "game.uiRects.shopClose = null;", "shop should not expose the old modal close button");
   assert.ok(!shopMenu.includes("Castle Quartermaster"), "shop should not render the old modal shop window");
   assert.ok(!shopMenu.includes("drawRadialHub"), "shop should not draw a central gold hub over the player");
+  assertIncludes(holyCandleVisual, 'drawConsumableItemIcon(ctx, "holyCandle"', "in-world Holy Candle should use the item icon");
+  assertIncludes(holyCandleVisual, "ctx.createRadialGradient", "Holy Candle should draw a visible radius aura");
+  assertIncludes(holyCandleVisual, "ctx.setLineDash([8, 7]);", "Holy Candle aura should mark the radius edge");
 
   assert.ok(!stats.includes('["Pace",'), "stats overlay should not show pace after HUD cleanup");
   assert.ok(!stats.includes("Enemies ${game.enemies.length}"), "compact enemy counter should be removed");
