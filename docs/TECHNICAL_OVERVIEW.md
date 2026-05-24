@@ -113,7 +113,7 @@ This document summarizes the current high-level architecture and validation work
   - `getActiveLightSources()` combines player, torch, and remote-player sources for rendering.
 - Torch objects carry stable gameplay/rendering fields: `id`, `type`, `x`, `y`, `size`, `lit`, `lightRadius`, and `snuffCooldown`.
 - Player entities carry `lanternFuel` in the `0..1` range. Network serialization includes that fuel value so the HUD gauge and player light radius stay aligned across clients.
-- Consumables can modify lighting: Lantern Fuel calls the centralized lantern fuel helper, Darkvision Potion contributes a private 10-tile local player sight radius with a purple visibility tint while active, and Holy Candle creates a timed `holyCandle` light source that heals living players in its radius.
+- Consumables can modify lighting and multiplayer player state: Lantern Fuel calls the centralized lantern fuel helper, Darkvision Potion contributes a private 10-tile local player sight radius with a purple visibility tint while active, Holy Candle creates a timed `holyCandle` light source that heals living players in its radius, and Phoenix Draught is multiplayer-only revive utility that restores one random dead ally at the user's position with 40% HP.
 - Enemy serialization includes active burning state (`burningTimer`, `burningDps`, and `burningLightRadius`) so multiplayer clients render ignited-enemy light from the same gameplay state as the host.
 - Lighting interaction updates are throttled and use squared-distance checks to avoid adding avoidable per-frame cost on larger floors.
 - The renderer draws torches through `runtimeSceneObjectDrawMethods.js` and applies the darkness/light overlay through `runtimeSceneLightingMethods.js`.

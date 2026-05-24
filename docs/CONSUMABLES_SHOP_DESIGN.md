@@ -412,6 +412,19 @@ The schema should be treated as the canonical starting point for new item design
 - `Max Inventory`: 1
 - `Effect`: Drops a `3` tile holy light for `10s` that heals players inside for `5%` max health each second
 
+### Phoenix Draught
+
+- `Name`: Phoenix Draught
+- `Type`: Active
+- `Rarity`: Rare
+- `Trigger Condition`: When an ally is dead
+- `Cooldown`: Default
+- `Unlock Floor`: 1
+- `Price`: 250
+- `Max Stack`: `1`
+- `Max Inventory`: `1`
+- `Effect`: Multiplayer-only. Instantly revives one random dead ally at the user's position with `40%` HP
+
 ### Monkey Paw
 
 - `Name`: Monkey Paw

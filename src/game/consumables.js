@@ -120,6 +120,20 @@ export const CONSUMABLE_DEFS = {
     maxInventory: 1,
     effect: "Drops a 3-tile holy light for 10s that heals players inside for 5% max health each second"
   },
+  phoenixDraught: {
+    key: "phoenixDraught",
+    name: "Phoenix Draught",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "When an ally is dead",
+    cooldown: "Default",
+    unlockFloor: 1,
+    price: 250,
+    maxStack: 1,
+    maxInventory: 1,
+    multiplayerOnly: true,
+    effect: "Instantly revives one random dead ally at your position with 40% health"
+  },
   angelRing: {
     key: "angelRing",
     name: "Angel Ring",

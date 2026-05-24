@@ -14,6 +14,30 @@ import { addLanternFuel } from "./lighting.js";
 const OIL_ATTACK_CHARGES = 15;
 const OIL_EFFECT_KEYS = ["fireOil", "frostOil"];
 const SPIKE_GROWTH_HITS = 25;
+const PHOENIX_DRAUGHT_REVIVE_PCT = 0.4;
+
+function getAllPlayerEntities(game) {
+  const players = typeof game?.getActivePlayerEntities === "function" ? game.getActivePlayerEntities() : [game?.player];
+  return (Array.isArray(players) ? players : [game?.player]).filter((player) => !!player);
+}
+
+export function isMultiplayerConsumableContext(game) {
+  if ((Number.isFinite(game?.activePlayerCount) && game.activePlayerCount > 1) || (Number.isFinite(game?.networkActivePlayerCount) && game.networkActivePlayerCount > 1)) return true;
+  return getAllPlayerEntities(game).length > 1;
+}
+
+function isDeadPlayerEntity(player) {
+  return !!player && (player.alive === false || (Number.isFinite(player.health) && player.health <= 0));
+}
+
+function getPhoenixDraughtTargets(game) {
+  if (!isMultiplayerConsumableContext(game)) return [];
+  const userId = typeof game?.player?.id === "string" && game.player.id ? game.player.id : "player";
+  return getAllPlayerEntities(game).filter((player) => {
+    if (!player || player.id === userId) return false;
+    return isDeadPlayerEntity(player) && Number.isFinite(player.maxHealth) && player.maxHealth > 0;
+  });
+}
 
 export function ensureShopStock(game) {
   if (!Array.isArray(game.shopStock) || game.shopStock.length <= 0) {
@@ -100,6 +124,7 @@ export function canAcquireConsumableType(game, def) {
 export function getShopFailureReason(game, key) {
   const def = getConsumableDefinition(key);
   if (!def) return "Out of stock";
+  if (def.multiplayerOnly && !isMultiplayerConsumableContext(game)) return "Multiplayer only";
   ensureShopStock(game);
   const entry = game.shopStock.find((item) => item?.key === key);
   if (!entry || entry.stock <= 0) return "Out of stock";
@@ -194,6 +219,7 @@ function clearConsumableStateForRemoval(game, consumables) {
 
 function canUseConsumable(game, def) {
   if (!def) return false;
+  if (def.key === "phoenixDraught") return getPhoenixDraughtTargets(game).length > 0;
   if (def.key === "regenerationPotion") return (game.player?.health || 0) < (game.player?.maxHealth || 0);
   if (def.key === "lanternFuel") {
     const maxFuel = Number.isFinite(game.config?.lighting?.lanternMaxFuel) ? game.config.lighting.lanternMaxFuel : 1;
@@ -219,6 +245,23 @@ function spawnHolyCandle(game) {
     lightRadius: tile * 3,
     lightIntensity: 0.45
   });
+}
+
+function usePhoenixDraught(game) {
+  const targets = getPhoenixDraughtTargets(game);
+  if (targets.length <= 0) return false;
+  const target = targets[Math.floor(Math.random() * targets.length)] || targets[0];
+  target.x = Number.isFinite(game.player?.x) ? game.player.x : target.x;
+  target.y = Number.isFinite(game.player?.y) ? game.player.y : target.y;
+  target.health = Math.max(1, Math.ceil((Number.isFinite(target.maxHealth) ? target.maxHealth : 1) * PHOENIX_DRAUGHT_REVIVE_PCT));
+  target.alive = true;
+  target.spectateTargetId = "";
+  if (typeof game.markPlayerEntityHealthBarVisible === "function") game.markPlayerEntityHealthBarVisible(target);
+  if (typeof game.spawnFloatingText === "function") {
+    game.spawnFloatingText(target.x, target.y - 34, "Revived!", "#ffc766", 0.95, 15);
+  }
+  pushConsumableMessage(game, `${target.handle || "Ally"} revived`);
+  return true;
 }
 
 function activateConsumableEffect(game, def) {
@@ -255,6 +298,8 @@ function activateConsumableEffect(game, def) {
     case "holyCandle":
       spawnHolyCandle(game);
       return true;
+    case "phoenixDraught":
+      return usePhoenixDraught(game);
     case "shield":
       setConsumableTempHp(game, getConsumableTempHp(game) + 10);
       return true;

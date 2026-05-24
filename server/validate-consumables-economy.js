@@ -73,6 +73,39 @@ function main() {
   assert.equal(itemGame.useConsumableSlot(0), true, "Spike Growth should be usable");
   assert.equal(itemGame.consumables.effects.spikeGrowth.attacksRemaining, 25, "Spike Growth should use 25 hit charges");
 
+  const soloPhoenixGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  soloPhoenixGame.gold = 1000;
+  soloPhoenixGame.shopStock = [{ key: "phoenixDraught", stock: 1 }];
+  assert.equal(soloPhoenixGame.getShopFailureReason("phoenixDraught"), "Multiplayer only", "Phoenix Draught should be blocked from single-player purchase");
+  soloPhoenixGame.consumables.activeSlots = [{ key: "phoenixDraught", count: 1, cooldownRemaining: 0 }];
+  assert.equal(soloPhoenixGame.useConsumableSlot(0), false, "Phoenix Draught should not be usable in single player");
+  assert.equal(soloPhoenixGame.consumables.activeSlots[0]?.count, 1, "blocked Phoenix Draught should not be consumed");
+
+  const phoenixGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  phoenixGame.player.id = "living";
+  phoenixGame.player.x = 300;
+  phoenixGame.player.y = 420;
+  const deadAlly = {
+    id: "dead-ally",
+    handle: "Dead Ally",
+    x: 120,
+    y: 140,
+    size: 22,
+    health: 0,
+    maxHealth: 100,
+    alive: false,
+    consumables: { activeSlots: [], passiveSlots: [], sharedCooldown: 0, effects: {} }
+  };
+  phoenixGame.activePlayerCount = 2;
+  phoenixGame.networkActivePlayers = [phoenixGame.player, deadAlly];
+  phoenixGame.consumables.activeSlots = [{ key: "phoenixDraught", count: 1, cooldownRemaining: 0 }];
+  assert.equal(phoenixGame.useConsumableSlot(0), true, "Phoenix Draught should revive a dead multiplayer ally");
+  assert.equal(deadAlly.alive, true, "Phoenix Draught should mark the ally alive");
+  assert.equal(deadAlly.health, 40, "Phoenix Draught should revive at 40% HP");
+  assert.equal(deadAlly.x, phoenixGame.player.x, "Phoenix Draught should move the ally to the user x position");
+  assert.equal(deadAlly.y, phoenixGame.player.y, "Phoenix Draught should move the ally to the user y position");
+  assert.equal(phoenixGame.consumables.activeSlots.length, 0, "Phoenix Draught should be consumed after revive");
+
   console.log(JSON.stringify({
     consumablesEconomy: "ok"
   }, null, 2));

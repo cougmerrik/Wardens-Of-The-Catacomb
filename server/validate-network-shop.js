@@ -164,6 +164,27 @@ function main() {
   assert(regenTextIds.length >= 2, "peer regeneration potion should publish repeated healing feedback");
   assert(new Set(regenTextIds).size === regenTextIds.length, "peer regeneration potion feedback should allocate unique floating text ids");
 
+  ownerState = room.syncPrimaryActivePlayerFromSim();
+  ownerState.x = 512;
+  ownerState.y = 640;
+  ownerState.consumables.sharedCooldown = 0;
+  ownerState.consumables.activeSlots = [{ key: "phoenixDraught", count: 1, cooldownRemaining: 0 }];
+  peerState.x = 96;
+  peerState.y = 128;
+  peerState.health = 0;
+  peerState.alive = false;
+  peerState.spectateTargetId = owner.id;
+  room.syncSimPrimaryPlayerState();
+  room.sim.activePlayerCount = Math.max(1, room.clients.size);
+  room.sim.networkActivePlayers = room.getSimulationPlayerEntities();
+  handleActionMessage(room, owner.id, { kind: "useConsumableSlot", slot: 0 });
+  ownerState = room.syncPrimaryActivePlayerFromSim();
+  assert(peerState.alive === true, "Phoenix Draught should revive a dead multiplayer ally");
+  assert(peerState.health === Math.ceil(peerState.maxHealth * 0.4), "Phoenix Draught should revive the ally at 40% HP");
+  assert(peerState.x === ownerState.x, "Phoenix Draught should revive the ally at the user's x position");
+  assert(peerState.y === ownerState.y, "Phoenix Draught should revive the ally at the user's y position");
+  assert(!getActiveSlot(ownerState, "phoenixDraught"), "Phoenix Draught should be consumed after revive");
+
   console.log(JSON.stringify({
     ownerGold: ownerState.gold,
     peerGold: peerState.gold,
