@@ -134,6 +134,20 @@ export const CONSUMABLE_DEFS = {
     multiplayerOnly: true,
     effect: "Instantly revives one random dead ally at your position with 40% health"
   },
+  flameOfTheFallen: {
+    key: "flameOfTheFallen",
+    name: "Flame of the Fallen",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "When an ally is dead",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 300,
+    maxStack: 1,
+    maxInventory: 1,
+    multiplayerOnly: true,
+    effect: "Creates a 20s pyre that charges from nearby enemy kills and revives all dead allies at the pyre with 50% health"
+  },
   angelRing: {
     key: "angelRing",
     name: "Angel Ring",
@@ -258,8 +272,8 @@ function chooseUniqueConsumable(floor, desiredRarity, chosenKeys) {
   return anyRemaining[Math.floor(Math.random() * anyRemaining.length)] || null;
 }
 
-export function rollConsumableShopStock(floor, entryCount = 5) {
-  const chosenKeys = new Set();
+export function rollConsumableShopStock(floor, entryCount = 5, excludeKeys = new Set()) {
+  const chosenKeys = new Set(excludeKeys);
   const stock = [];
   const attempts = Math.max(entryCount * 4, 12);
   for (let i = 0; i < attempts && stock.length < entryCount; i++) {

@@ -1291,6 +1291,7 @@ export class AuthoritativeRoom {
       players: fullState.players,
       serverStateAnomalies: this.recentServerStateAnomalies.slice(-12).map((entry) => ({ ...entry })),
       owlDelivery: fullState.owlDelivery,
+      flameOfTheFallen: fullState.flameOfTheFallen,
       delta
     };
     if (Array.isArray(fullState.floatingTexts) && fullState.floatingTexts.length > 0) {

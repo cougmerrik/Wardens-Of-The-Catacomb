@@ -9,6 +9,7 @@ const CONSUMABLE_ICON_SOURCES = {
   darkvisionPotion: "./assets/images/items/darkvisionPotion.png",
   holyCandle: "./assets/images/items/holyCandle.png",
   phoenixDraught: "./assets/images/items/phoenixDraught.png",
+  flameOfTheFallen: "./assets/images/items/flameOfTheFallen.png",
   angelRing: "./assets/images/items/angelRing.png",
   monkeyPaw: "./assets/images/items/monkeyPaw.png"
 };

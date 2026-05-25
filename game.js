@@ -76,6 +76,7 @@ import {
 } from "./src/leaderboard/leaderboardClient.js";
 import { getBaseClassDisplayLabel } from "./src/game/classDisplay.js";
 import { getStoredGameplayTipsEnabled, persistGameplayTipsEnabled } from "./src/game/gameplayTips.js";
+import { applyDevStartingConsumables, getDevStartingConsumableOptions, normalizeDevStartingConsumableKey } from "./src/game/devStartingConsumables.js";
 import { spawnTreasureGoblin } from "./src/game/enemySpawnFactories.js";
 import { preloadConsumableItemIcons } from "./src/rendering/hud/consumableItemIcons.js";
 import { preloadMageSkillIcons } from "./src/rendering/hud/mageSkillIcons.js";
@@ -134,6 +135,8 @@ const networkServerUrlResetButton = document.getElementById("net-server-url-rese
 const characterSelectBackButton = document.getElementById("character-select-back");
 const devStartOptions = document.getElementById("dev-start-options");
 const devStartFloorInput = document.getElementById("dev-start-floor");
+const devStartInventoryItemSelect = document.getElementById("dev-start-inventory-item");
+const devStartShopItemSelect = document.getElementById("dev-start-shop-item");
 const classButtons = Array.from(document.querySelectorAll("[data-class-option]"));
 const startButton = document.getElementById("start-game");
 const startTopButton = document.getElementById("start-game-top");
@@ -153,6 +156,8 @@ const networkLobbyToggleReadyTop = document.getElementById("network-lobby-toggle
 const networkLobbyLeaveTop = document.getElementById("network-lobby-leave-top");
 const networkLobbyDevStartOptions = document.getElementById("network-lobby-dev-start-options");
 const networkLobbyDevStartFloorInput = document.getElementById("network-lobby-dev-start-floor");
+const networkLobbyDevStartInventoryItemSelect = document.getElementById("network-lobby-dev-start-inventory-item");
+const networkLobbyDevStartShopItemSelect = document.getElementById("network-lobby-dev-start-shop-item");
 const networkLobbyGameRulesPanel = document.getElementById("network-lobby-game-rules");
 const networkLobbyDeathRulesInputs = Array.from(document.querySelectorAll('input[name="network-lobby-death-rules"]'));
 const networkLobbyClassButtons = Array.from(document.querySelectorAll("[data-lobby-class-option]"));
@@ -195,6 +200,8 @@ let netLobbyCountdownEndsAt = 0, netLobbyInlineText = "";
 let netRequestedStartFloor = 1;
 let netRequestedBossOverride = FLOOR_BOSS_OVERRIDE_AUTO;
 let netRequestedDeathRulesMode = getStoredNetworkDeathRulesMode();
+let netRequestedDevInventoryItem = "";
+let netRequestedDevShopItem = "";
 let netPendingWsUrl = "", netPendingRoomId = "", netPendingHandle = "";
 let netInputSeq = 0, netLastAckSeq = 0;
 let netPendingInputs = [], netMapSignature = "", netPendingSnapshot = null;
@@ -434,6 +441,25 @@ function syncDevBossOverrideControl() {
   const normalized = normalizeFloorBossOverride(selectedBossOverride);
   devBossOverrideSelect.value = normalized;
   if (devBossOverrideHint) devBossOverrideHint.textContent = getBossOverrideHint(normalized);
+}
+
+function populateDevConsumableSelect(select, placeholder) {
+  if (!select) return;
+  select.innerHTML = "";
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = placeholder;
+  select.appendChild(none);
+  for (const item of getDevStartingConsumableOptions()) {
+    const option = document.createElement("option");
+    option.value = item.key;
+    option.textContent = `${item.name} (${item.rarity})`;
+    select.appendChild(option);
+  }
+}
+
+function readDevConsumableSelection(select) {
+  return normalizeDevStartingConsumableKey(select?.value || "");
 }
 
 function syncDevModeUi() {
@@ -887,6 +913,14 @@ function renderNetworkLobby() {
         networkLobbyDevStartFloorInput.value = `${Math.max(1, netRequestedStartFloor || 1)}`;
       }
     }
+    if (networkLobbyDevStartInventoryItemSelect) {
+      networkLobbyDevStartInventoryItemSelect.disabled = !isOwner;
+      if (document.activeElement !== networkLobbyDevStartInventoryItemSelect) networkLobbyDevStartInventoryItemSelect.value = netRequestedDevInventoryItem;
+    }
+    if (networkLobbyDevStartShopItemSelect) {
+      networkLobbyDevStartShopItemSelect.disabled = !isOwner;
+      if (document.activeElement !== networkLobbyDevStartShopItemSelect) networkLobbyDevStartShopItemSelect.value = netRequestedDevShopItem;
+    }
   }
   if (networkLobbyGameRulesPanel) {
     const isOwner = !!(netRoomOwnerId && netPlayerId && netRoomOwnerId === netPlayerId);
@@ -1246,6 +1280,14 @@ if (typeof window !== "undefined") {
         ok: true,
         level: game.level
       };
+    }
+    if (action === "grantConsumable") {
+      const inventoryGranted = currentGame ? applyDevStartingConsumables(currentGame, { inventoryKey: payload.key || "" }).inventoryGranted : false;
+      return { ok: !!inventoryGranted, key: normalizeDevStartingConsumableKey(payload.key || "") };
+    }
+    if (action === "forceShopConsumable") {
+      const shopForced = currentGame ? applyDevStartingConsumables(currentGame, { shopKey: payload.key || "" }).shopForced : false;
+      return { ok: !!shopForced, key: normalizeDevStartingConsumableKey(payload.key || "") };
     }
     if (action === "setPlayerHealth") {
       const health = Number.isFinite(payload.health) ? Math.max(0, payload.health) : NaN;
@@ -1728,7 +1770,7 @@ function stopNetworkSession() {
   voiceManager.leave();
   netPlayerId = null; netControllerId = null;
   netRoomOwnerId = null; netPauseOwnerId = null; netRoomPhase = "active"; netRosterPlayers = [];
-  netJoinedRoomId = ""; netVoiceUid = null; netVoiceConfig = { enabled: false }; netLobbyCountdownEndsAt = 0; netLobbyInlineText = ""; netRequestedStartFloor = 1;
+  netJoinedRoomId = ""; netVoiceUid = null; netVoiceConfig = { enabled: false }; netLobbyCountdownEndsAt = 0; netLobbyInlineText = ""; netRequestedStartFloor = 1; netRequestedDevInventoryItem = ""; netRequestedDevShopItem = "";
   netPendingWsUrl = ""; netPendingRoomId = ""; netPendingHandle = "";
   netInputSeq = 0; netLastAckSeq = 0;
   netPendingInputs = []; netMapSignature = ""; netPendingSnapshot = null;
@@ -2025,6 +2067,8 @@ function startLocalGame() {
     onOpenOptions: () => showOptionsScreen({ inGame: true }),
     syncMusicForGame,
     startingFloor: requestedStartFloor,
+    devStartingInventoryItem: isDevMode ? readDevConsumableSelection(devStartInventoryItemSelect) : "",
+    devStartingShopItem: isDevMode ? readDevConsumableSelection(devStartShopItemSelect) : "",
     bossOverride: selectedBossOverride,
     debugHudEnabled: isDevMode,
     gameplayTipsEnabled,
@@ -2216,6 +2260,8 @@ function startNetworkGame() {
     netRequestedStartFloor = normalizeDevStartingFloor(netRequestedStartFloor);
     netRequestedBossOverride = normalizeFloorBossOverride(msg.requestedBossOverride);
     netRequestedDeathRulesMode = normalizeNetworkDeathRulesMode(msg.requestedDeathRulesMode);
+    netRequestedDevInventoryItem = normalizeDevStartingConsumableKey(msg.requestedDevInventoryItem);
+    netRequestedDevShopItem = normalizeDevStartingConsumableKey(msg.requestedDevShopItem);
     netLobbyCountdownEndsAt = Number.isFinite(msg.lobbyCountdownEndsAt) ? msg.lobbyCountdownEndsAt : 0;
     netLobbyInlineText = typeof msg.lobbyInlineMessage === "string" ? msg.lobbyInlineMessage : "";
     netRosterPlayers = Array.isArray(msg.players) ? msg.players.slice() : [];
@@ -2807,6 +2853,10 @@ if (devStartFloorInput) {
     devStartFloorInput.value = `${normalizeDevStartingFloor(devStartFloorInput.value)}`;
   });
 }
+populateDevConsumableSelect(devStartInventoryItemSelect, "No starting item");
+populateDevConsumableSelect(devStartShopItemSelect, "Normal shop roll");
+populateDevConsumableSelect(networkLobbyDevStartInventoryItemSelect, "No starting item");
+populateDevConsumableSelect(networkLobbyDevStartShopItemSelect, "Normal shop roll");
 
 if (openLeaderboardButton) {
   openLeaderboardButton.addEventListener("click", async () => {
@@ -2918,6 +2968,16 @@ if (networkLobbyDevStartFloorInput) {
     const nextFloor = normalizeDevStartingFloor(networkLobbyDevStartFloorInput.value);
     networkLobbyDevStartFloorInput.value = `${nextFloor}`;
     netClient.sendLobbyUpdate({ startingFloor: nextFloor });
+  });
+}
+if (networkLobbyDevStartInventoryItemSelect) {
+  networkLobbyDevStartInventoryItemSelect.addEventListener("change", () => {
+    if (netClient) netClient.sendLobbyUpdate({ devInventoryItem: readDevConsumableSelection(networkLobbyDevStartInventoryItemSelect) });
+  });
+}
+if (networkLobbyDevStartShopItemSelect) {
+  networkLobbyDevStartShopItemSelect.addEventListener("change", () => {
+    if (netClient) netClient.sendLobbyUpdate({ devShopItem: readDevConsumableSelection(networkLobbyDevStartShopItemSelect) });
   });
 }
 

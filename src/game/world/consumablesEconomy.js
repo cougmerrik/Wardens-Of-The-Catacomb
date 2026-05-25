@@ -10,11 +10,20 @@ import {
 } from "../consumables.js";
 import { enqueueOwlDeliveryOrder, getPendingOwlOrderCount, getPendingOwlOrderKeys } from "./owlDelivery.js";
 import { addLanternFuel } from "./lighting.js";
+import { canUseFlameOfTheFallen, startFlameOfTheFallen, tickFlameOfTheFallen } from "./flameOfTheFallen.js";
+
+export { getFlameOfTheFallenBuffMultiplier, recordFlameOfTheFallenKill } from "./flameOfTheFallen.js";
 
 const OIL_ATTACK_CHARGES = 15;
 const OIL_EFFECT_KEYS = ["fireOil", "frostOil"];
 const SPIKE_GROWTH_HITS = 25;
 const PHOENIX_DRAUGHT_REVIVE_PCT = 0.4;
+
+function getConsumableRunHost(game) {
+  if (!game || typeof game !== "object") return game;
+  const proto = Object.getPrototypeOf(game);
+  return proto && proto !== Object.prototype && Array.isArray(proto.shopStock) && proto.shopStock === game.shopStock ? proto : game;
+}
 
 function getAllPlayerEntities(game) {
   const players = typeof game?.getActivePlayerEntities === "function" ? game.getActivePlayerEntities() : [game?.player];
@@ -41,7 +50,10 @@ function getPhoenixDraughtTargets(game) {
 
 export function ensureShopStock(game) {
   if (!Array.isArray(game.shopStock) || game.shopStock.length <= 0) {
-    game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5);
+    const host = getConsumableRunHost(game);
+    const exclude = host?.flameOfTheFallenOffered || host?.flameOfTheFallenPurchased ? new Set(["flameOfTheFallen"]) : new Set();
+    game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5, exclude);
+    if (game.shopStock.some((entry) => entry?.key === "flameOfTheFallen")) host.flameOfTheFallenOffered = true;
   }
   return game.shopStock;
 }
@@ -125,6 +137,7 @@ export function getShopFailureReason(game, key) {
   const def = getConsumableDefinition(key);
   if (!def) return "Out of stock";
   if (def.multiplayerOnly && !isMultiplayerConsumableContext(game)) return "Multiplayer only";
+  if (key === "flameOfTheFallen" && getConsumableRunHost(game)?.flameOfTheFallenPurchased) return "Out of stock";
   ensureShopStock(game);
   const entry = game.shopStock.find((item) => item?.key === key);
   if (!entry || entry.stock <= 0) return "Out of stock";
@@ -178,6 +191,11 @@ export function buyShopItem(game, key) {
   if (typeof game.recordRunGoldSpent === "function") game.recordRunGoldSpent(price);
   const entry = game.shopStock.find((item) => item?.key === key);
   if (entry) entry.stock = Math.max(0, (entry.stock || 0) - 1);
+  if (def.key === "flameOfTheFallen") {
+    const host = getConsumableRunHost(game);
+    host.flameOfTheFallenOffered = true;
+    host.flameOfTheFallenPurchased = true;
+  }
   enqueueOwlDeliveryOrder(game, def.key, 1, typeof game.player?.id === "string" && game.player.id ? game.player.id : "player");
   return true;
 }
@@ -220,6 +238,7 @@ function clearConsumableStateForRemoval(game, consumables) {
 function canUseConsumable(game, def) {
   if (!def) return false;
   if (def.key === "phoenixDraught") return getPhoenixDraughtTargets(game).length > 0;
+  if (def.key === "flameOfTheFallen") return canUseFlameOfTheFallen(game);
   if (def.key === "regenerationPotion") return (game.player?.health || 0) < (game.player?.maxHealth || 0);
   if (def.key === "lanternFuel") {
     const maxFuel = Number.isFinite(game.config?.lighting?.lanternMaxFuel) ? game.config.lighting.lanternMaxFuel : 1;
@@ -300,6 +319,8 @@ function activateConsumableEffect(game, def) {
       return true;
     case "phoenixDraught":
       return usePhoenixDraught(game);
+    case "flameOfTheFallen":
+      return startFlameOfTheFallen(game);
     case "shield":
       setConsumableTempHp(game, getConsumableTempHp(game) + 10);
       return true;
@@ -334,6 +355,7 @@ export function useConsumableSlot(game, slotIndex) {
 
 export function tickConsumables(game, dt) {
   const consumables = ensureConsumableState(game);
+  tickFlameOfTheFallen(game, dt);
   consumables.sharedCooldown = Math.max(0, (consumables.sharedCooldown || 0) - dt);
   consumables.messageTimer = Math.max(0, (consumables.messageTimer || 0) - dt);
   if ((consumables.messageTimer || 0) <= 0) consumables.message = "";
@@ -462,5 +484,7 @@ export function applyPassiveConsumableEvent(game, eventKey, payload = {}) {
 }
 
 export function refillShopForFloor(game) {
-  game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5);
+  const exclude = game.flameOfTheFallenOffered || game.flameOfTheFallenPurchased ? new Set(["flameOfTheFallen"]) : new Set();
+  game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5, exclude);
+  if (game.shopStock.some((entry) => entry?.key === "flameOfTheFallen")) game.flameOfTheFallenOffered = true;
 }

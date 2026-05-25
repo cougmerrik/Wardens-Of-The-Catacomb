@@ -12,6 +12,7 @@ import { runtimeFloorBossMethods } from "./runtimeFloorBossMethods.js";
 import { createRunStats } from "./runtimeBaseStateFactories.js";
 import { initializeRuntimeBaseState } from "./runtimeBaseStateInit.js";
 import { createGameplayTipState, triggerGameplayTip } from "./gameplayTips.js";
+import { getFlameOfTheFallenBuffMultiplier } from "./world/consumablesEconomy.js";
 import {
   getNecromancerBlackCandleDamageBonus,
   getNecromancerBaseCharmDurationForLevel,
@@ -319,7 +320,8 @@ export class GameRuntimeBase {
     return (this.classSpec.baseMoveSpeed + levelBonus) *
       this.getMoveSpeedMultiplier() *
       this.getWarriorMomentumMultiplier() *
-      this.getPlayerTerrainMoveMultiplier();
+      this.getPlayerTerrainMoveMultiplier() *
+      getFlameOfTheFallenBuffMultiplier(this, this.player);
   }
 
   isArcherClass() {

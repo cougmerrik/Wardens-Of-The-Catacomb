@@ -330,7 +330,13 @@ export function handleClientMessage(raw, context) {
         typeof msg.deathRulesMode === "string" ? msg.deathRulesMode : undefined
       )
       : false;
-    if (changed || floorChanged || bossChanged || deathRulesChanged) room.broadcastRoster();
+    const devItemsChanged = Object.prototype.hasOwnProperty.call(msg, "devInventoryItem") || Object.prototype.hasOwnProperty.call(msg, "devShopItem")
+      ? room.updateRequestedDevStartingConsumables?.(client.id, {
+        inventoryItem: typeof msg.devInventoryItem === "string" ? msg.devInventoryItem : undefined,
+        shopItem: typeof msg.devShopItem === "string" ? msg.devShopItem : undefined
+      })
+      : false;
+    if (changed || floorChanged || bossChanged || deathRulesChanged || devItemsChanged) room.broadcastRoster();
     return;
   }
 

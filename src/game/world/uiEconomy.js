@@ -28,6 +28,7 @@ import {
   getActiveConsumableAttackEffects,
   getConsumableBonusDamage,
   getConsumableOwnedCount,
+  getFlameOfTheFallenBuffMultiplier,
   getShopFailureReason,
   pushConsumableMessage,
   refillShopForFloor,
@@ -50,7 +51,6 @@ export {
   tickConsumables,
   useConsumableSlot
 } from "./consumablesEconomy.js";
-
 function isActiveMultiplayer(game) {
   return !!game?.networkEnabled && game.networkRoomPhase === "active";
 }
@@ -106,8 +106,9 @@ export function getAttackSpeedMultiplier(game) {
 export function getDamageMultiplier(game) {
   const lvl = Number.isFinite(game.upgrades.damage.level) ? game.upgrades.damage.level : 0;
   const base = 1 + lvl * 0.08;
-  if (isRangerTalentGame(game)) return base * (1 + getRangerDamageBonus(game));
-  return base;
+  const flame = getFlameOfTheFallenBuffMultiplier(game, game.player);
+  if (isRangerTalentGame(game)) return base * flame * (1 + getRangerDamageBonus(game));
+  return base * flame;
 }
 
 export function getDefenseFlatReduction(game) {

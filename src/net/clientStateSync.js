@@ -498,6 +498,7 @@ export function applySnapshotToGame({
     applyOwlDeliveryNotifications(game, state.owlDelivery);
     game.owlDelivery = state.owlDelivery || null;
   }
+  if (Object.prototype.hasOwnProperty.call(state, "flameOfTheFallen")) game.flameOfTheFallen = state.flameOfTheFallen || null;
 
   return { netPendingInputs, netLastAckSeq };
 }

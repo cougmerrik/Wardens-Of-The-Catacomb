@@ -113,7 +113,7 @@ This document summarizes the current high-level architecture and validation work
   - `getActiveLightSources()` combines player, torch, and remote-player sources for rendering.
 - Torch objects carry stable gameplay/rendering fields: `id`, `type`, `x`, `y`, `size`, `lit`, `lightRadius`, and `snuffCooldown`.
 - Player entities carry `lanternFuel` in the `0..1` range. Network serialization includes that fuel value so the HUD gauge and player light radius stay aligned across clients.
-- Consumables can modify lighting and multiplayer player state: Lantern Fuel calls the centralized lantern fuel helper, Darkvision Potion contributes a private 10-tile local player sight radius with a purple visibility tint while active, Holy Candle creates a timed `holyCandle` light source that heals living players in its radius, and Phoenix Draught is multiplayer-only revive utility that restores one random dead ally at the user's position with 40% HP.
+- Consumables can modify lighting and multiplayer player state: Lantern Fuel calls the centralized lantern fuel helper, Darkvision Potion contributes a private 10-tile local player sight radius with a purple visibility tint while active, Holy Candle creates a timed `holyCandle` light source that heals living players in its radius, Phoenix Draught is multiplayer-only revive utility that restores one random dead ally at the user's position with 40% HP, and Flame of the Fallen is a once-per-run multiplayer-only active pyre that revives all dead allies at 50% HP if nearby enemy kills fill its soul meter before the 20s timer expires. Flame charge uses `(6 + total players + living players * 2) * 2`, clamped to `16-48`, so fewer survivors have a lower total target.
 - Enemy serialization includes active burning state (`burningTimer`, `burningDps`, and `burningLightRadius`) so multiplayer clients render ignited-enemy light from the same gameplay state as the host.
 - Lighting interaction updates are throttled and use squared-distance checks to avoid adding avoidable per-frame cost on larger floors.
 - The renderer draws torches through `runtimeSceneObjectDrawMethods.js` and applies the darkness/light overlay through `runtimeSceneLightingMethods.js`.
@@ -169,7 +169,7 @@ This document summarizes the current high-level architecture and validation work
   - purely local UI/control feedback can remain local-only, but new local-only presentation must be intentional and documented in the validator or implementation notes
   - new class progression effects must include targeted local-vs-network validation before merge, rather than waiting for manual multiplayer reports
 - The authoritative room still keeps one primary `sim.player` path for the pause owner, but snapshots now also serialize a `players` collection for all active participants.
-- Owl delivery state serializes as top-level `owlDelivery` snapshot data, while slain/expired delivery parcels use the existing `drops` collection with `type: "owl_item"`, purchaser id, item key, quantity, and normal drop lifetime cleanup. Clients apply `owlDelivery` directly for in-world Veronica rendering, portal-away presentation, minimap destination/drop markers, audio events, and de-duplicated top-HUD notification events.
+- Owl delivery state serializes as top-level `owlDelivery` snapshot data, while slain/expired delivery parcels use the existing `drops` collection with `type: "owl_item"`, purchaser id, item key, quantity, and normal drop lifetime cleanup. Clients apply `owlDelivery` directly for in-world Veronica rendering, portal-away presentation, minimap destination/drop markers, audio events, and de-duplicated top-HUD notification events. Flame of the Fallen serializes as top-level `flameOfTheFallen` state so clients render the same pyre radius, timer, and soul progress while the authoritative sim owns revive completion.
 - Authoritative player-state copying lives in `server/net/activePlayerState.js`; keep new multiplayer player fields there instead of duplicating mappings inside `AuthoritativeRoom`.
 - Player snapshot DTO fields live in `src/net/playerSnapshotSchema.js`; server serialization and client snapshot application both use this schema to reduce single-player/multiplayer state drift.
 - The client runtime resolves the local player out of `state.players`, keeps remote players in `game.remotePlayers`, and renders/interpolates them separately from the local predicted avatar.
@@ -237,7 +237,7 @@ This document summarizes the current high-level architecture and validation work
   - movement
   - hostile targeting and damage intake
   - class primary/alt combat paths
-  - shared XP/gold rewards with per-player kill score/build progression
+  - shared rewards, with XP divided across active players and gold divided across living players, plus per-player kill score/build progression
   - death/spectate flow
   - disconnect removal and room-owner / pause-owner transfer rules
 

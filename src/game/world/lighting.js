@@ -302,6 +302,11 @@ export function getActiveLightSources(game) {
     addSource({ ...game.portal, type: "exitPortal" }, "exitPortal", getPortalLightRadius(game), getPortalLightOptions(game));
   }
 
+  const flame = game.flameOfTheFallen;
+  if (flame?.active) {
+    addSource({ id: "flame-of-the-fallen", type: "flameOfTheFallen", x: flame.x, y: flame.y }, "flameOfTheFallen", getTileSize(game) * 6, getFireLightOptions(game));
+  }
+
   const owl = game.owlDelivery?.active;
   if (owl && owl.state !== "portal") {
     const x = Number.isFinite(owl.displayX) ? owl.displayX : owl.x;

@@ -6,7 +6,7 @@ import { getStableId, serializeMetaState, serializeState } from "./net/stateSeri
 import { average, monotonicNowMs, percentile } from "./net/telemetry.js";
 import { makeDefaultInput } from "./net/serverHelpers.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
-import { grantConsumableCharge } from "../src/game/world/consumablesEconomy.js";
+import { grantConsumableCharge, recordFlameOfTheFallenKill } from "../src/game/world/consumablesEconomy.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -184,6 +184,26 @@ function main() {
   assert(peerState.x === ownerState.x, "Phoenix Draught should revive the ally at the user's x position");
   assert(peerState.y === ownerState.y, "Phoenix Draught should revive the ally at the user's y position");
   assert(!getActiveSlot(ownerState, "phoenixDraught"), "Phoenix Draught should be consumed after revive");
+
+  peerState.health = 0;
+  peerState.alive = false;
+  peerState.spectateTargetId = owner.id;
+  ownerState.consumables.sharedCooldown = 0;
+  ownerState.consumables.activeSlots = [{ key: "flameOfTheFallen", count: 1, cooldownRemaining: 0 }];
+  room.syncSimPrimaryPlayerState();
+  room.sim.activePlayerCount = Math.max(1, room.clients.size);
+  room.sim.networkActivePlayers = room.getSimulationPlayerEntities();
+  handleActionMessage(room, owner.id, { kind: "useConsumableSlot", slot: 0 });
+  ownerState = room.syncPrimaryActivePlayerFromSim();
+  assert(room.sim.flameOfTheFallen?.active === true, "Flame of the Fallen should create an active multiplayer pyre");
+  assert(peerState.alive === false, "Flame of the Fallen should not revive before the soul meter fills");
+  const flame = room.sim.flameOfTheFallen;
+  recordFlameOfTheFallenKill(room.sim, { x: flame.x, y: flame.y, type: "golem" });
+  assert(peerState.alive === true, "Flame of the Fallen should revive a dead ally after the meter fills");
+  assert(peerState.health === Math.ceil(peerState.maxHealth * 0.5), "Flame of the Fallen should revive at 50% HP");
+  const flameSnapshot = serializeState(room);
+  assert(flameSnapshot.flameOfTheFallen?.state === "complete", "serialized state should include completed flame state");
+  assert(!getActiveSlot(ownerState, "flameOfTheFallen"), "Flame of the Fallen should be consumed after use");
 
   console.log(JSON.stringify({
     ownerGold: ownerState.gold,

@@ -79,6 +79,7 @@ export function buildJoinKeyframeState(fullState) {
     pickup: fullState.pickup,
     portal: fullState.portal,
     owlDelivery: fullState.owlDelivery,
+    flameOfTheFallen: fullState.flameOfTheFallen,
     floatingTexts: Array.isArray(fullState.floatingTexts) ? fullState.floatingTexts.map((entry) => ({ ...entry })) : [],
     delta: {
       keyframe: true,

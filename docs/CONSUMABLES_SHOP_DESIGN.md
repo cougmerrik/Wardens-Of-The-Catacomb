@@ -425,6 +425,19 @@ The schema should be treated as the canonical starting point for new item design
 - `Max Inventory`: `1`
 - `Effect`: Multiplayer-only. Instantly revives one random dead ally at the user's position with `40%` HP
 
+### Flame of the Fallen
+
+- `Name`: Flame of the Fallen
+- `Type`: Active
+- `Rarity`: Rare
+- `Trigger Condition`: When an ally is dead
+- `Cooldown`: Default
+- `Unlock Floor`: 2
+- `Price`: 300
+- `Max Stack`: `1`
+- `Max Inventory`: `1`
+- `Effect`: Multiplayer-only. Appears in shop stock at most once per run. Creates a `20s`, `15` tile pyre at the user's position. Living allies inside gain `+10%` movement speed and damage. Enemy kills inside the radius fill a soul meter, and when it fills all dead allies revive at the pyre with `50%` HP. Required souls are `(6 + total players + living players * 2) * 2`, clamped to `16-48`, so the target drops as the comeback gets more desperate.
+
 ### Monkey Paw
 
 - `Name`: Monkey Paw

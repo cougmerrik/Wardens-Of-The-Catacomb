@@ -4,6 +4,7 @@ import { drawChilledEnemyTint } from "./chilledEnemyTint.js";
 import { getNetworkDeathRulesLabel } from "../net/networkDeathRules.js";
 import { drawGameplayTipBubble } from "./hud/gameplayTipBubble.js";
 import { drawHolyCandleVisual } from "./holyCandleVisual.js";
+import { drawFlameOfTheFallenVisual } from "./flameOfFallenVisual.js";
 
 function drawArcaneMarkSigil(ctx, enemy, screenX, screenY, time = 0) {
   const timer = Number.isFinite(enemy?.arcaneMarkTimer) ? enemy.arcaneMarkTimer : 0;
@@ -267,6 +268,9 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     for (const light of game.lightSources || []) {
       if (light?.type === "torch") this.drawTorch(game, light, light.x - cameraX, light.y - cameraY);
       else if (light?.type === "holyCandle") drawHolyCandleVisual(this.ctx, game, light, light.x - cameraX, light.y - cameraY);
+    }
+    if (game.flameOfTheFallen?.active || (game.flameOfTheFallen?.visualTimer || 0) > 0) {
+      drawFlameOfTheFallenVisual(this.ctx, game, game.flameOfTheFallen, game.flameOfTheFallen.x - cameraX, game.flameOfTheFallen.y - cameraY);
     }
     for (const trap of game.wallTraps || []) {
       if (!trap.spotted) continue;

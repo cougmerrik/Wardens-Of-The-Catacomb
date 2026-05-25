@@ -26,6 +26,7 @@ import {
 import { getNecromancerRotTouchedRetaliationDamage, getNecromancerSkillPointGainForLevel, getNecromancerVigorMoveSpeedBonusPct } from "./necromancerTalentTree.js";
 import { runtimeActivePlayerTickMethods } from "./runtimeActivePlayerTickMethods.js";
 import { getXpToNextLevelForLevel as resolveXpToNextLevelForLevel } from "./xpProgression.js";
+import { getFlameOfTheFallenBuffMultiplier } from "./world/consumablesEconomy.js";
 
 export const runtimeBaseSupportMethods = {
   getXpToNextLevelForLevel(level = this.level) {
@@ -236,7 +237,7 @@ export const runtimeBaseSupportMethods = {
       if ((entity?.necromancerRuntime?.mimicTimer || 0) > 0) moveBonus -= 0.08;
       if ((entity?.necromancerRuntime?.stoneskinTimer || 0) > 0) moveBonus -= 0.5;
     }
-    return (classSpec.baseMoveSpeed + levelBonus) * (1 + moveBonus);
+    return (classSpec.baseMoveSpeed + levelBonus) * (1 + moveBonus) * getFlameOfTheFallenBuffMultiplier(this, entity);
   },
 
   getPlayerProgressField(entity, key, fallback = 0) {
@@ -265,6 +266,20 @@ export const runtimeBaseSupportMethods = {
     const seen = new Set();
     for (const player of this.getLivingPlayerEntities()) {
       if (!this.isLivingPlayerEntity(player) || seen.has(player)) continue;
+      seen.add(player);
+      recipients.push(player);
+    }
+    if (!seen.has(entity)) recipients.push(entity);
+    return recipients.length > 0 ? recipients : [entity];
+  },
+
+  getSharedExperienceRecipients(entity) {
+    if (!this.isLivingPlayerEntity(entity)) return [];
+    if (!this.isSharedMultiplayerProgressActive()) return [entity];
+    const recipients = [];
+    const seen = new Set();
+    for (const player of this.getActivePlayerEntities()) {
+      if (!player || seen.has(player)) continue;
       seen.add(player);
       recipients.push(player);
     }
@@ -370,27 +385,41 @@ export const runtimeBaseSupportMethods = {
 
   awardGoldToPlayerEntity(entity, amount, { spawnText = true } = {}) {
     if (!Number.isFinite(amount) || amount <= 0 || !this.isLivingPlayerEntity(entity)) return;
-    for (const recipient of this.getSharedProgressRecipients(entity)) {
+    const totalGold = Math.floor(amount);
+    if (totalGold <= 0) return;
+    const recipients = this.getSharedProgressRecipients(entity);
+    if (recipients.length <= 0) return;
+    const baseShare = Math.floor(totalGold / recipients.length);
+    const remainder = totalGold % recipients.length;
+    for (let i = 0; i < recipients.length; i++) {
+      const recipient = recipients[i];
+      const share = baseShare + (i < remainder ? 1 : 0);
+      if (share <= 0) continue;
       const currentGold = this.getPlayerProgressField(recipient, "gold", 0);
-      this.setPlayerProgressField(recipient, "gold", currentGold + amount);
-      this.awardScoreToPlayerEntity(recipient, amount);
-      if (this.isPrimaryPlayerEntity(recipient) && typeof this.recordRunGoldEarned === "function") this.recordRunGoldEarned(amount);
-      else recipient.goldEarned = (Number.isFinite(recipient.goldEarned) ? recipient.goldEarned : 0) + amount;
-      if (spawnText) this.spawnFloatingText(recipient.x, recipient.y - 30, `+${amount}g`, "#f2d76b", 0.75, 14);
+      this.setPlayerProgressField(recipient, "gold", currentGold + share);
+      this.awardScoreToPlayerEntity(recipient, share);
+      if (this.isPrimaryPlayerEntity(recipient) && typeof this.recordRunGoldEarned === "function") this.recordRunGoldEarned(share);
+      else recipient.goldEarned = (Number.isFinite(recipient.goldEarned) ? recipient.goldEarned : 0) + share;
+      if (spawnText) this.spawnFloatingText(recipient.x, recipient.y - 30, `+${share}g`, "#f2d76b", 0.75, 14);
     }
   },
 
   gainExperienceForPlayerEntity(entity, amount) {
     if (!this.isLivingPlayerEntity(entity) || !Number.isFinite(amount) || amount <= 0) return;
     if (typeof this.isFloorBossActive === "function" && this.isFloorBossActive()) return;
+    const recipients = this.getSharedExperienceRecipients(entity);
+    if (recipients.length <= 0) return;
+    const share = amount / recipients.length;
+    if (!Number.isFinite(share) || share <= 0) return;
     let bossTriggered = false;
-    for (const recipient of this.getSharedProgressRecipients(entity)) {
+    for (const recipient of recipients) {
       if (this.isPrimaryPlayerEntity(recipient)) {
-        this.gainExperience(amount);
+        this.gainExperience(share);
         continue;
       }
+      const wasDead = !this.isLivingPlayerEntity(recipient);
       const classSpec = this.getPlayerClassSpec(recipient);
-      recipient.experience = (Number.isFinite(recipient.experience) ? recipient.experience : 0) + amount;
+      recipient.experience = (Number.isFinite(recipient.experience) ? recipient.experience : 0) + share;
       recipient.expToNextLevel = Number.isFinite(recipient.expToNextLevel) ? recipient.expToNextLevel : this.config.progression.baseXpToLevel;
       recipient.level = Number.isFinite(recipient.level) ? recipient.level : 1;
       recipient.skillPoints = Number.isFinite(recipient.skillPoints) ? recipient.skillPoints : 0;
@@ -406,7 +435,8 @@ export const runtimeBaseSupportMethods = {
         if (recipient.classType === "archer") adjustedHpGain = hpGain * (1 + getRangerMaxHealthBonusPct(recipient));
         if (recipient.classType === "fighter") adjustedHpGain = hpGain * (1 + getWarriorIronGuardMaxHealthBonusPct(recipient));
         recipient.maxHealth = (Number.isFinite(recipient.maxHealth) ? recipient.maxHealth : 0) + adjustedHpGain;
-        recipient.health = Math.min(recipient.maxHealth, (Number.isFinite(recipient.health) ? recipient.health : 0) + adjustedHpGain);
+        recipient.health = wasDead ? 0 : Math.min(recipient.maxHealth, (Number.isFinite(recipient.health) ? recipient.health : 0) + adjustedHpGain);
+        if (wasDead) recipient.alive = false;
         const baseMin = Number.isFinite(classSpec.primaryDamageMin)
           ? classSpec.primaryDamageMin
           : Number.isFinite(classSpec.primaryDamage)

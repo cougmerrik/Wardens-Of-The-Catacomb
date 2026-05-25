@@ -302,6 +302,11 @@ function serializeOwlDelivery(source) {
   };
 }
 
+function serializeFlameOfTheFallen(source) {
+  if (!source || typeof source !== "object") return null;
+  return { active: !!source.active, state: source.state || (source.active ? "charging" : ""), x: source.x, y: source.y, radius: source.radius, timer: source.timer, maxTimer: source.maxTimer, souls: source.souls, requiredSouls: source.requiredSouls, pulseTimer: source.pulseTimer, visualTimer: source.visualTimer, linkedPlayerIds: Array.isArray(source.linkedPlayerIds) ? source.linkedPlayerIds.slice(0, 8) : [] };
+}
+
 function serializeBreakable(room, b) {
   return {
     id: getStableId(room, "breakable", "br", b),
@@ -479,6 +484,7 @@ export function serializeState(room) {
     pickup: { ...sim.pickup },
     portal: sim.portal ? { ...sim.portal } : null,
     owlDelivery: serializeOwlDelivery(sim.owlDelivery),
+    flameOfTheFallen: serializeFlameOfTheFallen(sim.flameOfTheFallen),
     enemies: activeEnemies.map((e) => serializeEnemy(room, e)),
     drops: activeDrops.map((d) => serializeDrop(room, d)),
     lightSources: (sim.lightSources || []).map((light) => serializeLightSource(room, light)),

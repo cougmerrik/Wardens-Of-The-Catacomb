@@ -6,6 +6,7 @@ import { hasWarriorSpellknight } from "./warriorTalentTree.js";
 import { hasRangerTalent } from "./rangerTalentTree.js";
 import { spawnGhost, spawnSkeleton } from "./enemySpawnFactories.js";
 import { pickupOwlItemDrop } from "./world/owlDelivery.js";
+import { recordFlameOfTheFallenKill } from "./world/consumablesEconomy.js";
 
 export function resolveCombatAndDrops({
   game,
@@ -682,6 +683,7 @@ export function resolveCombatAndDrops({
         }
       }
       if (typeof game.recordKillByPlayerEntity === "function") game.recordKillByPlayerEntity(rewardOwner, enemy);
+      recordFlameOfTheFallenKill(game, enemy);
       if (rewardOwner && rewardOwner.classType === "archer") {
         const runtime = rewardOwner === game.player ? (game.rangerRuntime || (game.rangerRuntime = {})) : (rewardOwner.rangerRuntime || (rewardOwner.rangerRuntime = {}));
         const talentSource = rewardOwner === game.player ? game : rewardOwner;

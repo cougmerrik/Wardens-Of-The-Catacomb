@@ -1,4 +1,5 @@
 import { FLOOR_BOSS_OVERRIDE_AUTO, normalizeFloorBossOverride } from "../../src/game/floorBossDebugOverride.js";
+import { forceConsumableIntoShop, grantDevStartingConsumable, normalizeDevStartingConsumableKey } from "../../src/game/devStartingConsumables.js";
 import {
   NETWORK_DEATH_RULES_FRIENDLY,
   NETWORK_DEATH_RULES_SURVIVAL,
@@ -12,6 +13,8 @@ export function installRoomDevBossOverride(room) {
   room.__devBossOverrideInstalled = true;
   room.requestedBossOverride = FLOOR_BOSS_OVERRIDE_AUTO;
   room.requestedDeathRulesMode = NETWORK_DEATH_RULES_SURVIVAL;
+  room.requestedDevInventoryItem = "";
+  room.requestedDevShopItem = "";
 
   const baseCreateFreshSim = typeof room.createFreshSim === "function" ? room.createFreshSim : null;
   const baseStartRun = typeof room.startRun === "function" ? room.startRun : null;
@@ -63,7 +66,13 @@ export function installRoomDevBossOverride(room) {
     if (this.sim && typeof this.sim.applyDebugBossOverride === "function") {
       this.sim.applyDebugBossOverride(this.requestedBossOverride);
     }
-    return baseStartRun ? baseStartRun.call(this, nowMs) : false;
+    const started = baseStartRun ? baseStartRun.call(this, nowMs) : false;
+    if (started) {
+      forceConsumableIntoShop(this.sim, this.requestedDevShopItem);
+      for (const state of this.activePlayers.values()) grantDevStartingConsumable(this.sim, this.requestedDevInventoryItem, state);
+      this.syncSimPrimaryPlayerState();
+    }
+    return started;
   };
 
   room.tick = function tickWithFriendlyRules(nowMs, scheduleDriftMs = 0) {
@@ -98,6 +107,18 @@ export function installRoomDevBossOverride(room) {
     return true;
   };
 
+  room.updateRequestedDevStartingConsumables = function updateRequestedDevStartingConsumables(clientId, { inventoryItem, shopItem } = {}) {
+    if (this.phase !== "lobby" || clientId !== this.roomOwnerId) return false;
+    const nextInventory = normalizeDevStartingConsumableKey(inventoryItem ?? this.requestedDevInventoryItem);
+    const nextShop = normalizeDevStartingConsumableKey(shopItem ?? this.requestedDevShopItem);
+    if (nextInventory === this.requestedDevInventoryItem && nextShop === this.requestedDevShopItem) return false;
+    this.requestedDevInventoryItem = nextInventory;
+    this.requestedDevShopItem = nextShop;
+    this.cancelLobbyCountdown("Dev starting items changed. Countdown restarted.");
+    this.refreshLobbyState(Date.now(), "Dev starting items changed. Countdown restarted.");
+    return true;
+  };
+
   room.broadcastRoster = function broadcastRosterWithBossOverride() {
     this.broadcast("room.roster", {
       phase: this.phase,
@@ -107,6 +128,8 @@ export function installRoomDevBossOverride(room) {
       requestedStartFloor: this.requestedStartFloor,
       requestedBossOverride: this.requestedBossOverride,
       requestedDeathRulesMode: this.requestedDeathRulesMode,
+      requestedDevInventoryItem: this.requestedDevInventoryItem,
+      requestedDevShopItem: this.requestedDevShopItem,
       lobbyCountdownEndsAt: this.lobbyCountdownEndsAt || 0,
       lobbyCountdownRemainingMs: this.getLobbyCountdownRemainingMs(),
       lobbyInlineMessage: this.lobbyInlineMessage,
