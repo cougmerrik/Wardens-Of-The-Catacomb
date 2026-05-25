@@ -293,7 +293,7 @@ The schema should be treated as the canonical starting point for new item design
 - `Price`: 2000
 - `Max Stack`: `1`
 - `Max Inventory`: `1`
-- `Effect`: Heal the player for `20%` HP immediately
+- `Effect`: Heal the player for `50%` HP immediately
 
 ### Regeneration Potion
 

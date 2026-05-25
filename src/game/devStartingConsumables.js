@@ -9,7 +9,7 @@ export const DEV_START_CONSUMABLE_NONE = "";
 
 export function getDevStartingConsumableOptions() {
   return getConsumableCatalog()
-    .filter((item) => item && item.key && item.type === "Active")
+    .filter((item) => item && item.key)
     .map((item) => ({ key: item.key, name: item.name || item.key, type: item.type, rarity: item.rarity || "" }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

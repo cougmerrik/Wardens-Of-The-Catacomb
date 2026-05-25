@@ -11,6 +11,8 @@ import {
 import { enqueueOwlDeliveryOrder, getPendingOwlOrderCount, getPendingOwlOrderKeys } from "./owlDelivery.js";
 import { addLanternFuel } from "./lighting.js";
 import { canUseFlameOfTheFallen, startFlameOfTheFallen, tickFlameOfTheFallen } from "./flameOfTheFallen.js";
+import { triggerForzare } from "./forzare.js";
+import { triggerAngelRing } from "./angelRing.js";
 
 export { getFlameOfTheFallenBuffMultiplier, recordFlameOfTheFallenKill } from "./flameOfTheFallen.js";
 
@@ -52,7 +54,9 @@ export function ensureShopStock(game) {
   if (!Array.isArray(game.shopStock) || game.shopStock.length <= 0) {
     const host = getConsumableRunHost(game);
     const exclude = host?.flameOfTheFallenOffered || host?.flameOfTheFallenPurchased ? new Set(["flameOfTheFallen"]) : new Set();
-    game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5, exclude);
+    game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5, exclude, {
+      includeMultiplayerOnly: isMultiplayerConsumableContext(game)
+    });
     if (game.shopStock.some((entry) => entry?.key === "flameOfTheFallen")) host.flameOfTheFallenOffered = true;
   }
   return game.shopStock;
@@ -362,6 +366,7 @@ export function tickConsumables(game, dt) {
   for (const slot of consumables.passiveSlots) {
     slot.cooldownRemaining = Math.max(0, (slot.cooldownRemaining || 0) - dt);
   }
+  applyPassiveConsumableEvent(game, "surrounded");
   const effects = consumables.effects;
   for (const key of Object.keys(effects)) {
     const effect = effects[key];
@@ -463,11 +468,18 @@ export function applyPassiveConsumableEvent(game, eventKey, payload = {}) {
     const def = getConsumableDefinition(liveSlot.key);
     if (!def) continue;
     if (eventKey === "lethalDamage" && def.key === "angelRing") {
-      if (typeof game.applyPlayerHealing === "function") game.applyPlayerHealing((game.player?.maxHealth || 0) * 0.2, { suppressText: true });
-      if (payload && typeof payload === "object") payload.preventDeath = true;
+      triggerAngelRing(game, payload);
       consumeSlotCharge(game, liveSlot, "Passive");
       showConsumableConsumedText(game, def);
       changed = true;
+      continue;
+    }
+    if (eventKey === "surrounded" && def.key === "forzare") {
+      if (triggerForzare(game, liveSlot, def, {
+        breakSlot: () => consumeSlotCharge(game, liveSlot, "Passive"),
+        showConsumed: showConsumableConsumedText,
+        pushMessage: pushConsumableMessage
+      })) changed = true;
       continue;
     }
     if (eventKey === "floorAdvance" && def.key === "monkeyPaw") {
@@ -485,6 +497,8 @@ export function applyPassiveConsumableEvent(game, eventKey, payload = {}) {
 
 export function refillShopForFloor(game) {
   const exclude = game.flameOfTheFallenOffered || game.flameOfTheFallenPurchased ? new Set(["flameOfTheFallen"]) : new Set();
-  game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5, exclude);
+  game.shopStock = rollConsumableShopStock(Math.max(1, Math.floor(game.floor || 1)), 5, exclude, {
+    includeMultiplayerOnly: isMultiplayerConsumableContext(game)
+  });
   if (game.shopStock.some((entry) => entry?.key === "flameOfTheFallen")) game.flameOfTheFallenOffered = true;
 }

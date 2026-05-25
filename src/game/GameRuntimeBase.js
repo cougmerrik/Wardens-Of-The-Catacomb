@@ -110,6 +110,7 @@ export class GameRuntimeBase {
     if (type === "melee" || type === "physical") return "#ef5f5f";
     if (type === "sonic") return "#8edbff";
     if (type === "lightning") return "#f7ee74";
+    if (type === "force") return "#c9b7ff";
     return "#ef5f5f";
   }
 

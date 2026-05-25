@@ -1,9 +1,11 @@
+import { drawAngelRingBurst, drawForzareBurst } from "./consumableProcVisuals.js";
 export const projectileEffectsFireZoneMethods = {
   drawFireZone(zone, cameraX, cameraY, time = 0) {
     const ctx = this.ctx;
-    const x = zone.x - cameraX;
-    const y = zone.y - cameraY;
+    const x = zone.x - cameraX, y = zone.y - cameraY;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (zone.zoneType === "forzareBurst") return drawForzareBurst(ctx, zone, x, y, time);
+    if (zone.zoneType === "angelRingBurst") return drawAngelRingBurst(ctx, zone, x, y);
     if (zone.zoneType === "cloudDaggers") {
       const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 48;
       const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 4;

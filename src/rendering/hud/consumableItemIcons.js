@@ -11,6 +11,7 @@ const CONSUMABLE_ICON_SOURCES = {
   phoenixDraught: "./assets/images/items/phoenixDraught.png",
   flameOfTheFallen: "./assets/images/items/flameOfTheFallen.png",
   angelRing: "./assets/images/items/angelRing.png",
+  forzare: "./assets/images/items/forzare.png",
   monkeyPaw: "./assets/images/items/monkeyPaw.png"
 };
 

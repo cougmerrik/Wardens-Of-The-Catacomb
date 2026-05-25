@@ -2,8 +2,8 @@ import { strict as assert } from "node:assert";
 import { GameSim } from "../src/sim/GameSim.js";
 import { getFlameOfTheFallenBuffMultiplier, recordFlameOfTheFallenKill } from "../src/game/world/consumablesEconomy.js";
 import { getFlameOfTheFallenRequiredSouls } from "../src/game/world/flameOfTheFallen.js";
-import { rollConsumableShopStock } from "../src/game/consumables.js";
-import { applyDevStartingConsumables, grantDevStartingConsumable } from "../src/game/devStartingConsumables.js";
+import { getConsumableDefinition, rollConsumableShopStock } from "../src/game/consumables.js";
+import { applyDevStartingConsumables, getDevStartingConsumableOptions, grantDevStartingConsumable } from "../src/game/devStartingConsumables.js";
 
 function assertInactiveEffect(effect, fields, label) {
   for (const field of fields) {
@@ -78,6 +78,9 @@ function main() {
   assert.equal(itemGame.consumables.effects.spikeGrowth.attacksRemaining, 25, "Spike Growth should use 25 hit charges");
 
   const soloPhoenixGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  assert(!soloPhoenixGame.shopStock.some((entry) => getConsumableDefinition(entry.key)?.multiplayerOnly), "single-player initial shop should not include multiplayer-only items");
+  soloPhoenixGame.refillShopForFloor();
+  assert(!soloPhoenixGame.shopStock.some((entry) => getConsumableDefinition(entry.key)?.multiplayerOnly), "single-player refill shop should not include multiplayer-only items");
   soloPhoenixGame.gold = 1000;
   soloPhoenixGame.shopStock = [{ key: "phoenixDraught", stock: 1 }];
   assert.equal(soloPhoenixGame.getShopFailureReason("phoenixDraught"), "Multiplayer only", "Phoenix Draught should be blocked from single-player purchase");
@@ -131,6 +134,7 @@ function main() {
   assert(!flamePurchaseGame.shopStock.some((entry) => entry.key === "flameOfTheFallen"), "Flame should not appear after it has already appeared once");
 
   const devItemGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  assert(getDevStartingConsumableOptions().some((option) => option.key === "forzare" && option.type === "Passive"), "dev starting item options should include Forzare");
   const devApplied = applyDevStartingConsumables(devItemGame, { inventoryKey: "flameOfTheFallen", shopKey: "holyCandle" });
   assert.equal(devApplied.inventoryGranted, true, "dev starting item should grant inventory");
   assert.equal(devApplied.shopForced, true, "dev starting shop item should force stock");
@@ -139,6 +143,81 @@ function main() {
   const remoteState = { id: "remote", health: 10, maxHealth: 100, alive: true };
   assert.equal(grantDevStartingConsumable(devItemGame, "shield", remoteState), true, "dev starting item should grant to active player state");
   assert(remoteState.consumables?.activeSlots?.some((slot) => slot.key === "shield"), "remote active player should receive forced dev item");
+
+  const angelGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  angelGame.player.maxHealth = 100;
+  angelGame.player.health = 10;
+  angelGame.consumables.passiveSlots = [{ key: "angelRing", count: 1, cooldownRemaining: 0 }];
+  const angelPayload = { preventDeath: false };
+  assert.equal(angelGame.applyPassiveConsumableEvent("lethalDamage", angelPayload), true, "Angel Ring should trigger on lethal damage");
+  assert.equal(angelPayload.preventDeath, true, "Angel Ring should prevent lethal damage");
+  assert.equal(angelGame.player.health, 60, "Angel Ring should heal for 50% max HP");
+  assert(angelGame.fireZones.some((zone) => zone.zoneType === "angelRingBurst"), "Angel Ring should spawn holy proc VFX");
+  assert(angelGame.floatingTexts.some((text) => text.text === "+50"), "Angel Ring should show healing amount text");
+  assert(!angelGame.consumables.passiveSlots.some((slot) => slot.key === "angelRing"), "Angel Ring should be consumed after triggering");
+
+  const forzareGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  const tile = forzareGame.config.map.tile;
+  forzareGame.player.id = "forzare-player";
+  forzareGame.player.x = 400;
+  forzareGame.player.y = 400;
+  forzareGame.moveWithCollisionSubsteps = (entity, dx, dy) => {
+    entity.x += dx;
+    entity.y += dy;
+  };
+  forzareGame.consumables.passiveSlots = [{ key: "forzare", count: 1, cooldownRemaining: 0 }];
+  const adjacentEnemyDistance = tile + forzareGame.getPlayerEnemyCollisionRadiusFor(forzareGame.player) + 8;
+  forzareGame.enemies = Array.from({ length: 4 }, (_, index) => ({
+    id: `forzare-enemy-${index}`,
+    type: "mummy",
+    x: forzareGame.player.x + Math.cos(index * Math.PI * 0.5) * adjacentEnemyDistance,
+    y: forzareGame.player.y + Math.sin(index * Math.PI * 0.5) * adjacentEnemyDistance,
+    size: 18,
+    hp: 30,
+    maxHp: 30
+  }));
+  const originalRandom = Math.random;
+  Math.random = () => 0.5;
+  try {
+    forzareGame.tickConsumables(0.016);
+  } finally {
+    Math.random = originalRandom;
+  }
+  const forzareSlot = forzareGame.consumables.passiveSlots.find((slot) => slot.key === "forzare");
+  assert(forzareSlot, "Forzare should remain in the passive slot after triggering");
+  assert(forzareSlot.cooldownRemaining > 19.9, "Forzare should start a 20s cooldown");
+  assert(forzareGame.enemies.every((enemy) => enemy.hp < 30), "Forzare should damage every surrounding enemy");
+  assert(forzareGame.enemies.every((enemy) => Math.hypot(enemy.x - forzareGame.player.x, enemy.y - forzareGame.player.y) > tile), "Forzare should knock surrounding enemies away");
+  assert(forzareGame.fireZones.some((zone) => zone.zoneType === "forzareBurst"), "Forzare should spawn purple proc VFX");
+  assert(forzareGame.floatingTexts.some((text) => text.text === "Forzare!"), "Forzare should show proc status text");
+  assert.equal(forzareGame.consumables.message, "Forzare triggered", "Forzare should show consumable proc status");
+  const hpAfterForzare = forzareGame.enemies.map((enemy) => enemy.hp);
+  forzareGame.tickConsumables(0.016);
+  assert.deepEqual(forzareGame.enemies.map((enemy) => enemy.hp), hpAfterForzare, "Forzare should not trigger again while on cooldown");
+  const forzareBreakGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  forzareBreakGame.player.x = 400;
+  forzareBreakGame.player.y = 400;
+  forzareBreakGame.moveWithCollisionSubsteps = (entity, dx, dy) => {
+    entity.x += dx;
+    entity.y += dy;
+  };
+  forzareBreakGame.consumables.passiveSlots = [{ key: "forzare", count: 1, cooldownRemaining: 0 }];
+  forzareBreakGame.enemies = Array.from({ length: 4 }, (_, index) => ({
+    id: `forzare-break-enemy-${index}`,
+    type: "mummy",
+    x: forzareBreakGame.player.x + Math.cos(index * Math.PI * 0.5) * adjacentEnemyDistance,
+    y: forzareBreakGame.player.y + Math.sin(index * Math.PI * 0.5) * adjacentEnemyDistance,
+    size: 18,
+    hp: 30,
+    maxHp: 30
+  }));
+  Math.random = () => 0.01;
+  try {
+    forzareBreakGame.tickConsumables(0.016);
+  } finally {
+    Math.random = originalRandom;
+  }
+  assert(!forzareBreakGame.consumables.passiveSlots.some((slot) => slot.key === "forzare"), "Forzare should leave the passive slot when it breaks");
 
   const flameGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   flameGame.player.id = "living";
@@ -161,6 +240,7 @@ function main() {
   sixPlayerCheck.networkActivePlayers[1].alive = false;
   assert.equal(getFlameOfTheFallenRequiredSouls(sixPlayerCheck), 28, "Solo survivor in a six-player run should be hard but lower than a group target");
   assert(!rollConsumableShopStock(10, 20, new Set(["flameOfTheFallen"])).some((entry) => entry.key === "flameOfTheFallen"), "excluded Flame should not roll into shop stock again");
+  assert(!rollConsumableShopStock(10, 20).some((entry) => getConsumableDefinition(entry.key)?.multiplayerOnly), "default shop rolls should exclude multiplayer-only items");
   recordFlameOfTheFallenKill(flameGame, { x: flameGame.player.x + 16, y: flameGame.player.y, type: "basic" });
   assert.equal(flameGame.flameOfTheFallen?.active, true, "One basic kill should not complete the pyre");
   recordFlameOfTheFallenKill(flameGame, { x: flameGame.player.x + 16, y: flameGame.player.y, isBoss: true });

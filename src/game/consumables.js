@@ -156,10 +156,23 @@ export const CONSUMABLE_DEFS = {
     triggerCondition: "When the player would hit 0 HP",
     cooldown: "Default",
     unlockFloor: 1,
-    price: 2000,
+    price: 500,
     maxStack: 1,
     maxInventory: 1,
-    effect: "Heal the player for 20% HP immediately"
+    effect: "Heal the player for 50% HP immediately"
+  },
+  forzare: {
+    key: "forzare",
+    name: "Forzare",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "When more than 3 enemies are within 1 tile",
+    cooldown: "20s",
+    unlockFloor: 1,
+    price: 400,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Knocks nearby surrounding enemies back up to 3 tiles and deals force damage, with a 5% chance to break"
   },
   monkeyPaw: {
     key: "monkeyPaw",
@@ -169,7 +182,7 @@ export const CONSUMABLE_DEFS = {
     triggerCondition: "On moving to the next floor",
     cooldown: "Default",
     unlockFloor: 1,
-    price: 1000,
+    price: 300,
     maxStack: 1,
     maxInventory: 1,
     effect: "Remove all consumables, fully heal the player, and immediately grant a level"
@@ -240,10 +253,11 @@ export function createConsumableShopEntry(key, stock) {
   };
 }
 
-function getEligibleConsumables(floor, rarity, excludeKeys = new Set()) {
+function getEligibleConsumables(floor, rarity, excludeKeys = new Set(), { includeMultiplayerOnly = false } = {}) {
   return getConsumableCatalog().filter((item) =>
     item.rarity === rarity &&
     item.unlockFloor <= floor &&
+    (includeMultiplayerOnly || !item.multiplayerOnly) &&
     !excludeKeys.has(item.key)
   );
 }
@@ -255,7 +269,7 @@ function rollRarity() {
   return legendaryUpgrade ? "Legendary" : "Rare";
 }
 
-function chooseUniqueConsumable(floor, desiredRarity, chosenKeys) {
+function chooseUniqueConsumable(floor, desiredRarity, chosenKeys, options = {}) {
   const fallbackOrder =
     desiredRarity === "Legendary"
       ? ["Legendary", "Rare", "Common"]
@@ -263,22 +277,27 @@ function chooseUniqueConsumable(floor, desiredRarity, chosenKeys) {
       ? ["Rare", "Common"]
       : ["Common"];
   for (const rarity of fallbackOrder) {
-    const pool = getEligibleConsumables(floor, rarity, chosenKeys);
+    const pool = getEligibleConsumables(floor, rarity, chosenKeys, options);
     if (pool.length <= 0) continue;
     return pool[Math.floor(Math.random() * pool.length)] || null;
   }
-  const anyRemaining = getConsumableCatalog().filter((item) => item.unlockFloor <= floor && !chosenKeys.has(item.key));
+  const includeMultiplayerOnly = !!options.includeMultiplayerOnly;
+  const anyRemaining = getConsumableCatalog().filter((item) =>
+    item.unlockFloor <= floor &&
+    (includeMultiplayerOnly || !item.multiplayerOnly) &&
+    !chosenKeys.has(item.key)
+  );
   if (anyRemaining.length <= 0) return null;
   return anyRemaining[Math.floor(Math.random() * anyRemaining.length)] || null;
 }
 
-export function rollConsumableShopStock(floor, entryCount = 5, excludeKeys = new Set()) {
+export function rollConsumableShopStock(floor, entryCount = 5, excludeKeys = new Set(), options = {}) {
   const chosenKeys = new Set(excludeKeys);
   const stock = [];
   const attempts = Math.max(entryCount * 4, 12);
   for (let i = 0; i < attempts && stock.length < entryCount; i++) {
     const desired = rollRarity();
-    const item = chooseUniqueConsumable(floor, desired, chosenKeys);
+    const item = chooseUniqueConsumable(floor, desired, chosenKeys, options);
     if (!item) break;
     chosenKeys.add(item.key);
     stock.push(createConsumableShopEntry(item.key, item.maxInventory));
