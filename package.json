@@ -74,6 +74,8 @@
     "validate:network-framework": "node server/validate-network-framework-evaluation.js",
     "validate:selective-closeout-plan": "node server/validate-selective-closeout-plan.js",
     "validate:voice-config": "node server/validate-voice-config.js",
+    "validate:ranger-assassin": "node server/validate-ranger-assassin.js",
+    "validate:ranger-rogue-stealth": "node server/validate-ranger-rogue-stealth.js",
     "validate:ranger-visuals": "node server/validate-ranger-visuals.js",
     "validate:warrior-visuals": "node server/validate-warrior-visuals.js",
     "validate:mage-visuals": "node server/validate-mage-visuals.js",

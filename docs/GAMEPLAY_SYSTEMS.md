@@ -28,6 +28,8 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Skill path focuses on Fire Arrow, Piercing Strike, and Multiarrow
 - The current class-art pass focuses on making the ranger read as a female elf archer while preserving the retro sprite style. Ranger talent choices can change costume accents, weapon silhouettes, projectile styling, and short-lived status/effect visuals without changing combat rules by themselves.
 - Ranger path and capstone visual accents are intentionally small and readable: Fire Arrow/storm effects emphasize orange and pale-blue arrow energy, Rogue emphasizes dark hood/shadow cues, Assassin emphasizes sharper dagger/execution marks, and Beast Master emphasizes natural green/bone/wolf-pact accents.
+- Rogue attacks made from stealth, including Shadowstep, Shadow Veil, and smoke concealment, deal double damage and have a 33% critical-strike chance.
+- Assassin ranged attacks chain physical damage to nearby enemies at medium-or-higher combo, and Assassin attacks have a 40% chance to execute normal enemies reduced below 15% health. Ranged executes leave a short red splash where the enemy fell.
 - Throwing Knives now present ranged and melee modes differently without changing attack rules: ranged throws alternate hands and briefly show the thrown hand empty during reload, while melee `Close Cuts` draws tight alternating slash arcs near the ranger.
 - Ranger `Flurry` converts combo tiers into attack speed, granting `+6%`, `+12%`, or `+18%` attack speed at `5`, `10`, or `20` combo.
 

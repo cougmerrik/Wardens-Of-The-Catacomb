@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { VeronicaAudioEvents } from "../src/audio/veronicaAudioEvents.js";
 import { GameSim } from "../src/sim/GameSim.js";
-import { pickupOwlItemDrop, tickOwlDelivery } from "../src/game/world/owlDelivery.js";
+import { getOwlCourierMaxHp, pickupOwlItemDrop, tickOwlDelivery } from "../src/game/world/owlDelivery.js";
 
 function activeSlot(game, key) {
   return game.consumables.activeSlots.find((slot) => slot?.key === key) || null;
@@ -56,10 +56,17 @@ function main() {
   assert(game.owlDelivery.active.path.length <= 60, "Veronica should not spawn across the whole map from the target");
   assert.equal(game.owlDelivery.active.size, 16.5, "Veronica should render at the reduced courier size");
   assert.equal(game.owlDelivery.active.speed, game.config.classes.archer.baseMoveSpeed, "Veronica should move at base Scout speed");
+  assert.equal(game.owlDelivery.active.maxHp, getOwlCourierMaxHp(game), "Veronica health should use level-scaled courier max hp");
+  assert.equal(game.owlDelivery.active.hp, game.owlDelivery.active.maxHp, "Veronica should spawn at full courier health");
   assert.equal(game.owlDelivery.active.orders[0].playerId, "player", "order should remember purchaser id");
   assert.equal(game.consumables.message, "Veronica delivery incoming!", "incoming alert should be visible");
   assert.equal(game.owlDelivery.audioEvents.at(-1)?.kind, "veronica_entrance", "spawn should queue the entrance clip once");
   assert(game.owlDelivery.notificationEvents.some((event) => event.text === "Veronica delivery incoming!"), "incoming notification should be queued");
+
+  assert.equal(getOwlCourierMaxHp(game), 32, "level-one Veronica hp should use 26 + 6 * player level");
+  const highLevelGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  highLevelGame.level = 10;
+  assert.equal(getOwlCourierMaxHp(highLevelGame), 86, "Veronica hp should scale from player level instead of floor");
 
   game.owlDelivery.active.x = game.player.x + 8;
   game.owlDelivery.active.y = game.player.y + 8;

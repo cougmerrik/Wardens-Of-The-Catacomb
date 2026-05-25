@@ -453,6 +453,16 @@ export const runtimePlayerAttackMethods = {
     return true;
   },
 
+  getRogueStealthAttackBonus() {
+    if (!(this.isArcherClass && this.isArcherClass()) || getRangerSelectedPath(this) !== "roguePath") return { active: false, damageMult: 1, critMultiplier: 1 };
+    this.rangerRuntime = this.rangerRuntime && typeof this.rangerRuntime === "object" ? this.rangerRuntime : {};
+    const stealthActive = (this.rangerRuntime.shadowVeilTimer || 0) > 0 || (this.player && this.isPointInRangerSmokeBomb(this.player.x, this.player.y));
+    if (!stealthActive) return { active: false, damageMult: 1, critMultiplier: 1 };
+    if ((this.rangerRuntime.shadowVeilTimer || 0) > 0) this.rangerRuntime.shadowVeilTimer = 0;
+    const critical = Math.random() < 0.33;
+    return { active: true, damageMult: 2, critMultiplier: critical ? getRangerCritMultiplier() : 1 };
+  },
+
   ...runtimeMageCoreAttackMethods,
 
   ...runtimeMageSpellAttackMethods,
@@ -499,6 +509,7 @@ export const runtimePlayerAttackMethods = {
     const damageMultipliers = this.getMultiarrowArrowDamageMultipliers();
     const consumableAttackEffects = typeof this.getActiveConsumableAttackEffects === "function" ? this.getActiveConsumableAttackEffects() : null;
     const baseDamage = this.rollPrimaryDamage();
+    const rogueStealthAttack = this.getRogueStealthAttackBonus();
     const critChance = getRangerCritChance(this);
     const critMultiplier = getRangerCritMultiplier();
     if (typeof this.recordClassSpecificStat === "function") this.recordClassSpecificStat("ranger", "shotsFired", count);
@@ -526,6 +537,11 @@ export const runtimePlayerAttackMethods = {
       this.rangerRuntime.combo = Math.max(0, Math.floor(this.rangerRuntime.combo || 0) - 2);
       this.rangerRuntime.comboDecayDelayTimer = 1.15;
     }
+    const assassinRangedChainCount = this.isArcherClass && this.isArcherClass() &&
+      getRangerSelectedPath(this) === "assassinPath" &&
+      getRangerComboTier(this) >= 2
+      ? 2
+      : 0;
     const stormcallerSplitIndex = Math.floor((count - 1) * 0.5);
     for (let i = 0; i < count; i++) {
       const a = volleyAngles[i];
@@ -553,12 +569,14 @@ export const runtimePlayerAttackMethods = {
         life: projectileLife,
         size: projectileSize,
         damage: baseDamage,
-        damageMult: damageMultBase * (damageMultipliers[i] || damageMultipliers[damageMultipliers.length - 1] || 1),
-        critMultiplier: Math.random() < critChance ? critMultiplier : 1,
+        damageMult: damageMultBase * rogueStealthAttack.damageMult * (damageMultipliers[i] || damageMultipliers[damageMultipliers.length - 1] || 1),
+        critMultiplier: rogueStealthAttack.critMultiplier > 1 ? rogueStealthAttack.critMultiplier : (Math.random() < critChance ? critMultiplier : 1),
         remainingRicochets: getRangerRicochetCount(this),
         stormcallerSplitOnRicochet: hasRangerTalent(this, "stormcaller") && i === stormcallerSplitIndex,
         stormcallerSplitUsed: false,
         predatorPierce: predatorPierceAttack,
+        assassinChainCount: assassinRangedChainCount,
+        comboEnhanced: assassinRangedChainCount > 0,
         linebreakerHits: 0,
         projectileType,
         knockback,
@@ -645,6 +663,7 @@ export const runtimePlayerAttackMethods = {
     const guaranteedCrit = !!(this.warriorRuntime?.rageCritReady || this.warriorRuntime?.butcherCritReady);
     const critMultiplier = guaranteedCrit ? (raging && hasWarriorCleaveDiscipline(this) ? 2.2 : 2) : 1;
     const consumableAttackEffects = typeof this.getActiveConsumableAttackEffects === "function" ? this.getActiveConsumableAttackEffects() : null;
+    const rogueStealthAttack = rangerMeleeStats ? this.getRogueStealthAttackBonus() : { active: false, damageMult: 1, critMultiplier: 1 };
     if (isWarriorTalentGame(this)) {
       this.warriorRuntime.rageCritReady = false;
       this.warriorRuntime.butcherCritReady = false;
@@ -692,10 +711,9 @@ export const runtimePlayerAttackMethods = {
           if (this.rangerRuntime.pendingSwapBonus.style === "footwork") this.rangerRuntime.footworkGuardTimer = Math.max(this.rangerRuntime.footworkGuardTimer || 0, 1);
           this.rangerRuntime.pendingSwapBonus = null;
         }
-        if (rangerMeleeStats && this.rangerRuntime?.shadowVeilTimer > 0) {
-          damage *= 1.35;
+        if (rangerMeleeStats && rogueStealthAttack.active) {
+          damage *= rogueStealthAttack.damageMult * rogueStealthAttack.critMultiplier;
           if (hasRangerTalent(this, "livingShadow")) this.triggerLivingShadowEcho(enemy, damage, "melee");
-          this.rangerRuntime.shadowVeilTimer = 0;
         }
         if (isWarriorTalentGame(this)) {
           damage *= 1 + getWarriorHeavyHandDamageBonus(this, enemy);
@@ -739,7 +757,7 @@ export const runtimePlayerAttackMethods = {
           if (attackProfile?.stance === "B") damage *= 1 + (attackProfile.executeBonus || 0) * 0.3;
           damage *= critMultiplier;
         }
-        this.applyEnemyDamage(enemy, damage, "melee", this.player.id || null, { critical: critMultiplier > 1 });
+        this.applyEnemyDamage(enemy, damage, "melee", this.player.id || null, { critical: critMultiplier > 1 || rogueStealthAttack.critMultiplier > 1 });
         const warCircle = typeof this.getCrusaderConsecratedZoneForEntity === "function" ? this.getCrusaderConsecratedZoneForEntity(this.player) : null;
         if (warCircle?.zoneType === "warCircle" && warCircle.doctrine === "berserker" && damage > 0 && typeof this.applyHealingToPlayerEntity === "function") {
           this.applyHealingToPlayerEntity(this.player, damage * 0.06, { suppressText: true });
@@ -781,6 +799,7 @@ export const runtimePlayerAttackMethods = {
         }
         if (this.isArcherClass && this.isArcherClass()) this.addRangerCombo(rangerMeleeStats?.comboGain || 1);
         if (this.isArcherClass && this.isArcherClass()) this.applyRangerTalentOnHitEffects(enemy, "melee");
+        if (rangerMeleeStats && this.tryAssassinExecuteEnemy(enemy)) executeProc = true;
         if (rangerMeleeStats) {
           this.rangerRuntime.lastAttackAt = this.time || 0;
           this.rangerRuntime.lastAttackTargetId = enemy.id || null;

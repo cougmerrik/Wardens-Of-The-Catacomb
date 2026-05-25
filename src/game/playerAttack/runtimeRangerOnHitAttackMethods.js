@@ -171,6 +171,28 @@ export const runtimeRangerOnHitAttackMethods = {
     return projectileDamage * damageMult * critMult * linebreakerMult * pinningLineMult * swapMult * getRangerArrowBonusAgainstEnemy(this, enemy);
   },
 
+  tryAssassinExecuteEnemy(enemy, { ranged = false } = {}) {
+    if (!(this.isArcherClass && this.isArcherClass()) || getRangerSelectedPath(this) !== "assassinPath") return false;
+    if (!enemy || (enemy.hp || 0) <= 0 || enemy.isBoss || enemy.isFloorBoss) return false;
+    const ratio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
+    if (!(ratio > 0 && ratio < 0.15)) return false;
+    if (Math.random() >= 0.4) return false;
+    enemy.hp = 0;
+    enemy.pendingAssassinExecuteKill = true;
+    if (ranged && Array.isArray(this.fireZones)) {
+      this.fireZones.push({
+        x: enemy.x,
+        y: enemy.y,
+        radius: Math.max(18, (enemy.size || 20) * 0.9),
+        life: 0.42,
+        totalLife: 0.42,
+        zoneType: "assassinExecuteSplash",
+        ownerId: this.player?.id || null
+      });
+    }
+    return true;
+  },
+
   triggerLivingShadowEcho(enemy, baseDamage, damageType = "physical") {
     if (!enemy) return;
     if ((this.rangerRuntime?.livingShadowCooldownTimer || 0) > 0) return;

@@ -1,8 +1,7 @@
-import { drawAngelRingBurst, drawForzareBurst } from "./consumableProcVisuals.js";
+import { drawAngelRingBurst, drawAssassinExecuteSplash, drawForzareBurst } from "./consumableProcVisuals.js";
 export const projectileEffectsFireZoneMethods = {
   drawFireZone(zone, cameraX, cameraY, time = 0) {
-    const ctx = this.ctx;
-    const x = zone.x - cameraX, y = zone.y - cameraY;
+    const ctx = this.ctx, x = zone.x - cameraX, y = zone.y - cameraY;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     if (zone.zoneType === "forzareBurst") return drawForzareBurst(ctx, zone, x, y, time);
     if (zone.zoneType === "angelRingBurst") return drawAngelRingBurst(ctx, zone, x, y);
@@ -178,6 +177,7 @@ export const projectileEffectsFireZoneMethods = {
       ctx.restore();
       return;
     }
+    if (zone.zoneType === "assassinExecuteSplash") return drawAssassinExecuteSplash(ctx, zone, x, y, time);
     if (zone.zoneType === "smokeBomb") {
       const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 2.75;
       const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));

@@ -1,5 +1,6 @@
 import { vecLength } from "../utils.js";
 import { finalizeProjectilesAndTransientState, pulseMageFrozenOrb, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
+import { resolveAssassinProjectileEffects } from "./stepAssassinCombat.js";
 import { resolveFireZonesAndEnemyStatus } from "./stepCombatZoneAndEnemyStatus.js";
 import { getNecromancerPlaguecraftRiseChance, getNecromancerRotDps, getNecromancerRotDuration, hasNecromancerHarvester, hasNecromancerPlaguecraftRot, isNecromancerTalentGame } from "./necromancerTalentTree.js";
 import { hasWarriorSpellknight } from "./warriorTalentTree.js";
@@ -449,6 +450,7 @@ export function resolveCombatAndDrops({
           }
         }
         if (b.projectileType !== "holyWave" && typeof projectileOwnerContext.applyRangerOnHitEffects === "function") projectileOwnerContext.applyRangerOnHitEffects(enemy, b.x, b.y);
+        resolveAssassinProjectileEffects({ game, projectile: b, ownerContext: projectileOwnerContext, enemy, activeEnemies, projectileDamage });
         if (Number.isFinite(b.knockback) && b.knockback > 0) {
           const len = vecLength((enemy.x || 0) - (b.x || 0), (enemy.y || 0) - (b.y || 0)) || 1;
           enemy.vx = (enemy.vx || 0) + (((enemy.x || 0) - (b.x || 0)) / len) * b.knockback;

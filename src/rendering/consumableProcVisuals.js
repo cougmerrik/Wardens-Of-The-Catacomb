@@ -23,6 +23,33 @@ export function drawForzareBurst(ctx, zone, x, y, time = 0) {
   }
 }
 
+export function drawAssassinExecuteSplash(ctx, zone, x, y, time = 0) {
+  const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 0.42;
+  const lifeFrac = Math.max(0, Math.min(1, zone.life / totalLife));
+  const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 20;
+  ctx.save();
+  ctx.globalAlpha = lifeFrac;
+  const splash = ctx.createRadialGradient(x, y, 1, x, y, radius);
+  splash.addColorStop(0, "rgba(255, 210, 210, 0.68)");
+  splash.addColorStop(0.38, "rgba(190, 24, 36, 0.54)");
+  splash.addColorStop(1, "rgba(70, 0, 10, 0)");
+  ctx.fillStyle = splash;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * (1.12 - lifeFrac * 0.28), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 92, 92, 0.82)";
+  ctx.lineWidth = 2.4;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + time * 0.8;
+    const r = radius * (0.68 + (i % 2) * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * radius * 0.18, y + Math.sin(a) * radius * 0.18);
+    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function drawAngelRingBurst(ctx, zone, x, y) {
   const radius = Number.isFinite(zone.radius) ? Math.max(8, zone.radius) : 64;
   const totalLife = Number.isFinite(zone.totalLife) && zone.totalLife > 0 ? zone.totalLife : 0.55;

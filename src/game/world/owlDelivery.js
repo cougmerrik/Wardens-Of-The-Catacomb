@@ -15,7 +15,7 @@ const SPAWN_MAX_PATH_TILES = 56;
 const SPAWN_TARGET_PATH_TILES = 38;
 const ENEMY_AVOID_TILES = 6;
 const PICKUP_TILES = 2;
-const OWL_HP = 26;
+const OWL_BASE_HP = 26;
 const OWL_SPEED = 176;
 const OWL_SIZE = 16.5;
 const OWL_DROP_LIFE = 30;
@@ -101,6 +101,11 @@ function randomDispatchDelay(game) {
 function schedulePendingDispatch(game, state, extraDelay = 0) {
   if (!state || state.active || state.pendingOrders.length <= 0) return;
   state.nextDispatchAt = now(game) + Math.max(0, extraDelay || 0) + randomDispatchDelay(game);
+}
+
+export function getOwlCourierMaxHp(game) {
+  const level = Number.isFinite(game?.level) ? Math.max(1, Math.floor(game.level)) : 1;
+  return OWL_BASE_HP + level * 6;
 }
 
 export function enqueueOwlDeliveryOrder(game, key, quantity = 1, playerId = getPlayerId(game)) {
@@ -274,18 +279,15 @@ function selectSpawnPoint(game, dest) {
 function spawnOwl(game, orders) {
   const destination = selectDeliveryPoint(game);
   const spawn = selectSpawnPoint(game, destination);
+  const maxHp = getOwlCourierMaxHp(game);
   return {
     id: "ticklecorn",
     name: "Veronica",
-    x: spawn.x, y: spawn.y,
-    displayX: spawn.x, displayY: spawn.y,
-    destX: destination.x, destY: destination.y,
-    hp: OWL_HP, maxHp: OWL_HP, size: OWL_SIZE,
+    x: spawn.x, y: spawn.y, displayX: spawn.x, displayY: spawn.y,
+    destX: destination.x, destY: destination.y, hp: maxHp, maxHp, size: OWL_SIZE,
     speed: Number.isFinite(game?.config?.classes?.archer?.baseMoveSpeed) ? game.config.classes.archer.baseMoveSpeed : OWL_SPEED,
-    phase: 0, state: "flying",
-    waitTimer: DELIVERY_WAIT_TIME, portalTimer: 0, slainTimer: 0,
-    pressureTimer: 0,
-    underAttackTimer: 0, attackWarningCooldown: 0,
+    phase: 0, state: "flying", waitTimer: DELIVERY_WAIT_TIME, portalTimer: 0, slainTimer: 0,
+    pressureTimer: 0, underAttackTimer: 0, attackWarningCooldown: 0,
     orders: orders.map((order) => ({ ...order })),
     path: Array.isArray(spawn.path) ? spawn.path.slice(1) : [],
     pathDestX: destination.x,
@@ -303,9 +305,7 @@ function dropOwlOrders(game, owl) {
     game.drops.push({
       type: "owl_item", key: order.key, playerId: order.playerId,
       quantity: Math.max(1, Math.floor(order.quantity || 1)),
-      x: owl.x, y: owl.y,
-      size: 22, life: OWL_DROP_LIFE,
-      name: def.name
+      x: owl.x, y: owl.y, size: 22, life: OWL_DROP_LIFE, name: def.name
     });
   }
   owl.orders = [];
@@ -313,13 +313,7 @@ function dropOwlOrders(game, owl) {
 
 function markOwlDeath(game, owl) {
   const state = ensureOwlDeliveryState(game);
-  state.lastMarker = {
-    x: owl.x,
-    y: owl.y,
-    life: DEATH_MARKER_LIFE,
-    markerType: "delivery_box",
-    text: "Veronica was slain!"
-  };
+  state.lastMarker = { x: owl.x, y: owl.y, life: DEATH_MARKER_LIFE, markerType: "delivery_box", text: "Veronica was slain!" };
 }
 
 function finishOwlRetire(game, slain = false) {
