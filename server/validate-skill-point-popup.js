@@ -213,6 +213,10 @@ function validateWiring() {
   assert(input.includes("skillPointPopupNodes"), "touch routing should treat popup skill cards as UI");
   assert(popup.includes("drawSkillTooltip"), "popup skill cards should keep mouseover tooltips");
   assert(popup.includes("getPopupSkillTooltip"), "popup skill cards should use class skill tooltips");
+  assert(popup.includes("ctx.fillStyle = \"#000000\""), "popup skill icons should draw on a black square background");
+  assert(popup.includes("ctx.imageSmoothingEnabled = false"), "popup skill icons should force nearest-neighbor scaling");
+  assert(popup.includes("const cardSize"), "popup skill cards should use square icon boxes");
+  assert(popup.includes("drawSkillIcon(ctx, game, def, iconRect, false, 0)"), "popup skill icons should fill their square boxes");
 }
 
 validatePopupQueue();
