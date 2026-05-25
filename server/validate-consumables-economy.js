@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { GameSim } from "../src/sim/GameSim.js";
 import { getFlameOfTheFallenBuffMultiplier, recordFlameOfTheFallenKill } from "../src/game/world/consumablesEconomy.js";
+import { tickShopStockRotation } from "../src/game/world/shopStockRotation.js";
 import { getFlameOfTheFallenRequiredSouls } from "../src/game/world/flameOfTheFallen.js";
 import { getConsumableDefinition, rollConsumableShopStock } from "../src/game/consumables.js";
 import { applyDevStartingConsumables, getDevStartingConsumableOptions, grantDevStartingConsumable } from "../src/game/devStartingConsumables.js";
@@ -87,6 +88,10 @@ function main() {
   soloPhoenixGame.consumables.activeSlots = [{ key: "phoenixDraught", count: 1, cooldownRemaining: 0 }];
   assert.equal(soloPhoenixGame.useConsumableSlot(0), false, "Phoenix Draught should not be usable in single player");
   assert.equal(soloPhoenixGame.consumables.activeSlots[0]?.count, 1, "blocked Phoenix Draught should not be consumed");
+  soloPhoenixGame.gold = 0;
+  soloPhoenixGame.shopStock = [{ key: "shield", stock: 1 }];
+  assert.equal(soloPhoenixGame.buyShopItem("shield"), false, "unaffordable purchases should fail");
+  assert.equal(soloPhoenixGame.consumables.message, "Not enough gold", "unaffordable purchases should show feedback");
 
   const phoenixGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   phoenixGame.player.id = "living";
@@ -241,6 +246,47 @@ function main() {
   assert.equal(getFlameOfTheFallenRequiredSouls(sixPlayerCheck), 28, "Solo survivor in a six-player run should be hard but lower than a group target");
   assert(!rollConsumableShopStock(10, 20, new Set(["flameOfTheFallen"])).some((entry) => entry.key === "flameOfTheFallen"), "excluded Flame should not roll into shop stock again");
   assert(!rollConsumableShopStock(10, 20).some((entry) => getConsumableDefinition(entry.key)?.multiplayerOnly), "default shop rolls should exclude multiplayer-only items");
+
+  const rotationGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  rotationGame.floor = 1;
+  rotationGame.time = 59.9;
+  rotationGame.shopStock = [
+    { key: "regenerationPotion", stock: 2 },
+    { key: "speedPotion", stock: 2 },
+    { key: "frostOil", stock: 2 },
+    { key: "fireOil", stock: 2 },
+    { key: "spikeGrowth", stock: 2 }
+  ];
+  rotationGame.shopStockRotationNextAt = 60;
+  rotationGame.multiplayerNotificationQueue = [];
+  rotationGame.multiplayerNotificationCurrent = null;
+  const beforeRotation = rotationGame.shopStock.map((entry) => entry.key);
+  assert.equal(tickShopStockRotation(rotationGame, 0.1), null, "shop stock should not rotate before the 60s interval");
+  assert.deepEqual(rotationGame.shopStock.map((entry) => entry.key), beforeRotation, "pre-interval shop stock should remain unchanged");
+  const rotationRandom = Math.random;
+  Math.random = () => 0;
+  let rotated;
+  try {
+    rotationGame.time = 60;
+    rotated = tickShopStockRotation(rotationGame, 0.1);
+  } finally {
+    Math.random = rotationRandom;
+  }
+  assert(rotated, "shop stock should rotate at the interval");
+  assert.equal(rotated.slotIndex, 0, "rotation should replace one selected shop slot");
+  assert.equal(rotationGame.shopStock.length, 5, "rotation should preserve shop slot count");
+  assert.equal(rotationGame.shopStock.filter((entry) => beforeRotation.includes(entry.key)).length, 4, "rotation should only replace one visible slot");
+  assert(rotationGame.shopStock[0].key !== "regenerationPotion", "rotation should pick a new item for the replaced slot when possible");
+  assert.equal(rotationGame.shopStockRotationNextAt, 120, "rotation should schedule the next interval");
+  assert.equal(rotationGame.multiplayerNotificationCurrent?.text, `${getConsumableDefinition(rotationGame.shopStock[0].key).name} is now available in the shop.`, "rotation should queue the multiplayer-style banner");
+  assert(rotationGame.shopRotationEvents.some((event) => event.text === rotationGame.multiplayerNotificationCurrent.text), "rotation should serialize a banner event");
+  rotationGame.multiplayerNotificationCurrent = { text: "Veronica delivery incoming!", duration: 2.5, owlLocal: true };
+  tickShopStockRotation(rotationGame, 0.5);
+  assert.equal(rotationGame.multiplayerNotificationCurrent.duration, 2.5, "shop rotation fallback should not tick owl banners");
+  rotationGame.multiplayerNotificationCurrent = { text: "Shop notice", duration: 2.5, shopRotationLocal: true };
+  tickShopStockRotation(rotationGame, 0.5);
+  assert.equal(rotationGame.multiplayerNotificationCurrent.duration, 2, "shop rotation fallback should tick shop banners");
+
   recordFlameOfTheFallenKill(flameGame, { x: flameGame.player.x + 16, y: flameGame.player.y, type: "basic" });
   assert.equal(flameGame.flameOfTheFallen?.active, true, "One basic kill should not complete the pyre");
   recordFlameOfTheFallenKill(flameGame, { x: flameGame.player.x + 16, y: flameGame.player.y, isBoss: true });

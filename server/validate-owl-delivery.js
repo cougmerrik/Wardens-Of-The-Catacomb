@@ -47,6 +47,7 @@ function main() {
   assert.equal(activeSlot(game, "shield"), null, "purchased item should not enter inventory instantly");
   assert.equal(game.owlDelivery.pendingOrders.length, 1, "purchase should create a pending owl order");
   assert.equal(game.owlDelivery.audioEvents.length, 0, "purchase queue should not play the entrance clip");
+  assert.equal(game.consumables.message, "Aid request accepted. Veronica will be sent to you soon.", "purchase should confirm that aid was requested");
 
   tickOwlDelivery(game, 0.1);
   assert(game.owlDelivery.active, "Veronica should spawn after dispatch delay");
@@ -86,6 +87,7 @@ function main() {
   assert.equal(game.buyShopItem("fireOil"), true, "purchase while owl is active should validate");
   assert(!owl.orders.some((order) => order.key === "fireOil"), "active owl should not receive purchases made after it appears");
   assert(game.owlDelivery.pendingOrders.some((order) => order.key === "fireOil"), "active-owl purchases should queue for the next delivery");
+  assert.equal(game.consumables.message, "Your aid request has been noted for Veronica's next delivery.", "active-owl purchase should communicate the next delivery");
   game.owlDeliveryDebugDelay = 5;
   owl.x = game.player.x + 100;
   owl.y = game.player.y + 100;
@@ -123,6 +125,22 @@ function main() {
   assert(game.owlDelivery.lastMarker, "slain owl should leave a minimap marker");
   assert.equal(pickupOwlItemDrop(game, parcel, game.player), true, "purchaser should recover dropped owl parcel");
   assert.equal(game.owlDelivery.lastMarker, null, "final recovered owl parcel should clear the minimap marker");
+
+  const timeoutGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  timeoutGame.owlDeliveryDebugDelay = 0;
+  timeoutGame.gold = 3000;
+  timeoutGame.player.id = "player";
+  timeoutGame.shopStock = [{ key: "shield", stock: 1 }];
+  assert.equal(timeoutGame.buyShopItem("shield"), true, "timeout purchase should validate");
+  tickOwlDelivery(timeoutGame, 0.1);
+  timeoutGame.owlDelivery.active.state = "waiting";
+  timeoutGame.owlDelivery.active.waitTimer = 0;
+  timeoutGame.owlDelivery.active.x = timeoutGame.player.x + timeoutGame.config.map.tile * 8;
+  timeoutGame.owlDelivery.active.y = timeoutGame.player.y;
+  tickOwlDelivery(timeoutGame, 0.1);
+  assert.equal(timeoutGame.consumables.message, "Veronica has returned. Parcels left at the drop point.", "timeout should use returned parcel wording");
+  assert.equal(timeoutGame.owlDelivery.lastMarker?.text, "Parcels left at the drop point.", "timeout parcel marker should avoid slain wording");
+  assert.equal(timeoutGame.owlDelivery.audioEvents.some((event) => event.kind === "veronica_dead"), false, "timeout should not play the death clip");
 
   const movementGame = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
   movementGame.owlDeliveryDebugDelay = 0;

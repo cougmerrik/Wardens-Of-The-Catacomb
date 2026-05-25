@@ -305,6 +305,11 @@ export function rollConsumableShopStock(floor, entryCount = 5, excludeKeys = new
   return stock;
 }
 
+export function rollConsumableShopEntry(floor, excludeKeys = new Set(), options = {}) {
+  const item = chooseUniqueConsumable(Math.max(1, Math.floor(floor || 1)), rollRarity(), new Set(excludeKeys), options);
+  return item ? createConsumableShopEntry(item.key, item.maxInventory) : null;
+}
+
 export function getConsumablePriceForFloor(def, floor) {
   const base = Number.isFinite(def?.price) ? def.price : 0;
   const scale = 1 + Math.max(0, floor - 1) * 0.15;

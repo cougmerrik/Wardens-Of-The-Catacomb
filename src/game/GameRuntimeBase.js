@@ -232,6 +232,7 @@ export class GameRuntimeBase {
       this.skillPointPopup.active = null;
       this.skillPointPopup.queue = [];
       this.skillPointPopup.lastSkillPoints = this.skillPoints;
+      this.skillPointPopup.retryAt = null;
     }
     this.player.maxHealth = persisted.maxHealth;
     this.player.health = Math.min(this.player.maxHealth, persisted.health);

@@ -187,7 +187,7 @@ export function buyShopItem(game, key) {
   if (!def) return false;
   const failure = getShopFailureReason(game, key);
   if (failure) {
-    if (failure !== "Not enough gold") pushConsumableMessage(game, failure);
+    pushConsumableMessage(game, failure);
     return false;
   }
   const price = getConsumablePriceForFloor(def, game.floor);
@@ -501,4 +501,5 @@ export function refillShopForFloor(game) {
     includeMultiplayerOnly: isMultiplayerConsumableContext(game)
   });
   if (game.shopStock.some((entry) => entry?.key === "flameOfTheFallen")) game.flameOfTheFallenOffered = true;
+  game.shopStockRotationNextAt = (Number.isFinite(game.time) ? game.time : 0) + 60;
 }

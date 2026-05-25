@@ -445,17 +445,15 @@ export function serializeMetaState(source) {
     necromancerRuntime: sim.necromancerRuntime,
     upgrades: sim.upgrades,
     consumables: sim.consumables,
-    shopStock: sim.shopStock
+    shopStock: sim.shopStock,
+    shopRotationEvents: sim.shopRotationEvents || []
   };
 }
 
 export function serializeState(room) {
   const sim = room.sim;
   const activeBounds = makeActiveBounds(sim, 8);
-  const floorBoss =
-    sim.floorBoss && typeof sim.floorBoss === "object"
-      ? { ...sim.floorBoss }
-      : null;
+  const floorBoss = sim.floorBoss && typeof sim.floorBoss === "object" ? { ...sim.floorBoss } : null;
   const activeEnemies = sim.enemies.filter((e) => isInsideBounds(e, activeBounds, 56));
   const activeDrops = sim.drops.filter((d) => isInsideBounds(d, activeBounds, 40));
   const activeBreakables = (sim.breakables || []).filter((b) => isInsideBounds(b, activeBounds, 48));
@@ -485,6 +483,8 @@ export function serializeState(room) {
     portal: sim.portal ? { ...sim.portal } : null,
     owlDelivery: serializeOwlDelivery(sim.owlDelivery),
     flameOfTheFallen: serializeFlameOfTheFallen(sim.flameOfTheFallen),
+    shopStock: sim.shopStock || [],
+    shopRotationEvents: sim.shopRotationEvents || [],
     enemies: activeEnemies.map((e) => serializeEnemy(room, e)),
     drops: activeDrops.map((d) => serializeDrop(room, d)),
     lightSources: (sim.lightSources || []).map((light) => serializeLightSource(room, light)),

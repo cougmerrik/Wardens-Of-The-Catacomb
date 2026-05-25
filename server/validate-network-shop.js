@@ -7,6 +7,8 @@ import { average, monotonicNowMs, percentile } from "./net/telemetry.js";
 import { makeDefaultInput } from "./net/serverHelpers.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
 import { grantConsumableCharge, recordFlameOfTheFallenKill } from "../src/game/world/consumablesEconomy.js";
+import { tickShopStockRotation } from "../src/game/world/shopStockRotation.js";
+import { getConsumableDefinition } from "../src/game/consumables.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -204,6 +206,26 @@ function main() {
   const flameSnapshot = serializeState(room);
   assert(flameSnapshot.flameOfTheFallen?.state === "complete", "serialized state should include completed flame state");
   assert(!getActiveSlot(ownerState, "flameOfTheFallen"), "Flame of the Fallen should be consumed after use");
+
+  room.sim.shopStock = [
+    { key: "regenerationPotion", stock: 2 },
+    { key: "speedPotion", stock: 2 },
+    { key: "frostOil", stock: 2 },
+    { key: "fireOil", stock: 2 },
+    { key: "spikeGrowth", stock: 2 }
+  ];
+  room.sim.shopStockRotationNextAt = room.sim.time;
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+  try {
+    tickShopStockRotation(room.sim, 0.016);
+  } finally {
+    Math.random = originalRandom;
+  }
+  const rotationSnapshot = serializeState(room);
+  assert(rotationSnapshot.shopStock?.[0]?.key !== "regenerationPotion", "serialized multiplayer state should include rotated shop stock");
+  const rotatedName = getConsumableDefinition(rotationSnapshot.shopStock?.[0]?.key)?.name || "";
+  assert(rotationSnapshot.shopRotationEvents?.some((event) => event.text === `${rotatedName} is now available in the shop.`), "serialized multiplayer state should include shop rotation banner event");
 
   console.log(JSON.stringify({
     ownerGold: ownerState.gold,

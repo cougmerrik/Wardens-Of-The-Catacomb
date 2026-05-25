@@ -112,6 +112,7 @@ export function enqueueOwlDeliveryOrder(game, key, quantity = 1, playerId = getP
   const def = getConsumableDefinition(key);
   if (!def) return false;
   const state = ensureOwlDeliveryState(game);
+  const activeDelivery = !!state.active;
   const order = {
     id: `owl_order_${state.orderSeq++}`,
     playerId,
@@ -121,7 +122,7 @@ export function enqueueOwlDeliveryOrder(game, key, quantity = 1, playerId = getP
   };
   state.pendingOrders.push(order);
   if (!state.active && (!Number.isFinite(state.nextDispatchAt) || state.nextDispatchAt <= now(game))) schedulePendingDispatch(game, state);
-  showOwlAlert(game, "Veronica delivery incoming!");
+  showOwlAlert(game, activeDelivery ? "Your aid request has been noted for Veronica's next delivery." : "Aid request accepted. Veronica will be sent to you soon.");
   return true;
 }
 
@@ -316,6 +317,11 @@ function markOwlDeath(game, owl) {
   state.lastMarker = { x: owl.x, y: owl.y, life: DEATH_MARKER_LIFE, markerType: "delivery_box", text: "Veronica was slain!" };
 }
 
+function markOwlParcelDrop(game, owl) {
+  const state = ensureOwlDeliveryState(game);
+  state.lastMarker = { x: owl.x, y: owl.y, life: DEATH_MARKER_LIFE, markerType: "delivery_box", text: "Parcels left at the drop point." };
+}
+
 function finishOwlRetire(game, slain = false) {
   const state = ensureOwlDeliveryState(game);
   state.active = null;
@@ -466,9 +472,9 @@ export function tickOwlDelivery(game, dt) {
   }
   if (owl.state === "waiting" && owl.waitTimer <= 0) {
     dropOwlOrders(game, owl);
-    showOwlAlert(game, "Veronica was slain!", owl.x, owl.y - 34);
-    queueOwlAudio(game, "veronica_dead");
-    beginOwlPortalAway(game, true);
+    markOwlParcelDrop(game, owl);
+    showOwlAlert(game, "Veronica has returned. Parcels left at the drop point.", owl.x, owl.y - 34);
+    beginOwlPortalAway(game, false);
   }
 }
 

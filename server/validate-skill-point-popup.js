@@ -5,6 +5,7 @@ import { handleUiClicks } from "../src/game/world/uiEconomy.js";
 import { handleNetworkUiActions } from "../src/net/sessionInteraction.js";
 import {
   SKILL_POINT_POPUP_DURATION,
+  SKILL_POINT_POPUP_RETRY_DELAY,
   dismissSkillPointPopup,
   getSkillPointPopupTier,
   resolveSkillPointPopupPendingSpend,
@@ -43,6 +44,33 @@ function validatePopupQueue() {
   syncSkillPointPopupQueue(game);
   assert.equal(game.skillPointPopup.queue.length, 2, "new skill point gain should queue behind the advanced popup");
   dismissSkillPointPopup(game, { clearQueue: true });
+}
+
+function validateUnspentPopupRetry() {
+  const game = new GameSim({ classType: "archer", viewportWidth: 960, viewportHeight: 640 });
+  game.level = 2;
+  game.skillPoints = 1;
+  syncSkillPointPopupQueue(game);
+  const firstId = game.skillPointPopup.active.id;
+
+  game.time = SKILL_POINT_POPUP_DURATION + 0.1;
+  updateSkillPointPopup(game);
+  assert.equal(game.skillPointPopup.active, null, "expired unspent popup should close before retry delay");
+  assert.equal(game.skillPointPopup.queue.length, 0, "expired unspent popup should not immediately requeue");
+  assert.equal(game.skillPointPopup.retryAt, game.time + SKILL_POINT_POPUP_RETRY_DELAY, "expired unspent popup should schedule a 15s retry");
+
+  game.time += SKILL_POINT_POPUP_RETRY_DELAY - 0.1;
+  syncSkillPointPopupQueue(game);
+  assert.equal(game.skillPointPopup.active, null, "unspent popup should stay hidden before retry delay");
+  game.time += 0.1;
+  syncSkillPointPopupQueue(game);
+  assert(game.skillPointPopup.active, "unspent popup should reopen after retry delay");
+  assert(game.skillPointPopup.active.id > firstId, "retry should use a newly queued popup");
+  assert.equal(game.skillPointPopup.retryAt, null, "retry should clear after popup reopens");
+
+  game.skillPoints = 0;
+  syncSkillPointPopupQueue(game);
+  assert.equal(game.skillPointPopup.retryAt, null, "spending all skill points should clear pending retry");
 }
 
 function validateSpendDismissal() {
@@ -188,6 +216,7 @@ function validateWiring() {
 }
 
 validatePopupQueue();
+validateUnspentPopupRetry();
 validateSpendDismissal();
 validateLocalPopupClickDoesNotSkipQueue();
 validateNetworkPopupClickWaitsForAuthoritativeSpend();
