@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { updateSkeleton } from "../src/game/enemyAi.js";
+import { getPriorityTarget } from "../src/game/enemyAiShared.js";
 import { moveEnemyTowardTargetPoint } from "../src/game/world/navigationCollision.js";
+import { GameSim } from "../src/sim/GameSim.js";
 
 function makePathingHarness() {
   const tile = 32;
@@ -87,9 +89,43 @@ function validateSharedPathingUnstuckSweep() {
   return { moved, before, after: { x: enemy.x, y: enemy.y } };
 }
 
+function validatePriorityTargetFallbackUsesNearestLivingPlayer() {
+  const primary = { id: "primary", x: 960, y: 0, size: 22, health: 100, alive: true };
+  const closer = { id: "closer", x: 160, y: 0, size: 22, health: 100, alive: true };
+  const enemy = { id: "targeting-skeleton", type: "skeleton", x: 0, y: 0, size: 20, hp: 10 };
+  const game = {
+    config: { map: { tile: 32 }, enemy: {} },
+    player: primary,
+    enemies: [enemy],
+    getLivingPlayerEntities: () => [primary, closer],
+    isEnemyFriendlyToPlayer: () => false
+  };
+  const target = getPriorityTarget(game, enemy, 16);
+  assert.equal(target, closer, "priority target fallback should use nearest living player, not livingPlayers[0]");
+  return { targetId: target.id };
+}
+
+function validateGenericHostileTargetingUsesMultiplayerPlayers() {
+  const game = new GameSim({ viewportWidth: 640, viewportHeight: 480 });
+  game.player.id = "primary";
+  game.player.x = 960;
+  game.player.y = 0;
+  game.player.health = 100;
+  game.player.alive = true;
+  const closer = { ...game.player, id: "closer", x: 40, y: 0, health: 100, alive: true };
+  const armor = { id: "armor-targeting", type: "armor", x: 0, y: 0, size: 26, hp: 20, maxHp: 20 };
+  game.networkActivePlayers = [game.player, closer];
+  game.enemies = [armor];
+  const target = game.getEnemyTargetPoint(armor);
+  assert.equal(target, closer, "generic hostile targeting should use the closest living multiplayer player");
+  return { targetId: target.id };
+}
+
 const results = {
   aroundWalls: validateSharedPathingReachesAroundWalls(),
-  unstuckSweep: validateSharedPathingUnstuckSweep()
+  unstuckSweep: validateSharedPathingUnstuckSweep(),
+  nearestFallback: validatePriorityTargetFallbackUsesNearestLivingPlayer(),
+  genericMultiplayerTargeting: validateGenericHostileTargetingUsesMultiplayerPlayers()
 };
 
 console.log(JSON.stringify(results, null, 2));
