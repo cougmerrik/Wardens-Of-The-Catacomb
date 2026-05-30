@@ -1,19 +1,4 @@
-import {
-  applyMetaStateToGame,
-  applyNetworkFloatingTextEvents,
-  captureEnemyStateById,
-  capturePlayerProgressById,
-  createProjectileSpawnReconciler,
-  findSnapshotLocalPlayer,
-  getPredictionPressure,
-  queuePlayerDeathNotifications,
-  syncFloorBossState,
-  syncNamedObject,
-  syncRemotePlayers,
-  synthesizeDespawnDamageFloatingTexts,
-  synthesizeEnemyDamageFloatingTexts,
-  synthesizePlayerProgressionFloatingTexts
-} from "./clientSnapshotHelpers.js";
+import { applyMetaStateToGame, applyNetworkFloatingTextEvents, captureEnemyStateById, capturePlayerProgressById, createProjectileSpawnReconciler, findSnapshotLocalPlayer, getPredictionPressure, queuePlayerDeathNotifications, syncFloorBossState, syncNamedObject, syncRemotePlayers, synthesizeDespawnDamageFloatingTexts, synthesizeEnemyDamageFloatingTexts, synthesizePlayerProgressionFloatingTexts } from "./clientSnapshotHelpers.js";
 import {
   ensureNetworkPerf,
   isPostLoadCorrectionActive,

@@ -64,14 +64,7 @@ export function ensureShopStock(game) {
 
 function ensureConsumableState(game) {
   if (!game.consumables || typeof game.consumables !== "object") {
-    game.consumables = {
-      activeSlots: [],
-      passiveSlots: [],
-      sharedCooldown: 0,
-      message: "",
-      messageTimer: 0,
-      effects: createConsumableEffectState()
-    };
+    game.consumables = { activeSlots: [], passiveSlots: [], sharedCooldown: 0, message: "", messageTimer: 0, effects: createConsumableEffectState() };
   }
   if (!Array.isArray(game.consumables.activeSlots)) game.consumables.activeSlots = [];
   if (!Array.isArray(game.consumables.passiveSlots)) game.consumables.passiveSlots = [];
@@ -165,11 +158,7 @@ function addConsumableCharge(game, def) {
   const slots = getConsumableSlots(game, def.type);
   let slot = slots.find((entry) => entry?.key === def.key);
   if (!slot) {
-    slot = {
-      key: def.key,
-      count: 0,
-      cooldownRemaining: 0
-    };
+    slot = { key: def.key, count: 0, cooldownRemaining: 0 };
     slots.push(slot);
   }
   slot.count = Math.min(def.maxStack, (slot.count || 0) + 1);
