@@ -37,6 +37,21 @@ export function getEnemyAttackOwnerId(game, enemy) {
   return typeof enemy.controllerPlayerId === "string" && enemy.controllerPlayerId ? enemy.controllerPlayerId : null;
 }
 
+function getNearestLivingPlayerToEnemy(enemy, livingPlayers, fallback = null) {
+  let best = null;
+  let bestDistSq = Number.POSITIVE_INFINITY;
+  for (const player of livingPlayers || []) {
+    if (!player) continue;
+    const dx = (player.x || 0) - (enemy?.x || 0);
+    const dy = (player.y || 0) - (enemy?.y || 0);
+    const distSq = dx * dx + dy * dy;
+    if (distSq >= bestDistSq) continue;
+    best = player;
+    bestDistSq = distSq;
+  }
+  return best || fallback;
+}
+
 export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   if (!enemy) return game.player;
   const sourceFriendly = isFriendlyToPlayer(game, enemy);
@@ -106,7 +121,8 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
       anchorOnly: true
     };
   }
-  return sourceFriendly ? (livingPlayers[0] || game.player) : (suppressedPlayerSeen ? fallbackAnchor : (livingPlayers[0] || game.player));
+  const nearestLivingPlayer = getNearestLivingPlayerToEnemy(enemy, livingPlayers, game.player);
+  return sourceFriendly ? nearestLivingPlayer : (suppressedPlayerSeen ? fallbackAnchor : nearestLivingPlayer);
 }
 
 export function moveEnemyTowardPoint(game, enemy, target, dt, speedScale, minDistance = 0) {

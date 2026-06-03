@@ -27,6 +27,7 @@ import {
   dropGolemLoot as dropGolemLootEntity,
   dropLeprechaunLoot as dropLeprechaunLootEntity
 } from "./enemySystems.js";
+import { getPriorityTarget } from "./enemyAiShared.js";
 import { GameRuntimeWorld } from "./GameRuntimeWorld.js";
 import { runtimePlayerAttackMethods } from "./runtimePlayerAttackMethods.js";
 import { runtimePlayerCombatMethods } from "./runtimePlayerCombatMethods.js";
@@ -76,6 +77,7 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
   getEnemyTargetPoint(sourceEnemy) {
     if (!sourceEnemy) return this.player;
     const leash = (this.config.necromancer?.aggroRangeTiles || 6.5) * this.config.map.tile;
+    if (!this.isEnemyFriendlyToPlayer(sourceEnemy)) return getPriorityTarget(this, sourceEnemy, leash);
     let best = this.player;
     let bestDist = Number.POSITIVE_INFINITY;
     const sourceFriendly = this.isEnemyFriendlyToPlayer(sourceEnemy);
@@ -95,16 +97,6 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       }
       return true;
     };
-    if (!sourceFriendly) {
-      const owl = this.owlDelivery?.active;
-      if (owl && owl.state !== "portal" && (owl.hp || 0) > 0) {
-        const dist = vecLength(owl.x - sourceEnemy.x, owl.y - sourceEnemy.y);
-        if (dist <= this.config.map.tile * 8 && hasLineOfSight(sourceEnemy.x, sourceEnemy.y, owl.x, owl.y)) {
-          best = owl;
-          bestDist = dist;
-        }
-      }
-    }
     for (const enemy of this.enemies || []) {
       if (!enemy || enemy === sourceEnemy || (enemy.hp || 0) <= 0) continue;
       if (sourceFriendly && typeof this.isEnemyTargetedByAnyNecromancerBeam === "function" && this.isEnemyTargetedByAnyNecromancerBeam(enemy)) continue;
@@ -118,10 +110,6 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
         best = enemy;
         bestDist = dist;
       }
-    }
-    if (!sourceFriendly) {
-      const playerDist = vecLength(this.player.x - sourceEnemy.x, this.player.y - sourceEnemy.y);
-      if (playerDist <= bestDist || best === this.player) return this.player;
     }
     return best;
   }
@@ -157,13 +145,11 @@ export class GameRuntimeSystems extends GameRuntimeWorld {
       }
       return;
     }
-    this.moveEnemyTowardTarget(
-      enemy,
-      target,
-      speedScale,
-      dt,
-      target === this.player ? this.getPlayerEnemyCollisionRadius() + enemy.size * 0.5 : 6
-    );
+    const targetIsPlayer = typeof this.isPlayerEntity === "function" && this.isPlayerEntity(target);
+    const playerRadius = targetIsPlayer
+      ? (typeof this.getPlayerEnemyCollisionRadiusFor === "function" ? this.getPlayerEnemyCollisionRadiusFor(target) : this.getPlayerEnemyCollisionRadius())
+      : 0;
+    this.moveEnemyTowardTarget(enemy, target, speedScale, dt, targetIsPlayer ? playerRadius + enemy.size * 0.5 : 6);
   }
 
   fireWallTrap(trap) {

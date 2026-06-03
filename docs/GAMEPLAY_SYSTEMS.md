@@ -195,6 +195,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - ambient spawns can appear around separated living players
   - active-world bounds expand to the union of living player view areas
   - proximity systems such as targeting, pickups, traps, and armor wakeups operate on the living player roster
+  - hostile target fallback uses the nearest living player by distance instead of the first roster entry, and generic hostile enemies such as animated armor use the shared multiplayer-aware target selection
 - Slain hostile enemies leave timed, non-blocking body/remnant sprites. Bosses such as the minotaur also leave bodies while still completing boss progression, opening the portal, and clearing active boss targeting. Dead bodies render below drops and living enemies, do not push the player, and do not deal contact damage.
 - Dead bodies and collapsed remnants are not valid combat targets. Projectiles, melee checks, area effects, and direct damage routing skip slain enemies so corpse contact cannot consume projectiles, spawn hit effects, or create floating damage text.
 - Ghosts leave a floor-mist remnant instead of disappearing immediately. Skeleton warrior collapsed-body behavior remains non-blocking and is treated consistently with other death remnants.
