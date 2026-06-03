@@ -235,7 +235,7 @@ export const RANGER_TALENT_DEFS = [
     description: [
       "Path. Your right-click class skill becomes Shadowstep, with an 8 sec cooldown.",
       "Shadowstep dashes 140 units in your aim direction and grants 1.5 sec of stealth.",
-      "After Shadowstep, your next attack in your current weapon mode deals 150% damage."
+      "Attacking from stealth deals double damage and has a 33% chance to critically strike."
     ]
   },
   {
@@ -249,7 +249,8 @@ export const RANGER_TALENT_DEFS = [
     description: [
       "Path. Your right-click class skill becomes Execute, with a 7 sec cooldown.",
       "Execute throws a physical knife at a visible target within your ranged weapon range and applies Marked for 4 sec.",
-      "Non-boss targets are killed outright. Bosses instead take a 150% critical physical hit."
+      "Non-boss targets are killed outright. Bosses instead take a 150% critical physical hit.",
+      "Ranged attacks chain to nearby enemies at 10+ combo, and all attacks have a 40% chance to execute normal enemies reduced below 15% health."
     ]
   },
   {
@@ -277,7 +278,7 @@ export const RANGER_TALENT_DEFS = [
     description: [
       "General. Swapping into melee mode grants 1.25 sec of stealth.",
       "Stealth prevents enemies from targeting you, but does not prevent incidental or area damage.",
-      "Your next melee hit consumes stealth and deals 35% increased damage."
+      "Rogue attacks from stealth deal double damage and have a 33% chance to critically strike."
     ]
   },
   {

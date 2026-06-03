@@ -12,6 +12,7 @@ import { runtimeFloorBossMethods } from "./runtimeFloorBossMethods.js";
 import { createRunStats } from "./runtimeBaseStateFactories.js";
 import { initializeRuntimeBaseState } from "./runtimeBaseStateInit.js";
 import { createGameplayTipState, triggerGameplayTip } from "./gameplayTips.js";
+import { getFlameOfTheFallenBuffMultiplier } from "./world/consumablesEconomy.js";
 import {
   getNecromancerBlackCandleDamageBonus,
   getNecromancerBaseCharmDurationForLevel,
@@ -81,7 +82,7 @@ export class GameRuntimeBase {
   }
 
   isActive() {
-    return !this.gameOver && !this.shopOpen && !this.skillTreeOpen && !this.paused && !this.optionsOpen;
+    return !this.gameOver && !this.skillTreeOpen && !this.paused && !this.optionsOpen;
   }
 
   getPlayAreaWidth() {
@@ -109,6 +110,7 @@ export class GameRuntimeBase {
     if (type === "melee" || type === "physical") return "#ef5f5f";
     if (type === "sonic") return "#8edbff";
     if (type === "lightning") return "#f7ee74";
+    if (type === "force") return "#c9b7ff";
     return "#ef5f5f";
   }
 
@@ -230,6 +232,7 @@ export class GameRuntimeBase {
       this.skillPointPopup.active = null;
       this.skillPointPopup.queue = [];
       this.skillPointPopup.lastSkillPoints = this.skillPoints;
+      this.skillPointPopup.retryAt = null;
     }
     this.player.maxHealth = persisted.maxHealth;
     this.player.health = Math.min(this.player.maxHealth, persisted.health);
@@ -319,7 +322,8 @@ export class GameRuntimeBase {
     return (this.classSpec.baseMoveSpeed + levelBonus) *
       this.getMoveSpeedMultiplier() *
       this.getWarriorMomentumMultiplier() *
-      this.getPlayerTerrainMoveMultiplier();
+      this.getPlayerTerrainMoveMultiplier() *
+      getFlameOfTheFallenBuffMultiplier(this, this.player);
   }
 
   isArcherClass() {

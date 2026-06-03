@@ -57,6 +57,15 @@ export function getPriorityTarget(game, enemy, maxRange = Infinity) {
   let suppressedPlayerSeen = false;
   const fallbackAnchor = { x: enemy.x, y: enemy.y, anchorOnly: true, noVisibleTarget: true };
   if (!sourceFriendly) {
+    const owl = game.owlDelivery?.active;
+    if (owl && owl.state !== "portal" && (owl.hp || 0) > 0) {
+      const owlDist = vecLength((owl.x || 0) - enemy.x, (owl.y || 0) - enemy.y);
+      const owlRange = Math.min(maxRange, tile * 8);
+      if (owlDist <= owlRange && hasLineOfSight(game, enemy.x, enemy.y, owl.x, owl.y)) {
+        best = owl;
+        bestDist = owlDist;
+      }
+    }
     for (const player of livingPlayers) {
       if (!player) continue;
       const dist = vecLength((player.x || 0) - enemy.x, (player.y || 0) - enemy.y);

@@ -28,6 +28,7 @@ import {
   getActiveConsumableAttackEffects,
   getConsumableBonusDamage,
   getConsumableOwnedCount,
+  getFlameOfTheFallenBuffMultiplier,
   getShopFailureReason,
   pushConsumableMessage,
   refillShopForFloor,
@@ -50,7 +51,6 @@ export {
   tickConsumables,
   useConsumableSlot
 } from "./consumablesEconomy.js";
-
 function isActiveMultiplayer(game) {
   return !!game?.networkEnabled && game.networkRoomPhase === "active";
 }
@@ -106,8 +106,9 @@ export function getAttackSpeedMultiplier(game) {
 export function getDamageMultiplier(game) {
   const lvl = Number.isFinite(game.upgrades.damage.level) ? game.upgrades.damage.level : 0;
   const base = 1 + lvl * 0.08;
-  if (isRangerTalentGame(game)) return base * (1 + getRangerDamageBonus(game));
-  return base;
+  const flame = getFlameOfTheFallenBuffMultiplier(game, game.player);
+  if (isRangerTalentGame(game)) return base * flame * (1 + getRangerDamageBonus(game));
+  return base * flame;
 }
 
 export function getDefenseFlatReduction(game) {
@@ -225,7 +226,6 @@ export function refundAllSkills(game) {
 export function toggleShop(game, open) {
   if (game.gameOver || (Number.isFinite(game?.player?.health) && game.player.health <= 0)) return;
   game.shopOpen = typeof open === "boolean" ? open : !game.shopOpen;
-  if (game.shopOpen) game.paused = false;
   if (typeof game.onPauseChanged === "function") game.onPauseChanged(game.paused, game);
   if (game.shopOpen) game.skillTreeOpen = false;
   if (game.shopOpen) game.statsPanelOpen = false;
@@ -364,6 +364,7 @@ export function handleUiClicks(game) {
   const clicks = game.input.consumeUiLeftClicks();
   if (clicks.length === 0) return;
 
+  clickLoop:
   for (const click of clicks) {
     const consumableSlots = Array.isArray(game.uiRects.consumableSlots) ? game.uiRects.consumableSlots : [];
     if (playerAlive && !game.gameOver && !game.shopOpen && !game.skillTreeOpen) {
@@ -485,13 +486,12 @@ export function handleUiClicks(game) {
       break;
     }
     if (handledSkillNode) continue;
-    const itemRects = game.uiRects.shopItems || [];
-    for (const item of itemRects) {
-      if (pointInRect(game, click.x, click.y, item.rect)) {
-        clearPinnedUiTooltip(game);
-        buyShopItem(game, item.key);
-        break;
-      }
+    for (const item of game.uiRects.shopItems || []) {
+      if (!pointInRect(game, click.x, click.y, item.rect)) continue;
+      const pinned = game?.uiPinnedTooltip;
+      if (isAndroidTouchUi(game) && !(pinned?.source === "shop" && pinned.key === item.key)) pinUiTooltip(game, { source: "shop", key: item.key });
+      else { clearPinnedUiTooltip(game); buyShopItem(game, item.key); }
+      continue clickLoop;
     }
     if (isAndroidTouchUi(game)) clearPinnedUiTooltip(game);
   }

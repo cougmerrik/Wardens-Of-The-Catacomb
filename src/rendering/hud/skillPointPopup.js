@@ -12,10 +12,10 @@ import { drawScoutSkillIcon } from "./scoutSkillIcons.js";
 import { drawSkillTooltip } from "./skillTooltip.js";
 import { drawWarriorSkillIcon } from "./warriorSkillIcons.js";
 
-function drawSkillIcon(ctx, game, def, rect, muted = false) {
-  if (game?.isArcherClass?.() && drawScoutSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, 2, muted)) return;
-  if (game?.isNecromancerClass?.() && drawMageSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, 1, muted)) return;
-  if (game?.isWarriorClass?.() && drawWarriorSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, 1, muted)) return;
+function drawSkillIcon(ctx, game, def, rect, muted = false, padding = 1) {
+  if (game?.isArcherClass?.() && drawScoutSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, padding, muted)) return;
+  if (game?.isNecromancerClass?.() && drawMageSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, padding, muted)) return;
+  if (game?.isWarriorClass?.() && drawWarriorSkillIcon(ctx, def.key, rect.x, rect.y, rect.w, padding, muted)) return;
   ctx.fillStyle = def.color || "#93c7ff";
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
   ctx.fillStyle = "#081019";
@@ -50,13 +50,12 @@ export function drawSkillPointPopup(renderer, game, layout, lanternBounds = null
 
   const defs = tierInfo.defs.slice(0, 8);
   const playW = layout.playW || renderer.canvas.width;
-  const cardW = layout.isAndroid ? 44 : 54;
-  const cardH = layout.isAndroid ? 50 : 62;
+  const cardSize = layout.isAndroid ? 46 : 54;
   const gap = 6;
-  const columns = Math.min(defs.length, Math.max(1, Math.floor((Math.min(720, playW - 24) + gap) / (cardW + gap))));
+  const columns = Math.min(defs.length, Math.max(1, Math.floor((Math.min(720, playW - 24) + gap) / (cardSize + gap))));
   const rows = Math.max(1, Math.ceil(defs.length / columns));
-  const panelW = Math.min(playW - 24, columns * cardW + Math.max(0, columns - 1) * gap + 20);
-  const panelH = 34 + rows * cardH + Math.max(0, rows - 1) * gap;
+  const panelW = Math.min(playW - 24, columns * cardSize + Math.max(0, columns - 1) * gap + 20);
+  const panelH = 34 + rows * cardSize + Math.max(0, rows - 1) * gap;
   const x = Math.floor((playW - panelW) / 2);
   const anchorY = Number.isFinite(lanternBounds?.y) ? lanternBounds.y : renderer.canvas.height - (layout.xpBarH || 28) - 50;
   const y = Math.max(46, Math.floor(anchorY - panelH - 8));
@@ -79,18 +78,21 @@ export function drawSkillPointPopup(renderer, game, layout, lanternBounds = null
   const mouseX = game.input?.mouse?.screenX;
   const mouseY = game.input?.mouse?.screenY;
   let hovered = null;
-  const startX = x + Math.floor((panelW - (columns * cardW + Math.max(0, columns - 1) * gap)) / 2);
+  const startX = x + Math.floor((panelW - (columns * cardSize + Math.max(0, columns - 1) * gap)) / 2);
   for (let i = 0; i < defs.length; i++) {
     const def = defs[i];
     const col = i % columns;
     const row = Math.floor(i / columns);
-    const rect = { x: startX + col * (cardW + gap), y: y + 26 + row * (cardH + gap), w: cardW, h: cardH };
-    ctx.fillStyle = "rgba(20, 31, 45, 0.96)";
+    const rect = { x: startX + col * (cardSize + gap), y: y + 26 + row * (cardSize + gap), w: cardSize, h: cardSize };
+    ctx.fillStyle = "#000000";
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.strokeStyle = "rgba(136, 172, 216, 0.56)";
     ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
-    const iconSize = Math.min(40, rect.w - 12, rect.h - 12);
-    drawSkillIcon(ctx, game, def, { x: rect.x + Math.floor((rect.w - iconSize) / 2), y: rect.y + Math.floor((rect.h - iconSize) / 2), w: iconSize, h: iconSize });
+    const iconRect = { x: rect.x + 1, y: rect.y + 1, w: rect.w - 2, h: rect.h - 2 };
+    const previousSmoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    drawSkillIcon(ctx, game, def, iconRect, false, 0);
+    ctx.imageSmoothingEnabled = previousSmoothing;
     game.uiRects.skillPointPopupNodes.push({ key: def.key, kind: "skillPointPopup", rect });
     if (Number.isFinite(mouseX) && Number.isFinite(mouseY) && isPointInRect(mouseX, mouseY, rect)) hovered = getPopupSkillTooltip(game, def);
   }

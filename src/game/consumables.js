@@ -66,7 +66,7 @@ export const CONSUMABLE_DEFS = {
     price: 50,
     maxStack: 3,
     maxInventory: 2,
-    effect: "For 5s after activation, enemies that attack the player take +3 retaliatory damage"
+    effect: "For the next 25 hits, enemies that attack the player take +3 retaliatory damage"
   },
   shield: {
     key: "shield",
@@ -76,10 +76,77 @@ export const CONSUMABLE_DEFS = {
     triggerCondition: "N/A",
     cooldown: "Default",
     unlockFloor: 1,
-    price: 3,
+    price: 15,
     maxStack: 2,
     maxInventory: 2,
     effect: "Gain 10 temporary HP"
+  },
+  lanternFuel: {
+    key: "lanternFuel",
+    name: "Lantern Fuel",
+    type: "Active",
+    rarity: "Common",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 1,
+    price: 20,
+    maxStack: 2,
+    maxInventory: 2,
+    effect: "Refills the player's lantern by 20%"
+  },
+  darkvisionPotion: {
+    key: "darkvisionPotion",
+    name: "Darkvision Potion",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 1,
+    price: 35,
+    maxStack: 3,
+    maxInventory: 2,
+    effect: "Privately see in the dark up to 10 tiles for 30s"
+  },
+  holyCandle: {
+    key: "holyCandle",
+    name: "Holy Candle",
+    type: "Active",
+    rarity: "Legendary",
+    triggerCondition: "N/A",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 150,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Drops a 3-tile holy light for 10s that heals players inside for 5% max health each second"
+  },
+  phoenixDraught: {
+    key: "phoenixDraught",
+    name: "Phoenix Draught",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "When an ally is dead",
+    cooldown: "Default",
+    unlockFloor: 1,
+    price: 250,
+    maxStack: 1,
+    maxInventory: 1,
+    multiplayerOnly: true,
+    effect: "Instantly revives one random dead ally at your position with 40% health"
+  },
+  flameOfTheFallen: {
+    key: "flameOfTheFallen",
+    name: "Flame of the Fallen",
+    type: "Active",
+    rarity: "Rare",
+    triggerCondition: "When an ally is dead",
+    cooldown: "Default",
+    unlockFloor: 2,
+    price: 300,
+    maxStack: 1,
+    maxInventory: 1,
+    multiplayerOnly: true,
+    effect: "Creates a 20s pyre that charges from nearby enemy kills and revives all dead allies at the pyre with 50% health"
   },
   angelRing: {
     key: "angelRing",
@@ -89,10 +156,23 @@ export const CONSUMABLE_DEFS = {
     triggerCondition: "When the player would hit 0 HP",
     cooldown: "Default",
     unlockFloor: 1,
-    price: 2000,
+    price: 500,
     maxStack: 1,
     maxInventory: 1,
-    effect: "Heal the player for 20% HP immediately"
+    effect: "Heal the player for 50% HP immediately"
+  },
+  forzare: {
+    key: "forzare",
+    name: "Forzare",
+    type: "Passive",
+    rarity: "Rare",
+    triggerCondition: "When more than 3 enemies are within 1 tile",
+    cooldown: "20s",
+    unlockFloor: 1,
+    price: 400,
+    maxStack: 1,
+    maxInventory: 1,
+    effect: "Knocks nearby surrounding enemies back up to 3 tiles and deals force damage, with a 5% chance to break"
   },
   monkeyPaw: {
     key: "monkeyPaw",
@@ -102,7 +182,7 @@ export const CONSUMABLE_DEFS = {
     triggerCondition: "On moving to the next floor",
     cooldown: "Default",
     unlockFloor: 1,
-    price: 1000,
+    price: 300,
     maxStack: 1,
     maxInventory: 1,
     effect: "Remove all consumables, fully heal the player, and immediately grant a level"
@@ -123,7 +203,8 @@ export function createConsumableEffectState() {
     speedPotion: { timer: 0 },
     frostOil: { timer: 0, attacksRemaining: 0 },
     fireOil: { timer: 0, attacksRemaining: 0 },
-    spikeGrowth: { timer: 0 }
+    spikeGrowth: { timer: 0, attacksRemaining: 0 },
+    darkvisionPotion: { timer: 0 }
   };
 }
 
@@ -172,10 +253,11 @@ export function createConsumableShopEntry(key, stock) {
   };
 }
 
-function getEligibleConsumables(floor, rarity, excludeKeys = new Set()) {
+function getEligibleConsumables(floor, rarity, excludeKeys = new Set(), { includeMultiplayerOnly = false } = {}) {
   return getConsumableCatalog().filter((item) =>
     item.rarity === rarity &&
     item.unlockFloor <= floor &&
+    (includeMultiplayerOnly || !item.multiplayerOnly) &&
     !excludeKeys.has(item.key)
   );
 }
@@ -187,7 +269,7 @@ function rollRarity() {
   return legendaryUpgrade ? "Legendary" : "Rare";
 }
 
-function chooseUniqueConsumable(floor, desiredRarity, chosenKeys) {
+function chooseUniqueConsumable(floor, desiredRarity, chosenKeys, options = {}) {
   const fallbackOrder =
     desiredRarity === "Legendary"
       ? ["Legendary", "Rare", "Common"]
@@ -195,27 +277,37 @@ function chooseUniqueConsumable(floor, desiredRarity, chosenKeys) {
       ? ["Rare", "Common"]
       : ["Common"];
   for (const rarity of fallbackOrder) {
-    const pool = getEligibleConsumables(floor, rarity, chosenKeys);
+    const pool = getEligibleConsumables(floor, rarity, chosenKeys, options);
     if (pool.length <= 0) continue;
     return pool[Math.floor(Math.random() * pool.length)] || null;
   }
-  const anyRemaining = getConsumableCatalog().filter((item) => item.unlockFloor <= floor && !chosenKeys.has(item.key));
+  const includeMultiplayerOnly = !!options.includeMultiplayerOnly;
+  const anyRemaining = getConsumableCatalog().filter((item) =>
+    item.unlockFloor <= floor &&
+    (includeMultiplayerOnly || !item.multiplayerOnly) &&
+    !chosenKeys.has(item.key)
+  );
   if (anyRemaining.length <= 0) return null;
   return anyRemaining[Math.floor(Math.random() * anyRemaining.length)] || null;
 }
 
-export function rollConsumableShopStock(floor, entryCount = 5) {
-  const chosenKeys = new Set();
+export function rollConsumableShopStock(floor, entryCount = 5, excludeKeys = new Set(), options = {}) {
+  const chosenKeys = new Set(excludeKeys);
   const stock = [];
   const attempts = Math.max(entryCount * 4, 12);
   for (let i = 0; i < attempts && stock.length < entryCount; i++) {
     const desired = rollRarity();
-    const item = chooseUniqueConsumable(floor, desired, chosenKeys);
+    const item = chooseUniqueConsumable(floor, desired, chosenKeys, options);
     if (!item) break;
     chosenKeys.add(item.key);
     stock.push(createConsumableShopEntry(item.key, item.maxInventory));
   }
   return stock;
+}
+
+export function rollConsumableShopEntry(floor, excludeKeys = new Set(), options = {}) {
+  const item = chooseUniqueConsumable(Math.max(1, Math.floor(floor || 1)), rollRarity(), new Set(excludeKeys), options);
+  return item ? createConsumableShopEntry(item.key, item.maxInventory) : null;
 }
 
 export function getConsumablePriceForFloor(def, floor) {

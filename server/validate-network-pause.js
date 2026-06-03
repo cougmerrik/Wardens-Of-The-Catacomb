@@ -250,33 +250,22 @@ async function main() {
 
     await ownerPage.waitForFunction(() => {
       const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.paused === true && state.ui?.shopOpen === true;
+      return !!state && state.ui?.paused === false && state.ui?.shopOpen === true;
     }, { timeout: 5000 });
     await otherPage.waitForFunction(() => {
       const state = window.__WOTC_DEBUG__?.getState?.();
-      return !!state && state.ui?.paused === true;
+      return !!state && state.ui?.paused === false;
     }, { timeout: 5000 });
 
     ownerState = await getDebugState(ownerPage);
     otherState = await getDebugState(otherPage);
 
     assert(ownerState?.ui?.shopOpen === true, "pause owner shop did not open");
+    assert(ownerState?.ui?.paused === false, "opening the shop paused the owner");
     assert(otherState?.ui?.shopOpen === false, "non-owner unexpectedly opened the shop");
+    assert(otherState?.ui?.paused === false, "opening the owner shop paused the room");
     assert(otherState?.ui?.skillTreeOpen === false, "non-owner unexpectedly opened the skill tree");
-    assert(otherState?.ui?.pauseOverlayResume, "non-owner pause overlay resume rect unavailable");
-    const nonOwnerResumeSample = await sampleCanvasCenter(otherPage, otherState.ui.pauseOverlayResume);
-    assert(
-      nonOwnerResumeSample && nonOwnerResumeSample.r < 150 && nonOwnerResumeSample.g < 150 && nonOwnerResumeSample.b < 150,
-      `non-owner resume button did not render muted: ${JSON.stringify(nonOwnerResumeSample)}`
-    );
-    await clickCanvasRect(otherPage, otherState.ui.pauseOverlayResume);
-    await delay(300);
-    ownerState = await getDebugState(ownerPage);
-    otherState = await getDebugState(otherPage);
-    assert(ownerState?.ui?.paused === true && ownerState?.ui?.shopOpen === true, "non-owner resume button changed owner pause state");
-    assert(otherState?.ui?.paused === true, "non-owner resume button changed local pause state");
-
-    await clickCanvasRect(ownerPage, ownerState.ui.pauseButton);
+    await ownerPage.keyboard.press("b");
 
     await ownerPage.waitForFunction(() => {
       const state = window.__WOTC_DEBUG__?.getState?.();

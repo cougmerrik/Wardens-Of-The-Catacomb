@@ -128,6 +128,19 @@ function main() {
   game.rangerTalents = {};
   assert(game.getPlayerLightRadius(game.player) === 0, "non-Beast Master empty lantern fuel should still have no player light radius");
 
+  game.consumables.effects.darkvisionPotion.timer = 30;
+  assert(game.getPlayerLightRadius(game.player) === 10 * CONFIG.map.tile, "Darkvision should privately provide the local player 10 tiles of sight");
+  const remoteDarkvisionPlayer = {
+    id: "remote-darkvision",
+    x: game.player.x + 64,
+    y: game.player.y,
+    health: 100,
+    lanternFuel: 0,
+    consumables: { effects: { darkvisionPotion: { timer: 30 } } }
+  };
+  game.consumables.effects.darkvisionPotion.timer = 0;
+  assert(game.getPlayerLightRadius(remoteDarkvisionPlayer) === 0, "remote player darkvision should not create local world light");
+
   game.bullets = [{
     x: game.player.x + 176,
     y: game.player.y,
@@ -163,6 +176,9 @@ function main() {
   game.portal = { x: game.player.x + 272, y: game.player.y, active: true };
   const activePortalSources = game.getActiveLightSources();
   assert(activePortalSources.some((source) => source.sourceType === "exitPortal" && source.entityType === "exitPortal" && source.radius === CONFIG.lighting.portalRadiusTiles * CONFIG.map.tile && source.lightIntensity === CONFIG.lighting.portalLightPower && source.lightDecay === CONFIG.lighting.portalLightFalloffDecay && source.dimRadiusRatio === 1), "exit portal should be a moderate diffuse active light source");
+  game.owlDelivery = { active: { id: "veronica-test", state: "flying", x: game.player.x + 304, y: game.player.y, displayX: game.player.x + 304, displayY: game.player.y } };
+  const activeOwlSources = game.getActiveLightSources();
+  assert(activeOwlSources.some((source) => source.sourceType === "veronica" && source.entityType === "veronica" && source.radius === 2 * CONFIG.map.tile && source.lightIntensity < 0.4 && source.lightDecay < 1 && source.dimRadiusRatio === 1), "Veronica should shed diffuse low-power light in a 2 tile radius");
   assert(activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "pinningFire" && source.radius >= CONFIG.lighting.fireZoneMinRadiusTiles * CONFIG.map.tile), "active lights should include pinning fire line segments");
   assert(!activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "sonyaFire"), "enemy fire patches should not be classified as ranger fire light");
   assert(!activeSources.some((source) => source.sourceType === "enemy"), "default ghosts should not be active world lights");

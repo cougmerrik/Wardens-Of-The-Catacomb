@@ -18,6 +18,7 @@ export const runtimePlayerCombatMethods = {
 
   gainExperience(amount) {
     if (typeof this.isFloorBossActive === "function" && this.isFloorBossActive()) return;
+    const wasDead = typeof this.isLivingPlayerEntity === "function" ? !this.isLivingPlayerEntity(this.player) : (this.player?.health || 0) <= 0;
     this.experience += amount;
     while (this.experience >= this.expToNextLevel) {
       this.experience -= this.expToNextLevel;
@@ -27,7 +28,8 @@ export const runtimePlayerCombatMethods = {
       const hpGain = Number.isFinite(this.classSpec.levelHpGain) ? this.classSpec.levelHpGain : 10;
       const adjustedHpGain = this.classType === "archer" ? hpGain * (1 + getRangerMaxHealthBonusPct(this)) : hpGain;
       this.player.maxHealth += adjustedHpGain;
-      this.player.health = Math.min(this.player.maxHealth, this.player.health + adjustedHpGain);
+      this.player.health = wasDead ? 0 : Math.min(this.player.maxHealth, this.player.health + adjustedHpGain);
+      if (wasDead) this.player.alive = false;
       this.markPlayerHealthBarVisible();
       this.spawnFloatingText(this.player.x, this.player.y - 46, `+${adjustedHpGain.toFixed(1)} Max HP`, "#ff9f9f", 0.95, 14);
       const baseMin = Number.isFinite(this.classSpec.primaryDamageMin)

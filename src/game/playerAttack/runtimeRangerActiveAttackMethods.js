@@ -212,7 +212,7 @@ export const runtimeRangerActiveAttackMethods = {
     const distance = 140;
     this.moveWithCollisionSubsteps(this.player, (dx / len) * distance, (dy / len) * distance);
     this.rangerRuntime.shadowVeilTimer = Math.max(this.rangerRuntime.shadowVeilTimer || 0, 1.5);
-    this.rangerRuntime.pendingSwapBonus = { mode: getRangerCurrentWeaponMode(this), damageMult: 1.5, comboBonus: 0 };
+    this.rangerRuntime.pendingSwapBonus = { mode: getRangerCurrentWeaponMode(this), damageMult: 1, comboBonus: 0 };
     this.rangerRuntime.classSkillCooldownTimer = 8;
     if (typeof this.spawnFloatingText === "function") this.spawnFloatingText(this.player.x, this.player.y - 30, "Shadowstep", "#c7a5ff", 0.6, 13);
     return true;

@@ -39,8 +39,8 @@
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
     canvas.addEventListener("mousedown", (e) => {
+      const screen = this.getScreenPosition(e);
       if (e.button === 0) {
-        const screen = this.getScreenPosition(e);
         this.mouse.uiLeftClicks.push(screen);
         this.mouse.recentUiLeftClicks.push({
           x: screen.x,
@@ -49,7 +49,9 @@
         });
         if (this.mouse.recentUiLeftClicks.length > 12) this.mouse.recentUiLeftClicks.splice(0, this.mouse.recentUiLeftClicks.length - 12);
       }
+      const hitUi = this.isInteractiveUiPoint(screen.x, screen.y, this.getUiRects() || {});
       if (!this.isActive()) return;
+      if (hitUi) return;
       this.updateAim(e);
       if (e.button === 0) {
         this.mouse.leftDown = true;

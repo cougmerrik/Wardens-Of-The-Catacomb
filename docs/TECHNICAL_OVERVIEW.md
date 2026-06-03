@@ -40,7 +40,7 @@ This document summarizes the current high-level architecture and validation work
   - tap-to-UI hit routing for HUD/overlay actions
 - Android HUD layout helpers live under `src/rendering/hud/androidLayout.js`. They provide touch regions, draw active stick guides, and keep compact HUD panels away from the lower movement/aim zones.
 - Browser bootstrap owns Android-specific menu/gameplay chrome such as utility buttons, gameplay-control visibility, Android canvas sizing, and Android dev-mode unlock handling.
-- The in-canvas HUD exposes top-right `Stats` and `Options` rects plus class-panel `Shop`, `Skill Tree`, and `Pause` rects. `Options` opens the existing DOM Options panel as an overlay so master volume, voice chat, ads, and gameplay tips continue to use the main-menu persistence logic. `Pause` uses explicit HUD click/action routing, is greyed out for multiplayer clients without pause authority, and the pause overlay publishes its own `Resume` rect. `Esc` no longer toggles pause or unlocks music playback, music mute is controlled through options volume rather than an `M` keybind, and the embedded group list renders every teammate as a compact owner/name plus health bar row.
+- The in-canvas HUD exposes top-right `Stats` and `Options` rects plus class-panel `Call for Aid`, `Skill Tree`, and `Pause` rects. `Call for Aid` toggles a player-anchored radial consumable aid menu that publishes item hit rects through `uiRects.shopItems`; the old modal close rect and central gold hub are intentionally absent. The aid menu does not set `paused` or block gameplay input. Desktop uses hover tooltips, while Android/touch routes the first item tap through `uiPinnedTooltip` and buys on the second tap. Purchases route through the consumable shop validator, spend gold and shared stock immediately, then enqueue `owlDelivery` orders instead of granting inventory directly. `src/game/world/owlDelivery.js` dispatches the shared Veronica courier at base Scout speed, handles bounded ember trail state, delivery pickup by purchaser id, one-tile enemy evasion, wall-aware same-side pathing, timeout drops, minimap markers, top-HUD notifications, slain corpse linger, and serialized audio events. `src/game/world/owlDeliveryNavigation.js` builds one reverse distance map from the drop point so spawn selection can choose a several-room route without pathfinding every candidate. `src/game/world/lighting.js` exposes Veronica as a low-power diffuse 2-tile light source while she is in-world. `src/rendering/owlDeliverySpriteSheet.js` draws the phoenix courier from the `phoenix.html` flight pixel-sprite definition for all states, using a slower frame rate while waiting; `src/rendering/owlDeliveryVisuals.js` draws portal exit and fire-colored trail effects. `src/audio/veronicaAudioEvents.js` plays `assets/sounds/veronica_entrance.mp3`, `assets/sounds/veronica_hurt.mp3`, and `assets/sounds/veronica_dead.mp3`, de-duplicating entrance/death by event id and throttling hurt playback to once every 5 seconds. `Options` opens the existing DOM Options panel as an overlay so master volume, voice chat, ads, and gameplay tips continue to use the main-menu persistence logic. `Pause` uses explicit HUD click/action routing, is greyed out for multiplayer clients without pause authority, and the pause overlay publishes its own `Resume` rect. `Esc` no longer toggles pause or unlocks music playback, music mute is controlled through options volume rather than an `M` keybind, and the embedded group list renders every teammate as a compact owner/name plus health bar row.
 - Android build commands:
   - `npm run build:android:web` prepares `www/`
   - `npm run cap:sync:android` rebuilds and syncs the Capacitor Android project
@@ -113,6 +113,7 @@ This document summarizes the current high-level architecture and validation work
   - `getActiveLightSources()` combines player, torch, and remote-player sources for rendering.
 - Torch objects carry stable gameplay/rendering fields: `id`, `type`, `x`, `y`, `size`, `lit`, `lightRadius`, and `snuffCooldown`.
 - Player entities carry `lanternFuel` in the `0..1` range. Network serialization includes that fuel value so the HUD gauge and player light radius stay aligned across clients.
+- Consumables can modify lighting and multiplayer player state: Lantern Fuel calls the centralized lantern fuel helper, Darkvision Potion contributes a private 10-tile local player sight radius with a purple visibility tint while active, Holy Candle creates a timed `holyCandle` light source that heals living players in its radius, Phoenix Draught is multiplayer-only revive utility that restores one random dead ally at the user's position with 40% HP, Forzare is a rare passive artifact that checks nearby hostile density during consumable ticks and applies force damage plus collision-aware knockback on a 20s slot cooldown with a 5% break chance, and Flame of the Fallen is a once-per-run multiplayer-only active pyre that revives all dead allies at 50% HP if nearby enemy kills fill its soul meter before the 20s timer expires. Flame charge uses `(6 + total players + living players * 2) * 2`, clamped to `16-48`, so fewer survivors have a lower total target.
 - Enemy serialization includes active burning state (`burningTimer`, `burningDps`, and `burningLightRadius`) so multiplayer clients render ignited-enemy light from the same gameplay state as the host.
 - Lighting interaction updates are throttled and use squared-distance checks to avoid adding avoidable per-frame cost on larger floors.
 - The renderer draws torches through `runtimeSceneObjectDrawMethods.js` and applies the darkness/light overlay through `runtimeSceneLightingMethods.js`.
@@ -168,6 +169,7 @@ This document summarizes the current high-level architecture and validation work
   - purely local UI/control feedback can remain local-only, but new local-only presentation must be intentional and documented in the validator or implementation notes
   - new class progression effects must include targeted local-vs-network validation before merge, rather than waiting for manual multiplayer reports
 - The authoritative room still keeps one primary `sim.player` path for the pause owner, but snapshots now also serialize a `players` collection for all active participants.
+- Owl delivery state serializes as top-level `owlDelivery` snapshot data, while slain/expired delivery parcels use the existing `drops` collection with `type: "owl_item"`, purchaser id, item key, quantity, and normal drop lifetime cleanup. Clients apply `owlDelivery` directly for in-world Veronica rendering, portal-away presentation, minimap destination/drop markers, audio events, and de-duplicated top-HUD notification events. Flame of the Fallen serializes as top-level `flameOfTheFallen` state so clients render the same pyre radius, timer, and soul progress while the authoritative sim owns revive completion.
 - Authoritative player-state copying lives in `server/net/activePlayerState.js`; keep new multiplayer player fields there instead of duplicating mappings inside `AuthoritativeRoom`.
 - Player snapshot DTO fields live in `src/net/playerSnapshotSchema.js`; server serialization and client snapshot application both use this schema to reduce single-player/multiplayer state drift.
 - The client runtime resolves the local player out of `state.players`, keeps remote players in `game.remotePlayers`, and renders/interpolates them separately from the local predicted avatar.
@@ -235,7 +237,7 @@ This document summarizes the current high-level architecture and validation work
   - movement
   - hostile targeting and damage intake
   - class primary/alt combat paths
-  - shared XP/gold rewards with per-player kill score/build progression
+  - shared rewards, with XP divided across active players and gold divided across living players, plus per-player kill score/build progression
   - death/spectate flow
   - disconnect removal and room-owner / pause-owner transfer rules
 
@@ -318,10 +320,12 @@ This document summarizes the current high-level architecture and validation work
   - runs the audio validator in explicit focus-cycle mode and records focus/visibility telemetry; use `--headed` when a real desktop session is available and strict blur/focus assertions are desired
 - `validate:network-ui`
   - verifies that controller clients can open and interact with skill/shop UI paths in live network sessions
+- `validate:in-canvas-hud`
+  - verifies in-canvas HUD ownership and the radial shop rendering contract
 - `validate:network-refund`
   - verifies multiplayer-authoritative refund actions, snapshot propagation, and acting-player build-state resync
 - `validate:network-pause`
-  - verifies pause-owner shop flow pauses the room without opening overlays on other clients
+  - verifies Call for Aid does not pause the room or open overlays on other clients
   - checks that the passive `<handle> paused the game.` banner clears when the pause owner unpauses
 - `perf:network-browser`
   - captures active-tab frame cadence, snapshot backlog, correction pressure, and movement-latency proxies

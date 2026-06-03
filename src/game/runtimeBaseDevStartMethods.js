@@ -1,4 +1,10 @@
+import { applyDevStartingConsumables } from "./devStartingConsumables.js";
+
 export const runtimeBaseDevStartMethods = {
+  applyDevStartingConsumables(options = {}) {
+    return applyDevStartingConsumables(this, options);
+  },
+
   estimateDebugStartingGoldForFloor(floor = this.floor) {
     const safeFloor = Number.isFinite(floor) ? Math.max(1, Math.floor(floor)) : 1;
     if (safeFloor <= 1) return 0;

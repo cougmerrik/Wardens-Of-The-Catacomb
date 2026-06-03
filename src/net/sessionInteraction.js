@@ -4,7 +4,7 @@ export { applyPredictedTeleportAction } from "./teleportPrediction.js";
 
 export function collectInput(game, consumeQueued = true) {
   const playerAlive = !(Number.isFinite(game?.player?.health) && game.player.health <= 0);
-  const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.shopOpen || !!game?.skillTreeOpen || !!game?.optionsOpen;
+  const gameplayBlocked = !playerAlive || !!game?.gameOver || !!game?.paused || !!game?.skillTreeOpen || !!game?.optionsOpen;
   const input = game.input.getGameplayIntent({
     playerX: Number.isFinite(game?.player?.x) ? game.player.x : 0,
     playerY: Number.isFinite(game?.player?.y) ? game.player.y : 0,
@@ -94,6 +94,10 @@ export function handleNetworkUiActions(game, netClient, isController) {
       pinned.key === node?.key &&
       pinned.kind === node?.kind
     );
+  };
+  const isPinnedShopItem = (item) => {
+    const pinned = game?.uiPinnedTooltip;
+    return !!(pinned && pinned.source === "shop" && pinned.key === item?.key);
   };
   const handleSpectateUi = () => {
     if (!game || !game.input || game.gameOver || (Number.isFinite(game?.player?.health) && game.player.health > 0)) return false;
@@ -339,15 +343,26 @@ export function handleNetworkUiActions(game, netClient, isController) {
       continue;
     }
     const itemRects = game.uiRects.shopItems || [];
+    let handledShopItem = false;
     for (const item of itemRects) {
       if (!playerAlive) break;
       if (hit(click.x, click.y, item.rect)) {
-        clearPinnedUiTooltip();
-        recordAction(click, `shopItem:${item.key}`, "buyUpgrade", item.key);
-        netClient.sendAction({ kind: "buyUpgrade", key: item.key });
+        if (isAndroidTouchUi && !isPinnedShopItem(item)) {
+          pinUiTooltip({
+            source: "shop",
+            key: item.key
+          });
+          recordAction(click, `shopItem:${item.key}`, "pinTooltip", item.key);
+        } else {
+          clearPinnedUiTooltip();
+          recordAction(click, `shopItem:${item.key}`, "buyUpgrade", item.key);
+          netClient.sendAction({ kind: "buyUpgrade", key: item.key });
+        }
+        handledShopItem = true;
         break;
       }
     }
+    if (handledShopItem) continue;
     if (playerAlive && hit(click.x, click.y, game.uiRects.skillRefundButton)) {
       recordAction(click, "skillRefundButton", "refundSkills");
       netClient.sendAction({ kind: "refundSkills" });

@@ -228,7 +228,7 @@ function serializeFloatingText(room, text, activeEnemies) {
 }
 
 function serializeDrop(room, d) {
-  return {
+  const payload = {
     id: getStableId(room, "drop", "d", d),
     type: d.type,
     x: d.x,
@@ -237,6 +237,74 @@ function serializeDrop(room, d) {
     amount: d.amount,
     life: d.life
   };
+  copyStringFields(payload, d, ["key", "playerId", "name"]);
+  copyFiniteFields(payload, d, ["quantity"]);
+  return payload;
+}
+
+function serializeOwlDelivery(source) {
+  if (!source || typeof source !== "object") return null;
+  const active = source.active && typeof source.active === "object"
+    ? {
+        id: "ticklecorn",
+        name: "Veronica",
+        x: source.active.x,
+        y: source.active.y,
+        displayX: source.active.displayX,
+        displayY: source.active.displayY,
+        destX: source.active.destX,
+        destY: source.active.destY,
+        hp: source.active.hp,
+        maxHp: source.active.maxHp,
+        size: source.active.size,
+        state: source.active.state,
+        waitTimer: source.active.waitTimer,
+        portalTimer: source.active.portalTimer,
+        slainTimer: source.active.slainTimer,
+        portalSlain: !!source.active.portalSlain,
+        arrivalNotified: !!source.active.arrivalNotified,
+        underAttackTimer: source.active.underAttackTimer,
+        orders: Array.isArray(source.active.orders)
+          ? source.active.orders.map((order) => ({
+              id: order.id,
+              playerId: order.playerId,
+              key: order.key,
+              quantity: order.quantity,
+              purchasedAt: order.purchasedAt
+            }))
+          : [],
+        trail: Array.isArray(source.active.trail)
+          ? source.active.trail.slice(-48).map((mote) => ({
+              x: mote.x,
+              y: mote.y,
+              vx: mote.vx,
+              vy: mote.vy,
+              radius: mote.radius,
+              sparkle: !!mote.sparkle,
+              phase: mote.phase,
+              life: mote.life,
+              maxLife: mote.maxLife
+            }))
+          : []
+      }
+    : null;
+  return {
+    active,
+    pendingCount: Array.isArray(source.pendingOrders) ? source.pendingOrders.length : 0,
+    nextDispatchAt: source.nextDispatchAt,
+    audioEvents: Array.isArray(source.audioEvents)
+      ? source.audioEvents.slice(-12).map((event) => ({ id: event.id, kind: event.kind, at: event.at }))
+      : [],
+    notificationEvents: Array.isArray(source.notificationEvents)
+      ? source.notificationEvents.slice(-12).map((event) => ({ id: event.id, text: event.text, at: event.at }))
+      : [],
+    lastMarker: source.lastMarker ? { ...source.lastMarker } : null
+  };
+}
+
+function serializeFlameOfTheFallen(source) {
+  if (!source || typeof source !== "object") return null;
+  return { active: !!source.active, state: source.state || (source.active ? "charging" : ""), x: source.x, y: source.y, radius: source.radius, timer: source.timer, maxTimer: source.maxTimer, souls: source.souls, requiredSouls: source.requiredSouls, pulseTimer: source.pulseTimer, visualTimer: source.visualTimer, linkedPlayerIds: Array.isArray(source.linkedPlayerIds) ? source.linkedPlayerIds.slice(0, 8) : [] };
 }
 
 function serializeBreakable(room, b) {
@@ -377,17 +445,15 @@ export function serializeMetaState(source) {
     necromancerRuntime: sim.necromancerRuntime,
     upgrades: sim.upgrades,
     consumables: sim.consumables,
-    shopStock: sim.shopStock
+    shopStock: sim.shopStock,
+    shopRotationEvents: sim.shopRotationEvents || []
   };
 }
 
 export function serializeState(room) {
   const sim = room.sim;
   const activeBounds = makeActiveBounds(sim, 8);
-  const floorBoss =
-    sim.floorBoss && typeof sim.floorBoss === "object"
-      ? { ...sim.floorBoss }
-      : null;
+  const floorBoss = sim.floorBoss && typeof sim.floorBoss === "object" ? { ...sim.floorBoss } : null;
   const activeEnemies = sim.enemies.filter((e) => isInsideBounds(e, activeBounds, 56));
   const activeDrops = sim.drops.filter((d) => isInsideBounds(d, activeBounds, 40));
   const activeBreakables = (sim.breakables || []).filter((b) => isInsideBounds(b, activeBounds, 48));
@@ -415,6 +481,10 @@ export function serializeState(room) {
     door: { ...sim.door },
     pickup: { ...sim.pickup },
     portal: sim.portal ? { ...sim.portal } : null,
+    owlDelivery: serializeOwlDelivery(sim.owlDelivery),
+    flameOfTheFallen: serializeFlameOfTheFallen(sim.flameOfTheFallen),
+    shopStock: sim.shopStock || [],
+    shopRotationEvents: sim.shopRotationEvents || [],
     enemies: activeEnemies.map((e) => serializeEnemy(room, e)),
     drops: activeDrops.map((d) => serializeDrop(room, d)),
     lightSources: (sim.lightSources || []).map((light) => serializeLightSource(room, light)),

@@ -84,23 +84,29 @@ function validateSharedRewards() {
 
   room.sim.gainExperienceForPlayerEntity(peerState, 4);
   ({ ownerState, peerState } = readRewardPlayers(room));
-  assert.equal(ownerState.experience, 4, "owner did not receive shared XP from peer reward");
-  assert.equal(peerState.experience, 4, "peer did not keep XP from own reward");
+  assert.equal(ownerState.experience, 2, "owner did not receive split shared XP from peer reward");
+  assert.equal(peerState.experience, 2, "peer did not keep split XP from own reward");
 
   room.sim.awardGoldToPlayerEntity(peerState, 11, { spawnText: false });
   ({ ownerState, peerState } = readRewardPlayers(room));
-  assert.equal(ownerState.gold, 11, "owner did not receive shared gold from peer pickup");
-  assert.equal(peerState.gold, 11, "peer did not keep gold from own pickup");
-  assert.equal(ownerState.score, 11, "owner gold-score reward did not mirror shared gold");
-  assert.equal(peerState.score, 11, "peer gold-score reward did not mirror shared gold");
+  assert.equal(ownerState.gold, 6, "owner did not receive split shared gold from peer pickup");
+  assert.equal(peerState.gold, 5, "peer did not keep split gold from own pickup");
+  assert.equal(ownerState.score, 6, "owner gold-score reward did not mirror split shared gold");
+  assert.equal(peerState.score, 5, "peer gold-score reward did not mirror split shared gold");
 
   peerState.alive = false;
   peerState.health = 0;
   prepareRewardPlayers(room);
   room.sim.awardGoldToPlayerEntity(room.sim.player, 5, { spawnText: false });
   ({ ownerState, peerState } = readRewardPlayers(room));
-  assert.equal(ownerState.gold, 16, "living owner did not receive gold after peer death");
-  assert.equal(peerState.gold, 11, "dead peer incorrectly received shared gold");
+  assert.equal(ownerState.gold, 11, "living owner did not receive full gold after peer death");
+  assert.equal(peerState.gold, 5, "dead peer incorrectly received shared gold");
+  room.sim.gainExperienceForPlayerEntity(room.sim.player, 3);
+  ({ ownerState, peerState } = readRewardPlayers(room));
+  assert.equal(ownerState.experience, 3.5, "living owner did not receive split XP after peer death");
+  assert.equal(peerState.experience, 3.5, "dead peer did not receive split shared XP");
+  assert.equal(peerState.alive, false, "shared XP should not revive a dead peer");
+  assert.equal(peerState.health, 0, "shared XP should not heal a dead peer");
 }
 
 function makeRewardEnemy(game, overrides = {}) {
@@ -141,7 +147,9 @@ function validateDeathRewardEligibility() {
   game.enemies.push(makeRewardEnemy(game, { id: "ownerless" }));
   stepGame(game, 0.016, { processUi: false });
   assert.ok(remote.experience > 0, "ownerless enemy death should reward remaining active players");
-  assert.equal(game.experience, 0, "dead primary player should not receive shared XP");
+  assert.ok(game.experience > 0, "dead primary player should receive shared XP");
+  assert.equal(game.player.health, 0, "dead primary player should not be healed by shared XP");
+  assert.equal(game.player.alive, false, "dead primary player should not be revived by shared XP");
 
   const xpAfterOwnerless = remote.experience;
   game.enemies.push(makeRewardEnemy(game, {

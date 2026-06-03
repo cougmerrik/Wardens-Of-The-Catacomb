@@ -2,6 +2,7 @@ import { vecLength, directionIndexFromVector } from "../utils.js";
 import { updateConfusedEnemy, updateFriendlyMageSummon } from "./gameStepMageSummons.js";
 import { resolveCombatAndDrops } from "./stepCombatResolution.js";
 import { syncSkillPointPopupQueue } from "./skillPointPopup.js";
+import { tickShopStockRotation } from "./world/shopStockRotation.js";
 import { getWarriorPassiveRegenBonusPct, isWarriorTalentGame } from "./warriorTalentTree.js";
 import {
   getNecromancerBlackCandleCursedBeamBonus,
@@ -69,6 +70,8 @@ export function stepGame(game, dt, controls = {}) {
   game.time += dt;
   if (typeof game.tickActivePlayerEntities === "function") game.tickActivePlayerEntities(dt);
   if (typeof game.tickConsumables === "function") game.tickConsumables(dt);
+  tickShopStockRotation(game, dt);
+  if (typeof game.tickOwlDelivery === "function") game.tickOwlDelivery(dt);
   if (typeof game.updateNavigationField === "function") game.updateNavigationField();
   if (typeof game.updateFloorBossTrigger === "function") game.updateFloorBossTrigger();
   if (typeof game.syncFloorBossFeedback === "function") game.syncFloorBossFeedback();
@@ -561,7 +564,7 @@ export function stepGame(game, dt, controls = {}) {
   const livingPlayersForWake = typeof game.getLivingPlayerEntities === "function" ? game.getLivingPlayerEntities() : [game.player];
   for (const stand of game.armorStands) {
     if (!stand.animated || stand.activated) continue;
-    if (floorBossActive) break;
+    if (floorBossActive || postBossSpawnSuppressed) break;
     if (countLivingEnemies() >= activeEnemyCap || armorActivations >= 4) break;
     const shouldWake = livingPlayersForWake.some(
       (player) => player && vecLength((player.x || 0) - stand.x, (player.y || 0) - stand.y) < armorWakeRadius

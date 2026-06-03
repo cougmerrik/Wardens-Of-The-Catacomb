@@ -6,6 +6,9 @@ import { getStableId, serializeMetaState, serializeState } from "./net/stateSeri
 import { average, monotonicNowMs, percentile } from "./net/telemetry.js";
 import { makeDefaultInput } from "./net/serverHelpers.js";
 import { chooseGameplayTrack } from "./musicCatalog.js";
+import { grantConsumableCharge, recordFlameOfTheFallenKill } from "../src/game/world/consumablesEconomy.js";
+import { tickShopStockRotation } from "../src/game/world/shopStockRotation.js";
+import { getConsumableDefinition } from "../src/game/consumables.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -99,15 +102,20 @@ function main() {
 
   handleActionMessage(room, owner.id, { kind: "buyUpgrade", key: "shield" });
   ownerState = room.syncPrimaryActivePlayerFromSim();
-  assert(ownerState.gold === 2997, `owner gold did not drop after shield purchase: ${ownerState.gold}`);
-  assert(getActiveSlot(ownerState, "shield")?.count === 1, "owner shield did not enter active inventory");
+  assert(ownerState.gold === 2985, `owner gold did not drop after shield purchase: ${ownerState.gold}`);
+  assert(!getActiveSlot(ownerState, "shield"), "owner shield should wait for owl delivery");
+  assert((room.sim.owlDelivery?.pendingOrders || []).some((order) => order.key === "shield" && order.playerId === owner.id), "owner shield order was not queued for owl delivery");
   assert(getStock(room, "shield")?.stock === 1, `shared shield stock did not decrement after owner purchase: ${getStock(room, "shield")?.stock}`);
   assert(!getActiveSlot(peerState, "shield"), "peer incorrectly received owner shield purchase");
+  grantConsumableCharge(room.sim, "shield");
+  ownerState = room.syncPrimaryActivePlayerFromSim();
 
   handleActionMessage(room, peer.id, { kind: "buyUpgrade", key: "shield" });
-  assert(peerState.gold === 2997, `peer gold did not drop after shield purchase: ${peerState.gold}`);
-  assert(getActiveSlot(peerState, "shield")?.count === 1, "peer shield did not enter active inventory");
+  assert(peerState.gold === 2985, `peer gold did not drop after shield purchase: ${peerState.gold}`);
+  assert(!getActiveSlot(peerState, "shield"), "peer shield should wait for owl delivery");
+  assert((room.sim.owlDelivery?.pendingOrders || []).some((order) => order.key === "shield" && order.playerId === peer.id), "peer shield order was not queued for owl delivery");
   assert(getStock(room, "shield")?.stock === 0, `shared shield stock did not reach zero after peer purchase: ${getStock(room, "shield")?.stock}`);
+  grantConsumableCharge({ player: peerState, consumables: peerState.consumables }, "shield");
 
   handleActionMessage(room, owner.id, { kind: "buyUpgrade", key: "shield" });
   ownerState = room.syncPrimaryActivePlayerFromSim();
@@ -115,11 +123,11 @@ function main() {
 
   handleActionMessage(room, owner.id, { kind: "buyUpgrade", key: "angelRing" });
   ownerState = room.syncPrimaryActivePlayerFromSim();
-  assert(getPassiveSlot(ownerState, "angelRing")?.count === 1, "owner angel ring did not enter passive inventory");
+  assert(!getPassiveSlot(ownerState, "angelRing"), "owner angel ring should wait for owl delivery");
   assert(getStock(room, "angelRing")?.stock === 1, "angel ring stock did not decrement after owner purchase");
 
   handleActionMessage(room, peer.id, { kind: "buyUpgrade", key: "angelRing" });
-  assert(getPassiveSlot(peerState, "angelRing")?.count === 1, "peer angel ring did not enter passive inventory");
+  assert(!getPassiveSlot(peerState, "angelRing"), "peer angel ring should wait for owl delivery");
   assert(getStock(room, "angelRing")?.stock === 0, "angel ring stock did not reach zero after peer purchase");
 
   handleActionMessage(room, owner.id, { kind: "useConsumableSlot", slot: 0 });
@@ -157,6 +165,67 @@ function main() {
     .map((entry) => entry.id);
   assert(regenTextIds.length >= 2, "peer regeneration potion should publish repeated healing feedback");
   assert(new Set(regenTextIds).size === regenTextIds.length, "peer regeneration potion feedback should allocate unique floating text ids");
+
+  ownerState = room.syncPrimaryActivePlayerFromSim();
+  ownerState.x = 512;
+  ownerState.y = 640;
+  ownerState.consumables.sharedCooldown = 0;
+  ownerState.consumables.activeSlots = [{ key: "phoenixDraught", count: 1, cooldownRemaining: 0 }];
+  peerState.x = 96;
+  peerState.y = 128;
+  peerState.health = 0;
+  peerState.alive = false;
+  peerState.spectateTargetId = owner.id;
+  room.syncSimPrimaryPlayerState();
+  room.sim.activePlayerCount = Math.max(1, room.clients.size);
+  room.sim.networkActivePlayers = room.getSimulationPlayerEntities();
+  handleActionMessage(room, owner.id, { kind: "useConsumableSlot", slot: 0 });
+  ownerState = room.syncPrimaryActivePlayerFromSim();
+  assert(peerState.alive === true, "Phoenix Draught should revive a dead multiplayer ally");
+  assert(peerState.health === Math.ceil(peerState.maxHealth * 0.4), "Phoenix Draught should revive the ally at 40% HP");
+  assert(peerState.x === ownerState.x, "Phoenix Draught should revive the ally at the user's x position");
+  assert(peerState.y === ownerState.y, "Phoenix Draught should revive the ally at the user's y position");
+  assert(!getActiveSlot(ownerState, "phoenixDraught"), "Phoenix Draught should be consumed after revive");
+
+  peerState.health = 0;
+  peerState.alive = false;
+  peerState.spectateTargetId = owner.id;
+  ownerState.consumables.sharedCooldown = 0;
+  ownerState.consumables.activeSlots = [{ key: "flameOfTheFallen", count: 1, cooldownRemaining: 0 }];
+  room.syncSimPrimaryPlayerState();
+  room.sim.activePlayerCount = Math.max(1, room.clients.size);
+  room.sim.networkActivePlayers = room.getSimulationPlayerEntities();
+  handleActionMessage(room, owner.id, { kind: "useConsumableSlot", slot: 0 });
+  ownerState = room.syncPrimaryActivePlayerFromSim();
+  assert(room.sim.flameOfTheFallen?.active === true, "Flame of the Fallen should create an active multiplayer pyre");
+  assert(peerState.alive === false, "Flame of the Fallen should not revive before the soul meter fills");
+  const flame = room.sim.flameOfTheFallen;
+  recordFlameOfTheFallenKill(room.sim, { x: flame.x, y: flame.y, type: "golem" });
+  assert(peerState.alive === true, "Flame of the Fallen should revive a dead ally after the meter fills");
+  assert(peerState.health === Math.ceil(peerState.maxHealth * 0.5), "Flame of the Fallen should revive at 50% HP");
+  const flameSnapshot = serializeState(room);
+  assert(flameSnapshot.flameOfTheFallen?.state === "complete", "serialized state should include completed flame state");
+  assert(!getActiveSlot(ownerState, "flameOfTheFallen"), "Flame of the Fallen should be consumed after use");
+
+  room.sim.shopStock = [
+    { key: "regenerationPotion", stock: 2 },
+    { key: "speedPotion", stock: 2 },
+    { key: "frostOil", stock: 2 },
+    { key: "fireOil", stock: 2 },
+    { key: "spikeGrowth", stock: 2 }
+  ];
+  room.sim.shopStockRotationNextAt = room.sim.time;
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+  try {
+    tickShopStockRotation(room.sim, 0.016);
+  } finally {
+    Math.random = originalRandom;
+  }
+  const rotationSnapshot = serializeState(room);
+  assert(rotationSnapshot.shopStock?.[0]?.key !== "regenerationPotion", "serialized multiplayer state should include rotated shop stock");
+  const rotatedName = getConsumableDefinition(rotationSnapshot.shopStock?.[0]?.key)?.name || "";
+  assert(rotationSnapshot.shopRotationEvents?.some((event) => event.text === `${rotatedName} is now available in the shop.`), "serialized multiplayer state should include shop rotation banner event");
 
   console.log(JSON.stringify({
     ownerGold: ownerState.gold,

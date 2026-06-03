@@ -4,7 +4,7 @@ const RANDOM_TIP_MIN_DELAY = 18;
 const RANDOM_TIP_DELAY_SPREAD = 14;
 
 export const GAMEPLAY_RANDOM_TIPS = [
-  "The shop has items that can help you survive!",
+  "Call for Aid has items that can help you survive!",
   "Don't die!",
   "You can disable these tips in the options menu.",
   "Basic!",
@@ -14,7 +14,7 @@ export const GAMEPLAY_RANDOM_TIPS = [
   "Moving can help you escape from enemies.",
   "Killing monsters gives you XP.",
   "Selecting the skills is forever, unless you want to buy a refund.",
-  "The shop is everywhere. Everywhere is the shop.",
+  "Veronica is just a hoot away.",
   "You can turn the music up in the options menu.",
   "You can disable the ads by buying the full game, or through the options menu.",
   "Torches refill your lantern meter.",

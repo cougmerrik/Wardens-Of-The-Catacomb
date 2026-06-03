@@ -7,6 +7,8 @@ export function createLocalGame({
   returnToMenu,
   syncMusicForGame,
   startingFloor = 1,
+  devStartingInventoryItem = "",
+  devStartingShopItem = "",
   bossOverride = "auto",
   debugHudEnabled = false,
   gameplayTipsEnabled = true,
@@ -34,6 +36,9 @@ export function createLocalGame({
   }
   if (startingFloor > 1 && typeof game.applyDebugStartingFloor === "function") {
     game.applyDebugStartingFloor(startingFloor);
+  }
+  if (typeof game.applyDevStartingConsumables === "function") {
+    game.applyDevStartingConsumables({ inventoryKey: devStartingInventoryItem, shopKey: devStartingShopItem });
   }
   syncMusicForGame(game);
   game.start();

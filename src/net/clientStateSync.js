@@ -1,19 +1,4 @@
-import {
-  applyMetaStateToGame,
-  applyNetworkFloatingTextEvents,
-  captureEnemyStateById,
-  capturePlayerProgressById,
-  createProjectileSpawnReconciler,
-  findSnapshotLocalPlayer,
-  getPredictionPressure,
-  queuePlayerDeathNotifications,
-  syncFloorBossState,
-  syncNamedObject,
-  syncRemotePlayers,
-  synthesizeDespawnDamageFloatingTexts,
-  synthesizeEnemyDamageFloatingTexts,
-  synthesizePlayerProgressionFloatingTexts
-} from "./clientSnapshotHelpers.js";
+import { applyMetaStateToGame, applyNetworkFloatingTextEvents, captureEnemyStateById, capturePlayerProgressById, createProjectileSpawnReconciler, findSnapshotLocalPlayer, getPredictionPressure, queuePlayerDeathNotifications, syncFloorBossState, syncNamedObject, syncRemotePlayers, synthesizeDespawnDamageFloatingTexts, synthesizeEnemyDamageFloatingTexts, synthesizePlayerProgressionFloatingTexts } from "./clientSnapshotHelpers.js";
 import {
   ensureNetworkPerf,
   isPostLoadCorrectionActive,
@@ -26,12 +11,12 @@ import {
 import { applyPlayerSnapshotToGameState } from "./playerSnapshotSchema.js";
 import { applyPredictedTeleportAction } from "./teleportPrediction.js";
 import { resolveSkillPointPopupPendingSpend } from "../game/skillPointPopup.js";
+import { applyOwlDeliveryNotifications } from "./owlDeliveryNotifications.js";
+import { applyShopRotationSnapshot } from "./shopRotationNotifications.js";
 export { applyMetaStateToGame, resetNetworkFloatingTextEventCache } from "./clientSnapshotHelpers.js";
 
 function normalizeMapRow(row) {
-  if (typeof row === "string") return Array.from(row);
-  if (Array.isArray(row)) return row.slice();
-  return [];
+  return typeof row === "string" ? Array.from(row) : Array.isArray(row) ? row.slice() : [];
 }
 
 export function applyMapStateToGame(game, payload) {
@@ -250,6 +235,7 @@ export function applySnapshotToGame({
 }) {
   if (!state || typeof state !== "object") return { netPendingInputs, netLastAckSeq };
   applyMetaStateToGame(game, state);
+  applyShopRotationSnapshot(game, state);
   applyServerStateAnomalies(game, state.serverStateAnomalies);
   const previousAliveById = new Map();
   if (game?.player?.id) previousAliveById.set(game.player.id, (game.player.alive !== false) && (game.player.health || 0) > 0);
@@ -493,6 +479,11 @@ export function applySnapshotToGame({
     synthesizeEnemyDamageFloatingTexts(game, previousEnemyStateById, { skip: false });
     recordSuspiciousNetworkState(game, { keyframe: false, ackSeq });
   }
+  if (Object.prototype.hasOwnProperty.call(state, "owlDelivery")) {
+    applyOwlDeliveryNotifications(game, state.owlDelivery);
+    game.owlDelivery = state.owlDelivery || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(state, "flameOfTheFallen")) game.flameOfTheFallen = state.flameOfTheFallen || null;
 
   return { netPendingInputs, netLastAckSeq };
 }

@@ -223,5 +223,21 @@ export const runtimeSceneLightingMethods = {
     overlayCtx.globalCompositeOperation = "source-over";
     overlayCtx.restore();
     ctx.drawImage(overlayCanvas, 0, 0);
+
+    if ((game?.consumables?.effects?.darkvisionPotion?.timer || 0) > 0 && game.player) {
+      const tile = Number.isFinite(game?.config?.map?.tile) ? game.config.map.tile : 32;
+      const sx = (game.player.x || 0) - cameraX;
+      const sy = (game.player.y || 0) - cameraY;
+      const radius = tile * 10;
+      const tint = ctx.createRadialGradient(sx, sy, Math.max(1, radius * 0.08), sx, sy, radius);
+      tint.addColorStop(0, "rgba(146, 84, 255, 0.18)");
+      tint.addColorStop(0.55, "rgba(112, 54, 210, 0.11)");
+      tint.addColorStop(1, "rgba(73, 32, 145, 0)");
+      ctx.save();
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, top, playW, h);
+      ctx.restore();
+    }
   }
 };

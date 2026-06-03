@@ -57,7 +57,7 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.skillTreeOpen = false;
   game.time = 0;
   game.skillPoints = 0;
-  game.skillPointPopup = { active: null, queue: [], nextId: 1, lastSkillPoints: 0 };
+  game.skillPointPopup = { active: null, queue: [], nextId: 1, lastSkillPoints: 0, retryAt: null };
   game.refundCount = 0;
   game.statsPanelOpen = false;
   game.statsPanelView = "run";
@@ -78,6 +78,7 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.enemies = [];
   game.armorStands = [];
   game.lightSources = [];
+  game.flameOfTheFallen = null;
   game.breakables = [];
   game.wallTraps = [];
   game.enemySpawnTimer = config.enemy.spawnIntervalStart;
@@ -106,7 +107,13 @@ export function initializeRuntimeBaseState(game, { classType, classSpec, config 
   game.upgrades = createUpgradeState();
   game.shopOrder = [];
   game.consumables = createConsumableInventoryState();
+  game.flameOfTheFallenOffered = false;
+  game.flameOfTheFallenPurchased = false;
   game.shopStock = rollConsumableShopStock(game.floor, 5);
+  if (game.shopStock.some((entry) => entry?.key === "flameOfTheFallen")) game.flameOfTheFallenOffered = true;
+  game.shopStockRotationNextAt = 60;
+  game.shopRotationEventSeq = 0;
+  game.shopRotationEvents = [];
 
   game.player = createPlayerState(classType, classSpec, config.player.maxHealth);
   game.player.rangerTalents = game.rangerTalents;

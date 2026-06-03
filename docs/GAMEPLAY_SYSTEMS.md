@@ -28,6 +28,8 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Skill path focuses on Fire Arrow, Piercing Strike, and Multiarrow
 - The current class-art pass focuses on making the ranger read as a female elf archer while preserving the retro sprite style. Ranger talent choices can change costume accents, weapon silhouettes, projectile styling, and short-lived status/effect visuals without changing combat rules by themselves.
 - Ranger path and capstone visual accents are intentionally small and readable: Fire Arrow/storm effects emphasize orange and pale-blue arrow energy, Rogue emphasizes dark hood/shadow cues, Assassin emphasizes sharper dagger/execution marks, and Beast Master emphasizes natural green/bone/wolf-pact accents.
+- Rogue attacks made from stealth, including Shadowstep, Shadow Veil, and smoke concealment, deal double damage and have a 33% critical-strike chance.
+- Assassin ranged attacks chain physical damage to nearby enemies at medium-or-higher combo, and Assassin attacks have a 40% chance to execute normal enemies reduced below 15% health. Ranged executes leave a short red splash where the enemy fell.
 - Throwing Knives now present ranged and melee modes differently without changing attack rules: ranged throws alternate hands and briefly show the thrown hand empty during reload, while melee `Close Cuts` draws tight alternating slash arcs near the ranger.
 - Ranger `Flurry` converts combo tiers into attack speed, granting `+6%`, `+12%`, or `+18%` attack speed at `5`, `10`, or `20` combo.
 
@@ -153,9 +155,15 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Health pickups restore `25%` of max health.
 - Gold-find and spawn-rate shop upgrades were removed from the shop.
 - The current shop is consumable-only. Consumables are active or passive, have finite charges, appear in the HUD while owned, and follow the schema in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md).
+- Pressing `Call for Aid` opens an in-game radial aid menu around the player instead of a modal shop window. The menu does not pause local or multiplayer gameplay. Each radial entry shows the consumable icon and remaining stock; hover tooltips show the item name, type, rarity, price, effect, and purchase failure reason. On touch layouts, the first tap pins the tooltip and the second tap buys.
+- Radial shop entries with `0` stock or insufficient gold are greyed out. The existing finite stock rules still apply, including shared multiplayer stock depletion.
+- Call for Aid purchases deduct gold and stock immediately, but the item is delivered by Veronica, a bright blue magic owl courier. The first pending order starts a 15-30 second dispatch window. Orders added before Veronica spawns join that delivery; orders placed while Veronica is already on the map queue for the next delivery and start their dispatch window after the current Veronica departs.
+- The shop pool includes tactical utility consumables such as Lantern Fuel, Darkvision Potion, Holy Candle, passive artifacts, and multiplayer-only revive consumables. Lantern Fuel refills the purchaser's lantern by 20%, Darkvision Potion privately gives the consumer 10 tiles of dark sight for 30 seconds, Holy Candle drops a 3-tile holy light for 10 seconds that heals players inside for 5% max health each second, Phoenix Draught revives one random dead ally at the user's position with 40% HP, and the once-per-run Flame of the Fallen creates a 20s pyre that revives all dead allies at 50% HP if nearby enemy kills fill its soul meter. Spike Growth is charge-based, retaliating for the next 25 hits instead of expiring by time. Forzare is a rare passive artifact that triggers when more than 3 enemies are within 1 tile, dealing force damage and knocking them back up to 3 tiles, then enters a 20s cooldown unless its 5% break chance destroys it.
+- Veronica spawns near the dungeon edge, flies to a stable delivery point near the party, appears in-world as a small wolf-sized detailed blue ghost owl with a nameplate and long-lived blue magic sparkle trail, and is marked on the minimap with her destination regardless of player distance. Players automatically claim only their own ordered items by moving within 2 tiles of her.
+- Veronica moves at roughly base Scout speed and is fragile. Nearby enemies target and damage her, under-attack feedback appears as the same top-screen notification style used by multiplayer join/leave messages, and a damaged health bar is shown. Unclaimed orders drop as recoverable owl parcels if she dies or waits 15 seconds at the delivery point. When she leaves she exits through a small dungeon-style portal; when slain, her body lingers briefly before that portal appears. Dropped-delivery minimap markers use a delivery box icon. If Veronica is slain, the next queued delivery waits an extra 60 seconds before its normal dispatch window. Purchased resources are not refunded.
 - The class status area reserves fixed space for active consumable effect icons so the panel does not resize as effects start or expire.
 - Regeneration Potion shows its item icon with remaining seconds in the class status area while active and displays periodic healing gain text as health is restored.
-- Speed Potion, Spike Growth, Shield, Fire Oil, and Frost Oil also show active effect icons in the class status area. Timed effects count down seconds, Shield shows temporary HP, and oil coatings show remaining charged attacks.
+- Speed Potion, Spike Growth, Shield, Darkvision Potion, Fire Oil, and Frost Oil also show active effect icons in the class status area. Timed effects count down seconds, Shield shows temporary HP, and charge-based effects show remaining charged uses.
 - Fire Oil and Frost Oil are attack-count weapon coatings: each use grants `15` charged attacks and applies the oil's damage/status effect to coated hits.
 - New consumables should include a matching item icon generated with the canonical prompt in [CONSUMABLES_SHOP_DESIGN.md](CONSUMABLES_SHOP_DESIGN.md#icon-generation-prompt).
 
@@ -244,8 +252,9 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - active status icons must use the same status-row presentation in multiplayer as local play
   - damage text must still show when a hit kills or despawns the target
   - class progression effects for Archer, Fighter, and Necromancer must have targeted network validation when they add statuses, procs, summons, resource changes, or player-visible text
-- Shop, skill tree, and stats overlays are per-player UI in multiplayer:
-  - pause-owner shop/skill actions pause the room globally
+- Call for Aid, skill tree, and stats overlays are per-player UI in multiplayer:
+  - Call for Aid never pauses the room
+  - pause-owner skill actions pause the room globally
   - other players can open their own local overlays without opening them on teammates' clients
 - Multiplayer skill spend and refund actions are authoritative:
   - local clicks send actions to the server
@@ -270,7 +279,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Remote players render as full in-world avatars.
 - Remote player handles appear below their characters using that player's stable run color.
 - The active-play HUD is rendered in-canvas instead of reserving a desktop sidebar. The minimap anchors to the top-right of the play canvas at `80%` opacity, and the combined player/class HUD aligns directly beneath it.
-- The top-right HUD strip exposes `Stats` and `Options`; the combined player/class HUD keeps local player identity, gold, the class skill button, shop/skill tree, pause, the class meter, active consumable effects, and the group list.
+- The top-right HUD strip exposes `Stats` and `Options`; the combined player/class HUD keeps local player identity, gold, the class skill button, Call for Aid/skill tree, pause, the class meter, active consumable effects, and the group list. The `Call for Aid` button toggles the player-centered radial aid menu open and closed.
 - Unspent skill points are no longer displayed as an `SP` counter during active play. Newly earned points open the tier-only skill popup, and the `Skill Tree` button slowly blinks green while points remain available.
 - The group list is embedded at the bottom of the combined HUD. It renders every teammate as a compact one-line owner marker/name plus health bar, including dead-state entries for connected dead spectators.
 - The minimap uses stable per-run player colors for teammates.
@@ -315,7 +324,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - multiplayer combat input
   - hit-confirmation timing
   - refund spend/reset sync
-  - shared XP/gold reward sync
+  - shared reward sync, with XP divided across active players and gold divided across living players
   - archer projectile alignment
   - network floor-load movement and pause control
   - ranged projectile cadence and cleanup

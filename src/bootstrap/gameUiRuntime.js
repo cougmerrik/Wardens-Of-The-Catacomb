@@ -9,7 +9,6 @@ export function syncIdleSoundState(music, splashActive, game) {
     !game.networkEnabled &&
     !game.paused &&
     !game.gameOver &&
-    !game.shopOpen &&
     !game.skillTreeOpen &&
     !game.statsPanelOpen
   );
@@ -34,6 +33,9 @@ function shouldHoldGameplayAudio(game) {
 export function syncMusicForGame(music, splashActive, game) {
   if (splashActive) return;
   syncIdleSoundState(music, splashActive, game);
+  if (game?.owlDelivery?.audioEvents && typeof music.playVeronicaAudioEvents === "function") {
+    music.playVeronicaAudioEvents(game.owlDelivery.audioEvents);
+  }
   if (!game) {
     music.playMenuMusic();
     return;

@@ -1,10 +1,13 @@
 import { vecLength } from "../utils.js";
 import { finalizeProjectilesAndTransientState, pulseMageFrozenOrb, resolveSpecialProjectileCollision } from "./stepCombatProjectileSpecials.js";
+import { resolveAssassinProjectileEffects } from "./stepAssassinCombat.js";
 import { resolveFireZonesAndEnemyStatus } from "./stepCombatZoneAndEnemyStatus.js";
 import { getNecromancerPlaguecraftRiseChance, getNecromancerRotDps, getNecromancerRotDuration, hasNecromancerHarvester, hasNecromancerPlaguecraftRot, isNecromancerTalentGame } from "./necromancerTalentTree.js";
 import { hasWarriorSpellknight } from "./warriorTalentTree.js";
 import { hasRangerTalent } from "./rangerTalentTree.js";
 import { spawnGhost, spawnSkeleton } from "./enemySpawnFactories.js";
+import { pickupOwlItemDrop } from "./world/owlDelivery.js";
+import { recordFlameOfTheFallenKill } from "./world/consumablesEconomy.js";
 
 export function resolveCombatAndDrops({
   game,
@@ -447,6 +450,7 @@ export function resolveCombatAndDrops({
           }
         }
         if (b.projectileType !== "holyWave" && typeof projectileOwnerContext.applyRangerOnHitEffects === "function") projectileOwnerContext.applyRangerOnHitEffects(enemy, b.x, b.y);
+        resolveAssassinProjectileEffects({ game, projectile: b, ownerContext: projectileOwnerContext, enemy, activeEnemies, projectileDamage });
         if (Number.isFinite(b.knockback) && b.knockback > 0) {
           const len = vecLength((enemy.x || 0) - (b.x || 0), (enemy.y || 0) - (b.y || 0)) || 1;
           enemy.vx = (enemy.vx || 0) + (((enemy.x || 0) - (b.x || 0)) / len) * b.knockback;
@@ -681,6 +685,7 @@ export function resolveCombatAndDrops({
         }
       }
       if (typeof game.recordKillByPlayerEntity === "function") game.recordKillByPlayerEntity(rewardOwner, enemy);
+      recordFlameOfTheFallenKill(game, enemy);
       if (rewardOwner && rewardOwner.classType === "archer") {
         const runtime = rewardOwner === game.player ? (game.rangerRuntime || (game.rangerRuntime = {})) : (rewardOwner.rangerRuntime || (rewardOwner.rangerRuntime = {}));
         const talentSource = rewardOwner === game.player ? game : rewardOwner;
@@ -807,6 +812,8 @@ export function resolveCombatAndDrops({
       } else if (game.isGoldDrop(drop)) {
         const amount = Math.max(1, Math.floor(drop.amount * game.getGoldFindMultiplier()));
         if (typeof game.awardGoldToPlayerEntity === "function") game.awardGoldToPlayerEntity(player, amount);
+      } else if (drop.type === "owl_item") {
+        if (!pickupOwlItemDrop(game, drop, player)) continue;
       }
       drop.life = 0;
       break;

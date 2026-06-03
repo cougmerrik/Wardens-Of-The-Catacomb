@@ -15,6 +15,7 @@ import {
 
 export const SKILL_POINT_POPUP_DURATION = 8;
 export const SKILL_POINT_POPUP_FADE_SECONDS = 1;
+export const SKILL_POINT_POPUP_RETRY_DELAY = 15;
 const WARRIOR_TIER_LABELS = {
   1: "Weapon",
   2: "Stance",
@@ -31,7 +32,8 @@ export function ensureSkillPointPopupState(game) {
       active: null,
       queue: [],
       nextId: 1,
-      lastSkillPoints: Number.isFinite(game.skillPoints) ? Math.max(0, Math.floor(game.skillPoints)) : 0
+      lastSkillPoints: Number.isFinite(game.skillPoints) ? Math.max(0, Math.floor(game.skillPoints)) : 0,
+      retryAt: null
     };
   }
   if (!Array.isArray(game.skillPointPopup.queue)) game.skillPointPopup.queue = [];
@@ -47,6 +49,7 @@ function startNextPopup(game, state) {
   if (state.active || state.queue.length <= 0) return;
   const next = state.queue.shift();
   state.active = { ...next, startedAt: now(game) };
+  state.retryAt = null;
 }
 
 export function enqueueSkillPointPopup(game, count = 1) {
@@ -67,14 +70,22 @@ export function syncSkillPointPopupQueue(game) {
     for (let i = current; i < state.lastSkillPoints; i++) dismissSkillPointPopup(game);
   }
   state.lastSkillPoints = current;
-  if (current <= 0) dismissSkillPointPopup(game, { clearQueue: true });
+  if (current <= 0) {
+    dismissSkillPointPopup(game, { clearQueue: true });
+    state.retryAt = null;
+  } else if (!state.active && state.queue.length <= 0 && Number.isFinite(state.retryAt) && now(game) >= state.retryAt) {
+    enqueueSkillPointPopup(game, 1);
+  }
 }
 
 export function dismissSkillPointPopup(game, options = {}) {
   const state = ensureSkillPointPopupState(game);
   if (!state) return;
   state.active = null;
-  if (options.clearQueue) state.queue.length = 0;
+  if (options.clearQueue) {
+    state.queue.length = 0;
+    state.retryAt = null;
+  }
   else startNextPopup(game, state);
   if (options.syncSkillPoints && Number.isFinite(game.skillPoints)) {
     state.lastSkillPoints = Math.max(0, Math.floor(game.skillPoints));
@@ -130,6 +141,9 @@ export function updateSkillPointPopup(game) {
   const elapsed = now(game) - state.active.startedAt;
   if (elapsed >= SKILL_POINT_POPUP_DURATION) {
     dismissSkillPointPopup(game);
+    if (!state.active && state.queue.length <= 0 && Math.max(0, Math.floor(game.skillPoints || 0)) > 0) {
+      state.retryAt = now(game) + SKILL_POINT_POPUP_RETRY_DELAY;
+    }
     return state.active;
   }
   return state.active;

@@ -13,11 +13,13 @@ function main() {
   const scene = read("src/rendering/RendererRuntimeScene.js");
   const pendingScene = read("src/rendering/runtimeSceneDrawMethods.js");
   const classPanel = read("src/rendering/hud/classStatusPanel.js");
+  const shopMenu = read("src/rendering/hud/shopMenu.js");
   const topHud = read("src/rendering/hud/top.js");
   const minimap = read("src/rendering/rendererEffectsPlayerMethods.js");
   const stats = read("src/rendering/hud/stats.js");
   const gameRuntime = read("src/game/GameRuntimeBase.js");
   const renderer = read("src/rendering/RendererRuntime.js");
+  const holyCandleVisual = read("src/rendering/holyCandleVisual.js");
 
   assertIncludes(scene, "const sidebarW = 0;", "desktop play area should no longer reserve sidebar width");
   assertIncludes(gameRuntime, "return this.canvas.width;", "gameplay camera width should use the full canvas");
@@ -52,7 +54,8 @@ function main() {
   assertIncludes(classPanel, "let contentY = rect.y + PANEL_CONTENT_TOP;", "class status content should avoid excessive header gap");
   assertIncludes(classPanel, "game.uiRects.shopButton = shopRect;", "combined HUD should own the shop button rect");
   assertIncludes(classPanel, "function formatHudGold", "combined HUD should compact large gold amounts");
-  assertIncludes(classPanel, "goldAmount: game.gold || 0", "shop button should include the current gold amount");
+  assertIncludes(classPanel, '"Call for Aid"', "shop button should be labeled Call for Aid");
+  assertIncludes(classPanel, "goldAmount: game.gold || 0", "send-for-aid button should include the current gold amount");
   assertIncludes(classPanel, "ctx.arc(coinX, coinY, coinR", "shop button should draw a gold coin indicator");
   assertIncludes(classPanel, "game.uiRects.skillTreeButton = skillRect;", "combined HUD should own the skill tree button rect");
   assertIncludes(topHud, "game.uiRects.statsButton = statsRect;", "top HUD should own the stats button rect");
@@ -64,6 +67,15 @@ function main() {
   assertIncludes(classPanel, "getConsumableStatusRows(rect.w) * 28", "consumable status area should reserve fixed icon space");
   assertIncludes(classPanel, "drawAndroidSwapWidget(renderer, game, game.uiRects.hudAbilityWidget)", "Android swap button rect should be populated from the combined HUD");
   assert.ok(!classPanel.includes("drawModeSwapButton"), "combined HUD should not draw a swap button");
+  assertIncludes(shopMenu, "getPlayerScreenCenter", "shop should anchor the radial menu around the player");
+  assertIncludes(shopMenu, "drawShopTooltip", "shop radial items should expose hover tooltips");
+  assertIncludes(shopMenu, "game.uiRects.shopItems.push({ key: item.key, rect });", "shop radial nodes should publish purchase hit rects");
+  assertIncludes(shopMenu, "game.uiRects.shopClose = null;", "shop should not expose the old modal close button");
+  assert.ok(!shopMenu.includes("Castle Quartermaster"), "shop should not render the old modal shop window");
+  assert.ok(!shopMenu.includes("drawRadialHub"), "shop should not draw a central gold hub over the player");
+  assertIncludes(holyCandleVisual, 'drawConsumableItemIcon(ctx, "holyCandle"', "in-world Holy Candle should use the item icon");
+  assertIncludes(holyCandleVisual, "ctx.createRadialGradient", "Holy Candle should draw a visible radius aura");
+  assertIncludes(holyCandleVisual, "ctx.setLineDash([8, 7]);", "Holy Candle aura should mark the radius edge");
 
   assert.ok(!stats.includes('["Pace",'), "stats overlay should not show pace after HUD cleanup");
   assert.ok(!stats.includes("Enemies ${game.enemies.length}"), "compact enemy counter should be removed");
