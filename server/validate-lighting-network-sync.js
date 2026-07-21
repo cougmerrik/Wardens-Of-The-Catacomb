@@ -90,6 +90,11 @@ function main() {
   assert(Array.isArray(fullState.lightSources), "serialized state should include lightSources");
   assert(fullState.lightSources.length === serverGame.lightSources.length, "serialized state should include all torches");
   assert(fullState.lightSources.every((light) => typeof light.id === "string" && light.type === "torch"), "serialized torches should include stable ids and type");
+  assert(fullState.lightSources.every((light) => light.variant === "brazier"), "serialized light sources should preserve the brazier presentation variant");
+  serverGame.lightSources[0].lit = false;
+  serverGame.lightSources[0].relightTimer = 12.5;
+  const relightState = serializeState(room);
+  assert(relightState.lightSources[0].relightTimer === 12.5, "serialized braziers should preserve the authoritative relight timer");
   assert(fullState.bullets.some((bullet) => bullet.projectileType === "holyWave" && bullet.lightRadius === 72 && bullet.lightIntensity === 0.25), "serialized bullets should include light radius and intensity");
   assert(fullState.fireZones.some((zone) => zone.zoneType === "warCircle" && zone.lightRadius === 44 && zone.lightIntensity === 0.25), "serialized fire zones should include light radius and intensity");
 
@@ -171,6 +176,7 @@ function main() {
   assert(syncedTorch && syncedTorch.lit === false, "snapshot delta should sync lit=false to client");
   assert(syncedTorch.snuffCooldown === 0.75, "snapshot delta should sync snuff cooldown to client");
   assert(clientGame.player.lanternFuel === 0.42, "snapshot should sync lantern fuel to client player");
+  assert(clientGame.lightSources.some((light) => light.relightTimer === 12.5), "snapshot delta should sync the brazier relight timer to clients");
 
   console.log("Lighting network sync validation passed.");
 }

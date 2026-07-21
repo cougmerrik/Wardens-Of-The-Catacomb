@@ -1,5 +1,6 @@
 import { getRangerSelectedPath } from "../rangerTalentTree.js";
 import { getWarriorDoctrine } from "../warriorTalentTree.js";
+import { getBrazierLightWobble } from "./brazierLightWobble.js";
 
 function getTileSize(game) {
   return Number.isFinite(game?.config?.map?.tile) ? game.config.map.tile : 32;
@@ -232,12 +233,15 @@ export function placeTorches(game) {
     game.lightSources.push({
       id: `torch-${game.floor || 1}-${i}`,
       type: "torch",
+      variant: "brazier",
       x: c.x,
       y: c.y,
       size,
       lit: true,
+      litChangedAt: Number.isFinite(game.time) ? game.time : 0,
       lightRadius,
-      snuffCooldown: 0
+      snuffCooldown: 0,
+      relightTimer: 0
     });
   }
   return game.lightSources;
@@ -295,7 +299,12 @@ export function getActiveLightSources(game) {
   for (const light of Array.isArray(game.lightSources) ? game.lightSources : []) {
     if (!light || light.lit === false) continue;
     const radius = Number.isFinite(light.lightRadius) ? light.lightRadius : 0;
-    addSource(light, light.type || "light", radius);
+    if (light.type === "torch" && light.variant === "brazier") {
+      const wobble = getBrazierLightWobble(game, light, radius, cfg);
+      addSource(light, light.type, wobble.radius, { lightIntensity: wobble.lightIntensity, lightWobble: wobble.wobble });
+    } else {
+      addSource(light, light.type || "light", radius);
+    }
   }
 
   if (game.portal?.active) {
@@ -375,6 +384,7 @@ export function updateLightingInteractions(game, dt = 0) {
   decayLanternFuel(game, livingPlayers, elapsed);
   tickHolyCandles(game, livingPlayers, elapsed);
   if (!Array.isArray(game.lightSources) || game.lightSources.length === 0) return;
+  tickCollectedBrazierRelights(game, elapsed);
   const interval = Math.max(0, Number.isFinite(cfg.interactionInterval) ? cfg.interactionInterval : 0.25);
   const state = game._lightingInteractionState && typeof game._lightingInteractionState === "object"
     ? game._lightingInteractionState
@@ -382,7 +392,7 @@ export function updateLightingInteractions(game, dt = 0) {
   state.elapsed += elapsed;
   const sourceChanged = state.sourceRef !== game.lightSources;
   const hasRelightCandidate = game.lightSources.some((light) => {
-    if (!light || light.type !== "torch" || light.lit !== false) return false;
+    if (!light || light.type !== "torch" || light.lit !== false || (light.relightTimer || 0) > 0) return false;
     const torchRadius = Math.max(0, Number.isFinite(light.size) ? light.size * 0.5 : tile * 0.25);
     return livingPlayers.some((player) => {
       const playerRadius = Number.isFinite(player.size) ? Math.max(0, player.size * 0.5) : 0;
@@ -418,6 +428,7 @@ export function updateLightingInteractions(game, dt = 0) {
       });
       if (touchedBySnuffer) {
         light.lit = false;
+        light.litChangedAt = Number.isFinite(game.time) ? game.time : 0;
         light.snuffCooldown = snuffCooldown;
         if (typeof game.spawnFloatingText === "function") {
           game.spawnFloatingText(light.x, light.y - tile * 0.45, "Snuffed", "#9ba7bd", 0.7, 13);
@@ -432,8 +443,9 @@ export function updateLightingInteractions(game, dt = 0) {
       });
       if (collectingPlayer) {
         const gained = addLanternFuel(game, collectingPlayer, cfg.lanternFuelPerTorch);
-        light.collected = true;
         light.lit = false;
+        light.litChangedAt = Number.isFinite(game.time) ? game.time : 0;
+        light.relightTimer = Number.isFinite(cfg.brazierRelightSeconds) ? Math.max(0, cfg.brazierRelightSeconds) : 30;
         if (typeof game.spawnFloatingText === "function") {
           const label = gained > 0 ? "Lantern +" : "Lantern Full";
           game.spawnFloatingText(light.x, light.y - tile * 0.45, label, "#ffd978", 0.75, 13);
@@ -442,18 +454,34 @@ export function updateLightingInteractions(game, dt = 0) {
       }
     }
     if (light.lit !== false) continue;
+    if ((Number.isFinite(light.relightTimer) ? light.relightTimer : 0) > 0) continue;
     const touchedByPlayer = livingPlayers.some((player) => {
       const playerRadius = Number.isFinite(player.size) ? Math.max(0, player.size * 0.5) : 0;
       return isWithinDistance(player.x, player.y, light.x, light.y, touchDistance + torchRadius + playerRadius);
     });
     if (!touchedByPlayer) continue;
     light.lit = true;
+    light.litChangedAt = Number.isFinite(game.time) ? game.time : 0;
     light.snuffCooldown = 0;
     if (typeof game.spawnFloatingText === "function") {
       game.spawnFloatingText(light.x, light.y - tile * 0.45, "Relit", "#ffd978", 0.7, 13);
     }
   }
-  game.lightSources = game.lightSources.filter((light) => !light?.collected && (light.type !== "holyCandle" || (light.life || 0) > 0));
+  game.lightSources = game.lightSources.filter((light) => light?.type !== "holyCandle" || (light.life || 0) > 0);
+}
+
+function tickCollectedBrazierRelights(game, dt) {
+  if (dt <= 0) return;
+  const cfg = getLightingConfig(game);
+  const relightProtection = Number.isFinite(cfg.torchSnuffCooldown) ? Math.max(0, cfg.torchSnuffCooldown) : 1;
+  for (const light of game.lightSources) {
+    if (!light || light.type !== "torch" || light.lit !== false || !(light.relightTimer > 0)) continue;
+    light.relightTimer = Math.max(0, light.relightTimer - dt);
+    if (light.relightTimer > 0) continue;
+    light.lit = true;
+    light.litChangedAt = Number.isFinite(game.time) ? game.time : 0;
+    light.snuffCooldown = relightProtection;
+  }
 }
 
 function tickHolyCandles(game, livingPlayers, dt) {

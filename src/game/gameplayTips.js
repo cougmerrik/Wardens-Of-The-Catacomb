@@ -17,7 +17,7 @@ export const GAMEPLAY_RANDOM_TIPS = [
   "Veronica is just a hoot away.",
   "You can turn the music up in the options menu.",
   "You can disable the ads by buying the full game, or through the options menu.",
-  "Torches refill your lantern meter.",
+  "Lit braziers refill your lantern meter.",
   "Try to avoid fighting in the dark.",
   "Rat archers are pure evil."
 ];

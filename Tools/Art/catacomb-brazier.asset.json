@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "asset": "ENV_CatacombBrazier",
+  "specification": "environment-art/v0.1",
+  "seed": 41017,
+  "category": "animated_environment_prop",
+  "triangleBudget": 600,
+  "frame": { "width": 48, "height": 48 },
+  "camera": { "azimuthDegrees": 45, "elevationDegrees": 55, "orthoScale": 2.15 },
+  "palette": {
+    "ironShadow": "#1F2024",
+    "ironMid": "#24272B",
+    "ember": "#D64016",
+    "flameOrange": "#FF5A0A",
+    "flameHot": "#FFC21C",
+    "flameCore": "#FFF1A0",
+    "smokeDark": "#29282B",
+    "smokeLight": "#625F5A"
+  },
+  "states": [
+    { "name": "unlit", "from": 1, "to": 1, "durationMs": 125, "direction": "forward" },
+    { "name": "ignite", "from": 2, "to": 5, "durationMs": 100, "direction": "forward" },
+    { "name": "lit", "from": 6, "to": 11, "durationMs": 125, "direction": "forward" },
+    { "name": "extinguish", "from": 12, "to": 17, "durationMs": 125, "direction": "forward" }
+  ],
+  "outputs": {
+    "blend": "catacomb_brazier.generated.blend",
+    "aseprite": "catacomb_brazier.generated.aseprite",
+    "sheet": "catacomb_brazier_states_17f_48.png",
+    "data": "catacomb_brazier_states_17f_48.json",
+    "report": "catacomb_brazier.build-report.json"
+  }
+}

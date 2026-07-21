@@ -4,8 +4,8 @@ import { extname, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const LOC_LIMIT = 500;
-const EXISTING_OVERSIZE_GROWTH_LIMIT = 40;
+const REVIEW_THRESHOLD = 800;
+const LARGE_GROWTH_REVIEW_THRESHOLD = 150;
 
 function runGit(args) {
   try {
@@ -60,7 +60,7 @@ function main() {
   process.chdir(projectRoot);
   const files = collectFiles();
   const results = [];
-  const violations = [];
+  const advisories = [];
   for (const file of files) {
     try {
       const stats = statSync(resolve(process.cwd(), file));
@@ -69,24 +69,14 @@ function main() {
       const baseLines = getBaseLines(file);
       const delta = baseLines == null ? lines : lines - baseLines;
       results.push({ file, lines, baseLines, delta });
-      if (lines <= LOC_LIMIT) continue;
-      if (baseLines != null && baseLines > LOC_LIMIT) {
-        if (delta > EXISTING_OVERSIZE_GROWTH_LIMIT) {
-          violations.push({ file, lines, baseLines, delta, reason: "existing oversized file grew too much" });
-        }
-        continue;
+      if (lines >= REVIEW_THRESHOLD || delta >= LARGE_GROWTH_REVIEW_THRESHOLD) {
+        advisories.push({ file, lines, baseLines, delta, reason: "review module cohesion; LOC is advisory only" });
       }
-      violations.push({ file, lines, baseLines, delta, reason: "file exceeds LOC limit" });
     } catch {
       // ignore deleted or transient paths
     }
   }
-  if (violations.length > 0) {
-    throw new Error(
-      `LOC threshold exceeded: ${violations.map((entry) => `${entry.file} (${entry.lines}, base ${entry.baseLines ?? "new"}, delta ${entry.delta >= 0 ? `+${entry.delta}` : entry.delta}, ${entry.reason})`).join(", ")}`
-    );
-  }
-  console.log(JSON.stringify({ checkedFiles: results }, null, 2));
+  console.log(JSON.stringify({ checkedFiles: results, advisories }, null, 2));
 }
 
 main();

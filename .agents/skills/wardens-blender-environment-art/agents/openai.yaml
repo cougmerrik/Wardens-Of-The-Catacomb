@@ -1,0 +1,11 @@
+interface:
+  display_name: "Wardens Blender Environment Art"
+  short_description: "Build consistent low-poly Wardens assets"
+  default_prompt: "Use $wardens-blender-environment-art to design and validate a modular catacomb environment asset."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "blender"
+      description: "Official Blender Lab MCP server"
+      transport: "stdio"

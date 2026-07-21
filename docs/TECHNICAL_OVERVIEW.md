@@ -54,7 +54,7 @@ This document summarizes the current high-level architecture and validation work
 
 ## Recent Refactor Summary
 - Large gameplay, server, bootstrap, and renderer files were split into reusable modules.
-- No application JavaScript files remain over the `500` LOC threshold.
+- LOC reporting is advisory rather than a hard gate. Modules are split when responsibility, ownership, or testability benefits; targeted reads and searches control agent context use without forcing arbitrary 500-line boundaries.
 - Notable extracted module groups include:
   - `src/game/enemySpawnFactories.js`
   - `src/game/enemyAi.js`
@@ -106,17 +106,18 @@ This document summarizes the current high-level architecture and validation work
 ## Dynamic Lighting Architecture
 - Lighting gameplay state is stored on `game.lightSources` and reset during floor generation.
 - Runtime lighting helpers live in `src/game/world/lighting.js` and are mixed into `GameRuntimeWorld`:
-  - `placeTorches(game)` seeds static floor torches.
-  - `updateLightingInteractions(game, dt)` handles lantern fuel decay, lit-torch collection, relight/snuff interactions, and torch cooldowns.
+  - `placeTorches(game)` seeds static floor braziers using the network-compatible `torch` type and `brazier` presentation variant.
+  - `updateLightingInteractions(game, dt)` handles lantern fuel decay, lit-brazier collection, the authoritative 30-second automatic relight timer, player relighting of enemy-snuffed braziers, and snuff cooldowns.
   - `getPlayerLightRadius(player)` computes player light radius from bounded lantern fuel; `0%` fuel returns no player light and `100%` fuel reaches the configured full radius.
   - `getEnemyLightRadius(enemy)` resolves explicit enemy light-radius overrides, though default enemies and ghosts do not create world light.
   - `getActiveLightSources()` combines player, torch, and remote-player sources for rendering.
-- Torch objects carry stable gameplay/rendering fields: `id`, `type`, `x`, `y`, `size`, `lit`, `lightRadius`, and `snuffCooldown`.
+- Brazier objects carry stable gameplay/rendering fields: `id`, `type`, `variant`, `x`, `y`, `size`, `lit`, `litChangedAt`, `lightRadius`, `snuffCooldown`, and `relightTimer`. Collection leaves the object in place with `lit: false`; the server decrements `relightTimer` and restores `lit: true` at zero. The authoritative `litChangedAt` timestamp keeps one-shot animation progress correct when a state change occurs offscreen. The `type` remains `torch` so existing snapshot and delta schemas remain compatible.
 - Player entities carry `lanternFuel` in the `0..1` range. Network serialization includes that fuel value so the HUD gauge and player light radius stay aligned across clients.
 - Consumables can modify lighting and multiplayer player state: Lantern Fuel calls the centralized lantern fuel helper, Darkvision Potion contributes a private 10-tile local player sight radius with a purple visibility tint while active, Holy Candle creates a timed `holyCandle` light source that heals living players in its radius, Phoenix Draught is multiplayer-only revive utility that restores one random dead ally at the user's position with 40% HP, Forzare is a rare passive artifact that checks nearby hostile density during consumable ticks and applies force damage plus collision-aware knockback on a 20s slot cooldown with a 5% break chance, and Flame of the Fallen is a once-per-run multiplayer-only active pyre that revives all dead allies at 50% HP if nearby enemy kills fill its soul meter before the 20s timer expires. Flame charge uses `(6 + total players + living players * 2) * 2`, clamped to `16-48`, so fewer survivors have a lower total target.
 - Enemy serialization includes active burning state (`burningTimer`, `burningDps`, and `burningLightRadius`) so multiplayer clients render ignited-enemy light from the same gameplay state as the host.
 - Lighting interaction updates are throttled and use squared-distance checks to avoid adding avoidable per-frame cost on larger floors.
-- The renderer draws torches through `runtimeSceneObjectDrawMethods.js` and applies the darkness/light overlay through `runtimeSceneLightingMethods.js`.
+- The renderer draws the generated 17-frame brazier sheet through `brazierSpriteSheet.js` and `runtimeSceneObjectDrawMethods.js`. Stable lit/unlit changes select one-shot ignition or extinguish/smoke ranges before settling into the lit loop or unlit hold. The darkness/light overlay remains in `runtimeSceneLightingMethods.js`.
+- `src/game/world/lighting.js` applies deterministic brazier light wobble from `game.time` and a stable-ID phase. Two bounded waves modulate radius by at most `2.5%` and intensity within approximately `0.93..1.0`; this is derived presentation state and requires no additional network serialization.
 - The lighting overlay is rendered after terrain/world objects and before enemies, drops, floating text, vignette, and HUD layers.
 - Enemies and drops draw after the global overlay and receive a tight sprite-sized darkness overlay capped by `enemyMaxDarknessAlpha`, which can meet the 99% global darkness maximum while using `enemyLightFalloffDecay` so sprites visibly brighten before reaching the center of a light source.
 - Ranger Fire Arrow projectiles, `fire`/`pinningFire` zones, and burning enemies are included in active light source collection with config-driven bright-light radii and source-specific falloff metadata.
@@ -258,7 +259,7 @@ This document summarizes the current high-level architecture and validation work
 
 ## Validation and Quality Gates
 - `npm run validate:core`
-  - syntax and LOC validation
+  - syntax checks plus advisory maintainability and LOC diagnostics
 - `npm run validate:gameplay`
   - boss, tactics, and minotaur gameplay regressions
 - `npm run validate:network`
@@ -334,15 +335,15 @@ This document summarizes the current high-level architecture and validation work
 - `validate:lighting-state`
   - verifies lighting config, base runtime state, and helper behavior
 - `validate:lighting-placement`
-  - verifies floor torch placement, object shape, and placement exclusions
+  - verifies floor brazier placement, presentation variant, authoritative animation timestamp, and placement exclusions
 - `validate:lighting-render`
-  - verifies torch drawing and overlay compositing/falloff behavior with a stub canvas context
+  - verifies 17-frame brazier playback, legacy-torch fallback, offscreen transition timing, and overlay compositing/falloff behavior with a stub canvas context
 - `validate:lighting-interaction`
-  - verifies player relight, enemy snuffing, cooldown behavior, and relight-after-snuff
+  - verifies fuel collection, extinguishing, the 30-second automatic relight timer, player relight, enemy snuffing, and cooldown behavior
 - `validate:lighting-enemies`
   - verifies enemies and bosses remain readable while default ghosts do not create world light
 - `validate:lighting-network`
-  - verifies light-source serialization, network map state, delta sync behavior, and burning-enemy light propagation
+  - verifies brazier variants, relight timers, animation timestamps, network map state, delta sync behavior, and burning-enemy light propagation
 - `validate:lighting-browser`
   - verifies browser rendering, debug state, active light sources, faint dark-area visibility, and HUD/sidebar readability
 - `perf:floor-scaling`
@@ -384,7 +385,7 @@ This document summarizes the current high-level architecture and validation work
 - `server/run-validation-suite.js` supports `--list`, `--only`, `--from`, `--until`, and `--base` for validation triage. Use these options to rerun failed gates or resume late-suite debugging.
 - `closeout:selective` uses `server/validation/selectiveCloseoutPlan.js` to map changed files to closeout gates. It always includes core checks, ignores generated `artifacts/` and `www/` outputs, escalates broad runtime/config diffs to full closeout, and adds targeted gameplay, network, lighting, mobile, framework, and perf validators based on changed paths.
 - Use full `npm run validate:closeout` when the selective plan escalates, when branch risk is hard to classify, or before a release-critical merge.
-- Shared browser/network harness helpers now live under `server/validation/`, which keeps individual validators below the LOC gate while preserving a common startup, port-probing, and failure-capture path.
+- Shared browser/network harness helpers live under `server/validation/`, preserving common startup, port-probing, and failure-capture behavior while keeping validators cohesive and independently testable.
 - `?dev=1` now bypasses the splash and goes straight to Mode Select so local playtesting and `validate:dev-start` are not blocked by browser-specific media preload timing.
 - The perf baselines were refreshed from post-fix runs on 2026-03-17/18, so future comparisons should use the current baseline files instead of the earlier pre-correction artifacts.
 - `server/validate-floor-boss.js` now validates the generalized floor-boss flow rather than assuming only the necromancer boss exists.

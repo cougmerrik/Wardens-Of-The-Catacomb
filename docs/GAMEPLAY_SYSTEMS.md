@@ -124,7 +124,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - very dark past the outer falloff
 - Current light sources are:
   - the local player
-  - lit dungeon torches
+  - lit dungeon braziers
   - remote players in multiplayer sessions
 - Player light radius is driven by lantern fuel:
   - fuel starts at `50%`
@@ -133,11 +133,12 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - full-fuel radius is configured through `playerFuelRadiusTiles`
   - level and item radius modifiers reuse the same helper path and scale with fuel
 - Lantern fuel slowly decays over time, is bounded between `0%` and `100%`, and is shown in the bottom HUD area above the XP bar.
-- Torches are persistent floor objects placed on walkable tiles near walls while avoiding spawn, key, door, portal, and invalid map positions.
-- Players collect lit torches by touching them, removing the torch from the floor and restoring `20%` lantern fuel.
-- Players relight unlit torches by touching them.
-- Snuffer enemies can extinguish lit torches by touching them; mummies currently opt into this behavior.
-- Snuffed torches use a short cooldown to avoid immediate relight/snuff flicker, then can be relit by the player.
+- Braziers are persistent floor objects placed on walkable tiles near walls while avoiding spawn, key, door, portal, and invalid map positions. They retain the internal `torch` type for network compatibility and carry `variant: "brazier"` for presentation.
+- Players collect fuel from lit braziers by touching them, restoring `20%` lantern fuel. The brazier remains on the floor, plays its extinguish sequence, and holds the unlit sprite for 30 seconds before automatically relighting.
+- Players can relight enemy-snuffed braziers by touching them. A collected brazier cannot be touch-relit during its 30-second recovery. The renderer plays a four-frame ignition before entering the six-frame flame loop.
+- Snuffer enemies can extinguish lit braziers by touching them; mummies currently opt into this behavior. Extinguishing plays shrinking flame and smoke frames before holding the unlit pose.
+- Snuffed braziers use a short cooldown to avoid immediate relight/snuff flicker, then can be relit by the player.
+- Lit brazier light uses stable-ID phase offsets and layered periodic motion. Radius varies by at most `2.5%`, while intensity stays within approximately `0.93..1.0`, producing noticeable fire movement without large visibility swings or extra replicated state.
 - Enemy and boss sprites render after the global darkness overlay, then receive a tight darkness pass that can reach the 99% global darkness maximum and brightens with a gentler sprite-specific falloff as they approach active light.
 - Drops render after the global darkness overlay, then receive the same tight capped darkness pass as enemies so pickups brighten near active light and can fade to the 99% global darkness maximum at range.
 - Floating text renders after the darkness overlay so it remains fully readable outside the light radius.
@@ -316,7 +317,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Local controller movement is predicted in multiplayer and reconciled against authoritative snapshots so movement should remain responsive during normal play.
 - Ranger arrows in multiplayer use local prediction for immediate feedback, then reconcile against authoritative projectiles. Predicted arrows are intentionally drawn faintly and expire quickly so missed reconciliation does not leave full-strength stale arrow artifacts on screen.
 - Network projectile cadence follows the same attack cooldown as single-player. Held ranger primary fire should produce evenly spaced arrows rather than bursty catch-up shots.
-- Torch state is synchronized through map meta/state, snapshots, and deltas so relit or snuffed torches stay aligned between network clients.
+- Brazier lit state and collection relight timers are synchronized through map meta/state, snapshots, and deltas so collection, relighting, and snuffing stay aligned between network clients.
 - Optional Agora voice chat can be enabled by server startup config. Voice chat defaults off and can be enabled from Options; when active, remote player voices are attenuated by distance, panned left/right from player positions, muffled through closed doors and walls, and scaled by a separate voice volume. Microphone modes include Open Mic, Push to Talk with a configurable button, and Mute. Allies fade out fully beyond 20 tiles.
 - Dead spectators can only be heard by the living player they are currently spectating.
 - Dev-mode multiplayer sessions can show a compact network stats panel for local playtesting. The debug panel reports FPS/frame timing, ping, approximate latency, snapshot jitter, snapshot buffer depth, and pending inputs.

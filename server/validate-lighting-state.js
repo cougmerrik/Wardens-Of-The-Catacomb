@@ -31,6 +31,7 @@ function main() {
   assert(CONFIG.lighting.lanternInitialFuel === 0.5, "lantern should start at 50% fuel");
   assert(CONFIG.lighting.lanternMaxFuel === 1, "lantern fuel should be bounded to 100%");
   assert(CONFIG.lighting.lanternFuelPerTorch === 0.2, "lit torches should add 20% lantern fuel");
+  assert(CONFIG.lighting.brazierRelightSeconds === 30, "collected braziers should relight after 30 seconds");
   assert(CONFIG.lighting.lanternFuelDecayPerSecond > 0, "lantern fuel should decay over time");
   assert(CONFIG.lighting.torchRadiusTiles <= 2.5, "torch radius should stay localized");
   assert(CONFIG.lighting.warCircleLightRadiusMultiplier === 1.1, "War Circle light radius should extend 10% past the circle");
@@ -119,6 +120,17 @@ function main() {
   assert(activeSources.some((source) => source.sourceType === "rangerFireArrow" && source.lightDecay < 2 && source.brightRadiusRatio > CONFIG.lighting.brightRadiusRatio), "ranger fire arrows should use bright fire light falloff");
   assert(activeSources.some((source) => source.sourceType === "burningEnemy" && source.radius > CONFIG.lighting.torchRadiusTiles * CONFIG.map.tile), "active lights should include ignited enemies");
   assert(activeSources.some((source) => source.sourceType === "burningEnemy" && source.lightDecay < 2), "ignited enemies should use bright fire light falloff");
+
+  const brazier = { id: "torch-wobble-test", type: "torch", variant: "brazier", x: game.player.x + 30, y: game.player.y, lit: true, lightRadius: 80 };
+  game.lightSources = [brazier];
+  game.time = 0;
+  const wobbleA = game.getActiveLightSources().find((source) => source.id === brazier.id);
+  game.time = 0.37;
+  const wobbleB = game.getActiveLightSources().find((source) => source.id === brazier.id);
+  assert(wobbleA && wobbleB && wobbleA.radius !== wobbleB.radius, "brazier radius should wobble over time");
+  assert(wobbleA.lightIntensity !== wobbleB.lightIntensity, "brazier intensity should wobble over time");
+  assert(Math.abs(wobbleA.radius / brazier.lightRadius - 1) <= CONFIG.lighting.brazierLightWobbleRadius + 0.0001, "brazier radius wobble should stay narrowly bounded");
+  assert(wobbleA.lightIntensity >= 0.93 && wobbleA.lightIntensity <= 1, "brazier intensity wobble should stay subtle");
   assert(activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "fire" && source.radius > 40), "active lights should include circular ranger fire zones");
   assert(activeSources.some((source) => source.sourceType === "rangerFireZone" && source.entityType === "fire" && source.lightDecay < 2), "ranger fire zones should use bright fire light falloff");
 

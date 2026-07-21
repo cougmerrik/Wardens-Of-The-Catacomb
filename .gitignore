@@ -29,7 +29,15 @@ artifacts/ranger-visuals/*
 data/leaderboard.json
 
 # Local Codex workspace state
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/blender-mcp/
+!.agents/skills/blender-mcp/**
+!.agents/skills/wardens-blender-environment-art/
+!.agents/skills/wardens-blender-environment-art/**
+!.agents/skills/wardens-blender-sprite-art/
+!.agents/skills/wardens-blender-sprite-art/**
 .codex
 .playwright-mcp/
 

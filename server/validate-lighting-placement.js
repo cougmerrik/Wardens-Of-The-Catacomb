@@ -31,12 +31,15 @@ function assertTorchPlacement(game) {
   const tileSize = game.config.map.tile;
   for (const torch of torches) {
     assert(torch.type === "torch", `expected torch type, got ${torch.type}`);
+    assert(torch.variant === "brazier", `expected brazier presentation variant, got ${torch.variant}`);
     assert(typeof torch.id === "string" && torch.id, "torch should have stable id");
     assert(!ids.has(torch.id), `duplicate torch id ${torch.id}`);
     ids.add(torch.id);
     assert(torch.lit === true, "torch should default lit");
+    assert(Number.isFinite(torch.litChangedAt), "brazier should track its authoritative visual state-change time");
     assert(torch.lightRadius === cfg.torchRadiusTiles * tileSize, "torch light radius should match config");
     assert(torch.snuffCooldown === 0, "torch snuff cooldown should default to zero");
+    assert(torch.relightTimer === 0, "brazier relight timer should default to zero");
     const { tx, ty, value } = tileAt(game, torch.x, torch.y);
     assert(value !== "#" && value !== "D" && value !== "K" && value !== "P", `torch placed on invalid tile ${value}`);
     assert(game.isWalkableTile(tx, ty), `torch placed on non-walkable tile ${tx},${ty}`);
