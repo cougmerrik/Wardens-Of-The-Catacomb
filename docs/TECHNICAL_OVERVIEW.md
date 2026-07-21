@@ -54,7 +54,7 @@ This document summarizes the current high-level architecture and validation work
 
 ## Recent Refactor Summary
 - Large gameplay, server, bootstrap, and renderer files were split into reusable modules.
-- No application JavaScript files remain over the `500` LOC threshold.
+- LOC reporting is advisory rather than a hard gate. Modules are split when responsibility, ownership, or testability benefits; targeted reads and searches control agent context use without forcing arbitrary 500-line boundaries.
 - Notable extracted module groups include:
   - `src/game/enemySpawnFactories.js`
   - `src/game/enemyAi.js`
@@ -259,7 +259,7 @@ This document summarizes the current high-level architecture and validation work
 
 ## Validation and Quality Gates
 - `npm run validate:core`
-  - syntax and LOC validation
+  - syntax checks plus advisory maintainability and LOC diagnostics
 - `npm run validate:gameplay`
   - boss, tactics, and minotaur gameplay regressions
 - `npm run validate:network`
@@ -335,15 +335,15 @@ This document summarizes the current high-level architecture and validation work
 - `validate:lighting-state`
   - verifies lighting config, base runtime state, and helper behavior
 - `validate:lighting-placement`
-  - verifies floor torch placement, object shape, and placement exclusions
+  - verifies floor brazier placement, presentation variant, authoritative animation timestamp, and placement exclusions
 - `validate:lighting-render`
-  - verifies torch drawing and overlay compositing/falloff behavior with a stub canvas context
+  - verifies 17-frame brazier playback, legacy-torch fallback, offscreen transition timing, and overlay compositing/falloff behavior with a stub canvas context
 - `validate:lighting-interaction`
-  - verifies player relight, enemy snuffing, cooldown behavior, and relight-after-snuff
+  - verifies fuel collection, extinguishing, the 30-second automatic relight timer, player relight, enemy snuffing, and cooldown behavior
 - `validate:lighting-enemies`
   - verifies enemies and bosses remain readable while default ghosts do not create world light
 - `validate:lighting-network`
-  - verifies light-source serialization, network map state, delta sync behavior, and burning-enemy light propagation
+  - verifies brazier variants, relight timers, animation timestamps, network map state, delta sync behavior, and burning-enemy light propagation
 - `validate:lighting-browser`
   - verifies browser rendering, debug state, active light sources, faint dark-area visibility, and HUD/sidebar readability
 - `perf:floor-scaling`
@@ -385,7 +385,7 @@ This document summarizes the current high-level architecture and validation work
 - `server/run-validation-suite.js` supports `--list`, `--only`, `--from`, `--until`, and `--base` for validation triage. Use these options to rerun failed gates or resume late-suite debugging.
 - `closeout:selective` uses `server/validation/selectiveCloseoutPlan.js` to map changed files to closeout gates. It always includes core checks, ignores generated `artifacts/` and `www/` outputs, escalates broad runtime/config diffs to full closeout, and adds targeted gameplay, network, lighting, mobile, framework, and perf validators based on changed paths.
 - Use full `npm run validate:closeout` when the selective plan escalates, when branch risk is hard to classify, or before a release-critical merge.
-- Shared browser/network harness helpers now live under `server/validation/`, which keeps individual validators below the LOC gate while preserving a common startup, port-probing, and failure-capture path.
+- Shared browser/network harness helpers live under `server/validation/`, preserving common startup, port-probing, and failure-capture behavior while keeping validators cohesive and independently testable.
 - `?dev=1` now bypasses the splash and goes straight to Mode Select so local playtesting and `validate:dev-start` are not blocked by browser-specific media preload timing.
 - The perf baselines were refreshed from post-fix runs on 2026-03-17/18, so future comparisons should use the current baseline files instead of the earlier pre-correction artifacts.
 - `server/validate-floor-boss.js` now validates the generalized floor-boss flow rather than assuming only the necromancer boss exists.

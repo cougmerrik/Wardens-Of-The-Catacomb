@@ -142,16 +142,16 @@ Use Aseprite after Blender capture for pixel-level cleanup, palette enforcement,
 ### Import a fixed-grid Blender strip
 
 1. Open the lossless PNG strip and import it as a sprite sheet rather than editing the strip as one frame.
-2. Set the frame bounds to the exact render dimensions. For the brazier prototype, use a horizontal strip of six 48x48 frames with no padding.
+2. Set the frame bounds to the exact render dimensions. For the current brazier, use a horizontal strip of seventeen 48x48 frames with no padding.
 3. Confirm the animation canvas remains 48x48 and the timeline contains one cel per source frame.
-4. Set each ambient-loop frame to 125 ms for 8 FPS.
+4. Apply the manifest timings: 125 ms for unlit, lit-loop, and extinguish frames, and 100 ms for ignition frames.
 5. Save the editable source as `art/aseprite/<asset>/<asset>.aseprite` before cleanup.
 
 Never crop individual frames, move the asset root, introduce fractional opacity at hard pixel edges, or resize with interpolation. Use a 1 px pencil, nearest-neighbor scaling, and native-size playback review. Keep stable geometry stationary across frames; only the intended animated elements should change.
 
 ### Example: brazier state animation
 
-The catacomb brazier expands the six-frame ambient flame into four named states while preserving a 48x48 canvas and fixed bowl position:
+The catacomb brazier uses seventeen generated frames across four named states while preserving a 48x48 canvas and fixed bowl position:
 
 | Frames | Tag | Duration | Playback | Content |
 | --- | --- | ---: | --- | --- |
