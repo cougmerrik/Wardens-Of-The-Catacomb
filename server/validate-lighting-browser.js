@@ -106,6 +106,25 @@ async function readCanvasSamples(page, points) {
   }, points);
 }
 
+async function readCanvasRegionStats(page, bounds) {
+  return page.evaluate((region) => {
+    const canvas = document.getElementById("game");
+    const ctx = canvas?.getContext?.("2d", { willReadFrequently: true });
+    if (!canvas || !ctx) return { ok: false, brightPixels: 0 };
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.round(region.x)));
+    const y = Math.max(0, Math.min(canvas.height - 1, Math.round(region.y)));
+    const width = Math.max(1, Math.min(canvas.width - x, Math.round(region.width)));
+    const height = Math.max(1, Math.min(canvas.height - y, Math.round(region.height)));
+    const pixels = ctx.getImageData(x, y, width, height).data;
+    let brightPixels = 0;
+    for (let index = 0; index < pixels.length; index += 16) {
+      const luma = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+      if (pixels[index + 3] > 0 && luma > 24) brightPixels += 1;
+    }
+    return { ok: true, x, y, width, height, brightPixels };
+  }, bounds);
+}
+
 async function readLightingDebug(page) {
   return page.evaluate(() => window.__WOTC_LIGHTING_DEBUG__ || null);
 }
@@ -182,13 +201,13 @@ async function main() {
 
     const litSamples = await readCanvasSamples(page, [
       { label: "playerLight", x: playerScreen.x, y: playerScreen.y },
-      { label: "dark", x: 32, y: 590 },
-      { label: "hud", x: 900, y: 40 }
+      { label: "dark", x: 32, y: 590 }
     ]);
+    const hudStats = await readCanvasRegionStats(page, { x: 920, y: 0, width: 360, height: 700 });
     assert(litSamples.ok === true, "canvas pixel read failed");
     assert(litSamples.samples.some((sample) => sample.a > 0), "canvas should not be blank");
     assert(litSamples.samples.find((sample) => sample.label === "dark")?.luma > 1, "darkness overlay should leave faint visibility");
-    assert(litSamples.samples.find((sample) => sample.label === "hud")?.luma > 8, "HUD/sidebar should remain readable");
+    assert(hudStats.ok && hudStats.brightPixels > 100, "HUD/sidebar should retain readable bright content");
 
     const unlitResult = await runDebug(page, "setFirstTorchLit", { id: targetTorch.id, lit: false });
     assert(unlitResult?.ok === true, `failed to toggle torch unlit: ${JSON.stringify(unlitResult)}`);

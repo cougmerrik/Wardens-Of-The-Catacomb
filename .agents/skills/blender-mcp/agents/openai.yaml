@@ -1,0 +1,11 @@
+interface:
+  display_name: "Blender MCP"
+  short_description: "Create and inspect Blender assets safely"
+  default_prompt: "Use $blender-mcp to create and validate a low-poly Blender asset through the official Blender MCP."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "blender"
+      description: "Official Blender Lab MCP server"
+      transport: "stdio"

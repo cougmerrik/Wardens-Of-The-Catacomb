@@ -1,0 +1,11 @@
+interface:
+  display_name: "Wardens Blender Sprite Art"
+  short_description: "Render consistent Wardens sprites from 3D"
+  default_prompt: "Use $wardens-blender-sprite-art to build and validate a directional low-poly character sprite sheet."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "blender"
+      description: "Official Blender Lab MCP server"
+      transport: "stdio"

@@ -1,9 +1,24 @@
+import { drawBrazierSprite } from "./brazierSpriteSheet.js";
+
 export const runtimeSceneObjectDrawMethods = {
   drawTorch(game, torch, screenX, screenY) {
     const ctx = this.ctx;
     const size = Number.isFinite(torch?.size) ? Math.max(10, torch.size) : 16;
     const half = size * 0.5;
     const lit = torch?.lit !== false;
+
+    if (lit) {
+      const glow = ctx.createRadialGradient(screenX, screenY - half * 0.28, 1, screenX, screenY - half * 0.28, half * 1.45);
+      glow.addColorStop(0, "rgba(255, 236, 156, 0.7)");
+      glow.addColorStop(0.5, "rgba(255, 138, 35, 0.3)");
+      glow.addColorStop(1, "rgba(255, 90, 10, 0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY - half * 0.28, half * 1.45, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (drawBrazierSprite(ctx, game, torch, screenX, screenY)) return;
 
     ctx.fillStyle = "rgba(0, 0, 0, 0.34)";
     ctx.beginPath();

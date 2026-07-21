@@ -37,9 +37,18 @@ function main() {
   const fuelBeforeCollect = game.player.lanternFuel;
   const textCountBefore = game.floatingTexts.length;
   stepGame(game, 0.1, { processUi: false });
-  assert(!game.lightSources.some((torch) => torch.id === "lit-torch"), "player contact should collect a lit torch");
+  assert(game.lightSources.some((torch) => torch.id === "lit-torch"), "collected brazier should remain in place");
+  assert(litTorch.lit === false, "collected brazier should become unlit");
+  assert(litTorch.relightTimer === game.config.lighting.brazierRelightSeconds, "collected brazier should start its relight timer");
   assert(Math.abs(game.player.lanternFuel - (fuelBeforeCollect + 0.2 - game.config.lighting.lanternFuelDecayPerSecond * 0.1)) < 0.001, "collecting a lit torch should add 20% lantern fuel before decay");
   assert(game.floatingTexts.length > textCountBefore && game.floatingTexts.some((text) => String(text.text).startsWith("Lantern")), "collecting a lit torch should spawn lantern feedback");
+
+  game.player.x += game.config.map.tile * 4;
+  stepGame(game, 29.9, { processUi: false });
+  assert(litTorch.lit === false && litTorch.relightTimer > 0, "collected brazier should remain unlit before 30 seconds");
+  stepGame(game, 0.11, { processUi: false });
+  assert(litTorch.lit === true && litTorch.relightTimer === 0, "collected brazier should automatically relight after 30 seconds");
+  game.player.x = litTorch.x;
 
   const fullTorch = makeTorch(game, { id: "full-fuel-torch", lit: true, snuffCooldown: 0 });
   game.lightSources = [fullTorch];

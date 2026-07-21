@@ -1,5 +1,6 @@
 import { runtimeSceneObjectDrawMethods } from "../src/rendering/runtimeSceneObjectDrawMethods.js";
 import { runtimeSceneLightingMethods } from "../src/rendering/runtimeSceneLightingMethods.js";
+import { getBrazierFrame, resetBrazierSpritePlaybackForTests } from "../src/rendering/brazierSpriteSheet.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -66,6 +67,57 @@ function main() {
   assert(!unlitCalls.some((call) => call[0] === "createRadialGradient"), "unlit torch should not draw glow gradient");
   assert(unlitCalls.some((call) => call[0] === "stroke"), "unlit torch should draw charred wick mark");
   assert(unlitCalls.some((call) => call[0] === "fillRect"), "unlit torch should still draw torch body");
+
+  resetBrazierSpritePlaybackForTests();
+  const stable = { id: "brazier-stable", type: "torch", variant: "brazier", lit: true };
+  assert(getBrazierFrame(stable, 0) === 5, "new lit brazier should begin in the lit loop");
+  stable.lit = false;
+  assert(getBrazierFrame(stable, 1) === 11, "snuffed brazier should begin the extinguish sequence");
+  assert(getBrazierFrame(stable, 1.625) === 16, "extinguish sequence should reach its final smoke frame");
+  assert(getBrazierFrame(stable, 1.75) === 0, "extinguished brazier should settle on the unlit frame");
+  stable.lit = true;
+  assert(getBrazierFrame(stable, 2) === 1, "relit brazier should begin the ignition sequence");
+  assert(getBrazierFrame(stable, 2.25) === 3, "ignition should advance at 100ms per frame");
+  assert(getBrazierFrame(stable, 2.4) >= 5 && getBrazierFrame(stable, 2.4) <= 10, "ignition should settle into the lit loop");
+
+  const offscreen = { id: "brazier-offscreen", type: "torch", variant: "brazier", lit: true, litChangedAt: 0 };
+  assert(getBrazierFrame(offscreen, 0) === 5, "offscreen test brazier should begin lit");
+  offscreen.lit = false;
+  offscreen.litChangedAt = 1;
+  assert(getBrazierFrame(offscreen, 5) === 0, "an offscreen state change should be settled when first rendered later");
+
+  const PreviousImage = globalThis.Image;
+  globalThis.Image = class {
+    addEventListener(type, callback) {
+      if (type === "load") callback();
+    }
+    set src(value) { this.currentSrc = value; }
+  };
+  resetBrazierSpritePlaybackForTests();
+  const spriteCtx = createStubContext();
+  spriteCtx.imageSmoothingEnabled = true;
+  runtimeSceneObjectDrawMethods.drawTorch.call(
+    { ctx: spriteCtx },
+    { time: 0, config: { map: { tile: 32 } } },
+    { id: "sprite-brazier", type: "torch", variant: "brazier", size: 16, lit: true },
+    40,
+    60
+  );
+  assert(spriteCtx.calls.some((call) => call[0] === "drawImage" && call[2] === 5 * 48), "loaded brazier sheet should draw the first lit sprite frame");
+  assert(!spriteCtx.calls.some((call) => call[0] === "fillRect"), "loaded brazier sprite should replace the procedural torch body");
+
+  const legacyCtx = createStubContext();
+  runtimeSceneObjectDrawMethods.drawTorch.call(
+    { ctx: legacyCtx },
+    { time: 0, config: { map: { tile: 32 } } },
+    { id: "legacy-torch", type: "torch", size: 16, lit: true },
+    40,
+    60
+  );
+  assert(!legacyCtx.calls.some((call) => call[0] === "drawImage"), "legacy torches without the brazier variant should keep procedural rendering");
+  assert(legacyCtx.calls.some((call) => call[0] === "fillRect"), "legacy torches should retain their procedural body");
+  globalThis.Image = PreviousImage;
+  resetBrazierSpritePlaybackForTests();
 
   const overlayCtx = createStubContext();
   const darknessLayerCtx = createStubContext();

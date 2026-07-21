@@ -1112,12 +1112,15 @@ export class AuthoritativeRoom {
       lightSources: (this.sim.lightSources || []).map((light) => ({
         id: this.options.getStableId(this, "lightSource", "ls", light),
         type: typeof light?.type === "string" ? light.type : "light",
+        variant: typeof light?.variant === "string" ? light.variant : null,
         x: light.x,
         y: light.y,
         size: light.size,
         lit: light.lit !== false,
+        litChangedAt: Number.isFinite(light.litChangedAt) ? light.litChangedAt : 0,
         lightRadius: light.lightRadius,
-        snuffCooldown: Number.isFinite(light.snuffCooldown) ? light.snuffCooldown : 0
+        snuffCooldown: Number.isFinite(light.snuffCooldown) ? light.snuffCooldown : 0,
+        relightTimer: Number.isFinite(light.relightTimer) ? light.relightTimer : 0
       }))
     };
     if (toClient) {
@@ -1145,12 +1148,15 @@ export class AuthoritativeRoom {
       lightSources: (this.sim.lightSources || []).map((light) => ({
         id: this.options.getStableId(this, "lightSource", "ls", light),
         type: typeof light?.type === "string" ? light.type : "light",
+        variant: typeof light?.variant === "string" ? light.variant : null,
         x: light.x,
         y: light.y,
         size: light.size,
         lit: light.lit !== false,
+        litChangedAt: Number.isFinite(light.litChangedAt) ? light.litChangedAt : 0,
         lightRadius: light.lightRadius,
-        snuffCooldown: Number.isFinite(light.snuffCooldown) ? light.snuffCooldown : 0
+        snuffCooldown: Number.isFinite(light.snuffCooldown) ? light.snuffCooldown : 0,
+        relightTimer: Number.isFinite(light.relightTimer) ? light.relightTimer : 0
       }))
     };
     if (toClient) {

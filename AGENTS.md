@@ -50,7 +50,9 @@ These instructions apply to the whole repository.
 ## Validation
 
 - Prefer focused validation first, then broader validation before staging or commit.
-- Run `npm run validate:core` for quick syntax and LOC checks.
+- Run `npm run validate:core` for quick syntax and maintainability diagnostics. LOC reporting is advisory and must not block a change or motivate meaningless file splits.
+- Split modules by cohesive responsibility, ownership, and testability rather than an arbitrary line count. Prefer targeted search and partial file reads to control agent context consumption.
+- All project code may be agent-generated, but it must remain readable, understandable, maintainable, and covered by behavior-focused validation. Generated provenance is not an exception to normal code-quality expectations.
 - Run feature-specific validators when touching gameplay, networking, rendering, or validation harnesses.
 - Prefer behavior assertions over source-text wiring assertions for state machines, input blocking/draining, queue lifecycles, cleanup retries, local/network parity, and other regressions that depend on order or time.
 - Use source-text wiring assertions only as supplements when a runtime validator cannot cover the integration seam cheaply.
@@ -99,6 +101,12 @@ These instructions apply to the whole repository.
 - Keep gameplay state changes separate from renderer-only presentation when feasible.
 - Keep networked gameplay state serializable and validated when adding mechanics that affect multiplayer.
 - Keep local and multiplayer presentation parity for gameplay feedback. Status icons, floating text, damage/kill indicators, progression notifications, and class-effect notifications should share behavior unless a local-only exception is intentional and documented.
+- Treat `docs/ENVIRONMENT_ART_PIPELINE.md` as the source of truth for Blender-authored environment art, including modular dimensions, polygon budgets, flat-shading rules, camera, lighting, palette, render resolution, filtering, and animation standards.
+- Treat `docs/BLENDER_SPRITE_PIPELINE.md` as the source of truth for Blender-to-Aseprite character sprites, including rig structure, action frame counts, directional capture, pivots, palette cleanup, sheet layout, and runtime integration gates.
+- Use the repository-local `blender-mcp` skill for general Blender MCP safety, inspection, authoring, and validation so every collaborator follows the same base workflow.
+- Use the repository-local `wardens-blender-environment-art` skill for Blender MCP work on Wardens environment assets. Apply its specification before generation and report its validation checklist before saving or exporting.
+- Use the repository-local `wardens-blender-sprite-art` skill for low-poly character modeling, rigging, directional animation renders, sprite-sheet generation, and Aseprite cleanup for Wardens.
+- Keep Blender experiments non-destructive: inspect the scene first, create named asset collections, preserve exact modular seams, and do not overwrite `.blend` sources or exports without confirmation.
 
 ## Code Review
 
