@@ -88,6 +88,13 @@ function main() {
   assert(getBrazierFrame(reusedId, 1, firstGame) === 11, "the first game should retain its extinguish playback state");
   assert(getBrazierFrame(reusedId, 1, nextGame) === 0, "a new game should not inherit playback for a reused brazier id");
 
+  const recentlySnuffed = { id: "brazier-recently-snuffed", type: "torch", variant: "brazier", lit: false, litChangedAt: 9.75 };
+  assert(getBrazierFrame(recentlySnuffed, 10) === 13, "a recently snuffed brazier first seen offscreen should resume its extinguish sequence");
+  const recentlyRelit = { id: "brazier-recently-relit", type: "torch", variant: "brazier", lit: true, litChangedAt: 9.8 };
+  assert(getBrazierFrame(recentlyRelit, 10) === 3, "a recently relit brazier first seen offscreen should resume its ignition sequence");
+  const settledBeforeObservation = { id: "brazier-settled-before-observation", type: "torch", variant: "brazier", lit: false, litChangedAt: 8 };
+  assert(getBrazierFrame(settledBeforeObservation, 10) === 0, "an old state change should be settled when the brazier is first observed");
+
   const offscreen = { id: "brazier-offscreen", type: "torch", variant: "brazier", lit: true, litChangedAt: 0 };
   assert(getBrazierFrame(offscreen, 0) === 5, "offscreen test brazier should begin lit");
   offscreen.lit = false;

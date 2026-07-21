@@ -37,7 +37,10 @@ function getPlayback(torch, nowMs, game = null) {
   const lit = torch?.lit !== false;
   let playback = playbackCache.get(id);
   if (!playback) {
-    playback = { lit, transition: null, changedAtMs: nowMs };
+    const hasAuthoritativeChange = Number.isFinite(torch?.litChangedAt) && torch.litChangedAt > 0;
+    const authoritativeChangedAtMs = hasAuthoritativeChange ? Math.min(nowMs, torch.litChangedAt * 1000) : nowMs;
+    const transition = hasAuthoritativeChange ? (lit ? "ignite" : "extinguish") : null;
+    playback = { lit, transition, changedAtMs: authoritativeChangedAtMs };
     playbackCache.set(id, playback);
   } else if (playback.lit !== lit) {
     playback.lit = lit;
