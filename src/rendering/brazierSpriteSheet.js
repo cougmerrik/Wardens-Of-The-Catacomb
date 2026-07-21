@@ -11,6 +11,7 @@ const DEFAULT_FRAME_MS = 125;
 
 let sheetRecord = null;
 const playbackById = new Map();
+let playbackByGame = new WeakMap();
 
 function getSheetRecord() {
   if (sheetRecord) return sheetRecord;
@@ -23,13 +24,21 @@ function getSheetRecord() {
   return record;
 }
 
-function getPlayback(torch, nowMs) {
+function getPlayback(torch, nowMs, game = null) {
+  let playbackCache = playbackById;
+  if (game && (typeof game === "object" || typeof game === "function")) {
+    playbackCache = playbackByGame.get(game);
+    if (!playbackCache) {
+      playbackCache = new Map();
+      playbackByGame.set(game, playbackCache);
+    }
+  }
   const id = typeof torch?.id === "string" ? torch.id : "__anonymous_brazier";
   const lit = torch?.lit !== false;
-  let playback = playbackById.get(id);
+  let playback = playbackCache.get(id);
   if (!playback) {
     playback = { lit, transition: null, changedAtMs: nowMs };
-    playbackById.set(id, playback);
+    playbackCache.set(id, playback);
   } else if (playback.lit !== lit) {
     playback.lit = lit;
     playback.transition = lit ? "ignite" : "extinguish";
@@ -39,9 +48,9 @@ function getPlayback(torch, nowMs) {
   return playback;
 }
 
-export function getBrazierFrame(torch, timeSeconds = 0) {
+export function getBrazierFrame(torch, timeSeconds = 0, game = null) {
   const nowMs = Math.max(0, Number.isFinite(timeSeconds) ? timeSeconds * 1000 : 0);
-  const playback = getPlayback(torch, nowMs);
+  const playback = getPlayback(torch, nowMs, game);
   const elapsedMs = Math.max(0, nowMs - playback.changedAtMs);
   if (playback.transition === "ignite") {
     const offset = Math.floor(elapsedMs / IGNITE_FRAME_MS);
@@ -60,7 +69,7 @@ export function drawBrazierSprite(ctx, game, torch, screenX, screenY) {
   if (torch?.variant !== "brazier") return false;
   const record = getSheetRecord();
   if (!record || !record.loaded || record.failed) return false;
-  const frame = getBrazierFrame(torch, game?.time);
+  const frame = getBrazierFrame(torch, game?.time, game);
   const tile = Number.isFinite(game?.config?.map?.tile) ? game.config.map.tile : 32;
   const renderSize = Math.max(32, Math.round(tile * 1.5));
   const previousSmoothing = ctx.imageSmoothingEnabled;
@@ -76,5 +85,6 @@ export function drawBrazierSprite(ctx, game, torch, screenX, screenY) {
 
 export function resetBrazierSpritePlaybackForTests() {
   playbackById.clear();
+  playbackByGame = new WeakMap();
   sheetRecord = null;
 }

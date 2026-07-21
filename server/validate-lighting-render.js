@@ -80,6 +80,14 @@ function main() {
   assert(getBrazierFrame(stable, 2.25) === 3, "ignition should advance at 100ms per frame");
   assert(getBrazierFrame(stable, 2.4) >= 5 && getBrazierFrame(stable, 2.4) <= 10, "ignition should settle into the lit loop");
 
+  const firstGame = {};
+  const nextGame = {};
+  const reusedId = { id: "torch-1-0", type: "torch", variant: "brazier", lit: true };
+  assert(getBrazierFrame(reusedId, 0, firstGame) === 5, "a lit brazier should begin in the lit loop for the first game");
+  reusedId.lit = false;
+  assert(getBrazierFrame(reusedId, 1, firstGame) === 11, "the first game should retain its extinguish playback state");
+  assert(getBrazierFrame(reusedId, 1, nextGame) === 0, "a new game should not inherit playback for a reused brazier id");
+
   const offscreen = { id: "brazier-offscreen", type: "torch", variant: "brazier", lit: true, litChangedAt: 0 };
   assert(getBrazierFrame(offscreen, 0) === 5, "offscreen test brazier should begin lit");
   offscreen.lit = false;
