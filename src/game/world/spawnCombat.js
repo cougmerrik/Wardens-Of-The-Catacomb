@@ -182,6 +182,11 @@ export function applyEnemyDamage(game, enemy, amount, damageType = "physical", o
   enemy.lastDamageType = damageType;
   if (ownerId) enemy.lastDamageOwnerId = ownerId;
   enemy.hp -= effective;
+  if (enemy?.type === "ghost" && enemy.hp > 0) {
+    enemy.ghostHurtTimer = 0.4;
+    enemy.ghostAction = "hurt";
+    enemy.ghostActionStartedAt = Number.isFinite(game?.time) ? game.time : 0;
+  }
   if (enemy?.type === "golem" && effective > 0) {
     const shardlingCap = Math.max(0, game.config.enemy.golemShardlingSpawnCap || 10);
     const activeShardlings = (game.enemies || []).filter((other) => other && other.type === "shardling" && (other.hp || 0) > 0).length;

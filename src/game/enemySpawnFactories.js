@@ -3,18 +3,28 @@ export function spawnGhost(game, x, y) {
   const speedMin = Number.isFinite(game.config.enemy.ghostSpeedMin) ? game.config.enemy.ghostSpeedMin : 110;
   const speedMax = Number.isFinite(game.config.enemy.ghostSpeedMax) ? game.config.enemy.ghostSpeedMax : 150;
   const speed = speedMin + Math.random() * Math.max(0, speedMax - speedMin);
+  const ghostVariants = ["hollow_ghost", "veiled_specter", "shackled_poltergeist"];
+  const ghostPalettes = ["cold_haunt", "malignant_haunt"];
   return {
     type: "ghost",
     tacticKey: "ghost",
     x,
     y,
-    size: 20,
+    size: 16,
     speed,
     hp,
     maxHp: hp,
     baseMaxHp: hp,
     baseSpeed: speed,
     hpBarTimer: 0,
+    ghostVariant: ghostVariants[Math.floor(Math.random() * ghostVariants.length)],
+    ghostPalette: ghostPalettes[Math.floor(Math.random() * ghostPalettes.length)],
+    ghostAction: "hover",
+    ghostActionStartedAt: Number.isFinite(game.time) ? game.time : 0,
+    ghostAnimationPhase: Math.random() * 8,
+    ghostHurtTimer: 0,
+    dirX: 1,
+    dirY: 0,
     damageMin: game.config.enemy.ghostDamageMin,
     damageMax: game.config.enemy.ghostDamageMax,
     baseDamageMin: game.config.enemy.ghostDamageMin,

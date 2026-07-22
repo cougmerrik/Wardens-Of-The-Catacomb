@@ -1,0 +1,803 @@
+{
+  "schema": "wardens-ghost-sprite-family/v1",
+  "status": "indexed-runtime-prototype",
+  "sourceBlend": "art/blender/ghost_family/ghost_family.blend",
+  "generator": "Tools/Art/generate_ghost_family_prototype.py",
+  "outputRoot": "assets/images/enemies/ghost_family",
+  "variants": [
+    "hollow_ghost",
+    "veiled_specter",
+    "shackled_poltergeist"
+  ],
+  "palettes": [
+    "cold_haunt",
+    "malignant_haunt"
+  ],
+  "directions": [
+    "east",
+    "southeast",
+    "south",
+    "southwest",
+    "west",
+    "northwest",
+    "north",
+    "northeast"
+  ],
+  "actions": {
+    "hover": {
+      "frames": 6,
+      "loop": true
+    },
+    "move": {
+      "frames": 8,
+      "loop": true
+    },
+    "primary_attack": {
+      "frames": 8,
+      "loop": false,
+      "hitFrame": 4
+    },
+    "siphon": {
+      "frames": 8,
+      "loop": true
+    },
+    "hurt": {
+      "frames": 4,
+      "loop": false
+    },
+    "death": {
+      "frames": 10,
+      "loop": false
+    }
+  },
+  "passes": [
+    "color",
+    "shadow",
+    "silhouette",
+    "glow"
+  ],
+  "presentationFps": 10,
+  "rawFrameSize": [
+    64,
+    64
+  ],
+  "cellSize": [
+    128,
+    128
+  ],
+  "scale": {
+    "factor": 2,
+    "method": "nearest-neighbor"
+  },
+  "pivot": [
+    64,
+    104
+  ],
+  "worldLightRadius": 0,
+  "intentionalExceptions": [
+    "Rear-facing and late-death glow cells may be fully transparent when the soul core is occluded.",
+    "Sheets require indexed-palette and intentional-alpha cleanup before runtime integration."
+  ],
+  "sheets": [
+    {
+      "variant": "hollow_ghost",
+      "action": "hover",
+      "pass": "color",
+      "file": "hollow_ghost_hover_8dir_6f_color.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "hover",
+      "pass": "shadow",
+      "file": "hollow_ghost_hover_8dir_6f_shadow.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "hover",
+      "pass": "silhouette",
+      "file": "hollow_ghost_hover_8dir_6f_silhouette.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "hover",
+      "pass": "glow",
+      "file": "hollow_ghost_hover_8dir_6f_glow.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "move",
+      "pass": "color",
+      "file": "hollow_ghost_move_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "move",
+      "pass": "shadow",
+      "file": "hollow_ghost_move_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "move",
+      "pass": "silhouette",
+      "file": "hollow_ghost_move_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "move",
+      "pass": "glow",
+      "file": "hollow_ghost_move_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "primary_attack",
+      "pass": "color",
+      "file": "hollow_ghost_primary_attack_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "primary_attack",
+      "pass": "shadow",
+      "file": "hollow_ghost_primary_attack_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "primary_attack",
+      "pass": "silhouette",
+      "file": "hollow_ghost_primary_attack_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "primary_attack",
+      "pass": "glow",
+      "file": "hollow_ghost_primary_attack_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "siphon",
+      "pass": "color",
+      "file": "hollow_ghost_siphon_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "siphon",
+      "pass": "shadow",
+      "file": "hollow_ghost_siphon_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "siphon",
+      "pass": "silhouette",
+      "file": "hollow_ghost_siphon_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "siphon",
+      "pass": "glow",
+      "file": "hollow_ghost_siphon_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "hurt",
+      "pass": "color",
+      "file": "hollow_ghost_hurt_8dir_4f_color.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "hurt",
+      "pass": "shadow",
+      "file": "hollow_ghost_hurt_8dir_4f_shadow.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "hurt",
+      "pass": "silhouette",
+      "file": "hollow_ghost_hurt_8dir_4f_silhouette.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "hurt",
+      "pass": "glow",
+      "file": "hollow_ghost_hurt_8dir_4f_glow.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "death",
+      "pass": "color",
+      "file": "hollow_ghost_death_8dir_10f_color.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "death",
+      "pass": "shadow",
+      "file": "hollow_ghost_death_8dir_10f_shadow.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "death",
+      "pass": "silhouette",
+      "file": "hollow_ghost_death_8dir_10f_silhouette.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "hollow_ghost",
+      "action": "death",
+      "pass": "glow",
+      "file": "hollow_ghost_death_8dir_10f_glow.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hover",
+      "pass": "color",
+      "file": "veiled_specter_hover_8dir_6f_color.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hover",
+      "pass": "shadow",
+      "file": "veiled_specter_hover_8dir_6f_shadow.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hover",
+      "pass": "silhouette",
+      "file": "veiled_specter_hover_8dir_6f_silhouette.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hover",
+      "pass": "glow",
+      "file": "veiled_specter_hover_8dir_6f_glow.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "move",
+      "pass": "color",
+      "file": "veiled_specter_move_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "move",
+      "pass": "shadow",
+      "file": "veiled_specter_move_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "move",
+      "pass": "silhouette",
+      "file": "veiled_specter_move_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "move",
+      "pass": "glow",
+      "file": "veiled_specter_move_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "primary_attack",
+      "pass": "color",
+      "file": "veiled_specter_primary_attack_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "primary_attack",
+      "pass": "shadow",
+      "file": "veiled_specter_primary_attack_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "primary_attack",
+      "pass": "silhouette",
+      "file": "veiled_specter_primary_attack_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "primary_attack",
+      "pass": "glow",
+      "file": "veiled_specter_primary_attack_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "siphon",
+      "pass": "color",
+      "file": "veiled_specter_siphon_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "siphon",
+      "pass": "shadow",
+      "file": "veiled_specter_siphon_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "siphon",
+      "pass": "silhouette",
+      "file": "veiled_specter_siphon_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "siphon",
+      "pass": "glow",
+      "file": "veiled_specter_siphon_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hurt",
+      "pass": "color",
+      "file": "veiled_specter_hurt_8dir_4f_color.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hurt",
+      "pass": "shadow",
+      "file": "veiled_specter_hurt_8dir_4f_shadow.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hurt",
+      "pass": "silhouette",
+      "file": "veiled_specter_hurt_8dir_4f_silhouette.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "hurt",
+      "pass": "glow",
+      "file": "veiled_specter_hurt_8dir_4f_glow.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "death",
+      "pass": "color",
+      "file": "veiled_specter_death_8dir_10f_color.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "death",
+      "pass": "shadow",
+      "file": "veiled_specter_death_8dir_10f_shadow.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "death",
+      "pass": "silhouette",
+      "file": "veiled_specter_death_8dir_10f_silhouette.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "veiled_specter",
+      "action": "death",
+      "pass": "glow",
+      "file": "veiled_specter_death_8dir_10f_glow.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hover",
+      "pass": "color",
+      "file": "shackled_poltergeist_hover_8dir_6f_color.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hover",
+      "pass": "shadow",
+      "file": "shackled_poltergeist_hover_8dir_6f_shadow.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hover",
+      "pass": "silhouette",
+      "file": "shackled_poltergeist_hover_8dir_6f_silhouette.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hover",
+      "pass": "glow",
+      "file": "shackled_poltergeist_hover_8dir_6f_glow.png",
+      "rows": 8,
+      "columns": 6,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "move",
+      "pass": "color",
+      "file": "shackled_poltergeist_move_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "move",
+      "pass": "shadow",
+      "file": "shackled_poltergeist_move_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "move",
+      "pass": "silhouette",
+      "file": "shackled_poltergeist_move_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "move",
+      "pass": "glow",
+      "file": "shackled_poltergeist_move_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "primary_attack",
+      "pass": "color",
+      "file": "shackled_poltergeist_primary_attack_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "primary_attack",
+      "pass": "shadow",
+      "file": "shackled_poltergeist_primary_attack_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "primary_attack",
+      "pass": "silhouette",
+      "file": "shackled_poltergeist_primary_attack_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "primary_attack",
+      "pass": "glow",
+      "file": "shackled_poltergeist_primary_attack_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "siphon",
+      "pass": "color",
+      "file": "shackled_poltergeist_siphon_8dir_8f_color.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "siphon",
+      "pass": "shadow",
+      "file": "shackled_poltergeist_siphon_8dir_8f_shadow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "siphon",
+      "pass": "silhouette",
+      "file": "shackled_poltergeist_siphon_8dir_8f_silhouette.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "siphon",
+      "pass": "glow",
+      "file": "shackled_poltergeist_siphon_8dir_8f_glow.png",
+      "rows": 8,
+      "columns": 8,
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hurt",
+      "pass": "color",
+      "file": "shackled_poltergeist_hurt_8dir_4f_color.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hurt",
+      "pass": "shadow",
+      "file": "shackled_poltergeist_hurt_8dir_4f_shadow.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hurt",
+      "pass": "silhouette",
+      "file": "shackled_poltergeist_hurt_8dir_4f_silhouette.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "hurt",
+      "pass": "glow",
+      "file": "shackled_poltergeist_hurt_8dir_4f_glow.png",
+      "rows": 8,
+      "columns": 4,
+      "width": 512,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "death",
+      "pass": "color",
+      "file": "shackled_poltergeist_death_8dir_10f_color.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "death",
+      "pass": "shadow",
+      "file": "shackled_poltergeist_death_8dir_10f_shadow.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "death",
+      "pass": "silhouette",
+      "file": "shackled_poltergeist_death_8dir_10f_silhouette.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "variant": "shackled_poltergeist",
+      "action": "death",
+      "pass": "glow",
+      "file": "shackled_poltergeist_death_8dir_10f_glow.png",
+      "rows": 8,
+      "columns": 10,
+      "width": 1280,
+      "height": 1024
+    }
+  ]
+}

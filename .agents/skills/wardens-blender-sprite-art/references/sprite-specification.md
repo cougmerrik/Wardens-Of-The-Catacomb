@@ -54,6 +54,8 @@ Track every output as:
 - Exact action frame ranges, loop flags, and action names.
 - Eight-position compensated orthographic capture rig.
 - Batch rendering of the complete declared variant matrix.
+- Complete neutral location/rotation/scale keys for every controlled bone at each action baseline so action creation order cannot leak transforms.
+- Blender 5.x layered-action validation through layers, strips, channel bags, and F-curves.
 
 ## Aseprite gates
 
@@ -64,3 +66,12 @@ Track every output as:
 - Stable root, feet, head height, proportions, attachments, and light direction.
 - Complete action/direction/weapon/palette/pass coverage with pixel-aligned color, shadow, and silhouette outputs.
 - Fix systematic problems in Blender and rerender.
+
+## Runtime gate
+
+- Load representative sheets through the actual browser asset path; do not rely only on direct PNG inspection.
+- Allow the procedural renderer only as a temporary asynchronous/error fallback and confirm the sprite replaces it after image load.
+- Validate shadow, color, and glow order, alpha, palette mapping, nearest-neighbor filtering, action timing, and eight-direction row selection.
+- Size collision from the opaque gameplay core, not the full transparent cell or glow bounds.
+- Give repeated looping actors a stable per-entity phase offset when lockstep motion harms visual variety, and serialize that phase for multiplayer parity.
+- When a death sheet supplies the persistent remnant, clamp to its final frame for the approved lifetime instead of substituting a procedural corpse effect.

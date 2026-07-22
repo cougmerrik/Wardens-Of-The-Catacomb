@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare Branch Closeout"
+  short_description: "Roll up docs and validate branch changes"
+  default_prompt: "Use $prepare-branch-closeout to clean up and validate this branch for staging and push preparation."

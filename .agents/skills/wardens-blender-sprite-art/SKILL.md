@@ -29,7 +29,9 @@ If they conflict, follow the durable document and update the compact reference i
 9. Clean and palette-reduce in Aseprite without resampling.
 10. Upscale exactly 2x with nearest-neighbor sampling and pack 128x128 cells into one sheet per action.
 11. Validate geometry, rig, actions, direction/action/weapon/palette/pass coverage, bounds, pivots, palette, alpha, cross-pass alignment, sheets, and native gameplay previews.
-12. Ask before overwriting sources, cleaned frames, sheets, manifests, or runtime assets.
+12. Validate at least one sheet through the real browser/runtime loader, including asynchronous image loading and procedural fallback behavior.
+13. Compare the sprite's opaque core with its gameplay collision size; keep glow, cloth, wisps, and other transparent effects outside the solid hitbox unless intentional.
+14. Ask before overwriting sources, cleaned frames, sheets, manifests, or runtime assets.
 
 ## Source-first correction
 

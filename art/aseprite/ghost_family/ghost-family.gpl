@@ -1,0 +1,13 @@
+GIMP Palette
+Name: Wardens Ghost Family
+Columns: 9
+# Index 0 is reserved for transparency, followed by the eight semantic roles.
+255 0 255 Transparent
+23 21 44 Cavity Shadow
+67 81 111 Body Shadow
+130 155 189 Body Midtone
+184 237 238 Corpse Cyan Highlight
+119 136 165 Shroud Accent
+122 92 255 Soul Core
+214 209 255 Soul Core Highlight
+158 184 255 Controlled Undead Accent

@@ -249,8 +249,12 @@ function validateGhostDeathLeavesRemnant() {
   assert.equal(game.enemies.length, 1, "slain ghost should remain temporarily as a floor remnant");
   assert.equal(game.enemies[0].hp, 0, "ghost remnant should stay dead");
   assert.equal(game.enemies[0].deathProcessed, true, "ghost remnant should mark rewards as processed");
-  assert.ok(game.enemies[0].corpseTimer > 0, "ghost remnant should have a visible lifetime");
-  return { remnantType: game.enemies[0].type, corpseTimer: game.enemies[0].corpseTimer };
+  assert.ok(game.enemies[0].corpseTimer > 29.9, "ghost final death frame should remain for about 30 seconds");
+  const corpseTimer = game.enemies[0].corpseTimer;
+  game.enemies[0].corpseTimer = 0.01;
+  stepGame(game, 0.02, { processUi: false });
+  assert.equal(game.enemies.length, 0, "ghost dead state should disappear when its 30-second lifetime expires");
+  return { remnantType: ghost.type, corpseTimer, removedAfterExpiry: true };
 }
 
 function validateAllEnemyDeathsLeaveRemnants() {

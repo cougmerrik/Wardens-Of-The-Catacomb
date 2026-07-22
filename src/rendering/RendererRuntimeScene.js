@@ -167,7 +167,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       if (enemy.dormant) this.drawBreakable(game, { type: "box", size: enemy.size }, screenX, screenY);
       else this.drawMimic(enemy, screenX, screenY);
     } else {
-      this.drawGhost(enemy, screenX, screenY, enemy.size);
+      this.drawGhost(enemy, screenX, screenY, enemy.size, game.time);
     }
   }
 

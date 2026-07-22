@@ -187,7 +187,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
 - Floor boss encounters stop normal enemy spawning and armor-stand activations while the boss is active. After the boss dies, off-screen hostile enemies are silently removed, ambient spawning stays suppressed for `10s` or until the next floor, then resumes at half rate for the rest of that floor. Non-boss enemies killed after the floor boss dies do not drop loot.
 - Enemies now run through a tactics framework instead of only type-based chase logic.
 - Current enemy-tactics highlights:
-  - Ghosts orbit close to targets, maintain a purple siphon stream, and occasionally dive in for melee hits.
+  - Ghosts orbit close to targets, maintain a purple siphon stream, and occasionally dive in for melee hits. They appear as one of three stable pale-white or pale-green spectral silhouettes, use eight-direction hover/move/attack/siphon/hurt/death animation, and keep a 16 px solid collision core inside their larger translucent 44 px presentation.
   - Goblins progress through scared, feeding, and enraged phases as they eat gold.
   - Rat archers manage distance through retreat, hold, advance, and reposition phases.
   - Skeleton warriors collapse into bones, then either expire or telegraph a reanimation.
@@ -199,7 +199,7 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - hostile target fallback uses the nearest living player by distance instead of the first roster entry, and generic hostile enemies such as animated armor use the shared multiplayer-aware target selection
 - Slain hostile enemies leave timed, non-blocking body/remnant sprites. Bosses such as the minotaur also leave bodies while still completing boss progression, opening the portal, and clearing active boss targeting. Dead bodies render below drops and living enemies, do not push the player, and do not deal contact damage.
 - Dead bodies and collapsed remnants are not valid combat targets. Projectiles, melee checks, area effects, and direct damage routing skip slain enemies so corpse contact cannot consume projectiles, spawn hit effects, or create floating damage text.
-- Ghosts leave a floor-mist remnant instead of disappearing immediately. Skeleton warrior collapsed-body behavior remains non-blocking and is treated consistently with other death remnants.
+- Ghosts hold the final frame of their death animation as a non-blocking dead state for about 30 seconds, then disappear. They do not leave a separate floor-mist pool. Skeleton warrior collapsed-body behavior remains non-blocking and is treated consistently with other death remnants.
 - Shared enemy movement uses target-point pathing with corner-assist probes and blocked-move recovery. Necromancer boss summons, standard enemies, and other target-chasing enemies can recover from wall pinning through the common movement path, while enemy-specific behaviors such as minotaur charge recovery can still override or specialize movement.
 - The minotaur can destroy breakable boxes/crates by touching them, charging into them, or recovering from blocked movement against them. Blocked charges cancel into a sidestep recovery instead of staying pinned against collision.
 

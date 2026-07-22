@@ -13,7 +13,7 @@ The division of labor is deliberate:
 
 ## Pipeline Status
 
-- The workflow is a proposed `sprite-art/v0.1` baseline and has not yet been integrated into the runtime asset loader.
+- The workflow is a `sprite-art/v0.1` baseline. The ghost-family prototype is its first runtime-integrated asset; the knight example remains exploratory.
 - Wardens currently expects 128 px source frames, eight directions, six walk frames per direction, nearest-neighbor canvas rendering, a 44 px gameplay render size, and a nominal animation speed of 10 fps.
 - Use 64x64 px as the low-resolution Blender capture target, then upscale exactly 2x with nearest-neighbor sampling to the existing 128 px source-frame contract.
 - Idle, attack, hurt, and death sheet mappings are proposed and will require explicit runtime integration before replacing current presentation.
@@ -196,6 +196,74 @@ Do not paint unique structural corrections into only one frame when the same pro
 - Color, shadow, and silhouette passes share identical cells, pivots, and occupied-pixel alignment.
 - Native 44 px gameplay previews remain readable against catacomb lighting and floor values.
 - The runtime mapping is updated and validated before replacing an existing sprite implementation.
+
+## Wardens Ghost Family Prototype
+
+Use one related art family with three stable silhouette variants rather than relying on per-frame randomization:
+
+- Hollow Ghost (`hollow_ghost`): a hunched corpse spirit with a torn burial shroud, long arms, a hollow rib cavity, and a lower body that separates into trailing wisps. This is the common close-range drifter and preserves the existing orbit, siphon, and dive behavior.
+- Veiled Specter (`veiled_specter`): a taller, narrower apparition with a hood or veil, a recessed faceless cavity, and floating body bands. Its poses should read as quiet stalking followed by a sharp spectral-claw or dive attack.
+- Shackled Poltergeist (`shackled_poltergeist`): a compact, agitated spirit with broken restraints and separately rendered or runtime-composited debris. Keep orbiting chains, stones, bones, and pottery out of the body sheet when they need independent motion.
+
+All three variants use the same 64x64 capture size, 128x128 final cells, fixed contact pivot, eight-direction order, 10 fps presentation rate, and semantic palette roles. Select and serialize stable `ghostVariant` and `ghostPalette` values when runtime integration begins so local and multiplayer clients render the same appearance.
+
+### Ghost palette and alpha roles
+
+Use no more than eight semantic roles before Aseprite reduction:
+
+- cavity shadow
+- body shadow
+- body midtone
+- corpse-cyan highlight
+- shroud accent
+- soul-core midtone
+- soul-core highlight
+- controlled-undead accent
+
+Prepare `cold_haunt` and `malignant_haunt` mappings from one indexed semantic master per silhouette. Do not generate palette variety by repainting individual frames.
+
+Keep Blender color renders free of bloom, glare, and soft transparency gradients. Author crisp color and silhouette masters, a restrained indexed-alpha body treatment, and a separate tight glow pass around the eyes, soul core, and selected torn edges. The glow is sprite presentation only: default ghosts must not become world-light sources. Keep the shadow pass separate and use it as a faint contact mist rather than a solid living-character shadow.
+
+### Ghost action contract
+
+| Action | Frames | Loop | Intent |
+| --- | ---: | --- | --- |
+| Hover idle | 6 | Yes | asymmetric vertical drift with delayed shroud or band motion |
+| Float/move | 8 | Yes | directional locomotion with readable trailing secondary motion |
+| Primary attack | 8 | No | dive, spectral claw, or debris throw with anticipation and recovery |
+| Siphon/channel | 8 | Conditional | readable opening followed by a reusable unstable channel loop |
+| Hurt | 4 | No | fast silhouette distortion without moving the capture pivot |
+| Death | 10 | No | soul-core collapse whose final frame remains as the dead state for 30 seconds |
+
+For the poltergeist, keep an optional four-frame looping debris layer and six-frame projectile effect separate from the body action sheets. Record their attachment pivot and timing in the manifest.
+
+### Prototype gate
+
+Before producing the full eight-direction matrix, create front-facing `hover`, `move`, and `primary_attack` actions for all three silhouettes. Render color, shadow, silhouette, and glow passes at 64x64, then review both native frames and 44 px gameplay previews. Expand only silhouettes that retain distinct head, torso, trailing-body, and attack reads against representative catacomb floor and darkness values.
+
+### Front-facing prototype review
+
+The first headless prototype established three flat-shaded six-bone rigs and complete `6/8/8` hover, move, and primary-attack coverage at 10 fps. Evaluated triangle counts were 256 for Hollow Ghost, 268 for Veiled Specter, and 316 for Shackled Poltergeist, all below the 1,200-triangle family budget. The color, shadow, silhouette, and glow matrix contained all 264 expected 64x64 frames, and the corrected silhouette outputs used binary alpha.
+
+Native 64x64 and nearest-neighbor 44 px reviews retained the Hollow Ghost's torn multi-wisp read and the Poltergeist's broad debris-ringed read. The initial Veiled Specter primary-attack contact pose compressed into an overly abstract diamond at gameplay size. A source-first revision added asymmetric torso and veil rotation, a hooked striking arm, and a trailing arm; its anticipation, contact, and recovery poses then remained distinct at 44 px. All three front-facing silhouettes pass the initial action-read gate. Treat the current files as prototype evidence rather than runtime-ready sprite art; indexed-alpha cleanup and catacomb-background compositing remain open before eight-direction expansion.
+
+Catacomb compositing used the runtime floor palette and representative 15%, 65%, and 90% enemy-darkness overlays. Lifting the shared body-shadow, body-midtone, and shroud roles preserved variant identity through mid-falloff while a reduced tight glow left the surrounding floor unchanged. Near maximum darkness, only the soul-core presence remains intentionally readable. This is sprite presentation and does not add a world-light source.
+
+The approved full prototype uses runtime order `east`, `southeast`, `south`, `southwest`, `west`, `northwest`, `north`, `northeast` and all six actions at `6/8/8/8/4/10` frames. The first death pass folded into a hanging shape and the second broadened into a triangular tail; both were rejected. The accepted source action contracts every body axis into a small soul remnant at the fixed contact pivot. Runtime playtesting established that this final animation frame should itself remain as the non-blocking dead state for 30 seconds, with no procedural floor-mist handoff. A later validation found that death-scale channels could leak into actions that did not explicitly key scale, shrinking later-created rigs; the accepted `review10` source keys complete neutral location, rotation, and scale transforms before every action pose. Final headless coverage contained 4,224/4,224 color, shadow, silhouette, and glow frames. Occupied color, silhouette, and shadow frames had no edge clipping; empty glow frames are intentional rear/late-death occlusions. All checked hover, move, and siphon loop endpoints were non-duplicated.
+
+Raw review10 frames pack into 72 sheets: one sheet for each `variant × action × pass`, with eight direction rows and action-specific columns. Every 64x64 frame is scaled exactly 2x with nearest-neighbor sampling into a 128x128 cell. The accompanying raw manifest records direction order, frame counts, loop flags, hit frame, passes, pivot, presentation rate, and the zero world-light radius exception.
+
+Headless Aseprite conversion uses a nine-entry GPL palette: transparent index 0 plus the eight semantic ghost roles. Use no dithering. The automated review10 conversion preserved all raw alpha masks, dimensions, and at most nine palette entries across 72/72 sheets. Representative hover and death rows retained the cavity, body ramp, highlight clusters, silhouette identity, and soul-remnant contraction. The accepted review10 sheets were promoted as the first runtime visual pass after user review; an optional later Aseprite art-polish pass may improve isolated pixels, stair steps, overlaps, and intentional translucency without changing the runtime contract.
+
+Runtime integration lives in `src/rendering/ghostSpriteSheet.js` with permanent sheets under `assets/images/enemies/ghost_family/`. Spawned ghosts receive stable `ghostVariant`, `ghostPalette`, and randomized animation-phase fields. The authoritative simulation also records facing, action, action start time, animation phase, hurt timing, siphon state, and dive timing so network clients select the same row and animation without making every ghost loop in lockstep. The renderer composites separate shadow, semi-translucent color, and tight glow passes at 44 px with nearest-neighbor sampling and retains the procedural live ghost as an image-load fallback. The malignant palette is a deterministic sprite-only filter; neither palette contributes a world light.
+
+### Ghost-family lessons carried forward
+
+- Key neutral location, rotation, and scale on every controlled bone before action-specific poses. In the prototype, incomplete scale baselines allowed the death contraction to leak into later-created actions.
+- Blender 5.x action validation must traverse layered actions, strips, and channel bags; legacy direct F-curve assumptions can falsely report missing animation.
+- Native PNG inspection is insufficient for integration approval. Exercise representative frames through the real browser loader to catch stale sessions, asset-path failures, asynchronous fallback behavior, pass compositing, and runtime palette treatment.
+- Review the occupied opaque core separately from the full 128 px cell and 44 px presentation. Wisps and glow communicate silhouette but should not determine collision; playtesting reduced the ghost's solid core from 20 px to 16 px.
+- Headless Aseprite indexing is a valid reproducible baseline when dimensions, palette membership, alpha masks, and nearest-neighbor scaling pass. Manual cleanup remains valuable polish, but it need not block an explicitly accepted initial runtime pass.
 
 ## Recommended First Experiment
 

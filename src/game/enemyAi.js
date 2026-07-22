@@ -13,6 +13,13 @@ export { updateMinotaur } from "./enemyMinotaurAi.js";
 
 export { updateNecromancer, updateRatArcher, updateSkeleton, updateSkeletonWarrior, updateSonyaBoss, updateGolemBoss, updateShardling } from "./enemyAdvancedAi.js";
 
+function setGhostAction(game, enemy, action) {
+  if ((enemy.ghostHurtTimer || 0) > 0 && action !== "hurt") return;
+  if (enemy.ghostAction === action) return;
+  enemy.ghostAction = action;
+  enemy.ghostActionStartedAt = Number.isFinite(game?.time) ? game.time : 0;
+}
+
 export function updateGhost(game, enemy, dt, speedScale) {
   const ownerId = getEnemyAttackOwnerId(game, enemy);
   const friendly = isFriendlyToPlayer(game, enemy);
@@ -32,6 +39,9 @@ export function updateGhost(game, enemy, dt, speedScale) {
   const dist = vecLength(dx, dy) || 1;
   const dirX = dx / dist;
   const dirY = dy / dist;
+  enemy.dirX = dirX;
+  enemy.dirY = dirY;
+  if ((enemy.ghostHurtTimer || 0) > 0) setGhostAction(game, enemy, "hurt");
   const perpX = -dirY;
   const perpY = dirX;
   const preferredRange = Math.max(tile, (game.config.enemy.ghostPreferredRangeTiles || 2.8) * tile);
@@ -57,11 +67,17 @@ export function updateGhost(game, enemy, dt, speedScale) {
       enemy.diveTimer = Math.max(enemy.diveTimer || 0, 0.3);
       const holdDistance = Math.max(10, tile * 0.45);
       const anchorDist = vecLength(formationTarget.x - enemy.x, formationTarget.y - enemy.y);
-      if (anchorDist > holdDistance) moveEnemyTowardPoint(game, enemy, formationTarget, dt, Math.max(0.9, speedScale), holdDistance * 0.7);
+      if (anchorDist > holdDistance) {
+        setGhostAction(game, enemy, "move");
+        moveEnemyTowardPoint(game, enemy, formationTarget, dt, Math.max(0.9, speedScale), holdDistance * 0.7);
+      } else {
+        setGhostAction(game, enemy, "hover");
+      }
       return;
     }
     if (distToOwner > ownerLeash) {
       enemy.diveDuration = 0;
+      setGhostAction(game, enemy, "move");
       moveEnemyTowardPoint(game, enemy, formationTarget, dt, Math.max(1.05, speedScale), Math.max(10, tile * 0.35));
       return;
     }
@@ -85,6 +101,7 @@ export function updateGhost(game, enemy, dt, speedScale) {
 
   if (dist <= siphonRange) {
     enemy.siphoning = true;
+    setGhostAction(game, enemy, "siphon");
     game.fireZones.push({
       zoneType: "ghostSiphon",
       x: enemy.x,
@@ -106,6 +123,7 @@ export function updateGhost(game, enemy, dt, speedScale) {
   }
 
   if (enemy.diveDuration > 0) {
+    setGhostAction(game, enemy, "primary_attack");
     if (typeof game.setEnemyTacticPhase === "function") game.setEnemyTacticPhase(enemy, "dive");
     moveEnemyTowardPoint(game, enemy, target, dt, speedScale * 1.08, Math.max(0, diveAttackRange * 0.2));
     if (dist <= diveAttackRange && (enemy.contactAttackCooldown || 0) <= 0) {
@@ -126,6 +144,7 @@ export function updateGhost(game, enemy, dt, speedScale) {
   }
 
   if (dist < retreatRange) {
+    if (!enemy.siphoning) setGhostAction(game, enemy, "move");
     moveEnemyTowardPoint(game, enemy, { x: enemy.x - dirX * preferredRange, y: enemy.y - dirY * preferredRange }, dt, speedScale);
     return;
   }
@@ -134,9 +153,11 @@ export function updateGhost(game, enemy, dt, speedScale) {
   const orbitY = target.y - dirY * preferredRange + perpY * (enemy.orbitDir || 1) * preferredRange * 0.7;
   const orbitTarget = { x: orbitX, y: orbitY };
   if (dist > preferredRange * 1.22) {
+    setGhostAction(game, enemy, "move");
     moveEnemyTowardPoint(game, enemy, target, dt, speedScale * approachScale, preferredRange * 0.9);
     return;
   }
+  if (!enemy.siphoning) setGhostAction(game, enemy, "move");
   moveEnemyTowardPoint(game, enemy, orbitTarget, dt, speedScale * strafeScale);
 }
 
