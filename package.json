@@ -69,6 +69,7 @@
     "validate:network-floor-movement": "node server/validate-network-floor-movement.js",
     "validate:corpse-collision": "node server/validate-corpse-collision.js",
     "validate:enemy-pathing": "node server/validate-enemy-pathing.js",
+    "validate:ghost-sprites": "node server/validate-ghost-sprites.js",
     "validate:network-projectiles": "node server/validate-network-projectile-prediction.js",
     "validate:network-smoothness": "node server/validate-network-smoothness.js",
     "validate:network-rubberband-soak": "node server/validate-network-rubberband-soak.js",

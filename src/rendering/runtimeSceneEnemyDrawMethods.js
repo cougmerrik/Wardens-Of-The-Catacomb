@@ -2,6 +2,7 @@ import { runtimeSceneBossDrawMethods } from "./runtimeSceneBossDrawMethods.js";
 import { runtimeSceneEnemyCorpseDrawMethods } from "./runtimeSceneEnemyCorpseDrawMethods.js";
 
 import { runtimeSceneWolfDrawMethods } from "./runtimeSceneWolfDrawMethods.js";
+import { drawGhostSprite } from "./ghostSpriteSheet.js";
 
 function hexToRgba(color, alpha) {
   if (typeof color !== "string") return `rgba(158, 184, 255, ${alpha})`;
@@ -61,36 +62,19 @@ export const runtimeSceneEnemyDrawMethods = {
     ctx.restore();
   },
 
-  drawGhost(enemyOrScreenX, maybeScreenX, maybeScreenY, maybeSize) {
+  drawGhost(enemyOrScreenX, maybeScreenX, maybeScreenY, maybeSize, maybeTime = 0) {
     const ctx = this.ctx;
     const enemy = typeof enemyOrScreenX === "object" && enemyOrScreenX !== null ? enemyOrScreenX : null;
     const screenX = enemy ? maybeScreenX : enemyOrScreenX;
     const screenY = enemy ? maybeScreenY : maybeScreenX;
     const size = enemy ? maybeSize : maybeScreenY;
+    if (enemy && drawGhostSprite(ctx, enemy, screenX, screenY, maybeTime)) return;
+    if (enemy && (enemy.hp || 0) <= 0) return;
     const half = size / 2;
     const headRadius = half * 0.58;
     const bodyTop = screenY - size * 0.12;
     const bodyBottom = screenY + half;
     const controlledPalette = getControlledUndeadPalette(enemy);
-    if (enemy && (enemy.hp || 0) <= 0) {
-      const fade = Math.max(0.28, Math.min(1, (Number.isFinite(enemy.corpseTimer) ? enemy.corpseTimer : 4) / 12));
-      ctx.fillStyle = `rgba(23, 29, 42, ${0.34 * fade})`;
-      ctx.beginPath();
-      ctx.ellipse(screenX, screenY + half * 0.62, half * 1.08, half * 0.34, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = `rgba(190, 232, 255, ${0.42 * fade})`;
-      ctx.beginPath();
-      ctx.ellipse(screenX, screenY + half * 0.45, half * 0.84, half * 0.22, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = `rgba(120, 208, 255, ${0.36 * fade})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(screenX - half * 0.55, screenY + half * 0.43);
-      ctx.quadraticCurveTo(screenX - half * 0.12, screenY + half * 0.18, screenX + half * 0.42, screenY + half * 0.38);
-      ctx.stroke();
-      return;
-    }
-
     ctx.fillStyle = enemy?.isControlledUndead ? controlledPalette.fillStrong : "#d8f2ff";
     ctx.beginPath();
     ctx.arc(screenX, screenY - size * 0.2, headRadius, Math.PI, 0);

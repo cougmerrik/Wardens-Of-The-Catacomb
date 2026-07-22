@@ -26,7 +26,7 @@ export const runtimeSceneEnemyCorpseDrawMethods = {
     const duration = enemy?.isBoss || enemy?.isFloorBoss ? 18 : 12;
     const fade = Math.max(0.34, Math.min(1, (Number.isFinite(enemy?.corpseTimer) ? enemy.corpseTimer : duration) / duration));
     if (enemy?.type === "ghost") {
-      this.drawGhost(enemy, screenX, screenY, size);
+      this.drawGhost(enemy, screenX, screenY, size, time);
       return;
     }
 

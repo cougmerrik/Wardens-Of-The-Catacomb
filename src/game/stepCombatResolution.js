@@ -30,7 +30,7 @@ export function resolveCombatAndDrops({
     enemy.deathProcessed = true;
     enemy.slowTimer = 0;
     enemy.slowPct = 0;
-    const corpseDuration = enemy.isBoss || enemy.isFloorBoss ? 18 : 12;
+    const corpseDuration = enemy.type === "ghost" ? 30 : enemy.isBoss || enemy.isFloorBoss ? 18 : 12;
     enemy.corpseTimer = Math.max(Number.isFinite(enemy.corpseTimer) ? enemy.corpseTimer : 0, corpseDuration);
     return true;
   };

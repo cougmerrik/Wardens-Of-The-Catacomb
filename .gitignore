@@ -34,6 +34,8 @@ data/leaderboard.json
 .agents/skills/*
 !.agents/skills/blender-mcp/
 !.agents/skills/blender-mcp/**
+!.agents/skills/prepare-branch-closeout/
+!.agents/skills/prepare-branch-closeout/**
 !.agents/skills/wardens-blender-environment-art/
 !.agents/skills/wardens-blender-environment-art/**
 !.agents/skills/wardens-blender-sprite-art/
