@@ -1,0 +1,4 @@
+interface:
+  display_name: "Push Git Branch"
+  short_description: "Safely push and verify the current branch"
+  default_prompt: "Use $gh-push-branch to push the current validated branch to its matching remote branch."

@@ -36,6 +36,8 @@ data/leaderboard.json
 !.agents/skills/blender-mcp/**
 !.agents/skills/gh-run-pr-review/
 !.agents/skills/gh-run-pr-review/**
+!.agents/skills/gh-push-branch/
+!.agents/skills/gh-push-branch/**
 !.agents/skills/prepare-branch-closeout/
 !.agents/skills/prepare-branch-closeout/**
 !.agents/skills/wardens-blender-environment-art/
