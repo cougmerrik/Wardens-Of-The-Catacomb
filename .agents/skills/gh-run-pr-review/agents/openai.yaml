@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run GitHub PR Review"
+  short_description: "Dispatch and monitor automated PR review"
+  default_prompt: "Use $gh-run-pr-review to dispatch the repository's automated review workflow for the current pull request."
