@@ -1,3 +1,5 @@
+import { drawMinotaurBossSprite } from "./minotaurBossSpriteSheet.js";
+
 export const runtimeSceneBossDrawMethods = {
   drawLeprechaunPot(screenX, screenY, time = 0) {
     const ctx = this.ctx;
@@ -217,7 +219,8 @@ export const runtimeSceneBossDrawMethods = {
     ctx.stroke();
   },
 
-  drawMinotaur(enemy, screenX, screenY) {
+  drawMinotaur(enemy, screenX, screenY, time = 0) {
+    if (drawMinotaurBossSprite(this.ctx, { time }, enemy, screenX, screenY)) return;
     const ctx = this.ctx;
     const half = enemy.size * 0.5;
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();

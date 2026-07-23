@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "asset": "minotaur_boss",
+  "source": "Blender-to-Aseprite sprite pipeline",
+  "seed": 2607,
+  "triangleBudget": 9000,
+  "frame": { "width": 128, "height": 128 },
+  "directionRows": ["E", "SE", "S", "SW", "W", "NW", "N", "NE"],
+  "variants": [
+    { "variant": "normal", "condition": "hpRatio > 0.5" },
+    { "variant": "damaged", "condition": "hpRatio <= 0.5", "details": ["cuts", "blood streaks", "broken left horn"] }
+  ],
+  "actions": [
+    { "action": "idle", "frames": 4, "loop": true, "durationMs": 100 },
+    { "action": "walk", "frames": 6, "loop": true, "durationMs": 100 },
+    { "action": "windup", "frames": 4, "loop": true, "durationMs": 100 },
+    { "action": "charge", "frames": 4, "loop": true, "durationMs": 100 },
+    { "action": "stomp", "frames": 6, "loop": false, "durationMs": 100 },
+    { "action": "triumph", "frames": 6, "loop": false, "durationMs": 100 },
+    { "action": "death", "frames": 8, "loop": false, "durationMs": 100 }
+  ],
+  "outputs": {
+    "blend": "minotaur_boss.generated.blend",
+    "report": "minotaur_boss.build-report.json"
+  },
+  "visual": {
+    "body": "bulky massive muscular minotaur",
+    "expression": "angry red-eyed bull head",
+    "horns": "huge horns, damaged variant has one broken horn",
+    "special": ["foot stamp before charge", "lowered head while charging", "head roll triumph after killing a player", "collapse death"]
+  }
+}

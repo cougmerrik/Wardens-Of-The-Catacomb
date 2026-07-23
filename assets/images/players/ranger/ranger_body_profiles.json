@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "asset": "ranger_body_profiles",
+  "source": "Blender-to-Aseprite accepted 3D-to-2D body-sheet contract",
+  "character": "elven female ranger",
+  "frame": {
+    "width": 128,
+    "height": 128
+  },
+  "directions": [
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE"
+  ],
+  "framesPerDirection": 6,
+  "pivot": {
+    "x": 64,
+    "y": 101
+  },
+  "profiles": [
+    {
+      "key": "default",
+      "path": null,
+      "output": "ranger_default_walk_8dir_6f.png",
+      "weaponPolicy": "runtime weapon rigs are drawn separately for longbow, throwingKnives, twinDaggers, and rapierPistol",
+      "tintPolicy": "runtime path tint/filter/status overlays remain applied after body sheet selection"
+    },
+    {
+      "key": "rangerPath",
+      "path": "rangerPath",
+      "output": "ranger_path_fire_walk_8dir_6f.png",
+      "weaponPolicy": "runtime weapon rigs are drawn separately for longbow, throwingKnives, twinDaggers, and rapierPistol",
+      "tintPolicy": "runtime path tint/filter/status overlays remain applied after body sheet selection"
+    },
+    {
+      "key": "roguePath",
+      "path": "roguePath",
+      "output": "ranger_path_rogue_walk_8dir_6f.png",
+      "weaponPolicy": "runtime weapon rigs are drawn separately for longbow, throwingKnives, twinDaggers, and rapierPistol",
+      "tintPolicy": "runtime path tint/filter/status overlays remain applied after body sheet selection"
+    },
+    {
+      "key": "assassinPath",
+      "path": "assassinPath",
+      "output": "ranger_path_assassin_walk_8dir_6f.png",
+      "weaponPolicy": "runtime weapon rigs are drawn separately for longbow, throwingKnives, twinDaggers, and rapierPistol",
+      "tintPolicy": "runtime path tint/filter/status overlays remain applied after body sheet selection"
+    },
+    {
+      "key": "beastMasterPath",
+      "path": "beastMasterPath",
+      "output": "ranger_path_beast_walk_8dir_6f.png",
+      "weaponPolicy": "runtime weapon rigs are drawn separately for longbow, throwingKnives, twinDaggers, and rapierPistol",
+      "tintPolicy": "runtime path tint/filter/status overlays remain applied after body sheet selection"
+    }
+  ]
+}

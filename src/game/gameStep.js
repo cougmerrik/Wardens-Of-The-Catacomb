@@ -601,9 +601,9 @@ export function stepGame(game, dt, controls = {}) {
     if ((enemy.exposeTimer || 0) <= 0) enemy.exposePct = 0;
     enemy.arcaneMarkTimer = Math.max(0, (Number.isFinite(enemy.arcaneMarkTimer) ? enemy.arcaneMarkTimer : 0) - dt);
     enemy.hpBarTimer = Math.max(0, (enemy.hpBarTimer || 0) - dt);
-    enemy.ghostHurtTimer = Math.max(0, (enemy.ghostHurtTimer || 0) - dt);
     enemy.damageTextTimer = Math.max(0, (enemy.damageTextTimer || 0) - dt);
     enemy.damageBuffTimer = Math.max(0, (enemy.damageBuffTimer || 0) - dt);
+    enemy.triumphTimer = Math.max(0, (Number.isFinite(enemy.triumphTimer) ? enemy.triumphTimer : 0) - dt);
     enemy.corpseTimer = Math.max(0, (Number.isFinite(enemy.corpseTimer) ? enemy.corpseTimer : 0) - dt);
     const alwaysActiveBoss = !!enemy?.isFloorBoss && (typeof game.isFloorBossActive !== "function" || game.isFloorBossActive());
     if (!alwaysActiveBoss && !isActive(enemy, 72)) continue;

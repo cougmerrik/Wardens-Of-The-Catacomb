@@ -147,7 +147,8 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
   }
 
   drawSceneEnemyBody(game, enemy, screenX, screenY) {
-    if ((enemy.hp || 0) <= 0) this.drawEnemyCorpse(enemy, screenX, screenY, game.time);
+    if ((enemy.hp || 0) <= 0 && enemy.type === "minotaur") this.drawMinotaur(enemy, screenX, screenY, game.time);
+    else if ((enemy.hp || 0) <= 0) this.drawEnemyCorpse(enemy, screenX, screenY, game.time);
     else if (enemy.type === "goblin") this.drawTreasureGoblin(enemy, screenX, screenY);
     else if (enemy.type === "armor") this.drawAnimatedArmor(game, enemy, screenX, screenY);
     else if (enemy.type === "mummy") this.drawMummy(enemy, screenX, screenY);
@@ -157,7 +158,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
     else if (enemy.type === "sonya") this.drawSonyaBoss(enemy, screenX, screenY, game.time);
     else if (enemy.type === "necromancer") this.drawNecromancer(enemy, screenX, screenY);
     else if (enemy.type === "leprechaun") this.drawLeprechaunBoss(enemy, screenX, screenY);
-    else if (enemy.type === "minotaur") this.drawMinotaur(enemy, screenX, screenY);
+    else if (enemy.type === "minotaur") this.drawMinotaur(enemy, screenX, screenY, game.time);
     else if (enemy.type === "golem") this.drawGolemBoss(enemy, screenX, screenY, game.time);
     else if (enemy.type === "shardling") this.drawShardling(enemy, screenX, screenY, game.time);
     else if (enemy.type === "wolf") this.drawWolf(enemy, screenX, screenY, game.time);
@@ -167,7 +168,7 @@ export class RendererRuntimeScene extends RendererRuntimeBase {
       if (enemy.dormant) this.drawBreakable(game, { type: "box", size: enemy.size }, screenX, screenY);
       else this.drawMimic(enemy, screenX, screenY);
     } else {
-      this.drawGhost(enemy, screenX, screenY, enemy.size, game.time);
+      this.drawGhost(enemy, screenX, screenY, enemy.size);
     }
   }
 

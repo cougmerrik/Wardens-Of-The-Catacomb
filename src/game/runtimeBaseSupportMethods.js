@@ -741,6 +741,7 @@ export const runtimeBaseSupportMethods = {
       }
     }
     if (entity.health <= 0) {
+      if (source?.type === "minotaur") source.triumphTimer = Math.max(source.triumphTimer || 0, 1.2);
       if (source?.bossVariant === "sonya") this.gameOverTitle = "Haley Wins";
       this.handlePlayerEntityDeath(entity);
     }

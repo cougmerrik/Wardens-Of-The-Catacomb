@@ -1,0 +1,234 @@
+{
+  "asset": "minotaur_boss",
+  "blend": "minotaur_boss.generated.blend",
+  "modeling": "low-poly 3D primitives",
+  "frameWidth": 128,
+  "frameHeight": 128,
+  "directionRows": [
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE"
+  ],
+  "variants": [
+    "normal",
+    "damaged"
+  ],
+  "actions": [
+    {
+      "action": "idle",
+      "frames": 4,
+      "loop": true,
+      "durationMs": 100
+    },
+    {
+      "action": "walk",
+      "frames": 6,
+      "loop": true,
+      "durationMs": 100
+    },
+    {
+      "action": "windup",
+      "frames": 4,
+      "loop": true,
+      "durationMs": 100
+    },
+    {
+      "action": "charge",
+      "frames": 4,
+      "loop": true,
+      "durationMs": 100
+    },
+    {
+      "action": "stomp",
+      "frames": 6,
+      "loop": false,
+      "durationMs": 100
+    },
+    {
+      "action": "triumph",
+      "frames": 6,
+      "loop": false,
+      "durationMs": 100
+    },
+    {
+      "action": "death",
+      "frames": 8,
+      "loop": false,
+      "durationMs": 100
+    }
+  ],
+  "atlas": {
+    "file": null,
+    "directRawSheets": true,
+    "sheets": [
+      {
+        "variant": "normal",
+        "action": "idle",
+        "frames": 4,
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 1024,
+        "rawFile": "raw_minotaur_normal_idle_8dir_4f.png",
+        "triangles": 768
+      },
+      {
+        "variant": "normal",
+        "action": "walk",
+        "frames": 6,
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 1024,
+        "rawFile": "raw_minotaur_normal_walk_8dir_6f.png",
+        "triangles": 768
+      },
+      {
+        "variant": "normal",
+        "action": "windup",
+        "frames": 4,
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 1024,
+        "rawFile": "raw_minotaur_normal_windup_8dir_4f.png",
+        "triangles": 832
+      },
+      {
+        "variant": "normal",
+        "action": "charge",
+        "frames": 4,
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 1024,
+        "rawFile": "raw_minotaur_normal_charge_8dir_4f.png",
+        "triangles": 832
+      },
+      {
+        "variant": "normal",
+        "action": "stomp",
+        "frames": 6,
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 1024,
+        "rawFile": "raw_minotaur_normal_stomp_8dir_6f.png",
+        "triangles": 811
+      },
+      {
+        "variant": "normal",
+        "action": "triumph",
+        "frames": 6,
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 1024,
+        "rawFile": "raw_minotaur_normal_triumph_8dir_6f.png",
+        "triangles": 784
+      },
+      {
+        "variant": "normal",
+        "action": "death",
+        "frames": 8,
+        "x": 0,
+        "y": 0,
+        "width": 1024,
+        "height": 1024,
+        "rawFile": "raw_minotaur_normal_death_8dir_8f.png",
+        "triangles": 661
+      },
+      {
+        "variant": "damaged",
+        "action": "idle",
+        "frames": 4,
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 1024,
+        "rawFile": "raw_minotaur_damaged_idle_8dir_4f.png",
+        "triangles": 840
+      },
+      {
+        "variant": "damaged",
+        "action": "walk",
+        "frames": 6,
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 1024,
+        "rawFile": "raw_minotaur_damaged_walk_8dir_6f.png",
+        "triangles": 840
+      },
+      {
+        "variant": "damaged",
+        "action": "windup",
+        "frames": 4,
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 1024,
+        "rawFile": "raw_minotaur_damaged_windup_8dir_4f.png",
+        "triangles": 904
+      },
+      {
+        "variant": "damaged",
+        "action": "charge",
+        "frames": 4,
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 1024,
+        "rawFile": "raw_minotaur_damaged_charge_8dir_4f.png",
+        "triangles": 904
+      },
+      {
+        "variant": "damaged",
+        "action": "stomp",
+        "frames": 6,
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 1024,
+        "rawFile": "raw_minotaur_damaged_stomp_8dir_6f.png",
+        "triangles": 883
+      },
+      {
+        "variant": "damaged",
+        "action": "triumph",
+        "frames": 6,
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 1024,
+        "rawFile": "raw_minotaur_damaged_triumph_8dir_6f.png",
+        "triangles": 856
+      },
+      {
+        "variant": "damaged",
+        "action": "death",
+        "frames": 8,
+        "x": 0,
+        "y": 0,
+        "width": 1024,
+        "height": 1024,
+        "rawFile": "raw_minotaur_damaged_death_8dir_8f.png",
+        "triangles": 685
+      }
+    ]
+  },
+  "triangles": 904,
+  "triangleBudget": 9000,
+  "flatShaded": true,
+  "renderEngine": "BLENDER_WORKBENCH",
+  "camera": {
+    "type": "ORTHO",
+    "sourceFrame": "128x128",
+    "directionMode": "rotated 3D model per declared direction row"
+  }
+}

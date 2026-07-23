@@ -105,6 +105,10 @@ This document summarizes the current high-level architecture and validation work
   - `npm run validate:corpse-collision` verifies corpses/remnants are skipped by projectile collision, special projectile collision, and direct enemy damage so dead bodies cannot emit damage text or consume hits.
   - `npm run validate:player-healthbar` validates compact local player health-bar rendering and temp-HP-only extension behavior.
 
+## Blender/Aseprite Sprite Sources
+- The minotaur boss is authored through the Blender-to-Aseprite pipeline instead of an inline canvas/SVG generator. `Tools/Art/minotaur-boss.asset.json`, `Tools/Art/generate_minotaur_boss.py`, `Tools/Art/compose_minotaur_boss.lua`, and `Tools/Art/build-minotaur-boss.js` build a low-poly 3D primitive model, render direct eight-direction raw sheets, produce the `.blend`, create editable `.aseprite` masters, and promote runtime PNGs. Source outputs live under `art/blender/minotaur_boss/` and `art/aseprite/minotaur_boss/`; runtime sheets and the copied manifest live under `assets/images/enemies/minotaur/`. `npm run validate:minotaur-sprites` checks the runtime contract, source artifacts, damaged variant, action selection, and network serialization fields.
+- The default armor presentation uses deterministic generated statue sheets from `Tools/Art/generate-statue-enemy-sheets.js`, loaded by `src/rendering/statueEnemySpriteSheet.js` for armor stands and awakened armor enemies. Sewer-specific armor variants keep their procedural pool/gel visuals. `npm run validate:statue-enemy-sprites` checks the generated manifest, dimensions, direction/action coverage, and renderer constants.
+
 ## Dynamic Lighting Architecture
 - Lighting gameplay state is stored on `game.lightSources` and reset during floor generation.
 - Runtime lighting helpers live in `src/game/world/lighting.js` and are mixed into `GameRuntimeWorld`:
