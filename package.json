@@ -6,8 +6,13 @@
   "scripts": {
     "build": "node scripts/build-runtime-config.js",
     "art:brazier": "node Tools/Art/build-catacomb-brazier.js",
+    "art:minotaur": "node Tools/Art/build-minotaur-boss.js --promote",
+    "art:statue": "node Tools/Art/generate-statue-enemy-sheets.js",
     "validate:art:brazier:manifest": "node Tools/Art/validate-brazier-pipeline.js --manifest-only",
     "validate:art:brazier": "node Tools/Art/build-catacomb-brazier.js",
+    "validate:art:minotaur:manifest": "node Tools/Art/validate-minotaur-pipeline.js --manifest-only",
+    "validate:minotaur-sprites": "node server/validate-minotaur-sprites.js",
+    "validate:statue-enemy-sprites": "node server/validate-statue-enemy-sprites.js",
     "build:android:web": "node scripts/prepare-capacitor-web.js",
     "cap:sync:android": "npm run build:android:web && npx cap sync android",
     "android:gradle": "node scripts/run-android-gradle.js",

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "asset": "statue_enemy",
+  "source": "Blender-to-Aseprite accepted sprite contract",
+  "frame": {
+    "width": 128,
+    "height": 128
+  },
+  "directionRows": [
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE"
+  ],
+  "actions": [
+    {
+      "action": "dormant",
+      "frames": 1,
+      "loop": false
+    },
+    {
+      "action": "idle",
+      "frames": 4,
+      "loop": true
+    },
+    {
+      "action": "walk",
+      "frames": 6,
+      "loop": true
+    },
+    {
+      "action": "attack",
+      "frames": 6,
+      "loop": false
+    },
+    {
+      "action": "hurt",
+      "frames": 4,
+      "loop": false
+    },
+    {
+      "action": "death",
+      "frames": 8,
+      "loop": false
+    }
+  ],
+  "visual": {
+    "body": "grey flat-shaded statue",
+    "eyes": "red",
+    "weapon": "spear"
+  }
+}

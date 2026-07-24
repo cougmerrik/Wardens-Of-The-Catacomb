@@ -203,6 +203,21 @@ export function serializeEnemy(room, e) {
       base.tongueDirY = e.tongueDirY;
       base.tongueLength = e.tongueLength || 0;
       break;
+    case "minotaur":
+      copyFiniteFields(base, e, ["dirX", "dirY", "lastX", "lastY"]);
+      base.chargeTimer = e.chargeTimer || 0;
+      base.chargeWindupTimer = e.chargeWindupTimer || 0;
+      base.chargeDirX = e.chargeDirX || 0;
+      base.chargeDirY = e.chargeDirY || 0;
+      base.triumphTimer = e.triumphTimer || 0;
+      if (e.tactics && typeof e.tactics === "object") {
+        base.tactics = {
+          key: e.tactics.key || "minotaur",
+          phase: e.tactics.phase || "default",
+          phaseTime: e.tactics.phaseTime || 0
+        };
+      }
+      break;
     default:
       break;
   }

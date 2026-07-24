@@ -116,6 +116,13 @@ Higher-floor dev starts now use room-centered spawn selection instead of arbitra
   - flooded hall tiles slow player movement by `20%`
   - room pools are visual decals only, though some pool tiles hide disguised cube enemies
 
+## Enemy Presentation
+
+- Default armor stands and awakened armor enemies still use the gameplay/network type `armor`, but their default renderer now draws generated statue sprite sheets from `assets/images/enemies/statue/`.
+- The accepted statue presentation is a grey flat-shaded statue with red eyes and a spear. The renderer keeps the old procedural armor drawing as a load fallback and keeps sewer biome `sewer_pool` / `gel_cube` variants on their biome-specific procedural visuals.
+- `npm run art:statue` regenerates the deterministic accepted sheets, and `npm run validate:statue-enemy-sprites` verifies the sheet dimensions, direction rows, frame counts, visual manifest, and renderer constants.
+- The minotaur boss uses generated 8-direction sheets from `assets/images/enemies/minotaur/` for idle, walk, windup, charge, stomp, triumph, and death. At `50%` health or lower the renderer switches to a damaged variant with cuts and a broken horn. Charge windup shows foot stamping, active charge lowers the head, lethal player hits trigger a short head-roll triumph, and death uses a collapse sheet while preserving the existing boss collision and corpse timing.
+
 ## Dynamic Lighting
 - Dungeon floors render with ambient darkness by default, but unlit areas are never fully black. Figures and nearby shapes remain faintly readable outside direct light.
 - Light falloff is gradual:

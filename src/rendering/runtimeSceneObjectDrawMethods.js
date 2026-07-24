@@ -1,4 +1,5 @@
 import { drawBrazierSprite } from "./brazierSpriteSheet.js";
+import { drawStatueArmorStandSprite, drawStatueEnemySprite } from "./statueEnemySpriteSheet.js";
 
 export const runtimeSceneObjectDrawMethods = {
   drawTorch(game, torch, screenX, screenY) {
@@ -91,6 +92,7 @@ export const runtimeSceneObjectDrawMethods = {
       }
       return;
     }
+    if (drawStatueArmorStandSprite(ctx, game, stand, screenX, screenY)) return;
     const half = stand.size / 2;
     ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
     ctx.beginPath();
@@ -180,6 +182,7 @@ export const runtimeSceneObjectDrawMethods = {
       ctx.fillRect(screenX + 2, screenY - 3, 2, 2);
       return;
     }
+    if (drawStatueEnemySprite(ctx, game, enemy, screenX, screenY)) return;
     const half = enemy.size / 2;
     ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
     ctx.beginPath();

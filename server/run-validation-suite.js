@@ -22,6 +22,8 @@ const SCRIPT_TARGETS = {
   "validate:gameplay-tips": "server/validate-gameplay-tips.js",
   "validate:player-death-healing": "server/validate-player-death-healing.js",
   "validate:ranger-floor-persistence": "server/validate-ranger-floor-persistence.js",
+  "validate:minotaur-sprites": "server/validate-minotaur-sprites.js",
+  "validate:statue-enemy-sprites": "server/validate-statue-enemy-sprites.js",
   "validate:dev-start": "server/validate-dev-start.js",
   "validate:music-sync": "server/validate-music-sync.js",
   "validate:loc": "server/validate-loc.js",
@@ -62,7 +64,7 @@ const SCRIPT_TARGETS = {
 };
 
 const SUITES = {
-  core: ["check", "validate:music-sync", "validate:loc"],
+  core: ["check", "validate:music-sync", "validate:minotaur-sprites", "validate:statue-enemy-sprites", "validate:loc"],
   gameplay: ["validate:boss", "validate:spawn-scale", "validate:xp-pacing", "validate:tactics", "validate:minotaur", "validate:solo-xp", "validate:skill-refund", "validate:skill-popup", "validate:consumables-economy", "validate:consumable-oils", "validate:gameplay-tips", "validate:player-death-healing", "validate:ranger-floor-persistence", "validate:dev-start"],
   lighting: [
     "validate:lighting-state",
