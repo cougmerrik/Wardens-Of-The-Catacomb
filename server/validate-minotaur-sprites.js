@@ -84,6 +84,10 @@ const enemy = {
   isFloorBoss: true,
   x: 64,
   y: 96,
+  lastX: 62,
+  lastY: 96,
+  dirX: 0,
+  dirY: -1,
   size: 34,
   hp: 40,
   maxHp: 100,
@@ -119,6 +123,10 @@ const state = serializeState({
   },
 });
 const serializedMinotaur = state.enemies.find((entry) => entry.type === "minotaur");
+assert.equal(serializedMinotaur.dirX, enemy.dirX, "network state should preserve zero-valued minotaur facing");
+assert.equal(serializedMinotaur.dirY, enemy.dirY, "network state should preserve minotaur facing");
+assert.equal(serializedMinotaur.lastX, enemy.lastX, "network state should preserve minotaur horizontal movement");
+assert.equal(serializedMinotaur.lastY, enemy.lastY, "network state should preserve minotaur vertical movement");
 assert.equal(serializedMinotaur.chargeTimer, enemy.chargeTimer);
 assert.equal(serializedMinotaur.chargeWindupTimer, enemy.chargeWindupTimer);
 assert.equal(serializedMinotaur.chargeDirX, enemy.chargeDirX);

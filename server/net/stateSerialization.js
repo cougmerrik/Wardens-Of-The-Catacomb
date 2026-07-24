@@ -192,6 +192,7 @@ function serializeEnemy(room, e) {
       base.tongueLength = e.tongueLength || 0;
       break;
     case "minotaur":
+      copyFiniteFields(base, e, ["dirX", "dirY", "lastX", "lastY"]);
       base.chargeTimer = e.chargeTimer || 0;
       base.chargeWindupTimer = e.chargeWindupTimer || 0;
       base.chargeDirX = e.chargeDirX || 0;
