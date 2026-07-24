@@ -32,6 +32,14 @@ export function getStatueEnemyDirectionIndex(dirX = 1, dirY = 0) {
   return (Math.round(angle / (Math.PI / 4)) + 8) % 8;
 }
 
+export function getStatueEnemyFrameIndex(action, elapsedTime = 0) {
+  const sheet = STATUE_ENEMY_SHEETS[action] || STATUE_ENEMY_SHEETS.idle;
+  const elapsedFrames = Math.floor(Math.max(0, elapsedTime) * FPS);
+  return sheet.loop
+    ? elapsedFrames % sheet.frames
+    : Math.min(sheet.frames - 1, elapsedFrames);
+}
+
 function getEnemyMotionVector(enemy) {
   const moveX = Number.isFinite(enemy?.x) && Number.isFinite(enemy?.lastX) ? enemy.x - enemy.lastX : 0;
   const moveY = Number.isFinite(enemy?.y) && Number.isFinite(enemy?.lastY) ? enemy.y - enemy.lastY : 0;
@@ -113,10 +121,7 @@ export function drawStatueEnemySprite(ctx, game, enemy, screenX, screenY) {
   if (enemy?.variant) return false;
   const motion = getEnemyMotionVector(enemy);
   const action = getEnemyAction(enemy);
-  const sheet = STATUE_ENEMY_SHEETS[action] || STATUE_ENEMY_SHEETS.idle;
-  const frame = sheet.loop
-    ? Math.floor(Math.max(0, game?.time || 0) * FPS) % sheet.frames
-    : Math.min(sheet.frames - 1, Math.floor(Math.max(0, game?.time || 0) * FPS) % sheet.frames);
+  const frame = getStatueEnemyFrameIndex(action, game?.time || 0);
   const directionIndex = getStatueEnemyDirectionIndex(motion.x, motion.y);
   const size = Number.isFinite(enemy?.size) ? enemy.size : 24;
   const renderSize = Math.max(44, Math.round(size * 2.05));

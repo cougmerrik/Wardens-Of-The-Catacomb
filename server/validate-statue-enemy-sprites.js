@@ -10,6 +10,7 @@ import {
   drawStatueArmorStandSprite,
   drawStatueEnemySprite,
   getStatueEnemyDirectionIndex,
+  getStatueEnemyFrameIndex,
 } from "../src/rendering/statueEnemySpriteSheet.js";
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -50,6 +51,12 @@ assert.equal(getStatueEnemyDirectionIndex(Math.SQRT1_2, Math.SQRT1_2), 1);
 assert.equal(getStatueEnemyDirectionIndex(0, 1), 2);
 assert.equal(getStatueEnemyDirectionIndex(-1, 0), 4);
 assert.equal(getStatueEnemyDirectionIndex(0, -1), 6);
+
+assert.equal(getStatueEnemyFrameIndex("idle", 0.4), 0, "looping actions should wrap");
+assert.equal(getStatueEnemyFrameIndex("hurt", 0.2), 2, "non-looping actions should advance");
+assert.equal(getStatueEnemyFrameIndex("hurt", 0.4), 3, "non-looping actions should stop on the final frame");
+assert.equal(getStatueEnemyFrameIndex("hurt", 10), 3, "non-looping actions should not wrap");
+assert.equal(getStatueEnemyFrameIndex("death", 10), 7, "death should remain on the final frame");
 
 function createRecordingContext() {
   return {
