@@ -124,7 +124,7 @@ function serializeFloatingTextEvent(event) {
   };
 }
 
-function serializeEnemy(room, e) {
+export function serializeEnemy(room, e) {
   const base = {
     id: getStableId(room, "enemy", "e", e),
     type: e.type,
@@ -170,6 +170,18 @@ function serializeEnemy(room, e) {
   const controlledColor = resolveControlledEnemyColor(room, e);
   if (controlledColor) base.controlledColor = controlledColor;
   switch (e.type) {
+    case "ghost":
+      base.ghostVariant = e.ghostVariant;
+      base.ghostPalette = e.ghostPalette;
+      base.ghostAction = e.ghostAction;
+      base.ghostActionStartedAt = e.ghostActionStartedAt || 0;
+      base.ghostAnimationPhase = Number.isFinite(e.ghostAnimationPhase) ? e.ghostAnimationPhase : 0;
+      base.ghostHurtTimer = e.ghostHurtTimer || 0;
+      base.dirX = e.dirX;
+      base.dirY = e.dirY;
+      base.siphoning = !!e.siphoning;
+      base.diveDuration = e.diveDuration || 0;
+      break;
     case "rat_archer":
       base.dirX = e.dirX;
       base.dirY = e.dirY;
